@@ -37,7 +37,7 @@ app = Flask(__name__,
            static_folder='static')
 app.config['SECRET_KEY'] = 'your-secret-key-change-this'
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Global bot reference (will be set by main.py)
 _bot_instance = None
