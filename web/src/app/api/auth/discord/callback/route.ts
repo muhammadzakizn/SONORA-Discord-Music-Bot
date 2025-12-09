@@ -24,10 +24,15 @@ export async function GET(request: NextRequest) {
         // Exchange code for access token
         const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || '1443855259536461928';
         const clientSecret = process.env.DISCORD_CLIENT_SECRET;
-        const redirectUri = `${new URL(request.url).origin}/api/auth/discord/callback`;
+        
+        // Use NEXT_PUBLIC_APP_URL for the redirect URI (for server deployment with public domain)
+        // Fallback to request.url.origin for local development
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+        const redirectUri = `${appUrl}/api/auth/discord/callback`;
 
         console.log('Client ID:', clientId);
         console.log('Client Secret:', clientSecret ? 'configured' : 'MISSING');
+        console.log('App URL:', appUrl);
         console.log('Redirect URI:', redirectUri);
 
         if (!clientSecret) {
