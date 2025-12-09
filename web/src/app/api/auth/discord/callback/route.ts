@@ -118,9 +118,14 @@ export async function GET(request: NextRequest) {
 
         // Set session cookie (readable by client-side for session context)
         const encodedSession = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+        
+        // Note: secure: false for HTTP deployment (non-HTTPS)
+        // Set to true only when using HTTPS
+        const isSecure = appUrl.startsWith('https://');
+        
         response.cookies.set('sonora-admin-session', encodedSession, {
             httpOnly: false, // Allow client-side access for session display
-            secure: process.env.NODE_ENV === 'production',
+            secure: isSecure,
             sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: '/',
@@ -138,7 +143,7 @@ export async function GET(request: NextRequest) {
         };
         response.cookies.set('sonora-admin-auth', Buffer.from(JSON.stringify(adminAuthData)).toString('base64'), {
             httpOnly: false,
-            secure: process.env.NODE_ENV === 'production',
+            secure: isSecure,
             sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: '/',
