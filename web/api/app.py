@@ -3,7 +3,6 @@
 import asyncio
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
 from pathlib import Path
 from typing import Optional
 import threading
@@ -37,7 +36,10 @@ app = Flask(__name__,
            static_folder='static')
 app.config['SECRET_KEY'] = 'your-secret-key-change-this'
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# SocketIO disabled for server deployment - using REST API only
+# WebSocket features handled by Next.js frontend if needed
+socketio = None
 
 # Global bot reference (will be set by main.py)
 _bot_instance = None
@@ -974,62 +976,16 @@ def api_admin_cache_clear():
         return jsonify({"error": str(e)}), 500
 
 
-# ==================== WEBSOCKET EVENTS ====================
 
-@socketio.on('connect')
-def handle_connect():
-    """Handle client connection"""
-    logger.info("Web client connected")
-    emit('connected', {"status": "ok"})
-
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    """Handle client disconnection"""
-    logger.info("Web client disconnected")
-
-
-@socketio.on('subscribe_guild')
-def handle_subscribe_guild(data):
-    """Subscribe to guild updates"""
-    guild_id = data.get('guild_id')
-    logger.info(f"Client subscribed to guild {guild_id}")
-    # Client will receive updates via broadcast
-
+# ==================== WEBSOCKET EVENTS (DISABLED) ====================
+# SocketIO is disabled for server deployment
+# WebSocket features are handled by Next.js frontend polling instead
 
 # ==================== BACKGROUND TASKS ====================
 
 def broadcast_updates():
-    """Broadcast status updates to all connected clients"""
-    bot = get_bot()
-    if not bot:
-        return
-    
-    try:
-        # Get current status
-        stats = bot.voice_manager.get_stats()
-        
-        # Broadcast to all clients
-        socketio.emit('status_update', {
-            "guilds": len(bot.guilds),
-            "voice_connections": stats['connected'],
-            "playing": stats['playing'],
-            "timestamp": time.time()
-        })
-        
-        # Broadcast guild-specific updates
-        for guild_id in stats['guilds']:
-            connection = bot.voice_manager.get_connection(guild_id)
-            if connection and hasattr(bot, 'players') and guild_id in bot.players:
-                player = bot.players[guild_id]
-                socketio.emit(f'guild_update_{guild_id}', {
-                    "is_playing": player.is_playing,
-                    "is_paused": player.is_paused,
-                    "current_time": player.get_current_time(),
-                    "timestamp": time.time()
-                })
-    except Exception as e:
-        logger.error(f"Failed to broadcast updates: {e}")
+    """Broadcast status updates - disabled when SocketIO is None"""
+    pass  # SocketIO disabled for server deployment
 
 
 
