@@ -1102,13 +1102,8 @@ if V3_3_FEATURES:
 
 
 def start_background_tasks():
-    """Start background tasks for real-time updates"""
-    def run_updates():
-        while True:
-            socketio.sleep(2)  # Update every 2 seconds
-            broadcast_updates()
-    
-    socketio.start_background_task(run_updates)
+    """Start background tasks for real-time updates - disabled without SocketIO"""
+    pass  # Background tasks disabled when SocketIO is None
 
 
 # ==================== RUN SERVER ====================
@@ -1123,11 +1118,10 @@ def run_web_server(host: str = '0.0.0.0', port: int = 5000):
     """
     logger.info(f"Starting web dashboard on http://{host}:{port}")
     
-    # Start background tasks
-    start_background_tasks()
+    # Background tasks disabled (SocketIO not available)
+    # start_background_tasks()
     
-    # Run server - use plain Flask for better threading compatibility
-    # SocketIO features still work, but we avoid async_mode issues
+    # Run server - use plain Flask
     app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)
 
 
