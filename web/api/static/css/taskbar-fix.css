@@ -1,0 +1,50 @@
+/* Taskbar Fix Styles */
+
+body {
+    padding-bottom: 100px !important; /* Space for taskbar */
+    min-height: 100vh;
+}
+
+/* Dark mode by default */
+body:not(.light-mode) {
+    background: #0A0A0A;
+    color: #FFFFFF;
+}
+
+body.dark-mode .glass-dock {
+    background: rgba(26, 26, 26, 0.7) !important;
+    border-color: rgba(160, 32, 47, 0.3) !important;
+}
+
+body.light-mode .glass-dock {
+    background: rgba(255, 255, 255, 0.7) !important;
+    border-color: rgba(128, 0, 32, 0.3) !important;
+}
+
+/* Make sure taskbar is always visible */
+#taskbar-container {
+    position: relative;
+    z-index: 1000;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+}

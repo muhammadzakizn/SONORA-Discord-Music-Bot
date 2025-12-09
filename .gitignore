@@ -1,0 +1,106 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# Environment Variables
+.env
+.env.local
+.env.production
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Cache
+cache/
+*.cache
+__pycache__/
+
+# Downloads
+downloads/*.opus
+downloads/*.mp3
+downloads/*.m4a
+
+# Apple Music temp
+gamdl_temp_*/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Bot instance lock
+.bot_instance.lock
+
+# Exports
+exports/audio/*
+exports/lyrics/*
+exports/artwork/*
+exports/full/*
+!exports/**/.gitkeep
+
+# Cookies (sensitive)
+cookies/*.txt
+!cookies/.gitkeep
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Temporary files
+tmp_*
+temp_*
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Keep gitkeep files
+!.gitkeep
+
+# Node.js / Next.js
+node_modules/
+.next/
+*.zip
+
+# Web submodule (has its own git)
+web/.git
+

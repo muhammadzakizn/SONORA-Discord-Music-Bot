@@ -1,0 +1,758 @@
+"use client";
+
+import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import Image from "next/image";
+import { ArrowLeft, Lock, User, Eye, EyeOff, Shield, CheckCircle, XCircle, RefreshCw, LogIn } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSettings } from "@/contexts/SettingsContext";
+import { useSession, getAvatarUrl } from "@/contexts/SessionContext";
+import { cn } from "@/lib/utils";
+
+// HD background images from Unsplash (music/abstract themed)
+const backgroundImages = [
+  {
+    url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1920&q=80",
+    photographer: "Marcela Laskoski",
+    photographerUrl: "https://unsplash.com/@marcelalaskoski"
+  },
+  {
+    url: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1920&q=80",
+    photographer: "Austin Neill",
+    photographerUrl: "https://unsplash.com/@austinneill"
+  },
+  {
+    url: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1920&q=80",
+    photographer: "Wes Hicks",
+    photographerUrl: "https://unsplash.com/@sickhews"
+  },
+  {
+    url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1920&q=80",
+    photographer: "Aditya Chinchure",
+    photographerUrl: "https://unsplash.com/@adityachinchure"
+  },
+  {
+    url: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1920&q=80",
+    photographer: "Nainoa Shizuru",
+    photographerUrl: "https://unsplash.com/@nainoa"
+  },
+];
+
+// Discord SVG Icon
+const DiscordIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+  </svg>
+);
+
+type LoginMode = "select" | "admin" | "developer" | "verify";
+type VerifyStatus = "idle" | "sending" | "sent" | "verifying" | "success" | "error";
+
+// Loading fallback for Suspense
+function LoginPageLoading() {
+  return (
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center bg-black">
+      <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// Main export with Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageLoading />}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { t } = useSettings();
+  const { user, isLoggedIn } = useSession();
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [loginMode, setLoginMode] = useState<LoginMode>("select");
+  const [showPassword, setShowPassword] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [slideDirection, setSlideDirection] = useState(1);
+
+  // Verification state
+  const [verifyCode, setVerifyCode] = useState(["", "", "", "", "", ""]);
+  const [verifyStatus, setVerifyStatus] = useState<VerifyStatus>("idle");
+  const [verifyError, setVerifyError] = useState("");
+  const [verifyCountdown, setVerifyCountdown] = useState(0);
+  const [isZooming, setIsZooming] = useState(false);
+  const verifyInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Detect ?verify=true from OAuth callback and switch to verify mode
+  useEffect(() => {
+    if (searchParams.get('verify') === 'true' && isLoggedIn && user) {
+      setLoginMode("verify");
+      // Auto-send verification code
+      sendVerificationCode();
+    }
+  }, [searchParams, isLoggedIn, user]);
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (verifyCountdown > 0) {
+      const timer = setTimeout(() => setVerifyCountdown(verifyCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [verifyCountdown]);
+
+  // Background slideshow with slide transition
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSlideDirection(1);
+      setCurrentImageIndex((prev) => (prev + 1) % backgroundImages.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Handle Discord OAuth for Admin - Fixed redirect URI
+  const handleDiscordLogin = useCallback(() => {
+    // Use the actual deployed URL or localhost for development
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || "1443855259536461928";
+    const redirectUri = encodeURIComponent(`${baseUrl}/api/auth/discord/callback`);
+    const scope = encodeURIComponent("identify guilds");
+
+    window.location.href = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+  }, []);
+
+  // Handle Developer login
+  const handleDeveloperLogin = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+
+    const validUser = process.env.NEXT_PUBLIC_DEV_USER || "developer";
+    const validPass = process.env.NEXT_PUBLIC_DEV_PASS || "sonora2024";
+
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    if (username === validUser && password === validPass) {
+      localStorage.setItem("sonora-dev-auth", btoa(JSON.stringify({
+        role: "developer",
+        timestamp: Date.now()
+      })));
+      router.push("/developer");
+    } else {
+      setError(t('login.invalidCredentials'));
+      setIsLoading(false);
+    }
+  }, [username, password, router, t]);
+
+  // Send verification code via Discord DM
+  const sendVerificationCode = useCallback(async () => {
+    if (!user) return;
+
+    setVerifyStatus("sending");
+    setVerifyError("");
+
+    try {
+      const response = await fetch("/api/verify/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setVerifyStatus("sent");
+        setVerifyCountdown(60);
+      } else {
+        setVerifyStatus("error");
+        setVerifyError(data.error || "Failed to send verification code");
+      }
+    } catch {
+      setVerifyStatus("error");
+      setVerifyError("Network error. Please try again.");
+    }
+  }, [user]);
+
+  // Verify the entered code
+  const handleVerifyCode = useCallback(async () => {
+    if (!user) return;
+
+    const fullCode = verifyCode.join("");
+    if (fullCode.length !== 6) return;
+
+    setVerifyStatus("verifying");
+    setVerifyError("");
+
+    try {
+      const response = await fetch("/api/verify/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, code: fullCode }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.verified) {
+        setVerifyStatus("success");
+        // Start zoom animation after brief success message
+        setTimeout(() => {
+          setIsZooming(true);
+        }, 1000);
+        // Redirect after zoom animation fills screen completely
+        setTimeout(() => {
+          router.push("/admin");
+        }, 2500);
+      } else {
+        setVerifyStatus("error");
+        setVerifyError(data.error || "Invalid verification code");
+        setVerifyCode(["", "", "", "", "", ""]);
+        verifyInputRefs.current[0]?.focus();
+      }
+    } catch {
+      setVerifyStatus("error");
+      setVerifyError("Network error. Please try again.");
+    }
+  }, [user, verifyCode, router]);
+
+  // Handle verification code input change
+  const handleVerifyInputChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+
+    const newCode = [...verifyCode];
+    newCode[index] = value.slice(-1);
+    setVerifyCode(newCode);
+
+    if (value && index < 5) {
+      verifyInputRefs.current[index + 1]?.focus();
+    }
+
+    if (newCode.every(d => d) && newCode.join("").length === 6) {
+      setTimeout(() => handleVerifyCode(), 100);
+    }
+  };
+
+  // Handle backspace in verification inputs
+  const handleVerifyKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !verifyCode[index] && index > 0) {
+      verifyInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const currentImage = backgroundImages[currentImageIndex];
+
+  // Slide animation variants
+  const slideVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (direction: number) => ({
+      x: direction > 0 ? '-100%' : '100%',
+      opacity: 0,
+    }),
+  };
+
+  return (
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Full-Screen Background Slideshow */}
+      <div className="absolute inset-0">
+        <AnimatePresence mode="popLayout" custom={slideDirection}>
+          <motion.div
+            key={currentImageIndex}
+            custom={slideDirection}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute inset-0"
+          >
+            <Image
+              src={currentImage.url}
+              alt="Background"
+              fill
+              className="object-cover"
+              priority
+            />
+            {/* Dark overlay for readability */}
+            <div className="absolute inset-0 bg-black/50" />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Floating Orbs for depth effect */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-blue-600/15 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-2/3 left-1/3 w-64 h-64 bg-primary/20 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
+      </div>
+
+      {/* Centered Liquid Glass Login Container */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{
+            opacity: 1,
+            y: 0,
+            scale: isZooming ? 20 : 1,
+          }}
+          transition={{
+            duration: isZooming ? 1.2 : 0.6,
+            ease: isZooming ? [0.4, 0, 0.2, 1] : "easeOut"
+          }}
+          className="w-full max-w-md"
+        >
+          {/* Liquid Glass Card */}
+          <motion.div
+            animate={{
+              borderRadius: isZooming ? "0px" : "24px",
+              backgroundColor: isZooming ? "rgb(0, 0, 0)" : "rgba(255, 255, 255, 0.08)",
+            }}
+            transition={{ duration: isZooming ? 0.4 : 0.5 }}
+            className={cn(
+              "relative p-8 overflow-hidden",
+              !isZooming && "backdrop-blur-2xl border border-white/[0.15]",
+              !isZooming && "shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)]",
+              !isZooming && "rounded-3xl"
+            )}
+          >
+            {/* Glass Shimmer Effect - hide when zooming */}
+            {!isZooming && (
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.1] via-transparent to-transparent pointer-events-none rounded-3xl" />
+            )}
+
+            <AnimatePresence mode="wait">
+              {loginMode === "select" && (
+                <motion.div
+                  key="select"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="relative z-10"
+                >
+                  {/* Logo - Larger and centered at top */}
+                  <div className="flex flex-col items-center mb-8">
+                    <Image
+                      src="/sonora-logo.png"
+                      alt="SONORA"
+                      width={180}
+                      height={72}
+                      className="h-20 w-auto drop-shadow-lg mb-4"
+                    />
+                    <p className="text-white/60 text-sm">{t('hero.subtitle')}</p>
+                  </div>
+
+                  <h2 className="text-2xl font-bold text-white mb-2 text-center">{t('login.welcome')}</h2>
+                  <p className="text-white/60 mb-8 text-center">{t('login.chooseMethod')}</p>
+
+                  <div className="space-y-4">
+                    {/* Admin - Discord Login */}
+                    <motion.button
+                      whileHover={{ scale: 1.02, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setLoginMode("admin")}
+                      className="w-full flex items-center gap-4 p-4 rounded-2xl 
+                        bg-white/[0.08] backdrop-blur-xl
+                        border border-white/[0.1] 
+                        hover:bg-white/[0.15] hover:border-purple-500/40
+                        shadow-[0_4px_24px_rgba(0,0,0,0.3)]
+                        transition-all duration-300 group"
+                    >
+                      <div className="p-3 rounded-xl bg-purple-500/30 group-hover:bg-purple-500/40 transition-colors">
+                        <DiscordIcon />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <span className="block font-semibold text-white">{t('login.admin')}</span>
+                        <span className="text-sm text-white/50">{t('login.admin.desc')}</span>
+                      </div>
+                    </motion.button>
+
+                    <div className="relative flex items-center gap-4 py-2">
+                      <div className="flex-1 h-px bg-white/[0.1]" />
+                      <span className="text-sm text-white/40">{t('login.or')}</span>
+                      <div className="flex-1 h-px bg-white/[0.1]" />
+                    </div>
+
+                    {/* Developer - Private Login */}
+                    <motion.button
+                      whileHover={{ scale: 1.02, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setLoginMode("developer")}
+                      className="w-full flex items-center gap-4 p-4 rounded-2xl 
+                        bg-white/[0.08] backdrop-blur-xl
+                        border border-white/[0.1]
+                        hover:bg-white/[0.15] hover:border-green-500/40
+                        shadow-[0_4px_24px_rgba(0,0,0,0.3)]
+                        transition-all duration-300 group"
+                    >
+                      <div className="p-3 rounded-xl bg-green-500/30 group-hover:bg-green-500/40 transition-colors">
+                        <Lock className="w-5 h-5 text-green-400" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <span className="block font-semibold text-white">{t('login.developer')}</span>
+                        <span className="text-sm text-white/50">{t('login.developer.desc')}</span>
+                      </div>
+                    </motion.button>
+                  </div>
+
+                  <div className="mt-8 text-center">
+                    <Link
+                      href="/"
+                      className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      {t('common.backToHome')}
+                    </Link>
+                  </div>
+                </motion.div>
+              )}
+
+              {loginMode === "admin" && (
+                <motion.div
+                  key="admin"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="relative z-10"
+                >
+                  <button
+                    onClick={() => setLoginMode("select")}
+                    className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors mb-6"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    {t('common.back')}
+                  </button>
+
+                  {/* Logo */}
+                  <div className="flex justify-center mb-6">
+                    <Image
+                      src="/sonora-logo.png"
+                      alt="SONORA"
+                      width={120}
+                      height={48}
+                      className="h-12 w-auto drop-shadow-lg"
+                    />
+                  </div>
+
+                  <h2 className="text-2xl font-bold text-white mb-2">{t('login.adminTitle')}</h2>
+                  <p className="text-white/60 mb-8">{t('login.adminDesc')}</p>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleDiscordLogin}
+                    className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl 
+                      bg-[#5865F2] hover:bg-[#4752C4] 
+                      text-white font-semibold transition-colors
+                      shadow-[0_4px_24px_rgba(88,101,242,0.5)]"
+                  >
+                    <DiscordIcon />
+                    {t('login.continueDiscord')}
+                  </motion.button>
+
+                  <p className="mt-6 text-xs text-white/40 text-center">
+                    {t('login.termsNotice')}
+                  </p>
+                </motion.div>
+              )}
+
+              {loginMode === "developer" && (
+                <motion.div
+                  key="developer"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="relative z-10"
+                >
+                  <button
+                    onClick={() => setLoginMode("select")}
+                    className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors mb-6"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    {t('common.back')}
+                  </button>
+
+                  {/* Logo */}
+                  <div className="flex justify-center mb-6">
+                    <Image
+                      src="/sonora-logo.png"
+                      alt="SONORA"
+                      width={120}
+                      height={48}
+                      className="h-12 w-auto drop-shadow-lg"
+                    />
+                  </div>
+
+                  <h2 className="text-2xl font-bold text-white mb-2">{t('login.devTitle')}</h2>
+                  <p className="text-white/60 mb-8">{t('login.devDesc')}</p>
+
+                  <form onSubmit={handleDeveloperLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-white/70 mb-2">
+                        {t('login.username')}
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                        <input
+                          type="text"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 rounded-xl 
+                            bg-white/[0.08] backdrop-blur-xl
+                            border border-white/[0.1] 
+                            text-white placeholder:text-white/30 
+                            focus:outline-none focus:border-green-500/50 focus:bg-white/[0.12]
+                            transition-all"
+                          placeholder={t('login.enterUsername')}
+                          autoComplete="username"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-white/70 mb-2">
+                        {t('login.password')}
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full pl-12 pr-12 py-3 rounded-xl 
+                            bg-white/[0.08] backdrop-blur-xl
+                            border border-white/[0.1]
+                            text-white placeholder:text-white/30 
+                            focus:outline-none focus:border-green-500/50 focus:bg-white/[0.12]
+                            transition-all"
+                          placeholder={t('login.enterPassword')}
+                          autoComplete="current-password"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                        >
+                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {error && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-rose-400 text-sm"
+                      >
+                        {error}
+                      </motion.p>
+                    )}
+
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl 
+                        bg-gradient-to-r from-green-600 to-emerald-600 
+                        hover:from-green-500 hover:to-emerald-500 
+                        text-white font-semibold transition-all 
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                        shadow-[0_4px_24px_rgba(34,197,94,0.4)]"
+                    >
+                      {isLoading ? (
+                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <LogIn className="w-5 h-5" />
+                          {t('login.signIn')}
+                        </>
+                      )}
+                    </motion.button>
+                  </form>
+                </motion.div>
+              )}
+
+              {loginMode === "verify" && user && (
+                <motion.div
+                  key="verify"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="relative z-10"
+                >
+                  {/* Header with Shield Icon */}
+                  <div className="flex flex-col items-center mb-6">
+                    <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
+                      <Shield className="w-8 h-8 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-2">Verify Your Identity</h2>
+                    <p className="text-white/60 text-sm text-center">
+                      A verification code was sent to your Discord DM
+                    </p>
+                  </div>
+
+                  {/* User Info */}
+                  <div className="flex items-center gap-4 p-4 mb-6 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
+                    <Image
+                      src={getAvatarUrl(user)}
+                      alt={user.username}
+                      width={48}
+                      height={48}
+                      className="rounded-full"
+                    />
+                    <div>
+                      <p className="font-medium text-white">{user.username}</p>
+                      <p className="text-sm text-white/50">Discord ID: {user.id}</p>
+                    </div>
+                  </div>
+
+                  {verifyStatus === "success" ? (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="text-center py-8"
+                    >
+                      <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-400" />
+                      <h3 className="text-xl font-bold text-green-400 mb-2">Verified!</h3>
+                      <p className="text-white/60">Redirecting to dashboard...</p>
+                    </motion.div>
+                  ) : (
+                    <>
+                      {/* Code Input */}
+                      <div className="flex justify-center gap-3 mb-6">
+                        {verifyCode.map((digit, i) => (
+                          <input
+                            key={i}
+                            ref={(el) => { verifyInputRefs.current[i] = el; }}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={1}
+                            value={digit}
+                            onChange={(e) => handleVerifyInputChange(i, e.target.value)}
+                            onKeyDown={(e) => handleVerifyKeyDown(i, e)}
+                            disabled={verifyStatus === "verifying"}
+                            className={cn(
+                              "w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 bg-white/[0.08] focus:outline-none transition-colors text-white",
+                              verifyStatus === "error"
+                                ? "border-rose-500"
+                                : "border-white/[0.15] focus:border-purple-500"
+                            )}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Error Message */}
+                      {verifyStatus === "error" && verifyError && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center gap-2 justify-center text-rose-400 text-sm mb-4"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          <span>{verifyError}</span>
+                        </motion.div>
+                      )}
+
+                      {/* Verifying State */}
+                      {verifyStatus === "verifying" && (
+                        <div className="flex items-center justify-center gap-2 text-purple-400 mb-4">
+                          <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+                          <span>Verifying...</span>
+                        </div>
+                      )}
+
+                      {/* Verify Button */}
+                      {verifyStatus !== "verifying" && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={handleVerifyCode}
+                          disabled={verifyCode.join("").length !== 6}
+                          className={cn(
+                            "w-full py-3 mb-4 rounded-xl font-semibold transition-all",
+                            verifyCode.join("").length === 6
+                              ? "bg-gradient-to-r from-purple-500 to-cyan-500 text-white hover:opacity-90 shadow-[0_4px_24px_rgba(168,85,247,0.4)]"
+                              : "bg-white/[0.08] text-white/40 cursor-not-allowed"
+                          )}
+                        >
+                          Verify Code
+                        </motion.button>
+                      )}
+
+                      {/* Resend Button */}
+                      <div className="text-center">
+                        <button
+                          onClick={sendVerificationCode}
+                          disabled={verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"}
+                          className={cn(
+                            "flex items-center gap-2 mx-auto text-sm transition-colors",
+                            verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"
+                              ? "text-white/30 cursor-not-allowed"
+                              : "text-purple-400 hover:text-purple-300"
+                          )}
+                        >
+                          <RefreshCw className={cn("w-4 h-4", verifyStatus === "sending" && "animate-spin")} />
+                          {verifyStatus === "sending"
+                            ? "Sending..."
+                            : verifyCountdown > 0
+                              ? `Resend in ${verifyCountdown}s`
+                              : "Resend Code"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Photographer Credit */}
+          <div className="mt-6 text-center">
+            <a
+              href={currentImage.photographerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-white/40 hover:text-white/70 transition-colors"
+            >
+              Photo by {currentImage.photographer} on Unsplash
+            </a>
+          </div>
+
+          {/* Slideshow Indicators */}
+          <div className="flex justify-center gap-2 mt-4">
+            {backgroundImages.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setSlideDirection(idx > currentImageIndex ? 1 : -1);
+                  setCurrentImageIndex(idx);
+                }}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${idx === currentImageIndex
+                  ? "w-6 bg-white"
+                  : "bg-white/30 hover:bg-white/50"
+                  }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        </motion.div>
+      </div >
+    </div >
+  );
+}

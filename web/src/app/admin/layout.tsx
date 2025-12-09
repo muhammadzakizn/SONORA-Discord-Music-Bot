@@ -1,0 +1,406 @@
+"use client";
+
+import { ReactNode, useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import {
+  LayoutDashboard,
+  Server,
+  History,
+  Settings,
+  Menu,
+  X,
+  ChevronDown,
+  LogOut,
+  User,
+  Bell,
+  UserCircle,
+  Shield,
+  Home,
+  PanelLeft,
+  PanelLeftClose,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { SessionProvider, useSession, getAvatarUrl } from "@/contexts/SessionContext";
+import { TutorialOverlay, useTutorial } from "@/components/TutorialOverlay";
+import { useSettings } from "@/contexts/SettingsContext";
+
+interface NavItem {
+  labelKey: string;
+  href: string;
+  icon: React.ElementType;
+}
+
+const navItems: NavItem[] = [
+  { labelKey: "admin.dashboard", href: "/admin", icon: LayoutDashboard },
+  { labelKey: "admin.servers", href: "/admin/guilds", icon: Server },
+  { labelKey: "admin.history", href: "/admin/history", icon: History },
+  { labelKey: "admin.settings", href: "/admin/settings", icon: Settings },
+];
+
+// Sidebar width constant
+const SIDEBAR_WIDTH = 260; // 16.25rem = 260px
+
+function Sidebar({
+  isOpen,
+  onClose,
+  isDark,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  isDark: boolean;
+}) {
+  const pathname = usePathname();
+  const { user, managedGuilds } = useSession();
+  const { t } = useSettings();
+
+  return (
+    <motion.aside
+      initial={false}
+      animate={{
+        width: isOpen ? SIDEBAR_WIDTH : 0,
+        marginLeft: isOpen ? 12 : 0,
+        marginTop: isOpen ? 12 : 0,
+        marginBottom: isOpen ? 12 : 0,
+        opacity: isOpen ? 1 : 0,
+      }}
+      transition={{ type: "spring", damping: 25, stiffness: 300 }}
+      className={cn(
+        "flex flex-col overflow-hidden shrink-0",
+        // Liquid Glass Frosted Effect
+        "backdrop-blur-2xl rounded-2xl",
+        isDark
+          ? "bg-zinc-900/70 border border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+          : "bg-white/70 border border-black/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.15)]"
+      )}
+      style={{ height: isOpen ? 'calc(100% - 24px)' : '100%' }}
+    >
+      <div style={{ width: SIDEBAR_WIDTH }} className="flex flex-col h-full">
+        {/* Header */}
+        <div className={cn(
+          "flex items-center justify-between px-4 py-3 border-b shrink-0",
+          isDark ? "border-white/[0.08]" : "border-black/[0.06]"
+        )}>
+          <Link href="/" className="flex items-center gap-2">
+            <Image
+              src="/sonora-logo.png"
+              alt="SONORA"
+              width={100}
+              height={32}
+              className="h-7 w-auto"
+            />
+          </Link>
+        </div>
+
+        {/* User Info */}
+        {user && (
+          <div className={cn(
+            "p-3 border-b shrink-0",
+            isDark ? "border-white/[0.08]" : "border-black/[0.06]"
+          )}>
+            <div className={cn(
+              "flex items-center gap-3 p-2 rounded-xl",
+              isDark ? "bg-white/[0.05]" : "bg-black/[0.03]"
+            )}>
+              <Image
+                src={getAvatarUrl(user)}
+                alt={user.username}
+                width={40}
+                height={40}
+                className="rounded-full"
+              />
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  "text-sm font-medium truncate",
+                  isDark ? "text-white" : "text-gray-900"
+                )}>{user.username}</p>
+                <p className={cn(
+                  "text-xs flex items-center gap-1",
+                  isDark ? "text-white/50" : "text-gray-500"
+                )}>
+                  <Shield className="w-3 h-3" />
+                  {managedGuilds?.length || 0} servers
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <nav className="p-2 space-y-0.5 flex-1 overflow-y-auto">
+          <p className={cn(
+            "text-[10px] font-semibold uppercase tracking-wider px-3 py-2",
+            isDark ? "text-white/30" : "text-gray-400"
+          )}>
+            {t('admin.menu')}
+          </p>
+          {navItems.map((item) => {
+            const isActive = pathname === item.href ||
+              (item.href !== "/admin" && pathname?.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all text-sm",
+                  isActive
+                    ? "bg-[#7B1E3C] text-white"
+                    : isDark
+                      ? "text-white/60 hover:text-white hover:bg-white/[0.08]"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-black/[0.05]"
+                )}
+              >
+                <item.icon className={cn("w-5 h-5", isActive && "text-white")} />
+                <span>{t(item.labelKey)}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Footer */}
+        <div className={cn(
+          "p-2 border-t shrink-0",
+          isDark ? "border-white/[0.08]" : "border-black/[0.06]"
+        )}>
+          <Link
+            href="/"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm",
+              isDark
+                ? "text-white/50 hover:text-white hover:bg-white/[0.08]"
+                : "text-gray-500 hover:text-gray-900 hover:bg-black/[0.05]"
+            )}
+          >
+            <Home className="w-5 h-5" />
+            <span>{t('admin.backToHome')}</span>
+          </Link>
+        </div>
+      </div>
+    </motion.aside>
+  );
+}
+
+function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void; sidebarOpen: boolean; isDark: boolean }) {
+  const [showProfile, setShowProfile] = useState(false);
+  const { user, displayName, logout } = useSession();
+  const { t } = useSettings();
+
+  return (
+    <header className={cn(
+      "h-14 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30",
+      // Transparent - no background, no border
+      isDark ? "text-white" : "text-gray-900"
+    )}>
+      {/* Left */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuClick}
+          className={cn(
+            "p-2 rounded-xl transition-colors",
+            sidebarOpen
+              ? "bg-[#7B1E3C]/20 text-[#7B1E3C]"
+              : isDark
+                ? "hover:bg-white/[0.1] text-white/70"
+                : "hover:bg-black/[0.05] text-gray-600"
+          )}
+          title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+        >
+          {sidebarOpen ? (
+            <PanelLeftClose className="w-5 h-5" />
+          ) : (
+            <PanelLeft className="w-5 h-5" />
+          )}
+        </button>
+        <h1 className={cn(
+          "text-base font-semibold",
+          isDark ? "text-white/90" : "text-gray-900"
+        )}>{t('admin.title')}</h1>
+      </div>
+
+      {/* Right */}
+      <div className="flex items-center gap-2">
+        {/* Notifications */}
+        <button className={cn(
+          "relative p-2 rounded-xl transition-colors",
+          isDark ? "hover:bg-white/[0.08]" : "hover:bg-black/[0.05]"
+        )}>
+          <Bell className={cn("w-5 h-5", isDark ? "text-white/60" : "text-gray-500")} />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
+        </button>
+
+        {/* Profile */}
+        <div className="relative">
+          <button
+            onClick={() => setShowProfile(!showProfile)}
+            className={cn(
+              "flex items-center gap-2 p-1.5 rounded-xl transition-colors",
+              isDark ? "hover:bg-white/[0.08]" : "hover:bg-black/[0.05]"
+            )}
+          >
+            {user ? (
+              <Image
+                src={getAvatarUrl(user)}
+                alt={user.username}
+                width={32}
+                height={32}
+                className="rounded-full"
+              />
+            ) : (
+              <div className="w-8 h-8 bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
+              </div>
+            )}
+            <div className="hidden sm:block text-left">
+              <p className={cn(
+                "text-sm font-medium",
+                isDark ? "text-white/90" : "text-gray-900"
+              )}>{displayName || user?.username || 'Admin'}</p>
+            </div>
+            <ChevronDown className={cn(
+              "w-4 h-4 transition-transform",
+              isDark ? "text-white/40" : "text-gray-400",
+              showProfile && "rotate-180"
+            )} />
+          </button>
+
+          <AnimatePresence>
+            {showProfile && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className={cn(
+                  "absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-xl",
+                  "backdrop-blur-2xl border",
+                  isDark
+                    ? "bg-zinc-900/95 border-white/[0.15]"
+                    : "bg-white/95 border-black/[0.1]",
+                  "shadow-[0_8px_32px_rgba(0,0,0,0.2)]"
+                )}
+              >
+                {user && (
+                  <div className={cn(
+                    "p-3 border-b",
+                    isDark ? "border-white/[0.1]" : "border-black/[0.06]"
+                  )}>
+                    <p className={cn(
+                      "font-medium",
+                      isDark ? "text-white/90" : "text-gray-900"
+                    )}>{displayName || user.username}</p>
+                    <p className={cn(
+                      "text-xs",
+                      isDark ? "text-white/40" : "text-gray-500"
+                    )}>@{user.username}</p>
+                  </div>
+                )}
+
+                <Link
+                  href="/admin/profile"
+                  onClick={() => setShowProfile(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2.5 transition-colors text-sm",
+                    isDark
+                      ? "text-white/70 hover:text-white hover:bg-white/[0.08]"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-black/[0.05]"
+                  )}
+                >
+                  <UserCircle className="w-4 h-4" />
+                  <span>{t('admin.profile')}</span>
+                </Link>
+                <div className={cn(
+                  "border-t",
+                  isDark ? "border-white/[0.1]" : "border-black/[0.06]"
+                )} />
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-3 px-4 py-2.5 w-full text-left text-rose-500 hover:bg-rose-500/10 transition-colors text-sm"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>{t('admin.logout')}</span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function AdminLayoutContent({ children }: { children: ReactNode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(true); // Default open
+  const { isLoggedIn, isLoading } = useSession();
+  const router = useRouter();
+  const { t, isDark } = useSettings();
+
+  const { showTutorial, completeTutorial, skipTutorial } = useTutorial();
+
+  useEffect(() => {
+    if (!isLoading && !isLoggedIn) {
+      router.push('/login');
+    }
+  }, [isLoading, isLoggedIn, router]);
+
+  if (isLoading) {
+    return (
+      <div className={cn(
+        "h-screen flex items-center justify-center",
+        isDark ? "bg-black" : "bg-gray-50"
+      )}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-[#7B1E3C]/30 border-t-[#7B1E3C] rounded-full animate-spin" />
+          <p className={isDark ? "text-white/50" : "text-gray-500"}>{t('admin.loading')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return null;
+  }
+
+  return (
+    <>
+      <TutorialOverlay
+        isOpen={showTutorial}
+        onComplete={completeTutorial}
+        onSkip={skipTutorial}
+      />
+      <div className={cn(
+        "h-screen flex overflow-hidden transition-colors duration-300",
+        isDark ? "bg-black text-white" : "bg-gray-50 text-gray-900"
+      )}>
+        {/* Sidebar - pushes content */}
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          isDark={isDark}
+        />
+
+        {/* Main Content - expands when sidebar hidden */}
+        <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
+          <Header
+            onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+            sidebarOpen={sidebarOpen}
+            isDark={isDark}
+          />
+          <main className="flex-1 p-4 md:p-6 overflow-x-hidden overflow-y-auto custom-scrollbar">
+            <div className="max-w-7xl mx-auto w-full">
+              {children}
+            </div>
+          </main>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default function AdminLayout({ children }: { children: ReactNode }) {
+  return (
+    <SessionProvider>
+      <AdminLayoutContent>{children}</AdminLayoutContent>
+    </SessionProvider>
+  );
+}

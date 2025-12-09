@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Music Bot{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="glass-card" style="margin-bottom: 2rem;">
+        <h1 class="gradient-maroon-text" style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem;">
+            🎵 Music Bot Dashboard
+        </h1>
+        <p style="color: var(--text-secondary);">
+            Control your music, view stats, and manage everything from here
+        </p>
+    </div>
+    
+    <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="glass-card hover-lift card-entrance">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎵</div>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--maroon-primary);" id="now-playing-count">
+                0
+            </div>
+            <div style="color: var(--text-secondary); font-weight: 500;">
+                Now Playing
+            </div>
+        </div>
+        
+        <div class="glass-card hover-lift card-entrance" style="animation-delay: 0.1s;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📋</div>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--maroon-primary);" id="queue-count">
+                0
+            </div>
+            <div style="color: var(--text-secondary); font-weight: 500;">
+                In Queue
+            </div>
+        </div>
+        
+        <div class="glass-card hover-lift card-entrance" style="animation-delay: 0.2s;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔊</div>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--maroon-primary);" id="volume-level">
+                100%
+            </div>
+            <div style="color: var(--text-secondary); font-weight: 500;">
+                Volume
+            </div>
+        </div>
+        
+        <div class="glass-card hover-lift card-entrance" style="animation-delay: 0.3s;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎶</div>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--maroon-primary);" id="guild-count">
+                0
+            </div>
+            <div style="color: var(--text-secondary); font-weight: 500;">
+                Active Servers
+            </div>
+        </div>
+    </div>
+    
+    <div class="glass-card">
+        <h2 class="accent-maroon" style="margin-bottom: 1rem;">Now Playing</h2>
+        <div id="now-playing-display" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+            No music playing
+        </div>
+    </div>
+</div>
+
+<script>
+// Load dashboard data
+async function loadDashboardData() {
+    try {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+        
+        document.getElementById('guild-count').textContent = data.guilds || 0;
+        document.getElementById('now-playing-count').textContent = data.now_playing || 0;
+        
+        // Update now playing
+        if (data.now_playing > 0) {
+            // Load actual now playing data
+            const npResponse = await fetch('/api/guilds');
+            const guilds = await npResponse.json();
+            // Display first now playing
+            // ... implementation
+        }
+    } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+    }
+}
+
+// Load on page load
+loadDashboardData();
+
+// Refresh every 5 seconds
+setInterval(loadDashboardData, 5000);
+</script>
+{% endblock %}

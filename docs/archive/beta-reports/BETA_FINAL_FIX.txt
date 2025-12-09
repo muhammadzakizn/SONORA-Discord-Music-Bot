@@ -1,0 +1,38 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                 🔧 BETA FIX - VOICE MANAGER SIGNATURE                     ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+❌ ERROR:
+   VoiceManager.__init__() takes 1 positional argument but 2 were given
+
+🔍 ROOT CAUSE:
+   VoiceManager() doesn't take 'self' as parameter
+   But we tried: VoiceManager(self)  ❌
+
+✅ FIX:
+   self.voice_manager = VoiceManager()  # No parameter!
+   self.db_manager = get_db_manager()   # Use getter function
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 CORRECT INITIALIZATION:
+
+from services.voice.manager import VoiceManager
+from database.db_manager import get_db_manager
+from database.queue_manager import QueueManager
+from services.download_manager import DownloadManager
+
+self.voice_manager = VoiceManager()           ✅
+self.db_manager = get_db_manager()            ✅
+self.queue_manager = QueueManager(self.db_manager)  ✅
+self.download_manager = DownloadManager()     ✅
+self.players = {}                             ✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ VERIFIED:
+   - Matches stable bot initialization in core/bot.py
+   - All manager signatures correct
+   - Compilation successful
+
+╚════════════════════════════════════════════════════════════════════════════╝

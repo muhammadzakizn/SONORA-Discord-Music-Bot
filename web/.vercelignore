@@ -1,0 +1,14 @@
+# Python Flask API (runs locally, not on Vercel)
+/api/
+
+# Python files
+*.py
+*.pyc
+__pycache__/
+
+# Local data
+/data/
+
+# Other
+.DS_Store
+*.log

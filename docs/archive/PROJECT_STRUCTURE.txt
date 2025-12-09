@@ -1,0 +1,222 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                  SONORA BOT - PROJECT STRUCTURE                            ║
+║                        Visual Reference                                    ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📁 SONORA BOT ROOT DIRECTORY
+│
+├── 🎉 🎉_READ_THIS_FIRST.md              ⭐⭐⭐ START HERE! ⭐⭐⭐
+├── 📄 START_HERE.md                      Quick start (3 steps)
+├── 📄 README.md                          Main documentation
+├── 📄 COMPLETE_SETUP_GUIDE.md           Comprehensive guide
+│
+├── 📊 ORGANIZATION_SUMMARY.md           What changed & why
+├── 📊 BETA_PROMOTION_WORKFLOW.md        Deployment workflow
+├── 📊 CHANGELOG_v3.4.0.md               Version 3.4.0 changes
+├── 📊 FINAL_ORGANIZATION_REPORT.txt     Visual report
+├── 📊 PROJECT_STRUCTURE.txt             This file
+│
+├── 🚀 launcher.py                        ⭐ Smart launcher (MAIN ENTRY)
+├── 📝 main.py                           Stable version entry point
+├── 📦 requirements.txt                  Dependencies
+├── ⚙️  .env                              Stable configuration
+├── ⚙️  .env.example                      Configuration template
+├── 🚫 .gitignore                        Git ignore rules
+│
+├── 📂 beta-version/                      🧪 BETA TESTING ENVIRONMENT
+│   ├── 🚀 main_beta.py                  Beta entry point
+│   ├── ⚙️  .env.beta                     Beta configuration
+│   ├── 💾 bot_beta.db                   Beta database (separate!)
+│   ├── 📁 commands/                     Beta commands (with -beta suffix)
+│   │   └── play_beta.py
+│   ├── 📁 core/                         Beta core modules
+│   ├── 📁 services/                     Beta services
+│   ├── 📁 ui/                           Beta UI components
+│   ├── 📁 web_beta/                     🔧 Beta web dashboard
+│   │   ├── app_beta.py                  Enhanced dashboard
+│   │   └── templates/
+│   │       └── beta_debug.html          Debug console UI
+│   ├── 📁 logs/                         Beta logs (separate)
+│   ├── 📁 downloads/                    Beta downloads
+│   ├── 📁 cache/                        Beta cache
+│   └── 📁 database/                     Beta database files
+│
+├── 📂 docs/                              📚 DOCUMENTATION ROOT
+│   ├── 📂 official/                     ⭐ ALL OFFICIAL DOCS (30+ files)
+│   │   ├── README.md                    Documentation index
+│   │   ├── CHANGELOG.md                 Version history
+│   │   ├── DEVELOPMENT.md               Development guide
+│   │   ├── QUICK_START_V3.3.md         Quick start v3.3
+│   │   ├── PANDUAN_LENGKAP.md          Complete guide (ID)
+│   │   ├── ... (30+ documentation files)
+│   │   └── tmp_rovodev_setup_dev_branches.sh
+│   ├── API.md                           API documentation
+│   ├── COMMANDS.md                      Command reference
+│   ├── DATABASE.md                      Database schema
+│   ├── TROUBLESHOOTING.md              Troubleshooting guide
+│   ├── ARCHITECTURE.md                  System architecture
+│   ├── QUICK_START.md                   Quick start
+│   └── archive/                         Archived docs
+│
+├── 📂 core/                              🤖 BOT CORE
+│   ├── __init__.py
+│   ├── bot.py                           Main bot class
+│   └── error_handler.py                 Error handling
+│
+├── 📂 commands/                          🎮 SLASH COMMANDS (STABLE)
+│   ├── __init__.py
+│   ├── play.py                          Play command
+│   ├── control.py                       Pause, resume, stop, skip
+│   ├── queue.py                         Queue management
+│   ├── volume.py                        Volume control
+│   ├── admin.py                         Admin commands
+│   └── stats.py                         Statistics
+│
+├── 📂 services/                          ⚙️  BUSINESS LOGIC
+│   ├── __init__.py
+│   ├── download_manager.py              Download orchestration
+│   ├── translation.py                   Translation service
+│   ├── 📁 audio/                        Audio handlers
+│   │   ├── base.py                      Base handler
+│   │   ├── player.py                    Audio player
+│   │   ├── spotify.py                   Spotify downloader
+│   │   ├── youtube.py                   YouTube fallback
+│   │   ├── apple_music_handler.py       Apple Music handler
+│   │   ├── equalizer.py                 Audio equalizer
+│   │   └── playlist_processor.py        Playlist processing
+│   ├── 📁 lyrics/                       Lyrics fetchers
+│   │   ├── base.py
+│   │   ├── genius.py                    Genius API
+│   │   ├── lrclib.py                    LRCLib API
+│   │   ├── musixmatch.py               Musixmatch API
+│   │   └── syncedlyrics_fetcher.py     Synced lyrics
+│   ├── 📁 metadata/                     Metadata processing
+│   │   ├── artwork.py                   Artwork fetcher
+│   │   └── processor.py                 Metadata processor
+│   └── 📁 voice/                        Voice management
+│       ├── connection.py                Voice connection
+│       ├── manager.py                   Voice manager
+│       └── health_monitor.py            Health monitoring
+│
+├── 📂 ui/                                🎨 USER INTERFACE
+│   ├── __init__.py
+│   ├── embeds.py                        Discord embeds
+│   ├── media_player.py                  Media player UI
+│   ├── queue_view.py                    Queue viewer
+│   ├── volume_view.py                   Volume control UI
+│   ├── equalizer_view.py               Equalizer UI
+│   ├── menu_view.py                     Menu UI
+│   └── loading.py                       Loading messages
+│
+├── 📂 web/                               🌐 WEB DASHBOARD (STABLE)
+│   ├── __init__.py
+│   ├── app.py                           Flask application
+│   ├── auth.py                          Authentication
+│   ├── manifest.json                    PWA manifest
+│   ├── sw.js                            Service worker
+│   ├── 📁 static/                       Static assets
+│   │   ├── css/                         Stylesheets
+│   │   └── js/                          JavaScript
+│   └── 📁 templates/                    HTML templates
+│       ├── base.html
+│       ├── dashboard.html
+│       └── admin.html
+│
+├── 📂 database/                          💾 DATABASE LAYER
+│   ├── __init__.py
+│   ├── db_manager.py                    Database operations
+│   ├── models.py                        Data models
+│   ├── queue_manager.py                 Queue management
+│   └── analytics_schema.sql             Analytics schema
+│
+├── 📂 config/                            ⚙️  CONFIGURATION
+│   ├── __init__.py
+│   ├── settings.py                      Settings loader
+│   ├── constants.py                     Constants & enums
+│   └── logging_config.py               Logging setup
+│
+├── 📂 utils/                             🛠️  UTILITIES
+│   ├── __init__.py
+│   ├── formatters.py                    Time & progress formatters
+│   ├── validators.py                    Input validation
+│   ├── romanization.py                  Multi-language romanization
+│   ├── cache.py                         Caching utilities
+│   └── analytics.py                     Analytics tracking
+│
+├── 📂 scripts/                           🤖 AUTOMATION SCRIPTS
+│   ├── install.sh                       Installation script
+│   ├── start.sh                         Start script
+│   └── promote_beta.py                  ⭐ Beta→Stable promotion
+│
+├── 📂 tests/                             🧪 AUTOMATED TESTS
+│   ├── __init__.py
+│   ├── test_all_features.py            Feature tests
+│   └── test_search_complete.py         Search tests
+│
+├── 📂 backups/                           💾 AUTOMATIC BACKUPS
+│   └── stable_backup_YYYYMMDD_HHMMSS/  Auto-created during promotion
+│
+├── 📂 logs/                              📋 STABLE LOGS
+│   ├── bot.log                          Main log
+│   ├── errors.log                       Error log
+│   └── audio.log                        Audio operations log
+│
+├── 📂 downloads/                         💿 STABLE DOWNLOADS
+│   └── *.opus                           Downloaded audio files
+│
+├── 📂 cache/                             🗃️  STABLE CACHE
+│   └── artwork/                         Cached artwork
+│
+├── 📂 exports/                           📤 EXPORT FILES
+│   ├── audio/                           Exported audio
+│   ├── lyrics/                          Exported lyrics
+│   ├── artwork/                         Exported artwork
+│   └── full/                            Full exports
+│
+├── 📂 cookies/                           🍪 COOKIES (OPTIONAL)
+│   ├── apple_music_cookies.txt
+│   ├── spotify_cookies.txt
+│   └── youtube_music_cookies.txt
+│
+└── 💾 bot.db                             Stable database
+
+════════════════════════════════════════════════════════════════════════════
+
+🎯 KEY DIRECTORIES:
+
+⭐ launcher.py                    → MAIN ENTRY POINT (START HERE!)
+⭐ beta-version/                  → Beta testing environment
+⭐ docs/official/                 → All documentation (30+ files)
+⭐ scripts/promote_beta.py        → Automated deployment
+
+════════════════════════════════════════════════════════════════════════════
+
+🔄 WORKFLOW:
+
+1. Development  → Work in beta-version/
+2. Testing      → Use /command-beta in Discord
+3. Debugging    → Monitor http://localhost:5001/beta/debug
+4. Promotion    → Run: python3 launcher.py (option 4)
+5. Production   → Deploy stable version
+
+════════════════════════════════════════════════════════════════════════════
+
+📊 STATISTICS:
+
+Total Directories:  25+
+Total Files:        150+
+Python Files:       70+
+Documentation:      40+
+Configuration:      5+
+
+Code Lines:         ~18,000+
+Documentation:      ~10,000+ words
+
+════════════════════════════════════════════════════════════════════════════
+
+🎉 READY TO USE!
+
+Run: python3 launcher.py
+Read: 🎉_READ_THIS_FIRST.md
+
+╚════════════════════════════════════════════════════════════════════════════╝

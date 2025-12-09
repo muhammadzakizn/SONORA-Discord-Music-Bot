@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Discord Music Bot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="nav-bar">
+            <div class="nav-brand">
+                <h2>🛠️ Admin Panel</h2>
+                <span class="version">v3.2</span>
+            </div>
+            <div class="nav-links">
+                <a href="/">📊 Dashboard</a>
+                <a href="/admin" class="active">🛠️ Admin Panel</a>
+            </div>
+        </nav>
+
+        <!-- Quick Actions -->
+        <section class="quick-actions">
+            <h2>⚡ Quick Actions</h2>
+            <div class="actions-grid">
+                <div class="action-card" onclick="toggleMaintenanceModal()">
+                    <div class="action-icon">🔧</div>
+                    <div class="action-title">Maintenance Mode</div>
+                    <div class="action-desc">Enable/disable maintenance</div>
+                </div>
+                <div class="action-card" onclick="showBroadcastModal()">
+                    <div class="action-icon">📢</div>
+                    <div class="action-title">Broadcast</div>
+                    <div class="action-desc">Send message to all guilds</div>
+                </div>
+                <div class="action-card" onclick="refreshAllData()">
+                    <div class="action-icon">🔄</div>
+                    <div class="action-title">Refresh Data</div>
+                    <div class="action-desc">Reload all statistics</div>
+                </div>
+                <div class="action-card" onclick="clearCache()">
+                    <div class="action-icon">🗑️</div>
+                    <div class="action-title">Clear Cache</div>
+                    <div class="action-desc">Clean temporary files</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Health Monitor -->
+        <section class="health-section">
+            <h2>🏥 Bot Health Status</h2>
+            <div id="health-overview" class="loading">Loading health data...</div>
+        </section>
+
+        <!-- Activity Statistics -->
+        <section class="activity-section">
+            <h2>📊 Activity Statistics</h2>
+            <div class="period-selector">
+                <button onclick="loadActivity(7)" class="active">7 Days</button>
+                <button onclick="loadActivity(30)">30 Days</button>
+                <button onclick="loadActivity(90)">90 Days</button>
+            </div>
+            <div id="activity-stats" class="loading">Loading activity...</div>
+        </section>
+
+        <!-- Top Users -->
+        <section class="top-users-section">
+            <h2>👥 Most Active Users</h2>
+            <div id="top-users-list" class="loading">Loading users...</div>
+        </section>
+
+        <!-- Cache Management -->
+        <section class="cache-section">
+            <h2>💾 Cache Management</h2>
+            <div id="cache-info" class="loading">Loading cache data...</div>
+        </section>
+
+        <!-- Activity Chart -->
+        <section class="chart-section">
+            <h2>📈 Activity Trends</h2>
+            <canvas id="activityChart"></canvas>
+        </section>
+
+        <!-- Logs Viewer -->
+        <section class="logs-section">
+            <h2>📋 Console Logs</h2>
+            <div class="logs-controls">
+                <button onclick="loadLogs('all')" class="log-btn active" data-type="all">All</button>
+                <button onclick="loadLogs('error')" class="log-btn" data-type="error">Errors</button>
+                <button onclick="loadLogs('warning')" class="log-btn" data-type="warning">Warnings</button>
+                <button onclick="loadLogs('info')" class="log-btn" data-type="info">Info</button>
+                <button onclick="refreshLogs()" class="log-btn refresh-btn">🔄 Refresh</button>
+            </div>
+            <div id="logs-viewer" class="logs-viewer">
+                <div class="loading">Loading logs...</div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Maintenance Modal -->
+    <div class="modal" id="maintenance-modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal('maintenance-modal')">&times;</span>
+            <h2>🔧 Maintenance Mode</h2>
+            <div class="modal-body">
+                <label>
+                    <input type="checkbox" id="maintenance-toggle"> Enable Maintenance Mode
+                </label>
+                <div class="form-group">
+                    <label for="maintenance-reason">Reason:</label>
+                    <textarea id="maintenance-reason" rows="3" placeholder="e.g., Database optimization..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button onclick="applyMaintenance()" class="btn-primary">Apply</button>
+                    <button onclick="closeModal('maintenance-modal')" class="btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Broadcast Modal -->
+    <div class="modal" id="broadcast-modal">
+        <div class="modal-content modal-large">
+            <span class="modal-close" onclick="closeModal('broadcast-modal')">&times;</span>
+            <h2>📢 Advanced Broadcast System</h2>
+            <div class="modal-body">
+                <!-- Message -->
+                <div class="form-group">
+                    <label for="broadcast-message">Message: *</label>
+                    <textarea id="broadcast-message" rows="4" placeholder="Enter your broadcast message..." required></textarea>
+                </div>
+
+                <!-- Mention Options -->
+                <div class="form-group">
+                    <label>Mention Type:</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="mention-type" value="none" checked> No Mention</label>
+                        <label><input type="radio" name="mention-type" value="here"> @here</label>
+                        <label><input type="radio" name="mention-type" value="everyone"> @everyone</label>
+                    </div>
+                    <small class="help-text">⚠️ Bot will automatically check for mention_everyone permission</small>
+                </div>
+
+                <!-- Guild & Channel Selection -->
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="broadcast-all-channels"> Send to ALL channels in ALL servers
+                    </label>
+                </div>
+
+                <div id="guild-channel-selector" class="guild-channel-selector">
+                    <div class="loading">Loading guilds and channels...</div>
+                </div>
+
+                <!-- Preview -->
+                <div class="form-group">
+                    <label>Preview:</label>
+                    <div id="broadcast-preview" class="preview-box">
+                        Message preview will appear here...
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="modal-actions">
+                    <button onclick="sendBroadcastAdvanced()" class="btn-primary">📢 Send Broadcast</button>
+                    <button onclick="closeModal('broadcast-modal')" class="btn-secondary">Cancel</button>
+                </div>
+
+                <!-- Results -->
+                <div id="broadcast-results" class="broadcast-results" style="display:none;">
+                    <h3>Broadcast Results:</h3>
+                    <div id="broadcast-results-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>

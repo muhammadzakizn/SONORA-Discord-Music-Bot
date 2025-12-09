@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SONORA Music Bot</title>
+    
+    <link rel="stylesheet" href="/static/css/maroon-theme.css">
+    <link rel="stylesheet" href="/static/css/glass.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/taskbar-fix.css">
+</head>
+<body class="dark-mode page-transition">
+    
+    <div class="netflix-loader" id="page-loader">
+        <div class="loading-bar" style="width: 100%;"></div>
+        <div class="netflix-logo">🎵 SONORA</div>
+    </div>
+    
+    <div style="max-width: 1400px; margin: 0 auto; padding: 2rem;">
+        <div class="glass-card" style="margin-bottom: 2rem;">
+            <h1 class="gradient-maroon-text" style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem;">
+                🎵 SONORA Music Bot
+            </h1>
+            <p style="color: var(--text-secondary);">
+                Your premium music experience on Discord
+            </p>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+            <div class="glass-card hover-lift card-entrance">
+                <div style="padding: 1.5rem;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎵</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--maroon-primary);" id="now-playing-count">0</div>
+                    <div style="color: var(--text-secondary); font-weight: 500;">Now Playing</div>
+                </div>
+            </div>
+            
+            <div class="glass-card hover-lift card-entrance" style="animation-delay: 0.1s;">
+                <div style="padding: 1.5rem;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📋</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--maroon-primary);" id="queue-count">0</div>
+                    <div style="color: var(--text-secondary); font-weight: 500;">In Queue</div>
+                </div>
+            </div>
+            
+            <div class="glass-card hover-lift card-entrance" style="animation-delay: 0.2s;">
+                <div style="padding: 1.5rem;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔊</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--maroon-primary);">100%</div>
+                    <div style="color: var(--text-secondary); font-weight: 500;">Volume</div>
+                </div>
+            </div>
+            
+            <div class="glass-card hover-lift card-entrance" style="animation-delay: 0.3s;">
+                <div style="padding: 1.5rem;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎶</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--maroon-primary);" id="active-servers">0</div>
+                    <div style="color: var(--text-secondary); font-weight: 500;">Active Servers</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="glass-card">
+            <h2 class="accent-maroon" style="margin-bottom: 1rem;">Now Playing</h2>
+            <div id="now-playing-display" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                No music playing
+                <div style="margin-top: 1rem; font-size: 0.875rem; opacity: 0.7;">
+                    🔒 Privacy Mode: User info hidden
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="taskbar-container"></div>
+    
+    <script>
+        window.isAdmin = false;
+        window.isAuthenticated = false;
+    </script>
+    <script src="/static/js/pwa.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/taskbar-working.js"></script>
+    
+    <script>
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loader = document.getElementById('page-loader');
+                if (loader) loader.style.display = 'none';
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 361 361">
+  <defs>
+    <linearGradient id="appleGradient" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" style="stop-color:#FA233B"/>
+      <stop offset="100%" style="stop-color:#FB5C74"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#appleGradient)" d="M255.6,97.5v149.9c0,22.5-18.2,40.8-40.8,40.8h-9.6c-22.5,0-40.8-18.2-40.8-40.8v0c0-22.5,18.2-40.8,40.8-40.8h17.6v-64.4
+    l-92.8,27.4v88.2c0,22.5-18.2,40.8-40.8,40.8h-9.6c-22.5,0-40.8-18.2-40.8-40.8v0c0-22.5,18.2-40.8,40.8-40.8h17.6V137l122.4-35.9
+    C232.9,97.4,255.6,75.3,255.6,97.5z"/>
+</svg>

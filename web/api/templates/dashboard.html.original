@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Music Bot - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <h1>🎵 Discord Music Bot</h1>
+                <span class="version">v3.2</span>
+            </div>
+            <div class="nav-buttons">
+                <a href="/" class="nav-btn active">📊 Dashboard</a>
+                <a href="/admin" class="nav-btn">🛠️ Admin Panel</a>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Stats Overview -->
+        <section class="stats-grid" id="stats-overview">
+            <div class="stat-card">
+                <div class="stat-icon">🏰</div>
+                <div class="stat-content">
+                    <div class="stat-label">Guilds</div>
+                    <div class="stat-value" id="stat-guilds">0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <div class="stat-label">Users</div>
+                    <div class="stat-value" id="stat-users">0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔊</div>
+                <div class="stat-content">
+                    <div class="stat-label">Voice Connections</div>
+                    <div class="stat-value" id="stat-voice">0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">▶️</div>
+                <div class="stat-content">
+                    <div class="stat-label">Now Playing</div>
+                    <div class="stat-value" id="stat-playing">0</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Active Guilds -->
+        <section class="guilds-section">
+            <h2>Active Guilds</h2>
+            <div class="guilds-grid" id="guilds-list">
+                <div class="loading">Loading guilds...</div>
+            </div>
+        </section>
+
+        <!-- Recent Activity -->
+        <section class="activity-section">
+            <h2>Recent Activity</h2>
+            <div class="activity-list" id="activity-list">
+                <div class="loading">Loading activity...</div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Guild Detail Modal -->
+    <div class="modal" id="guild-modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div id="guild-detail">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Music Bot Dashboard{% endblock %}</title>
+    
+    <!-- PWA Meta -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#800020">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Music Bot">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/css/maroon-theme.css">
+    <link rel="stylesheet" href="/static/css/glass.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    
+    {% block extra_css %}{% endblock %}
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            padding-bottom: 80px; /* Space for taskbar */
+            overflow-x: hidden;
+        }
+        
+        #main-content {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        @media (max-width: 768px) {
+            #main-content {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="dark-mode">
+    <!-- Netflix-style Loading -->
+    <div class="netflix-loader" id="page-loader">
+        <div class="loading-bar" style="width: 100%;"></div>
+        <div class="netflix-logo">🎵</div>
+    </div>
+    
+    <!-- Main Content -->
+    <div id="main-content" class="page-transition">
+        {% block content %}{% endblock %}
+    </div>
+    
+    <!-- Bottom Taskbar Container -->
+    <div id="taskbar-container"></div>
+    
+    <!-- PWA Install Button (Hidden by default) -->
+    <button id="pwa-install-btn" class="glass-btn" style="
+        position: fixed;
+        bottom: 90px;
+        right: 1rem;
+        z-index: 999;
+        display: none;
+        padding: 0.75rem 1.5rem;
+        box-shadow: 0 4px 16px rgba(128, 0, 32, 0.3);
+    ">
+        📱 Install App
+    </button>
+    
+    <!-- Core Scripts -->
+    <script src="/static/js/pwa.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/taskbar.js"></script>
+    <script src="/static/js/translation.js"></script>
+    <script src="/static/js/download.js"></script>
+    <script src="/static/js/analytics.js"></script>
+    
+    {% block extra_js %}{% endblock %}
+    
+    <script>
+        // Global variables
+        window.isAdmin = {{ 'true' if is_admin else 'false' }};
+        window.isAuthenticated = {{ 'true' if is_authenticated else 'false' }};
+        
+        // Hide page loader after load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loader = document.getElementById('page-loader');
+                if (loader) {
+                    loader.style.display = 'none';
+                }
+            }, 1000);
+        });
+        
+        // WebSocket connection for real-time updates
+        let socket;
+        if (window.location.protocol === 'http:') {
+            const wsProtocol = 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/socket.io/`;
+            // Initialize SocketIO if available
+            if (typeof io !== 'undefined') {
+                socket = io();
+                
+                socket.on('connect', () => {
+                    console.log('✓ WebSocket connected');
+                });
+                
+                socket.on('update', (data) => {
+                    console.log('Update received:', data);
+                    // Handle real-time updates
+                });
+            }
+        }
+    </script>
+</body>
+</html>

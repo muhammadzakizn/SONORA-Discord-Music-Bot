@@ -1,0 +1,375 @@
+/* Glass Morphism / Liquid Glass Effect */
+/* Inspired by macOS Big Sur and iOS */
+
+/* Base Glass Container */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Glass Variants */
+.glass-strong {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(30px) saturate(200%);
+    -webkit-backdrop-filter: blur(30px) saturate(200%);
+}
+
+body.dark-mode .glass-strong {
+    background: rgba(26, 26, 26, 0.9);
+}
+
+.glass-subtle {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px) saturate(150%);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+}
+
+body.dark-mode .glass-subtle {
+    background: rgba(26, 26, 26, 0.5);
+}
+
+/* Glass Card */
+.glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 48px 0 rgba(128, 0, 32, 0.15);
+    border-color: var(--maroon-primary);
+}
+
+/* Glass Button */
+.glass-btn {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.glass-btn:hover {
+    background: rgba(128, 0, 32, 0.1);
+    border-color: var(--maroon-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(128, 0, 32, 0.2);
+}
+
+.glass-btn:active {
+    transform: translateY(0);
+}
+
+/* Glass Input */
+.glass-input {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0.875rem 1rem;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.glass-input:focus {
+    outline: none;
+    border-color: var(--maroon-primary);
+    box-shadow: 0 0 0 4px rgba(128, 0, 32, 0.1);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+body.dark-mode .glass-input:focus {
+    background: rgba(26, 26, 26, 0.95);
+}
+
+.glass-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* Glass Modal/Dialog */
+.glass-modal {
+    background: var(--glass-bg);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 2rem;
+    box-shadow: 0 24px 64px 0 rgba(0, 0, 0, 0.2);
+    max-width: 90%;
+    max-height: 90vh;
+    overflow: auto;
+}
+
+/* Glass Navbar/Header */
+.glass-nav {
+    background: var(--glass-bg);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-bottom: 1px solid var(--glass-border);
+    padding: 1rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+/* Glass Sidebar */
+.glass-sidebar {
+    background: var(--glass-bg);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-right: 1px solid var(--glass-border);
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 280px;
+    overflow-y: auto;
+    z-index: 999;
+}
+
+/* Glass Taskbar (Bottom) */
+.glass-taskbar {
+    background: var(--glass-bg);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border-top: 1px solid var(--glass-border);
+    border-radius: 24px 24px 0 0;
+    padding: 0.75rem 1.5rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    box-shadow: 0 -8px 32px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* macOS Dock Style Taskbar */
+.glass-dock {
+    background: var(--glass-bg);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 0.5rem;
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Dock Item */
+.dock-item {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+}
+
+.dock-item:hover {
+    transform: translateY(-8px) scale(1.1);
+    background: rgba(128, 0, 32, 0.15);
+}
+
+.dock-item.active {
+    background: var(--maroon-primary);
+    color: white;
+}
+
+.dock-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    background: var(--maroon-primary);
+    border-radius: 50%;
+}
+
+/* Dock Separator */
+.dock-separator {
+    width: 1px;
+    height: 40px;
+    background: var(--glass-border);
+    margin: 0 0.25rem;
+}
+
+/* Glass Badge/Notification */
+.glass-badge {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+/* Glass Tooltip */
+.glass-tooltip {
+    background: var(--glass-bg);
+    backdrop-filter: blur(30px) saturate(200%);
+    -webkit-backdrop-filter: blur(30px) saturate(200%);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15);
+    position: absolute;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.glass-tooltip.show {
+    opacity: 1;
+}
+
+/* Glass Dropdown */
+.glass-dropdown {
+    background: var(--glass-bg);
+    backdrop-filter: blur(30px) saturate(200%);
+    -webkit-backdrop-filter: blur(30px) saturate(200%);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 0.5rem;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+}
+
+.glass-dropdown-item {
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+}
+
+.glass-dropdown-item:hover {
+    background: rgba(128, 0, 32, 0.1);
+    transform: translateX(4px);
+}
+
+/* Glass Progress Bar */
+.glass-progress {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.glass-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--maroon-gradient-start), var(--maroon-gradient-end));
+    border-radius: 12px;
+    transition: width 0.3s ease;
+}
+
+/* Glass Divider */
+.glass-divider {
+    height: 1px;
+    background: var(--glass-border);
+    margin: 1rem 0;
+}
+
+/* Frosted Glass Effect (stronger blur) */
+.frosted-glass {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(50px) saturate(200%);
+    -webkit-backdrop-filter: blur(50px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+body.dark-mode .frosted-glass {
+    background: rgba(26, 26, 26, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Glass Container with Gradient Border */
+.glass-gradient-border {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 2px solid transparent;
+    border-radius: 16px;
+    background-clip: padding-box;
+    position: relative;
+}
+
+.glass-gradient-border::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 16px;
+    padding: 2px;
+    background: linear-gradient(135deg, var(--maroon-gradient-start), var(--maroon-gradient-end));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    z-index: -1;
+}
+
+/* Responsive Glass */
+@media (max-width: 768px) {
+    .glass-card {
+        padding: 1rem;
+        border-radius: 16px;
+    }
+    
+    .glass-modal {
+        padding: 1.5rem;
+        border-radius: 20px;
+        max-width: 95%;
+    }
+    
+    .glass-dock {
+        bottom: 0.5rem;
+        border-radius: 16px;
+        padding: 0.375rem;
+    }
+    
+    .dock-item {
+        width: 40px;
+        height: 40px;
+        font-size: 1.25rem;
+    }
+}

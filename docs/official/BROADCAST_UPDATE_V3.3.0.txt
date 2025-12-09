@@ -1,0 +1,203 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎉 UPDATE BOT MUSIK - VERSI 3.3.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@everyone Bot musik server kita baru saja mendapatkan update BESAR! 🚀
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  ✨ FITUR BARU v3.3.0            ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+🎚️ **EQUALIZER YANG BENAR-BENAR BEKERJA!**
+Akhirnya equalizer berfungsi dengan sempurna! 🔥
+• 10+ preset: Bass Boost, Treble Boost, Pop, Rock, Jazz, dll
+• Audio benar-benar berubah sesuai preset
+• Indikator EQ muncul di player (🎚️ Bass Boost)
+• Kustomisasi 10-band equalizer
+
+Cara pakai:
+1. `/play` lagu favorit
+2. Klik tombol **Equalizer** di player
+3. Pilih preset atau custom
+4. Klik **Apply** - langsung terdengar bedanya!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌐 **TERJEMAHAN LIRIK (LYRICS TRANSLATION)**
+Tidak bisa baca lirik? Sekarang bisa ditranslate! 🌍
+• 5 bahasa: English, Indonesia, Thai, Arabic, Turkish
+• Otomatis detect bahasa asli
+• Tampilan side-by-side (asli + terjemahan)
+• Toggle on/off sesukamu
+
+Tinggal klik tombol **Translate** di player lyrics!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📥 **DOWNLOAD MULTI-FORMAT**
+Suka sama lagunya? Download sekarang! 💾
+• Format audio: MP3, FLAC, OGG, OPUS
+• Download lyrics (dengan timestamp)
+• Download artwork (high-res)
+• Download lengkap (audio + lyrics + artwork)
+
+Klik tombol **Download** di player, pilih format, done!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔤 **ROMANISASI TOGGLE**
+Kontrol romanisasi sesuai keinginanmu:
+• 🇯🇵 Jepang: Kanji → Romaji
+• 🇨🇳 China: Hanzi → Pinyin
+• 🇰🇷 Korea: Hangul → Romanized
+• Bisa di-enable/disable per bahasa
+• Setting tersimpan otomatis
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  🎵 FITUR DARI v3.2.2 (Masih Ada) ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+✅ **SISTEM ANTRIAN** - Queue, shuffle, move
+✅ **KONTROL VOLUME** - 0-200%, slider interaktif
+✅ **LIRIK + ROMANISASI** - Otomatis untuk lagu Asia
+✅ **STATISTIK** - /stats, /history, /top
+✅ **AUTO-PLAY** - Lagu berikutnya otomatis main
+✅ **CACHE SYSTEM** - Lagu tersimpan, putar ulang instan!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  🎮 CARA PENGGUNAAN             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+**COMMAND DASAR:**
+
+Putar Musik:
+`/play <judul lagu>` - Cari berdasarkan nama
+`/play <URL>` - Link Spotify/YouTube/Apple Music
+`/play <URL playlist>` - Auto-add ke antrian
+
+Kontrol:
+`/pause` - Jeda
+`/resume` - Lanjut
+`/skip` - Skip
+`/stop` - Stop & keluar
+
+**ANTRIAN:**
+`/queue` - Lihat antrian
+`/shuffle` - Acak
+`/clear` - Hapus semua
+`/move <dari> <ke>` - Pindah posisi
+
+**VOLUME & EQ:**
+`/volume <0-200>` - Set volume
+`/volume-up` - +10%
+`/volume-down` - -10%
+Lalu klik tombol **Equalizer** untuk preset!
+
+**STATISTIK:**
+`/stats` - Statistik pribadi
+`/history` - Riwayat 10 lagu terakhir
+`/top` - Top 10 server
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  💡 TIPS & TRIK BARU             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+1️⃣ **Kombinasi Volume + EQ**
+Untuk bass MAKSIMAL:
+`/volume 150` + EQ Bass Boost = 💥💥💥
+
+2️⃣ **Translate Sambil Nyanyi**
+Lagi karaoke lagu Korea/Jepang?
+Aktifkan translate + romanisasi = perfect!
+
+3️⃣ **Download Favorit**
+Download lagu favorit dalam format FLAC untuk kualitas terbaik!
+Atau MP3 untuk hemat space.
+
+4️⃣ **Playlist + Shuffle**
+Paste link playlist Spotify (50 lagu) → `/shuffle` = party mode! 🎉
+
+5️⃣ **Preset EQ untuk Genre**
+• Dengerin EDM? → EQ **Electronic**
+• Dengerin Jazz? → EQ **Jazz**
+• Vokal fokus? → EQ **Vocal Boost**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  🎯 SUMBER YANG DIDUKUNG        ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+✅ **Spotify** (Track, Album, Playlist)
+✅ **YouTube & YouTube Music**
+✅ **Apple Music** (Artwork terbaik)
+✅ **Pencarian Langsung**
+✅ **Direct URL**
+
+**Kualitas Audio:**
+• 256-320kbps Opus
+• 48kHz sample rate
+• CPU usage <5%
+• Latency <50ms
+• EQ dengan FFmpeg filter 🔥
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  🐛 TROUBLESHOOTING              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+**EQ tidak terdengar bedanya?**
+→ Pastikan sudah klik "Apply" setelah pilih preset
+→ Coba Bass Boost atau Treble Boost (paling jelas)
+
+**Translate tidak muncul?**
+→ Tidak semua lagu punya lyrics
+→ Pastikan koneksi internet stabil
+
+**Download gagal?**
+→ Coba format lain (MP3/OGG)
+→ Check koneksi internet
+
+**Bot tidak masuk Voice Channel?**
+→ Pastikan kamu sudah di dalam Voice Channel
+
+**Audio tidak keluar?**
+→ `/stop` lalu `/play` lagi
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📖 **DOKUMENTASI:**
+Cek pinned messages atau `/help`
+
+📞 **SUPPORT:**
+Ada pertanyaan? Hubungi: @thixxert
+
+🐛 **LAPOR BUG:**
+Ketemu error? Report ke: @thixxert
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎊 **SELAMAT MENCOBA!**
+
+Update kali ini fokus pada kualitas audio dan user experience!
+Equalizer sekarang BENAR-BENAR bekerja - silakan dicoba! 🔥
+
+Nikmati musik favorit kalian dengan fitur-fitur baru ini! 🎶
+Jangan lupa kasih feedback ya! 😊
+
+**Happy Listening!** 🎵
+
+*- Tim SONORA*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Version 3.3.0 | Stable Release ✅
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
