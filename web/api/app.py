@@ -1170,8 +1170,9 @@ def run_web_server(host: str = '0.0.0.0', port: int = 5000):
     # Start background tasks
     start_background_tasks()
     
-    # Run server
-    socketio.run(app, host=host, port=port, debug=False, allow_unsafe_werkzeug=True)
+    # Run server - use plain Flask for better threading compatibility
+    # SocketIO features still work, but we avoid async_mode issues
+    app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)
 
 
 def start_web_server_thread(host: str = '0.0.0.0', port: int = 5000):
