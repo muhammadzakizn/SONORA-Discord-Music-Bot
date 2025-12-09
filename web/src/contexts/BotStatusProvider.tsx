@@ -46,7 +46,7 @@ export function BotStatusProvider({ children }: BotStatusProviderProps) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-            const response = await fetch('/api/health', {
+            const response = await fetch('/api/bot/health', {
                 signal: controller.signal,
                 cache: 'no-store',
             });
