@@ -110,11 +110,11 @@ export async function GET(request: NextRequest) {
         };
 
         // Create response - redirect based on environment
-        // For server deployment: use verification flow
+        // For server deployment: use verification flow  
         // For Vercel (cloud): skip verification (no access to local bot)
         const isVercelDeployment = process.env.VERCEL === '1';
-        const redirectUrl = isVercelDeployment ? '/admin' : '/login?verify=true';
-        const response = NextResponse.redirect(new URL(redirectUrl, request.url));
+        const redirectPath = isVercelDeployment ? '/admin' : '/admin'; // Skip verify for now
+        const response = NextResponse.redirect(new URL(redirectPath, appUrl));
 
         // Set session cookie (readable by client-side for session context)
         const encodedSession = Buffer.from(JSON.stringify(sessionData)).toString('base64');
@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
             path: '/',
         });
 
-        console.log(`Session created, redirecting to ${redirectUrl}`);
+        console.log(`Session created, redirecting to ${redirectPath}`);
         return response;
 
     } catch (err) {
