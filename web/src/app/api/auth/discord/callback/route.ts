@@ -110,10 +110,10 @@ export async function GET(request: NextRequest) {
         };
 
         // Create response - redirect based on environment
-        // For server deployment: use verification flow  
+        // For server deployment: use verification flow with DM code
         // For Vercel (cloud): skip verification (no access to local bot)
         const isVercelDeployment = process.env.VERCEL === '1';
-        const redirectPath = isVercelDeployment ? '/admin' : '/admin'; // Skip verify for now
+        const redirectPath = isVercelDeployment ? '/admin' : '/verify';
         const response = NextResponse.redirect(new URL(redirectPath, appUrl));
 
         // Set session cookie (readable by client-side for session context)
