@@ -74,26 +74,26 @@ class MetadataProcessor:
         artwork_task = self.artwork_fetcher.fetch(track_info, prefer_apple=prefer_apple_artwork)
         
         # Multi-source lyrics fetch with priority
-        # Priority: LRCLIB (duration validated) → Syncedlyrics → Genius (plain only)
+        # Priority: Genius → LRCLIB → Syncedlyrics
         async def fetch_lyrics_with_fallback():
-            # Priority 1: LRCLIB (best quality + duration validation)
-            logger.info(f"Fetching lyrics from LRCLIB: {track_info}")
+            # Priority 1: Genius (user's preferred source)
+            logger.info(f"Fetching lyrics from Genius: {track_info}")
+            lyrics = await self.genius_fetcher.fetch(track_info)
+            if lyrics and lyrics.lines:
+                return lyrics
+            
+            # Priority 2: LRCLIB (synced lyrics with duration validation)
+            logger.info("Genius not found, trying LRCLIB...")
             lyrics = await self.lrclib_fetcher.fetch(track_info)
             if lyrics and lyrics.lines:
                 return lyrics
             
-            # Priority 2: Syncedlyrics (fallback)
+            # Priority 3: Syncedlyrics (last fallback)
             if self.syncedlyrics_fetcher:
                 logger.info("LRCLIB not found, trying Syncedlyrics...")
                 lyrics = await self.syncedlyrics_fetcher.fetch(track_info)
                 if lyrics and lyrics.lines:
                     return lyrics
-            
-            # Priority 3: Genius (plain lyrics, last resort)
-            logger.info("Trying Genius for lyrics...")
-            lyrics = await self.genius_fetcher.fetch(track_info)
-            if lyrics:
-                return lyrics
             
             return None
         
