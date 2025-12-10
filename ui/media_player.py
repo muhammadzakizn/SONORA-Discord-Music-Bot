@@ -509,8 +509,11 @@ class SynchronizedMediaPlayer:
                     await asyncio.sleep(1)
                     
                 except Exception as e:
-                    logger.warning(f"Pre-download error for {track_to_process.title}: {e}")
-                    await asyncio.sleep(2)
+                    logger.warning(f"Pre-download error for {track_to_process.title}: {e} - skipping")
+                    # Mark as failed to prevent infinite retry loop
+                    track_to_process._prefetch_failed = True
+                    processed_count += 1  # Count as processed (failed) to prevent infinite loop
+                    await asyncio.sleep(1)
                     continue
             
             if processed_count > 0:
