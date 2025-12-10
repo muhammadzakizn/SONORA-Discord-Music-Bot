@@ -401,77 +401,96 @@ class SynchronizedMediaPlayer:
     
     async def _prefetch_next_track(self) -> None:
         """
-        Pre-fetch next track in background (starts 1 second after playback begins)
-        This ensures the next track is ready to play immediately when current track finishes
+        Continuously pre-download tracks from queue in background.
+        Downloads and processes tracks one by one, replacing TrackInfo with MetadataInfo
+        so they're ready to play instantly when user skips or current track ends.
         """
         try:
-            # Wait 1 second after playback starts (fast pre-fetch for instant transitions!)
-            await asyncio.sleep(1)
+            # Wait 2 seconds after playback starts before beginning pre-download
+            await asyncio.sleep(2)
             
             queue_cog = self.bot.get_cog('QueueCommands')
             if not queue_cog:
                 logger.debug("Queue system not available for pre-fetching")
                 return
             
-            # Peek at next track (don't remove from queue yet)
-            if self.guild_id not in queue_cog.queues or not queue_cog.queues[self.guild_id]:
-                logger.debug("No next track to pre-fetch")
-                return
-            
-            next_item = queue_cog.queues[self.guild_id][0]  # Peek first item
-            
-            from database.models import TrackInfo, MetadataInfo
-            
-            # Only pre-fetch if it's TrackInfo (needs processing)
-            if isinstance(next_item, MetadataInfo):
-                logger.debug(f"Next track already processed: {next_item.title}")
-                self.prefetched_metadata = next_item
-                return
-            
-            if not isinstance(next_item, TrackInfo):
-                logger.debug(f"Next item is not TrackInfo: {type(next_item)}")
-                return
-            
-            logger.info(f"🔄 Pre-fetching next track in background: {next_item.title}")
-            
-            # Get Play command for download methods
             play_cog = self.bot.get_cog('PlayCommand')
             if not play_cog:
                 logger.warning("PlayCommand not available for pre-fetching")
                 return
             
-            try:
-                # Download audio in background
-                logger.debug(f"  ⬇️ Downloading: {next_item.title}")
-                audio_result = await play_cog._download_with_fallback(next_item, None)
+            processed_count = 0
+            max_prefetch = 5  # Maximum number of tracks to pre-download
+            
+            from database.models import TrackInfo, MetadataInfo
+            
+            while self.is_playing and processed_count < max_prefetch:
+                # Check if there are tracks in queue
+                if self.guild_id not in queue_cog.queues or not queue_cog.queues[self.guild_id]:
+                    logger.debug("Queue empty, stopping pre-fetch")
+                    break
                 
-                if not audio_result or not audio_result.is_success:
-                    logger.warning(f"Pre-fetch download failed: {next_item.title}")
-                    return
+                queue = queue_cog.queues[self.guild_id]
                 
-                # Process metadata (artwork + lyrics) in background
-                logger.debug(f"  📋 Processing metadata: {next_item.title}")
-                voice_ch_id = getattr(next_item, 'voice_channel_id', None)
+                # Find first unprocessed track (TrackInfo, not MetadataInfo)
+                track_index = None
+                track_to_process = None
                 
-                next_metadata = await play_cog.metadata_processor.process(
-                    next_item,
-                    audio_result,
-                    requested_by="Pre-fetched",
-                    requested_by_id=0,
-                    prefer_apple_artwork=True,
-                    voice_channel_id=voice_ch_id
-                )
+                for i, item in enumerate(queue):
+                    if isinstance(item, TrackInfo):
+                        track_index = i
+                        track_to_process = item
+                        break
                 
-                # Cache the processed metadata
-                self.prefetched_metadata = next_metadata
+                if track_to_process is None:
+                    logger.info(f"✅ All {len(queue)} tracks in queue are pre-downloaded!")
+                    break
                 
-                logger.info(f"✅ Pre-fetched successfully: {next_metadata.title}")
-                logger.info(f"   Next track is ready to play instantly!")
+                logger.info(f"🔄 Pre-downloading track {processed_count + 1}: {track_to_process.title}")
                 
-            except Exception as e:
-                logger.warning(f"Pre-fetch failed for {next_item.title}: {e}")
-                # Don't raise - pre-fetching is optional optimization
-        
+                try:
+                    # Download audio in background
+                    audio_result = await play_cog._download_with_fallback(track_to_process, None)
+                    
+                    if not audio_result or not audio_result.is_success:
+                        logger.warning(f"Pre-download failed: {track_to_process.title}")
+                        # Don't remove from queue, will be retried when played
+                        await asyncio.sleep(2)
+                        continue
+                    
+                    # Process metadata (artwork + lyrics)
+                    voice_ch_id = getattr(track_to_process, 'voice_channel_id', None)
+                    
+                    processed_metadata = await play_cog.metadata_processor.process(
+                        track_to_process,
+                        audio_result,
+                        requested_by="Pre-downloaded",
+                        requested_by_id=0,
+                        prefer_apple_artwork=True,
+                        voice_channel_id=voice_ch_id
+                    )
+                    
+                    # Replace TrackInfo in queue with processed MetadataInfo
+                    if track_index is not None and track_index < len(queue):
+                        queue[track_index] = processed_metadata
+                        processed_count += 1
+                        logger.info(f"✅ Pre-downloaded: {processed_metadata.title} ({processed_count}/{max_prefetch})")
+                    
+                    # Store first pre-fetched as prefetched_metadata for instant play
+                    if processed_count == 1:
+                        self.prefetched_metadata = processed_metadata
+                    
+                    # Small delay between downloads to avoid rate limiting
+                    await asyncio.sleep(1)
+                    
+                except Exception as e:
+                    logger.warning(f"Pre-download error for {track_to_process.title}: {e}")
+                    await asyncio.sleep(2)
+                    continue
+            
+            if processed_count > 0:
+                logger.info(f"🎵 Background pre-download complete: {processed_count} tracks ready!")
+            
         except asyncio.CancelledError:
             logger.debug("Pre-fetch task cancelled")
         except Exception as e:
