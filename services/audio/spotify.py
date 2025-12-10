@@ -41,55 +41,39 @@ class SpotifyDownloader(BaseDownloader):
             raise RuntimeError("spotdl not installed")
     
     def _init_spotdl(self) -> None:
-        """Initialize spotdl instance (singleton)
+        """Initialize spotdl - verify CLI is available
         
-        spotdl v4+ has built-in default Spotify credentials that work for all public content.
-        We use headless=True and no_cache=True to avoid auth popups and stale cache issues.
-        
-        Default spotdl credentials (from their config):
-        - client_id: f8a606e5583643beaa27ce62c48e3fc1
-        - client_secret: f6f4c8f73f0649939286cf417c811607
+        We use spotdl CLI instead of Python API because:
+        1. CLI automatically uses spotdl's built-in default Spotify credentials
+        2. No authentication issues with Python API
+        3. More reliable for server environments
         """
         try:
-            from spotdl import Spotdl
+            import subprocess
             
-            logger.info("Initializing spotdl with default credentials (headless mode)")
-            
-            # Use headless mode to avoid browser auth popups
-            # Use no_cache to avoid stale token issues
-            SpotifyDownloader._spotdl_instance = Spotdl(
-                headless=True,
-                no_cache=True
+            # Just verify spotdl CLI is available
+            result = subprocess.run(
+                ['spotdl', '--version'],
+                capture_output=True,
+                text=True,
+                timeout=10
             )
-            logger.info("Spotdl instance initialized successfully")
+            
+            if result.returncode == 0:
+                version = result.stdout.strip()
+                logger.info(f"spotdl CLI verified: {version}")
+                SpotifyDownloader._spotdl_instance = True  # Mark as available
+            else:
+                logger.error(f"spotdl CLI check failed: {result.stderr}")
+                SpotifyDownloader._spotdl_instance = None
         
         except Exception as e:
-            error_str = str(e)
-            logger.error(f"Failed to initialize spotdl: {error_str}")
-            
-            # If there's an auth error, try with explicit default credentials
-            if 'invalid_client' in error_str.lower() or 'auth' in error_str.lower():
-                logger.info("Retrying with explicit default credentials...")
-                try:
-                    from spotdl import Spotdl
-                    
-                    # Use spotdl's own default credentials explicitly
-                    SpotifyDownloader._spotdl_instance = Spotdl(
-                        client_id="f8a606e5583643beaa27ce62c48e3fc1",
-                        client_secret="f6f4c8f73f0649939286cf417c811607",
-                        headless=True,
-                        no_cache=True
-                    )
-                    logger.info("Spotdl initialized with explicit default credentials")
-                except Exception as e2:
-                    logger.error(f"Spotdl retry also failed: {e2}")
-                    SpotifyDownloader._spotdl_instance = None
-            else:
-                SpotifyDownloader._spotdl_instance = None
+            logger.error(f"Failed to verify spotdl CLI: {e}")
+            SpotifyDownloader._spotdl_instance = None
     
     async def search(self, query: str) -> Optional[TrackInfo]:
         """
-        Search for track on Spotify using spotdl Python API
+        Search for track on Spotify using spotdl CLI
         
         Args:
             query: Search query or Spotify URL
@@ -98,64 +82,66 @@ class SpotifyDownloader(BaseDownloader):
             TrackInfo if found, None otherwise
         """
         if not SpotifyDownloader._spotdl_instance:
-            logger.error("Spotdl instance not initialized")
+            logger.error("Spotdl CLI not available")
             return None
         
-        # Retry up to 2 times if rate limited
-        max_retries = 2
-        retry_delay = 2  # seconds
+        logger.info(f"Searching Spotify via CLI: {query}")
         
-        for attempt in range(max_retries):
-            try:
-                # Search for songs using singleton instance
-                songs = SpotifyDownloader._spotdl_instance.search([query])
-                
-                if not songs:
-                    logger.warning(f"No results found for: {query}")
-                    return None
-                
-                # Get first result (spotdl returns best match)
-                song = songs[0]
-                
-                # Get artist name safely
-                artist_name = 'Unknown'
-                if hasattr(song, 'artist'):
-                    artist_name = song.artist
-                elif hasattr(song, 'artists') and song.artists:
-                    artist_name = song.artists[0] if isinstance(song.artists, list) else song.artists
-                
-                logger.info(f"Found: {song.name} - {artist_name}")
-                
-                # Get attributes safely
-                return TrackInfo(
-                    title=song.name,
-                    artist=artist_name,
-                    album=song.album_name if hasattr(song, 'album_name') else None,
-                    duration=song.duration if hasattr(song, 'duration') else 0,
-                    url=song.url if hasattr(song, 'url') else None,
-                    track_id=song.song_id if hasattr(song, 'song_id') else None,
-                    isrc=song.isrc if hasattr(song, 'isrc') else None
-                )
+        try:
+            # Use spotdl CLI to get song info (save mode doesn't download)
+            # This uses spotdl's built-in default credentials automatically
+            command = [
+                'spotdl',
+                'url',  # Just get the URL/info, don't download
+                query,
+                '--print-errors'
+            ]
             
-            except Exception as e:
-                error_str = str(e).lower()
+            stdout, stderr, returncode = await self._run_command(command, timeout=30)
+            
+            if returncode != 0:
+                # Try alternate approach with 'save' to get metadata
+                logger.debug(f"spotdl url failed, trying search approach")
                 
-                # Check if it's a rate limit error
-                if 'rate' in error_str or '429' in error_str or 'too many' in error_str:
-                    if attempt < max_retries - 1:
-                        logger.warning(f"Rate limited, retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries})")
-                        await asyncio.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff
-                        continue
-                    else:
-                        logger.error(f"Rate limit exceeded after {max_retries} attempts")
-                        return None
-                else:
-                    # Other error, don't retry
-                    logger.error(f"Spotify search failed: {e}", exc_info=True)
-                    return None
+                # For non-URL queries, we need a different approach
+                # Use the download command with --print-errors to get info
+                if not query.startswith('http'):
+                    # Search query - use spotdl's search capability
+                    search_cmd = [
+                        'spotdl',
+                        'download',
+                        query,
+                        '--output', '/dev/null',  # Don't actually save
+                        '--print-errors',
+                        '--headless'
+                    ]
+                    stdout, stderr, returncode = await self._run_command(search_cmd, timeout=30)
+            
+            # Parse output to extract track info
+            if stdout:
+                lines = stdout.strip().split('\n')
+                for line in lines:
+                    # spotdl outputs URLs or track names
+                    if 'spotify.com/track/' in line or ' - ' in line:
+                        # Found track info
+                        if ' - ' in line:
+                            parts = line.split(' - ', 1)
+                            if len(parts) == 2:
+                                artist = parts[0].strip()
+                                title = parts[1].strip()
+                                logger.info(f"Found on Spotify: {title} - {artist}")
+                                return TrackInfo(
+                                    title=title,
+                                    artist=artist,
+                                    url=query if query.startswith('http') else None
+                                )
+            
+            logger.warning(f"No Spotify results for: {query}")
+            return None
         
-        return None
+        except Exception as e:
+            logger.error(f"Spotify CLI search failed: {e}", exc_info=True)
+            return None
     
     async def download(self, track_info: TrackInfo) -> AudioResult:
         """
