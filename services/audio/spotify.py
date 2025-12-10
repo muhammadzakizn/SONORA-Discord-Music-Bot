@@ -443,16 +443,13 @@ class SpotifyDownloader(BaseDownloader):
             import spotipy
             from spotipy.oauth2 import SpotifyClientCredentials
             
-            # Initialize spotipy with built-in credentials
-            # spotdl uses: f8a606e5583643beaa27ce62c48e3fc1 / f6f4c8f73f0649939286cf417c811607
-            client_id = "f8a606e5583643beaa27ce62c48e3fc1"
-            client_secret = "f6f4c8f73f0649939286cf417c811607"
+            # Initialize spotipy with Settings credentials (loaded from .env)
+            client_id = Settings.SPOTIFY_CLIENT_ID
+            client_secret = Settings.SPOTIFY_CLIENT_SECRET
             
-            # Use environment variables if available
-            import os
-            if os.environ.get('SPOTIFY_CLIENT_ID') and os.environ.get('SPOTIFY_CLIENT_SECRET'):
-                client_id = os.environ.get('SPOTIFY_CLIENT_ID')
-                client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET')
+            if not client_id or not client_secret:
+                logger.error("Spotify credentials not configured in .env!")
+                return []
             
             auth_manager = SpotifyClientCredentials(
                 client_id=client_id,
@@ -519,13 +516,13 @@ class SpotifyDownloader(BaseDownloader):
             import spotipy
             from spotipy.oauth2 import SpotifyClientCredentials
             
-            client_id = "f8a606e5583643beaa27ce62c48e3fc1"
-            client_secret = "f6f4c8f73f0649939286cf417c811607"
+            # Initialize spotipy with Settings credentials (loaded from .env)
+            client_id = Settings.SPOTIFY_CLIENT_ID
+            client_secret = Settings.SPOTIFY_CLIENT_SECRET
             
-            import os
-            if os.environ.get('SPOTIFY_CLIENT_ID') and os.environ.get('SPOTIFY_CLIENT_SECRET'):
-                client_id = os.environ.get('SPOTIFY_CLIENT_ID')
-                client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET')
+            if not client_id or not client_secret:
+                logger.error("Spotify credentials not configured in .env!")
+                return 0
             
             auth_manager = SpotifyClientCredentials(
                 client_id=client_id,
@@ -560,10 +557,14 @@ class SpotifyDownloader(BaseDownloader):
         try:
             import spotipy
             from spotipy.oauth2 import SpotifyClientCredentials
-            import os
             
-            client_id = os.environ.get('SPOTIFY_CLIENT_ID', 'f8a606e5583643beaa27ce62c48e3fc1')
-            client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET', 'f6f4c8f73f0649939286cf417c811607')
+            # Initialize spotipy with Settings credentials (loaded from .env)
+            client_id = Settings.SPOTIFY_CLIENT_ID
+            client_secret = Settings.SPOTIFY_CLIENT_SECRET
+            
+            if not client_id or not client_secret:
+                logger.error("Spotify credentials not configured in .env!")
+                return 0
             
             auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
             sp = spotipy.Spotify(auth_manager=auth_manager)
@@ -601,10 +602,14 @@ class SpotifyDownloader(BaseDownloader):
         try:
             import spotipy
             from spotipy.oauth2 import SpotifyClientCredentials
-            import os
             
-            client_id = os.environ.get('SPOTIFY_CLIENT_ID', 'f8a606e5583643beaa27ce62c48e3fc1')
-            client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET', 'f6f4c8f73f0649939286cf417c811607')
+            # Initialize spotipy with Settings credentials (loaded from .env)
+            client_id = Settings.SPOTIFY_CLIENT_ID
+            client_secret = Settings.SPOTIFY_CLIENT_SECRET
+            
+            if not client_id or not client_secret:
+                logger.error("Spotify credentials not configured in .env!")
+                return []
             
             auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
             sp = spotipy.Spotify(auth_manager=auth_manager)
