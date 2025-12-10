@@ -223,13 +223,15 @@ class YouTubeDownloader(BaseDownloader):
             try:
                 logger.debug(f"Trying with player_client={client}...")
                 
-                # Build yt-dlp command - simplified to avoid conversion issues
+                # Build yt-dlp command
+                # Download best audio and keep original format (no ffmpeg conversion)
                 output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
                 
                 command = [
                     'yt-dlp',
                     url,
-                    '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
+                    '-f', 'bestaudio',  # Simplest format - let yt-dlp choose
+                    '-x',  # Extract audio
                     '-o', output_template,
                     '--no-playlist',
                     '--playlist-items', '1',
@@ -259,22 +261,27 @@ class YouTubeDownloader(BaseDownloader):
                     # Success! Wait for file and verify
                     await asyncio.sleep(1.0)
                     
-                    if not output_path.exists():
-                        possible_files = list(self.download_dir.glob(f"*{track_info.title}*.opus"))
-                        if not possible_files:
-                            possible_files = list(self.download_dir.glob("*.opus"))
-                            if possible_files:
-                                possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-                        
-                        if possible_files:
-                            output_path = possible_files[0]
-                            logger.info(f"Found downloaded file: {output_path.name}")
-                        else:
-                            raise FileNotFoundError(f"Downloaded file not found")
+                    # Search for any audio file (opus, m4a, webm, mp3, etc.)
+                    audio_extensions = ['*.opus', '*.m4a', '*.webm', '*.mp3', '*.ogg', '*.aac']
+                    possible_files = []
+                    
+                    for ext in audio_extensions:
+                        matches = list(self.download_dir.glob(ext))
+                        possible_files.extend(matches)
+                    
+                    if possible_files:
+                        # Get the most recently modified file
+                        possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                        output_path = possible_files[0]
+                        logger.info(f"Found downloaded file: {output_path.name}")
+                    else:
+                        raise FileNotFoundError(f"Downloaded file not found in any audio format")
+                    
+                    # Get actual format from file extension
+                    actual_format = output_path.suffix.lstrip('.')
                     
                     logger.info(f"✓ Downloaded from YouTube Music: {output_path.name}")
-                    logger.info(f"  Artwork embedded: Yes")
-                    logger.info(f"  Metadata added: Yes")
+                    logger.info(f"  Format: {actual_format}")
                     
                     return AudioResult(
                         file_path=output_path,
@@ -283,7 +290,7 @@ class YouTubeDownloader(BaseDownloader):
                         duration=track_info.duration,
                         source=AudioSource.YOUTUBE_MUSIC,
                         bitrate=Settings.AUDIO_BITRATE,
-                        format='opus',
+                        format=actual_format,
                         sample_rate=Settings.AUDIO_SAMPLE_RATE
                     )
                 else:
@@ -306,7 +313,8 @@ class YouTubeDownloader(BaseDownloader):
                 command = [
                     'yt-dlp',
                     fallback_url,
-                    '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
+                    '-f', 'bestaudio',
+                    '-x',  # Extract audio
                     '-o', str(self.download_dir / "%(uploader)s - %(title)s.%(ext)s"),
                     '--no-playlist',
                     '--no-warnings',
@@ -318,10 +326,16 @@ class YouTubeDownloader(BaseDownloader):
                 if returncode == 0:
                     await asyncio.sleep(1.0)
                     
-                    possible_files = list(self.download_dir.glob("*.opus"))
+                    # Search for any audio file
+                    audio_extensions = ['*.opus', '*.m4a', '*.webm', '*.mp3', '*.ogg']
+                    possible_files = []
+                    for ext in audio_extensions:
+                        possible_files.extend(list(self.download_dir.glob(ext)))
+                    
                     if possible_files:
                         possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
                         output_path = possible_files[0]
+                        actual_format = output_path.suffix.lstrip('.')
                         
                         logger.info(f"✓ Downloaded from YouTube (fallback): {output_path.name}")
                         
@@ -332,7 +346,7 @@ class YouTubeDownloader(BaseDownloader):
                             duration=track_info.duration,
                             source=AudioSource.YOUTUBE,
                             bitrate=Settings.AUDIO_BITRATE,
-                            format='opus',
+                            format=actual_format,
                             sample_rate=Settings.AUDIO_SAMPLE_RATE
                         )
                         
