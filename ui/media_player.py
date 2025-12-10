@@ -278,8 +278,13 @@ class SynchronizedMediaPlayer:
         """
         self.is_playing = False
         
+        # Cancel background tasks
         if self.update_task:
             self.update_task.cancel()
+        
+        if self.prefetch_task:
+            self.prefetch_task.cancel()
+            logger.debug("Pre-fetch task cancelled on playback end")
         
         if error:
             logger.error(f"Playback error: {error}")
