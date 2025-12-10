@@ -346,30 +346,34 @@ class SpotifyDownloader(BaseDownloader):
                     logger.debug(f"Searching for artist: {track_info.artist}")
                 
                 # Strategy 1: Search by title (FILES ONLY, not directories) - case insensitive
-                all_opus_files = [f for f in self.download_dir.glob("*.opus") if f.is_file()]
-                possible_files = [f for f in all_opus_files if track_info.title.lower() in f.name.lower()]
+                # spotdl can output different formats (m4a, opus, mp3)
+                audio_extensions = ['*.opus', '*.m4a', '*.mp3', '*.webm', '*.ogg']
+                all_audio_files = []
+                for ext in audio_extensions:
+                    all_audio_files.extend([f for f in self.download_dir.glob(ext) if f.is_file()])
+                possible_files = [f for f in all_audio_files if track_info.title.lower() in f.name.lower()]
                 
                 if retry == 0 and not possible_files:
                     logger.debug(f"No files found with title '{track_info.title}'")
                 
                 # Strategy 2: Search by artist (FILES ONLY) - case insensitive
                 if not possible_files:
-                    possible_files = [f for f in all_opus_files if track_info.artist.lower() in f.name.lower()]
+                    possible_files = [f for f in all_audio_files if track_info.artist.lower() in f.name.lower()]
                     
                 if retry == 0 and not possible_files:
                     logger.debug(f"No files found with artist '{track_info.artist}'")
                 
-                # Strategy 3: Get the newest .opus file in downloads (FILES ONLY)
+                # Strategy 3: Get the newest audio file in downloads (FILES ONLY)
                 if not possible_files:
-                    all_opus = sorted(
-                        [f for f in self.download_dir.glob("*.opus") if f.is_file()],
+                    all_audio = sorted(
+                        all_audio_files,
                         key=lambda p: p.stat().st_mtime,
                         reverse=True
                     )
-                    if all_opus:
+                    if all_audio:
                         # Get file modified in last 10 seconds (recently downloaded)
                         recent_files = [
-                            f for f in all_opus 
+                            f for f in all_audio 
                             if time.time() - f.stat().st_mtime < 10
                         ]
                         if recent_files:
@@ -406,6 +410,9 @@ class SpotifyDownloader(BaseDownloader):
             
             logger.info(f"✓ Downloaded from Spotify: {output_path}")
             
+            # Get actual format from file extension
+            actual_format = output_path.suffix.lstrip('.')
+            
             return AudioResult(
                 file_path=output_path,
                 title=track_info.title,
@@ -413,7 +420,7 @@ class SpotifyDownloader(BaseDownloader):
                 duration=track_info.duration,
                 source=AudioSource.SPOTIFY,
                 bitrate=Settings.AUDIO_BITRATE,
-                format='opus',
+                format=actual_format,
                 sample_rate=Settings.AUDIO_SAMPLE_RATE
             )
         
