@@ -29,6 +29,33 @@ class YouTubeDownloader(BaseDownloader):
         # Verify yt-dlp is installed
         self._verify_ytdlp()
     
+    def _clean_search_query(self, artist: str, title: str) -> str:
+        """
+        Clean title for better YouTube Music search results.
+        Removes extra info like (feat. X), - Remix, etc.
+        """
+        # Remove common patterns that mess up search
+        clean_title = title
+        
+        # Remove everything in parentheses (feat. X, Remix, etc.)
+        clean_title = re.sub(r'\s*\([^)]*\)\s*', ' ', clean_title)
+        
+        # Remove everything after " - " (e.g., "- As featured in Superman")
+        if ' - ' in clean_title:
+            clean_title = clean_title.split(' - ')[0]
+        
+        # Remove "feat." or "ft." even without parentheses
+        clean_title = re.sub(r'\s*(feat\.?|ft\.?)\s+.*', '', clean_title, flags=re.IGNORECASE)
+        
+        # Clean up multiple spaces
+        clean_title = ' '.join(clean_title.split())
+        
+        # Build simple query: artist + clean title
+        query = f"{artist} {clean_title}".strip()
+        
+        logger.debug(f"Search query cleaned: '{artist} {title}' -> '{query}'")
+        return query
+    
     def _verify_ytdlp(self) -> None:
         """Verify yt-dlp is installed and accessible"""
         try:
@@ -204,8 +231,9 @@ class YouTubeDownloader(BaseDownloader):
         if url and 'youtube.com/watch' in url and 'music.youtube.com' not in url:
             url = self._convert_to_ytmusic_url(url)
         elif not url:
-            # If no URL, search on YouTube Music
-            url = f"https://music.youtube.com/search?q={track_info.artist}+{track_info.title}".replace(' ', '+')
+            # If no URL, search on YouTube Music with cleaned query
+            clean_query = self._clean_search_query(track_info.artist, track_info.title)
+            url = f"https://music.youtube.com/search?q={clean_query}".replace(' ', '+')
         
         logger.info(f"Downloading from: {url}")
         
@@ -224,14 +252,15 @@ class YouTubeDownloader(BaseDownloader):
                 logger.debug(f"Trying with player_client={client}...")
                 
                 # Build yt-dlp command
-                # Download best audio and keep original format (no ffmpeg conversion)
+                # Use most flexible format selection to avoid "format not available" errors
                 output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
                 
                 command = [
                     'yt-dlp',
                     url,
-                    '-f', 'bestaudio',  # Simplest format - let yt-dlp choose
+                    '-f', 'ba/b',  # bestaudio or best (most flexible)
                     '-x',  # Extract audio
+                    '--no-check-formats',  # Don't check format availability
                     '-o', output_template,
                     '--no-playlist',
                     '--playlist-items', '1',
@@ -313,8 +342,9 @@ class YouTubeDownloader(BaseDownloader):
                 command = [
                     'yt-dlp',
                     fallback_url,
-                    '-f', 'bestaudio',
+                    '-f', 'ba/b',  # bestaudio or best (most flexible)
                     '-x',  # Extract audio
+                    '--no-check-formats',
                     '-o', str(self.download_dir / "%(uploader)s - %(title)s.%(ext)s"),
                     '--no-playlist',
                     '--no-warnings',
