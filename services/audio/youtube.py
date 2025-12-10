@@ -85,12 +85,11 @@ class YouTubeDownloader(BaseDownloader):
                 'yt-dlp',
                 '--dump-json',
                 '--no-playlist',
-                '--flat-playlist',  # Get first result from search
-                '--playlist-items', '1',  # Only first result
+                '--playlist-items', '1',  # Only first result from search
                 '--no-check-certificate',
                 '--geo-bypass',
                 # Force YouTube Music client for proper metadata
-                '--extractor-args', 'youtube:player_client=android_music',  # Force Music client
+                '--extractor-args', 'youtube:player_client=android_music',
                 search_query
             ]
             
