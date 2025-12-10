@@ -181,7 +181,7 @@ class YouTubeDownloader(BaseDownloader):
     
     async def download(self, track_info: TrackInfo) -> AudioResult:
         """
-        Download audio from YouTube Music
+        Download audio from YouTube Music with fallback to regular YouTube
         
         Args:
             track_info: Track information
@@ -190,100 +190,169 @@ class YouTubeDownloader(BaseDownloader):
             AudioResult with download result
         
         Raises:
-            Exception if download fails
+            Exception if all download attempts fail
         """
         logger.info(f"Downloading from YouTube Music: {track_info}")
         
-        try:
-            # Get output path
-            output_path = self._get_output_path(track_info, 'opus')
-            
-            # Convert URL to YouTube Music if needed
-            url = track_info.url
-            if url and 'youtube.com/watch' in url and 'music.youtube.com' not in url:
-                url = self._convert_to_ytmusic_url(url)
-            elif not url:
-                # If no URL, search on YouTube Music
-                url = f"https://music.youtube.com/search?q={track_info.artist}+{track_info.title}".replace(' ', '+')
-            
-            logger.info(f"Downloading from: {url}")
-            
-            # Build yt-dlp command optimized for YouTube Music
-            # Use %(track,title)s to prefer track name from YouTube Music metadata
-            output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
-            
-            command = [
-                'yt-dlp',
-                url,
-                '-f', 'bestaudio[ext=m4a]/bestaudio/best',
-                '-x',  # Extract audio
-                '--audio-format', 'opus',
-                '--audio-quality', f"{Settings.AUDIO_BITRATE}k",
-                '-o', output_template,  # Use template with track/artist
-                '--no-playlist',
-                '--playlist-items', '1',  # Only first result if searching
-                '--no-warnings',
-                '--geo-bypass',
-                '--embed-thumbnail',  # Embed artwork!
-                '--add-metadata',  # Add metadata
-                # Force YouTube Music client for proper track/artist metadata
-                '--extractor-args', 'youtube:player_client=android_music',
-                '--postprocessor-args', f'ffmpeg:-b:a {Settings.AUDIO_BITRATE}k'
-            ]
-            
-            # Add cookies if available
-            if Settings.YOUTUBE_COOKIES.exists():
-                try:
-                    if Settings.YOUTUBE_COOKIES.stat().st_size > 0:
-                        command.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
-                        logger.debug(f"Using YouTube cookies")
-                except Exception as e:
-                    logger.debug(f"Could not add cookies: {e}")
-            
-            logger.debug(f"Running yt-dlp download...")
-            
-            # Run download
-            stdout, stderr, returncode = await self._run_command(command, timeout=300)
-            
-            if returncode != 0:
-                error_msg = f"yt-dlp failed with code {returncode}: {stderr}"
-                logger.error(error_msg)
-                raise Exception(error_msg)
-            
-            # Wait for file to be written
-            await asyncio.sleep(1.0)
-            
-            # Verify file exists
-            if not output_path.exists():
-                # Try to find the downloaded file
-                possible_files = list(self.download_dir.glob(f"*{track_info.title}*.opus"))
-                if not possible_files:
+        # Get output path
+        output_path = self._get_output_path(track_info, 'opus')
+        
+        # Convert URL to YouTube Music if needed
+        url = track_info.url
+        original_url = url  # Keep original for fallback
+        
+        if url and 'youtube.com/watch' in url and 'music.youtube.com' not in url:
+            url = self._convert_to_ytmusic_url(url)
+        elif not url:
+            # If no URL, search on YouTube Music
+            url = f"https://music.youtube.com/search?q={track_info.artist}+{track_info.title}".replace(' ', '+')
+        
+        logger.info(f"Downloading from: {url}")
+        
+        # Try different player clients in order of preference
+        # android_music sometimes fails with "Did not get any data blocks"
+        player_clients = [
+            'android_music',  # Best for YouTube Music metadata
+            'android',        # Fallback Android client
+            'web',            # Web client as last resort
+        ]
+        
+        last_error = None
+        
+        for client in player_clients:
+            try:
+                logger.debug(f"Trying with player_client={client}...")
+                
+                # Build yt-dlp command
+                output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
+                
+                command = [
+                    'yt-dlp',
+                    url,
+                    '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+                    '-x',  # Extract audio
+                    '--audio-format', 'opus',
+                    '--audio-quality', f"{Settings.AUDIO_BITRATE}k",
+                    '-o', output_template,
+                    '--no-playlist',
+                    '--playlist-items', '1',
+                    '--no-warnings',
+                    '--geo-bypass',
+                    '--embed-thumbnail',
+                    '--add-metadata',
+                    '--extractor-args', f'youtube:player_client={client}',
+                    '--postprocessor-args', f'ffmpeg:-b:a {Settings.AUDIO_BITRATE}k'
+                ]
+                
+                # Add cookies if available - IMPORTANT for YouTube Music access
+                cookies_added = False
+                if Settings.YOUTUBE_COOKIES.exists():
+                    try:
+                        if Settings.YOUTUBE_COOKIES.stat().st_size > 0:
+                            command.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
+                            cookies_added = True
+                            logger.info(f"  Using YouTube Music cookies for {client} client")
+                    except Exception as e:
+                        logger.warning(f"Could not add cookies: {e}")
+                
+                if not cookies_added:
+                    logger.debug(f"  No cookies available, using {client} without auth")
+                
+                # Run download
+                stdout, stderr, returncode = await self._run_command(command, timeout=300)
+                
+                if returncode == 0:
+                    # Success! Wait for file and verify
+                    await asyncio.sleep(1.0)
+                    
+                    if not output_path.exists():
+                        possible_files = list(self.download_dir.glob(f"*{track_info.title}*.opus"))
+                        if not possible_files:
+                            possible_files = list(self.download_dir.glob("*.opus"))
+                            if possible_files:
+                                possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                        
+                        if possible_files:
+                            output_path = possible_files[0]
+                            logger.info(f"Found downloaded file: {output_path.name}")
+                        else:
+                            raise FileNotFoundError(f"Downloaded file not found")
+                    
+                    logger.info(f"✓ Downloaded from YouTube Music: {output_path.name}")
+                    logger.info(f"  Artwork embedded: Yes")
+                    logger.info(f"  Metadata added: Yes")
+                    
+                    return AudioResult(
+                        file_path=output_path,
+                        title=track_info.title,
+                        artist=track_info.artist,
+                        duration=track_info.duration,
+                        source=AudioSource.YOUTUBE_MUSIC,
+                        bitrate=Settings.AUDIO_BITRATE,
+                        format='opus',
+                        sample_rate=Settings.AUDIO_SAMPLE_RATE
+                    )
+                else:
+                    last_error = f"yt-dlp failed with {client}: {stderr[:200]}"
+                    logger.warning(f"Player client {client} failed: {stderr[:100]}")
+                    
+            except Exception as e:
+                last_error = str(e)
+                logger.warning(f"Player client {client} error: {e}")
+                continue
+        
+        # All YouTube Music attempts failed - try regular YouTube as final fallback
+        if original_url and 'youtube.com' in original_url:
+            try:
+                logger.info("Trying regular YouTube URL as fallback...")
+                
+                # Use regular youtube.com URL
+                fallback_url = original_url.replace('music.youtube.com', 'www.youtube.com')
+                
+                command = [
+                    'yt-dlp',
+                    fallback_url,
+                    '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+                    '-x',
+                    '--audio-format', 'opus',
+                    '--audio-quality', f"{Settings.AUDIO_BITRATE}k",
+                    '-o', str(self.download_dir / "%(uploader)s - %(title)s.%(ext)s"),
+                    '--no-playlist',
+                    '--no-warnings',
+                    '--geo-bypass',
+                    '--embed-thumbnail',
+                    '--add-metadata',
+                    '--postprocessor-args', f'ffmpeg:-b:a {Settings.AUDIO_BITRATE}k'
+                ]
+                
+                stdout, stderr, returncode = await self._run_command(command, timeout=300)
+                
+                if returncode == 0:
+                    await asyncio.sleep(1.0)
+                    
                     possible_files = list(self.download_dir.glob("*.opus"))
-                    # Get most recent
                     if possible_files:
                         possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-                
-                if possible_files:
-                    output_path = possible_files[0]
-                    logger.info(f"Found downloaded file: {output_path.name}")
-                else:
-                    raise FileNotFoundError(f"Downloaded file not found: {output_path}")
-            
-            logger.info(f"✓ Downloaded from YouTube Music: {output_path.name}")
-            logger.info(f"  Artwork embedded: Yes")
-            logger.info(f"  Metadata added: Yes")
-            
-            return AudioResult(
-                file_path=output_path,
-                title=track_info.title,
-                artist=track_info.artist,
-                duration=track_info.duration,
-                source=AudioSource.YOUTUBE_MUSIC,
-                bitrate=Settings.AUDIO_BITRATE,
-                format='opus',
-                sample_rate=Settings.AUDIO_SAMPLE_RATE
-            )
+                        output_path = possible_files[0]
+                        
+                        logger.info(f"✓ Downloaded from YouTube (fallback): {output_path.name}")
+                        
+                        return AudioResult(
+                            file_path=output_path,
+                            title=track_info.title,
+                            artist=track_info.artist,
+                            duration=track_info.duration,
+                            source=AudioSource.YOUTUBE,
+                            bitrate=Settings.AUDIO_BITRATE,
+                            format='opus',
+                            sample_rate=Settings.AUDIO_SAMPLE_RATE
+                        )
+                        
+            except Exception as e:
+                logger.warning(f"Regular YouTube fallback failed: {e}")
         
-        except Exception as e:
-            logger.error(f"YouTube Music download failed: {e}", exc_info=True)
-            raise
+        # All attempts failed
+        error_msg = f"yt-dlp failed with code 1: {last_error}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
+
