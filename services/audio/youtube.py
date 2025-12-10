@@ -223,23 +223,18 @@ class YouTubeDownloader(BaseDownloader):
             try:
                 logger.debug(f"Trying with player_client={client}...")
                 
-                # Build yt-dlp command
+                # Build yt-dlp command - simplified to avoid conversion issues
                 output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
                 
                 command = [
                     'yt-dlp',
                     url,
-                    '-f', 'bestaudio/best',  # More flexible format selector
-                    '-x',  # Extract audio
-                    '--audio-format', 'opus',
-                    '--audio-quality', '0',  # Best quality
+                    '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
                     '-o', output_template,
                     '--no-playlist',
                     '--playlist-items', '1',
                     '--no-warnings',
                     '--geo-bypass',
-                    '--embed-thumbnail',
-                    '--add-metadata',
                     '--extractor-args', f'youtube:player_client={client}',
                 ]
                 
@@ -311,16 +306,11 @@ class YouTubeDownloader(BaseDownloader):
                 command = [
                     'yt-dlp',
                     fallback_url,
-                    '-f', 'bestaudio/best',  # More flexible format
-                    '-x',
-                    '--audio-format', 'opus',
-                    '--audio-quality', '0',  # Best quality
+                    '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
                     '-o', str(self.download_dir / "%(uploader)s - %(title)s.%(ext)s"),
                     '--no-playlist',
                     '--no-warnings',
                     '--geo-bypass',
-                    '--embed-thumbnail',
-                    '--add-metadata',
                 ]
                 
                 stdout, stderr, returncode = await self._run_command(command, timeout=300)
