@@ -225,6 +225,12 @@ class SpotifyDownloader(BaseDownloader):
         Raises:
             Exception if download fails
         """
+        # Check if we have a Spotify URL - spotdl works best with Spotify URLs
+        # If no Spotify URL, let YouTube handle it instead
+        if not track_info.url or 'spotify.com' not in track_info.url:
+            logger.warning(f"No Spotify URL for track, skipping Spotify download: {track_info}")
+            raise Exception("No Spotify URL - use YouTube fallback")
+        
         logger.info(f"Downloading from Spotify: {track_info}")
         
         # Get clean environment
