@@ -86,6 +86,11 @@ class MediaPlayerView(discord.ui.View):
                 description="Lihat queue"
             ),
             discord.SelectOption(
+                label="🎤 Lyrics",
+                value="lyrics",
+                description="Kontrol lirik"
+            ),
+            discord.SelectOption(
                 label="🗑️ Clear Queue",
                 value="clear",
                 description="Hapus semua queue"
@@ -226,19 +231,81 @@ class MediaPlayerView(discord.ui.View):
                 await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
             
             elif action == "queue":
-                queue_cog = self.bot.get_cog('QueueCommands')
-                if queue_cog:
-                    queue_items = queue_cog.queues.get(self.guild_id, [])
-                    
-                    if queue_items:
-                        queue_text = "\n".join([f"{i+1}. {item.title if hasattr(item, 'title') else str(item)}" for i, item in enumerate(queue_items[:10])])
-                        if len(queue_items) > 10:
-                            queue_text += f"\n... dan {len(queue_items) - 10} lagi"
-                        await interaction.response.send_message(f"📋 **Queue ({len(queue_items)} tracks)**\n{queue_text}", ephemeral=True, delete_after=10)
-                    else:
-                        await interaction.response.send_message("📋 Queue kosong", ephemeral=True, delete_after=3)
+                # Use InteractiveQueueView like /queue command
+                from ui.queue_view import InteractiveQueueView
+                
+                # Get user voice channel
+                user_voice_channel_id = None
+                if interaction.user.voice and interaction.user.voice.channel:
+                    user_voice_channel_id = interaction.user.voice.channel.id
+                
+                if not user_voice_channel_id:
+                    await interaction.response.send_message(
+                        "❌ Join a voice channel first to see its queue", 
+                        ephemeral=True, 
+                        delete_after=5
+                    )
+                    return
+                
+                view = InteractiveQueueView(
+                    bot=self.bot,
+                    guild_id=self.guild_id,
+                    user_voice_channel_id=user_voice_channel_id,
+                    timeout=180
+                )
+                
+                embed = view.create_embed()
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+            
+            elif action == "lyrics":
+                # Use LyricsView from lyrics command
+                from commands.lyrics import LyricsView
+                
+                # Get current player
+                if not hasattr(self.bot, 'players') or self.guild_id not in self.bot.players:
+                    await interaction.response.send_message(
+                        "❌ No track is currently playing", 
+                        ephemeral=True, 
+                        delete_after=5
+                    )
+                    return
+                
+                player = self.bot.players[self.guild_id]
+                metadata = player.metadata
+                
+                # Build status embed
+                from config.constants import COLOR_INFO
+                embed = discord.Embed(
+                    title="🎤 Lyrics Control",
+                    description=f"**{metadata.title}** by *{metadata.artist}*",
+                    color=COLOR_INFO
+                )
+                
+                # Lyrics status
+                if metadata.lyrics and metadata.lyrics.is_synced:
+                    status = "🎵 **Synced Lyrics Available**"
+                    lines_count = len(metadata.lyrics.lines)
+                elif metadata.lyrics and metadata.lyrics.lines:
+                    status = "📝 **Plain Lyrics Available**"
+                    lines_count = len(metadata.lyrics.lines)
                 else:
-                    await interaction.response.send_message("❌ Queue system tidak tersedia", ephemeral=True, delete_after=3)
+                    status = "❌ **No Lyrics Found**"
+                    lines_count = 0
+                
+                embed.add_field(name="Status", value=status, inline=False)
+                
+                if lines_count > 0:
+                    embed.add_field(
+                        name="Source",
+                        value=f"{metadata.lyrics.source.value} • {lines_count} lines",
+                        inline=True
+                    )
+                
+                if metadata.artwork_url:
+                    embed.set_thumbnail(url=metadata.artwork_url)
+                
+                view = LyricsView(self.bot, self.guild_id, metadata)
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
             
             elif action == "clear":
                 queue_cog = self.bot.get_cog('QueueCommands')
