@@ -634,14 +634,16 @@ class PlaylistProcessor:
                         artist = video_data.get('uploader') or video_data.get('channel') or 'Unknown'
                         title = title_full
                     
-                    # Return TrackInfo with url=None to download on-demand
-                    # This is consistent with Spotify playlist behavior
+                    # Get video ID and construct direct URL (avoids search failures)
+                    video_id = video_data.get('id')
+                    direct_url = f"https://music.youtube.com/watch?v={video_id}" if video_id else None
+                    
                     track = TrackInfo(
                         title=title,
                         artist=artist,
                         duration=video_data.get('duration', 0),
-                        url=None,  # Will search and download on-demand
-                        track_id=video_data.get('id', None)
+                        url=direct_url,  # Direct video URL for reliable download
+                        track_id=video_id
                     )
                     tracks.append(track)
                 
@@ -715,12 +717,16 @@ class PlaylistProcessor:
                         artist = video_data.get('uploader') or video_data.get('channel') or 'Unknown'
                         title = title_full
                     
+                    # Get video ID and construct direct URL (avoids search failures)
+                    video_id = video_data.get('id')
+                    direct_url = f"https://music.youtube.com/watch?v={video_id}" if video_id else None
+                    
                     track = TrackInfo(
                         title=title,
                         artist=artist,
                         duration=video_data.get('duration', 0),
-                        url=None,  # Will download on-demand
-                        track_id=video_data.get('id', None)
+                        url=direct_url,  # Direct video URL for reliable download
+                        track_id=video_id
                     )
                     tracks.append(track)
                     

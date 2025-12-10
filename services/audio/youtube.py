@@ -238,10 +238,11 @@ class YouTubeDownloader(BaseDownloader):
         logger.info(f"Downloading from: {url}")
         
         # Try different player clients in order of preference
-        # android_music sometimes fails with "Did not get any data blocks"
+        # ios/mweb often work better with SABR streaming issues
         player_clients = [
-            'android_music',  # Best for YouTube Music metadata
-            'android',        # Fallback Android client
+            'ios',            # iOS client - often most stable
+            'mweb',           # Mobile web - good fallback
+            'android_music',  # YouTube Music specific
             'web',            # Web client as last resort
         ]
         
@@ -261,6 +262,7 @@ class YouTubeDownloader(BaseDownloader):
                     '-f', 'ba/b',  # bestaudio or best (most flexible)
                     '-x',  # Extract audio
                     '--no-check-formats',  # Don't check format availability
+                    '--remote-components', 'ejs:github',  # Download JS solver for signatures
                     '-o', output_template,
                     '--no-playlist',
                     '--playlist-items', '1',
