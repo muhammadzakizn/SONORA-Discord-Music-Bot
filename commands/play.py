@@ -529,7 +529,7 @@ class PlayCommand(commands.Cog):
         voice_channel: discord.VoiceChannel
     ) -> None:
         """
-        Handle playlist/album URLs
+        Handle playlist/album URLs with progressive loading for Spotify
         
         Args:
             interaction: Discord interaction
@@ -538,7 +538,31 @@ class PlayCommand(commands.Cog):
             voice_channel: Voice channel to connect to
         """
         try:
-            # Update loading message
+            url_type = URLValidator.get_url_type(url)
+            guild_id = interaction.guild.id
+            
+            # Get queue manager early
+            queue_cog = self.bot.get_cog('QueueCommands')
+            if not queue_cog:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_error(
+                        "Queue Not Available",
+                        "Queue system is not initialized"
+                    )
+                )
+                return
+            
+            if guild_id not in queue_cog.queues:
+                queue_cog.queues[guild_id] = []
+            
+            # SPOTIFY: Use progressive loading for faster playback
+            if url_type == 'spotify':
+                await self._handle_spotify_playlist_progressive(
+                    interaction, url, loader, voice_channel, queue_cog
+                )
+                return
+            
+            # OTHER SOURCES (YouTube, Apple Music): Use standard loading
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
                     "Processing Playlist",
@@ -546,35 +570,19 @@ class PlayCommand(commands.Cog):
                 )
             )
             
-            # Get all tracks from playlist
             tracks = await self.playlist_processor.process_url(url)
             
             if not tracks:
-                # Check if it might be a rate limit issue
-                url_type = URLValidator.get_url_type(url)
-                
-                if url_type == 'spotify':
-                    await self._safe_loader_update(loader, 
-                        embed=EmbedBuilder.create_error(
-                            "Spotify Rate Limit",
-                            "⚠️ Spotify API rate limit reached.\n\n"
-                            "**Please try again in a few minutes.**\n\n"
-                            "Or use YouTube/Apple Music playlists instead."
-                        )
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_error(
+                        "Playlist Empty",
+                        "Could not find any tracks in the playlist"
                     )
-                else:
-                    await self._safe_loader_update(loader, 
-                        embed=EmbedBuilder.create_error(
-                            "Playlist Empty",
-                            "Could not find any tracks in the playlist"
-                        )
-                    )
+                )
                 return
             
-            # Check for Apple Music playlist limitation
-            url_type = URLValidator.get_url_type(url)
+            # Apple Music playlist warning
             if url_type == 'apple_music' and 'playlist' in url.lower() and len(tracks) == 1:
-                # Warning for Apple Music playlist
                 await interaction.channel.send(
                     embed=EmbedBuilder.create_warning(
                         "⚠️ Apple Music Playlist Limitation",
@@ -586,183 +594,15 @@ class PlayCommand(commands.Cog):
                     ),
                     delete_after=15
                 )
-                logger.warning("⚠️ Apple Music playlist: only 1 track (spotdl limitation)")
             
-            # Limit tracks to reasonable amount (but allow up to 200 for large playlists)
+            # Limit and process remaining tracks using standard method
             max_tracks = 200
             if len(tracks) > max_tracks:
-                await self._safe_loader_update(loader, 
-                    embed=EmbedBuilder.create_loading(
-                        "Large Playlist",
-                        f"Found {len(tracks)} tracks. Adding first {max_tracks}...\n"
-                        f"💡 Tracks will be processed one by one (streaming mode)"
-                    )
-                )
                 tracks = tracks[:max_tracks]
-            else:
-                await self._safe_loader_update(loader, 
-                    embed=EmbedBuilder.create_loading(
-                        "Playlist Ready",
-                        f"Found {len(tracks)} tracks\n"
-                        f"💡 Streaming mode: tracks processed one by one"
-                    )
-                )
             
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Adding to Queue",
-                    f"Adding {len(tracks)} tracks to queue..."
-                )
+            await self._play_first_and_queue_rest(
+                interaction, tracks, loader, voice_channel, queue_cog, guild_id, url_type
             )
-            
-            # Get queue manager
-            queue_cog = self.bot.get_cog('QueueCommands')
-            
-            if not queue_cog:
-                await self._safe_loader_update(loader, 
-                    embed=EmbedBuilder.create_error(
-                        "Queue Not Available",
-                        "Queue system is not initialized"
-                    )
-                )
-                return
-            
-            # Prepare tracks
-            guild_id = interaction.guild.id
-            if guild_id not in queue_cog.queues:
-                queue_cog.queues[guild_id] = []
-            
-            # First track will be played immediately
-            # Remaining tracks will be queued
-            first_track = tracks[0]
-            remaining_tracks = tracks[1:]
-            
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Downloading First Track",
-                    f"**{first_track.title}** - *{first_track.artist}*"
-                )
-            )
-            
-            # Download first track
-            audio_result = await self._download_with_fallback(first_track, loader)
-            
-            if not audio_result or not audio_result.is_success:
-                await self._safe_loader_update(loader, 
-                    embed=EmbedBuilder.create_error(
-                        "Download Failed",
-                        "Failed to download first track"
-                    )
-                )
-                return
-            
-            # Process metadata
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Processing",
-                    "Fetching artwork and lyrics..."
-                )
-            )
-            
-            # Playlist: Determine artwork preference based on source
-            url_type = URLValidator.get_url_type(url)
-            # For Spotify/Apple Music playlists, prefer source artwork
-            # For YouTube playlists, prefer Apple Music (higher quality)
-            prefer_apple = (url_type == 'youtube')
-            
-            metadata = await self.metadata_processor.process(
-                first_track,
-                audio_result,
-                requested_by=interaction.user.display_name,
-                requested_by_id=interaction.user.id,
-                prefer_apple_artwork=prefer_apple,
-                voice_channel_id=voice_channel.id  # Track which voice channel
-            )
-            
-            # Connect to voice
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Connecting",
-                    "Connecting to voice channel..."
-                )
-            )
-            
-            voice_connection = RobustVoiceConnection()
-            await voice_connection.connect(voice_channel)
-            self.bot.voice_manager.connections[guild_id] = voice_connection
-            
-            # Delete loading and old player message
-            await loader.delete()
-            
-            # Delete old player message if exists (keep chat clean)
-            if hasattr(self.bot, 'player_messages'):
-                old_player_msg = self.bot.player_messages.get(guild_id)
-                if old_player_msg:
-                    try:
-                        await old_player_msg.delete()
-                        logger.debug("Deleted old player message")
-                    except Exception as e:
-                        logger.debug(f"Could not delete old player message: {e}")
-            else:
-                # Initialize player_messages dict if not exists
-                self.bot.player_messages = {}
-            
-            # Wait for buffer
-            await asyncio.sleep(1)
-            
-            # Create menu view for controls
-            view = MediaPlayerView(self.bot, guild_id, timeout=None)
-            
-            # Send NEW player message with menu
-            player_msg = await interaction.channel.send(
-                embed=EmbedBuilder.create_now_playing(
-                    metadata=metadata,
-                    progress_bar="",
-                    lyrics_lines=["", "", ""],
-                    guild_id=guild_id
-                ),
-                view=view
-            )
-            
-            # Store player message for future deletion
-            self.bot.player_messages[guild_id] = player_msg
-            
-            # Get volume
-            volume = 1.0
-            volume_cog = self.bot.get_cog('VolumeCommands')
-            if volume_cog:
-                volume_level = volume_cog.get_volume(guild_id)
-                volume = volume_level / 100.0
-            
-            # Start playback with bot and guild_id for auto-play
-            player = SynchronizedMediaPlayer(
-                voice_connection.connection,
-                player_msg,
-                metadata,
-                bot=self.bot,
-                guild_id=guild_id
-            )
-            
-            await player.start(volume=volume)
-            
-            logger.info(f"✓ Now playing first track: {metadata.title}")
-            
-            # Add remaining tracks to queue
-            for track in remaining_tracks:
-                queue_cog.queues[guild_id].append(track)
-            
-            # Send confirmation
-            if remaining_tracks:
-                await interaction.channel.send(
-                    embed=EmbedBuilder.create_success(
-                        "Playlist Added",
-                        f"✓ Now playing: **{metadata.title}**\n"
-                        f"📋 Added **{len(remaining_tracks)}** more tracks to queue"
-                    ),
-                    delete_after=10
-                )
-            
-            logger.info(f"✓ Playing playlist: {len(tracks)} tracks total")
         
         except Exception as e:
             logger.error(f"Failed to handle playlist: {e}", exc_info=True)
@@ -772,6 +612,289 @@ class PlayCommand(commands.Cog):
                     f"An error occurred: {str(e)}"
                 )
             )
+    
+    async def _handle_spotify_playlist_progressive(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+        loader: SafeLoadingManager,
+        voice_channel: discord.VoiceChannel,
+        queue_cog
+    ) -> None:
+        """
+        Handle Spotify playlist with progressive loading
+        First track plays IMMEDIATELY, rest are queued in background
+        """
+        guild_id = interaction.guild.id
+        first_track_played = False
+        tracks_queued = 0
+        
+        async def on_first_track(track: TrackInfo):
+            """Called when first track is ready - play immediately"""
+            nonlocal first_track_played
+            
+            await self._safe_loader_update(loader, 
+                embed=EmbedBuilder.create_loading(
+                    "Downloading First Track",
+                    f"**{track.title}** - *{track.artist}*"
+                )
+            )
+            
+            # Download first track
+            audio_result = await self._download_with_fallback(track, loader)
+            
+            if not audio_result or not audio_result.is_success:
+                logger.error("Failed to download first track")
+                return
+            
+            # Process metadata
+            metadata = await self.metadata_processor.process(
+                track,
+                audio_result,
+                requested_by=interaction.user.display_name,
+                requested_by_id=interaction.user.id,
+                prefer_apple_artwork=False,  # Spotify has good artwork
+                voice_channel_id=voice_channel.id
+            )
+            
+            # Connect to voice
+            voice_connection = RobustVoiceConnection()
+            await voice_connection.connect(voice_channel)
+            self.bot.voice_manager.connections[guild_id] = voice_connection
+            
+            # Delete loader
+            await loader.delete()
+            
+            # Delete old player message
+            if hasattr(self.bot, 'player_messages'):
+                old_msg = self.bot.player_messages.get(guild_id)
+                if old_msg:
+                    try:
+                        await old_msg.delete()
+                    except Exception:
+                        pass
+            else:
+                self.bot.player_messages = {}
+            
+            await asyncio.sleep(0.5)
+            
+            # Create and send player
+            view = MediaPlayerView(self.bot, guild_id, timeout=None)
+            player_msg = await interaction.channel.send(
+                embed=EmbedBuilder.create_now_playing(
+                    metadata=metadata,
+                    progress_bar="",
+                    lyrics_lines=["", "", ""],
+                    guild_id=guild_id
+                ),
+                view=view
+            )
+            self.bot.player_messages[guild_id] = player_msg
+            
+            # Get volume
+            volume = 1.0
+            volume_cog = self.bot.get_cog('VolumeCommands')
+            if volume_cog:
+                volume = volume_cog.get_volume(guild_id) / 100.0
+            
+            # Start playback
+            player = SynchronizedMediaPlayer(
+                voice_connection.connection,
+                player_msg,
+                metadata,
+                bot=self.bot,
+                guild_id=guild_id
+            )
+            
+            if not hasattr(self.bot, 'players'):
+                self.bot.players = {}
+            self.bot.players[guild_id] = player
+            
+            await player.start(volume=volume)
+            first_track_played = True
+            
+            logger.info(f"🎵 First track playing: {track.title}")
+        
+        async def on_track_ready(track: TrackInfo):
+            """Called for each subsequent track - add to queue"""
+            nonlocal tracks_queued
+            
+            # Store voice channel ID for the track
+            track.voice_channel_id = voice_channel.id
+            
+            # Add to queue (raw TrackInfo - will be processed when played)
+            queue_cog.queues[guild_id].append(track)
+            tracks_queued += 1
+            
+            logger.debug(f"📋 Queued: {track.title} (#{tracks_queued})")
+        
+        async def on_progress(current: int, total: int, message: str):
+            """Progress callback - update loading message only before first track"""
+            if not first_track_played:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_loading(
+                        f"Loading Playlist ({current}/{total})",
+                        message
+                    )
+                )
+        
+        # Start progressive loading
+        await self._safe_loader_update(loader, 
+            embed=EmbedBuilder.create_loading(
+                "🎵 Loading Spotify Playlist",
+                "Using progressive loading for faster playback..."
+            )
+        )
+        
+        try:
+            total = await self.playlist_processor.process_spotify_playlist_progressive(
+                url=url,
+                on_first_track=on_first_track,
+                on_track_ready=on_track_ready,
+                on_progress=on_progress
+            )
+            
+            if total > 0 and tracks_queued > 0:
+                # Send confirmation after loading completes
+                await interaction.channel.send(
+                    embed=EmbedBuilder.create_success(
+                        "✅ Playlist Loaded",
+                        f"🎵 Now playing first track\n"
+                        f"📋 **{tracks_queued}** tracks added to queue\n\n"
+                        f"💡 Tracks loaded progressively for faster playback!"
+                    ),
+                    delete_after=15
+                )
+            
+            logger.info(f"✅ Progressive playlist complete: {total} tracks")
+        
+        except Exception as e:
+            logger.error(f"Progressive playlist failed: {e}", exc_info=True)
+            if not first_track_played:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_error(
+                        "Playlist Error",
+                        f"Failed to load playlist: {str(e)[:100]}"
+                    )
+                )
+    
+    async def _play_first_and_queue_rest(
+        self,
+        interaction: discord.Interaction,
+        tracks: list,
+        loader: SafeLoadingManager,
+        voice_channel: discord.VoiceChannel,
+        queue_cog,
+        guild_id: int,
+        url_type: str
+    ) -> None:
+        """Standard playlist handling - play first track, queue rest"""
+        # First track will be played immediately
+        first_track = tracks[0]
+        remaining_tracks = tracks[1:]
+        
+        await self._safe_loader_update(loader, 
+            embed=EmbedBuilder.create_loading(
+                "Downloading First Track",
+                f"**{first_track.title}** - *{first_track.artist}*"
+            )
+        )
+        
+        # Download first track
+        audio_result = await self._download_with_fallback(first_track, loader)
+        
+        if not audio_result or not audio_result.is_success:
+            await self._safe_loader_update(loader, 
+                embed=EmbedBuilder.create_error(
+                    "Download Failed",
+                    "Failed to download first track"
+                )
+            )
+            return
+        
+        # Process metadata
+        prefer_apple = (url_type == 'youtube')
+        metadata = await self.metadata_processor.process(
+            first_track,
+            audio_result,
+            requested_by=interaction.user.display_name,
+            requested_by_id=interaction.user.id,
+            prefer_apple_artwork=prefer_apple,
+            voice_channel_id=voice_channel.id
+        )
+        
+        # Connect to voice
+        voice_connection = RobustVoiceConnection()
+        await voice_connection.connect(voice_channel)
+        self.bot.voice_manager.connections[guild_id] = voice_connection
+        
+        # Delete loader and old player
+        await loader.delete()
+        
+        if hasattr(self.bot, 'player_messages'):
+            old_msg = self.bot.player_messages.get(guild_id)
+            if old_msg:
+                try:
+                    await old_msg.delete()
+                except Exception:
+                    pass
+        else:
+            self.bot.player_messages = {}
+        
+        await asyncio.sleep(1)
+        
+        # Create player
+        view = MediaPlayerView(self.bot, guild_id, timeout=None)
+        player_msg = await interaction.channel.send(
+            embed=EmbedBuilder.create_now_playing(
+                metadata=metadata,
+                progress_bar="",
+                lyrics_lines=["", "", ""],
+                guild_id=guild_id
+            ),
+            view=view
+        )
+        self.bot.player_messages[guild_id] = player_msg
+        
+        # Get volume
+        volume = 1.0
+        volume_cog = self.bot.get_cog('VolumeCommands')
+        if volume_cog:
+            volume = volume_cog.get_volume(guild_id) / 100.0
+        
+        # Start playback
+        player = SynchronizedMediaPlayer(
+            voice_connection.connection,
+            player_msg,
+            metadata,
+            bot=self.bot,
+            guild_id=guild_id
+        )
+        
+        if not hasattr(self.bot, 'players'):
+            self.bot.players = {}
+        self.bot.players[guild_id] = player
+        
+        await player.start(volume=volume)
+        
+        logger.info(f"✓ Now playing: {metadata.title}")
+        
+        # Add remaining to queue
+        for track in remaining_tracks:
+            track.voice_channel_id = voice_channel.id
+            queue_cog.queues[guild_id].append(track)
+        
+        if remaining_tracks:
+            await interaction.channel.send(
+                embed=EmbedBuilder.create_success(
+                    "Playlist Added",
+                    f"✓ Now playing: **{metadata.title}**\n"
+                    f"📋 Added **{len(remaining_tracks)}** more tracks to queue"
+                ),
+                delete_after=10
+            )
+        
+        logger.info(f"✓ Playlist complete: {len(tracks)} tracks")
 
 
 async def setup(bot: commands.Bot):

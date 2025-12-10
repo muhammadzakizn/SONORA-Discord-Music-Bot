@@ -420,3 +420,129 @@ class SpotifyDownloader(BaseDownloader):
         except Exception as e:
             logger.error(f"Spotify download failed: {e}", exc_info=True)
             raise
+    
+    async def get_playlist_tracks_batch(
+        self,
+        playlist_id: str,
+        offset: int = 0,
+        limit: int = 50
+    ) -> list:
+        """
+        Get playlist tracks directly from Spotify API using spotipy
+        Much faster than spotdl CLI for metadata-only fetching
+        
+        Args:
+            playlist_id: Spotify playlist ID (extracted from URL)
+            offset: Starting position (0-based)
+            limit: Number of tracks to fetch (max 50 per API call)
+        
+        Returns:
+            List of TrackInfo objects
+        """
+        try:
+            import spotipy
+            from spotipy.oauth2 import SpotifyClientCredentials
+            
+            # Initialize spotipy with built-in credentials
+            # spotdl uses: f8a606e5583643beaa27ce62c48e3fc1 / f6f4c8f73f0649939286cf417c811607
+            client_id = "f8a606e5583643beaa27ce62c48e3fc1"
+            client_secret = "f6f4c8f73f0649939286cf417c811607"
+            
+            # Use environment variables if available
+            import os
+            if os.environ.get('SPOTIFY_CLIENT_ID') and os.environ.get('SPOTIFY_CLIENT_SECRET'):
+                client_id = os.environ.get('SPOTIFY_CLIENT_ID')
+                client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET')
+            
+            auth_manager = SpotifyClientCredentials(
+                client_id=client_id,
+                client_secret=client_secret
+            )
+            sp = spotipy.Spotify(auth_manager=auth_manager)
+            
+            # Fetch playlist tracks with pagination
+            logger.debug(f"Fetching playlist {playlist_id} tracks (offset={offset}, limit={limit})")
+            
+            results = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: sp.playlist_tracks(playlist_id, offset=offset, limit=limit)
+            )
+            
+            if not results or 'items' not in results:
+                logger.warning(f"No items in playlist response")
+                return []
+            
+            tracks = []
+            for item in results['items']:
+                if not item or 'track' not in item or not item['track']:
+                    continue
+                
+                track = item['track']
+                
+                # Extract artist names
+                artists = [artist['name'] for artist in track.get('artists', [])]
+                artist_str = ', '.join(artists) if artists else 'Unknown'
+                
+                # Create TrackInfo
+                from database.models import TrackInfo
+                track_info = TrackInfo(
+                    title=track.get('name', 'Unknown'),
+                    artist=artist_str,
+                    album=track.get('album', {}).get('name', None),
+                    duration=track.get('duration_ms', 0) / 1000,  # Convert ms to seconds
+                    url=None,  # Will download from YouTube Music
+                    track_id=track.get('id', None)
+                )
+                tracks.append(track_info)
+            
+            logger.info(f"Fetched {len(tracks)} tracks from Spotify API (offset={offset})")
+            return tracks
+        
+        except ImportError:
+            logger.error("spotipy not installed! Install with: pip install spotipy")
+            return []
+        except Exception as e:
+            logger.error(f"Spotify API batch fetch failed: {e}", exc_info=True)
+            return []
+    
+    async def get_playlist_total_tracks(self, playlist_id: str) -> int:
+        """
+        Get total number of tracks in a playlist
+        
+        Args:
+            playlist_id: Spotify playlist ID
+        
+        Returns:
+            Total number of tracks, 0 on error
+        """
+        try:
+            import spotipy
+            from spotipy.oauth2 import SpotifyClientCredentials
+            
+            client_id = "f8a606e5583643beaa27ce62c48e3fc1"
+            client_secret = "f6f4c8f73f0649939286cf417c811607"
+            
+            import os
+            if os.environ.get('SPOTIFY_CLIENT_ID') and os.environ.get('SPOTIFY_CLIENT_SECRET'):
+                client_id = os.environ.get('SPOTIFY_CLIENT_ID')
+                client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET')
+            
+            auth_manager = SpotifyClientCredentials(
+                client_id=client_id,
+                client_secret=client_secret
+            )
+            sp = spotipy.Spotify(auth_manager=auth_manager)
+            
+            # Get playlist info (minimal API call)
+            results = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: sp.playlist(playlist_id, fields='tracks.total')
+            )
+            
+            total = results.get('tracks', {}).get('total', 0)
+            logger.info(f"Playlist {playlist_id} has {total} tracks")
+            return total
+        
+        except Exception as e:
+            logger.error(f"Failed to get playlist total: {e}")
+            return 0

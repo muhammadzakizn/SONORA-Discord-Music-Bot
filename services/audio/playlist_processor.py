@@ -115,6 +115,123 @@ class PlaylistProcessor:
         
         return []
     
+    async def process_spotify_playlist_progressive(
+        self,
+        url: str,
+        on_first_track,  # Callable[[TrackInfo], Awaitable[None]] - play immediately
+        on_track_ready,  # Callable[[TrackInfo], Awaitable[None]] - add to queue
+        on_progress = None  # Callable[[int, int, str], Awaitable[None]] - (current, total, message)
+    ) -> int:
+        """
+        Progressive playlist loading for immediate playback
+        
+        Strategy:
+        1. Fetch first track → callback immediately (user hears music fast)
+        2. Fetch next 5 tracks → process each → callback
+        3. Fetch next 10 tracks → repeat until done
+        
+        Args:
+            url: Spotify playlist or album URL
+            on_first_track: Called with first track (play immediately)
+            on_track_ready: Called for each subsequent track (add to queue)
+            on_progress: Optional progress callback (current_count, total, message)
+        
+        Returns:
+            Total number of tracks processed
+        """
+        import re
+        
+        # Extract playlist/album ID
+        playlist_match = re.search(r'playlist/([a-zA-Z0-9]+)', url)
+        album_match = re.search(r'album/([a-zA-Z0-9]+)', url)
+        
+        if playlist_match:
+            content_id = playlist_match.group(1)
+            content_type = 'playlist'
+        elif album_match:
+            content_id = album_match.group(1)
+            content_type = 'album'
+        else:
+            logger.error(f"Could not extract Spotify ID from: {url}")
+            return 0
+        
+        logger.info(f"🎵 Progressive loading Spotify {content_type}: {content_id}")
+        
+        try:
+            # Get total count first
+            total_tracks = await self.spotify.get_playlist_total_tracks(content_id)
+            
+            if total_tracks == 0:
+                logger.warning("Playlist/album appears empty")
+                return 0
+            
+            if on_progress:
+                await on_progress(0, total_tracks, f"Found {total_tracks} tracks in {content_type}")
+            
+            processed = 0
+            offset = 0
+            batch_sizes = [1, 5, 10]  # First batch = 1, then 5, then 10 for remaining
+            current_batch_idx = 0
+            
+            while offset < total_tracks:
+                # Determine batch size
+                if current_batch_idx < len(batch_sizes):
+                    batch_size = batch_sizes[current_batch_idx]
+                    current_batch_idx += 1
+                else:
+                    batch_size = 10  # Default for remaining
+                
+                # Don't exceed remaining tracks
+                batch_size = min(batch_size, total_tracks - offset)
+                
+                logger.info(f"📦 Fetching batch: offset={offset}, limit={batch_size}")
+                
+                if on_progress:
+                    await on_progress(processed, total_tracks, f"Fetching tracks {offset+1}-{offset+batch_size}...")
+                
+                # Fetch batch
+                tracks = await self.spotify.get_playlist_tracks_batch(content_id, offset, batch_size)
+                
+                if not tracks:
+                    logger.warning(f"No tracks returned for offset {offset}")
+                    offset += batch_size
+                    continue
+                
+                # Process each track in batch
+                for i, track in enumerate(tracks):
+                    processed += 1
+                    
+                    if processed == 1:
+                        # First track - play immediately!
+                        logger.info(f"🎵 First track ready: {track.title} - {track.artist}")
+                        if on_first_track:
+                            await on_first_track(track)
+                    else:
+                        # Subsequent tracks - add to queue
+                        logger.info(f"📋 Track {processed}/{total_tracks} ready: {track.title}")
+                        if on_track_ready:
+                            await on_track_ready(track)
+                    
+                    if on_progress:
+                        await on_progress(processed, total_tracks, f"Processing: {track.title[:30]}...")
+                
+                offset += batch_size
+                
+                # Small delay between batches to avoid rate limits
+                if offset < total_tracks:
+                    await asyncio.sleep(0.5)
+            
+            logger.info(f"✅ Progressive loading complete: {processed}/{total_tracks} tracks")
+            
+            if on_progress:
+                await on_progress(processed, total_tracks, f"All {total_tracks} tracks loaded!")
+            
+            return processed
+        
+        except Exception as e:
+            logger.error(f"Progressive playlist loading failed: {e}", exc_info=True)
+            return 0
+    
     async def _get_spotify_playlist_info_batch(self, playlist_url: str, offset: int = 0, limit: int = 2) -> List[TrackInfo]:
         """
         Get LIMITED tracks from playlist (batch processing to avoid rate limits)
