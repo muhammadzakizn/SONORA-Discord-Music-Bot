@@ -41,24 +41,42 @@ class SpotifyDownloader(BaseDownloader):
             raise RuntimeError("spotdl not installed")
     
     def _init_spotdl(self) -> None:
-        """Initialize spotdl instance (singleton)"""
+        """Initialize spotdl instance (singleton)
+        
+        spotdl can work without explicit API credentials for public content.
+        It has built-in default access for public Spotify metadata.
+        Cookies are used primarily for YouTube Music Premium audio quality.
+        """
         try:
             from spotdl import Spotdl
             
-            # Simple settings without cache
+            # spotdl settings - credentials are OPTIONAL
+            # spotdl v4+ has built-in default access for public Spotify content
             spotdl_settings = {}
             
-            # Add credentials if available
+            # Add user credentials if available (optional, for private playlists)
             if Settings.SPOTIFY_CLIENT_ID and Settings.SPOTIFY_CLIENT_SECRET:
                 spotdl_settings['client_id'] = Settings.SPOTIFY_CLIENT_ID
                 spotdl_settings['client_secret'] = Settings.SPOTIFY_CLIENT_SECRET
+                logger.info("Using custom Spotify API credentials")
+            else:
+                # No credentials provided - spotdl will use its default access
+                # This works fine for public tracks, playlists, and albums
+                logger.info("No Spotify API credentials provided - using spotdl default access")
             
             SpotifyDownloader._spotdl_instance = Spotdl(**spotdl_settings)
-            logger.info("Spotdl instance initialized")
+            logger.info("Spotdl instance initialized successfully")
         
         except Exception as e:
             logger.error(f"Failed to initialize spotdl: {e}")
-            SpotifyDownloader._spotdl_instance = None
+            # Try initializing without any settings as fallback
+            try:
+                from spotdl import Spotdl
+                SpotifyDownloader._spotdl_instance = Spotdl()
+                logger.info("Spotdl initialized with default settings (fallback)")
+            except Exception as e2:
+                logger.error(f"Spotdl fallback initialization also failed: {e2}")
+                SpotifyDownloader._spotdl_instance = None
     
     async def search(self, query: str) -> Optional[TrackInfo]:
         """
