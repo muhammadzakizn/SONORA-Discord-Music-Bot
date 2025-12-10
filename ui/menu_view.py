@@ -138,6 +138,9 @@ class MediaPlayerView(discord.ui.View):
             if action == "pause":
                 if connection and connection.is_playing():
                     connection.connection.pause()
+                    # Also update player's is_paused state so update loop pauses
+                    if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                        self.bot.players[self.guild_id].is_paused = True
                     await interaction.response.send_message("⏸️ Paused", ephemeral=True, delete_after=3)
                 else:
                     await interaction.response.send_message("❌ Tidak ada yang diputar", ephemeral=True, delete_after=3)
@@ -145,6 +148,9 @@ class MediaPlayerView(discord.ui.View):
             elif action == "resume":
                 if connection and connection.is_paused():
                     connection.connection.resume()
+                    # Also update player's is_paused state so update loop resumes
+                    if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                        self.bot.players[self.guild_id].is_paused = False
                     await interaction.response.send_message("▶️ Resumed", ephemeral=True, delete_after=3)
                 else:
                     await interaction.response.send_message("❌ Playback tidak di-pause", ephemeral=True, delete_after=3)
