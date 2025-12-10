@@ -257,6 +257,8 @@ class YouTubeDownloader(BaseDownloader):
             '--retries', '3',
             '--js-runtimes', 'node',  # Use Node.js for JS signature solving
             '--remote-components', 'ejs:github',  # Download JS solver from GitHub
+            '--allow-unplayable-formats',  # Try to bypass DRM check
+            '--ignore-no-streams-error',  # Don't fail if no streams
         ]
         
         # Add cookies if available
@@ -328,6 +330,8 @@ class YouTubeDownloader(BaseDownloader):
             '--geo-bypass',
             '--js-runtimes', 'node',
             '--remote-components', 'ejs:github',
+            '--allow-unplayable-formats',
+            '--ignore-no-streams-error',
         ]
         
         if cookies_added:
