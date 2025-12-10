@@ -86,58 +86,7 @@ function ScrollToTopButton({ isDark }: { isDark: boolean }) {
   );
 }
 
-// Swipe Indicator Component
-function SwipeIndicator({ isDark }: { isDark: boolean }) {
-  const scrollToFeatures = () => {
-    const featuresSection = document.getElementById('features-section');
-    if (featuresSection) {
-      featuresSection.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
 
-  return (
-    <motion.button
-      onClick={scrollToFeatures}
-      className="flex flex-col items-center cursor-pointer group"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 1 }}
-    >
-      {/* Mouse/Swipe Icon */}
-      <motion.div
-        className={`w-8 h-12 border-2 rounded-full flex justify-center pt-2 relative overflow-hidden ${isDark ? 'border-white/40 group-hover:border-white/70' : 'border-gray-900/40 group-hover:border-gray-900/70'
-          } transition-colors`}
-        animate={{ y: [0, 5, 0] }}
-        transition={{ duration: 1.5, repeat: Infinity }}
-      >
-        {/* Scroll wheel */}
-        <motion.div
-          className={`w-1.5 h-3 rounded-full ${isDark ? 'bg-white/60' : 'bg-gray-900/60'}`}
-          animate={{ y: [0, 8, 0], opacity: [1, 0.3, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-        />
-        {/* Hand swipe visual */}
-        <motion.div
-          className={`absolute bottom-1 left-1/2 transform -translate-x-1/2 ${isDark ? 'text-white/50' : 'text-gray-900/50'}`}
-          animate={{ y: [0, -5, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-        >
-          <ChevronDown className="w-4 h-4" />
-        </motion.div>
-      </motion.div>
-
-      {/* Text */}
-      <motion.span
-        className={`mt-2 text-xs font-medium uppercase tracking-wider ${isDark ? 'text-white/50 group-hover:text-white/80' : 'text-gray-900/50 group-hover:text-gray-900/80'
-          } transition-colors`}
-        animate={{ opacity: [0.5, 1, 0.5] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        Swipe Down
-      </motion.span>
-    </motion.button>
-  );
-}
 
 // Animated Subtitle with Word Cycling and Glow Effect
 function AnimatedSubtitle({ isDark, t, isPaused }: { isDark: boolean; t: (key: string) => string; isPaused: boolean }) {
@@ -212,161 +161,126 @@ function AnimatedSubtitle({ isDark, t, isPaused }: { isDark: boolean; t: (key: s
 
 
 
-// Hero Section
-function HeroSection({ isDark, t, isPaused, setIsPaused }: { isDark: boolean; t: (key: string) => string; isPaused: boolean; setIsPaused: (v: boolean) => void }) {
-  // User activity detection for auto-pause
-  const [isUserActive, setIsUserActive] = useState(false);
-  const activityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Animation phase: 0=hidden, 1=fadeIn, 2=fastRandom, 3=gatherCenter, 4=zoomExpand, 5=fadeOut
-  const [phase, setPhase] = useState(0);
-
-  // Handle user activity (scroll/mouse) - pause animation
-  useEffect(() => {
-    const handleActivity = () => {
-      setIsUserActive(true);
-
-      // Clear existing timeout
-      if (activityTimeoutRef.current) {
-        clearTimeout(activityTimeoutRef.current);
-      }
-
-      // Resume after 3 seconds of inactivity
-      activityTimeoutRef.current = setTimeout(() => {
-        setIsUserActive(false);
-      }, 3000);
-    };
-
-    window.addEventListener('scroll', handleActivity);
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('touchmove', handleActivity);
-
-    return () => {
-      window.removeEventListener('scroll', handleActivity);
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('touchmove', handleActivity);
-      if (activityTimeoutRef.current) {
-        clearTimeout(activityTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Phase cycle animation - smoother flow with longer durations
-  useEffect(() => {
-    if (isPaused || isUserActive) return;
-
-    // Longer durations for smoother flow
-    const phaseDurations = [1000, 2000, 4000, 2000, 3000, 1500]; // Duration for each phase in ms
-
-    const timeout = setTimeout(() => {
-      setPhase((prev) => (prev + 1) % 6);
-    }, phaseDurations[phase]);
-
-    return () => clearTimeout(timeout);
-  }, [phase, isPaused, isUserActive]);
-
-  // Calculate blob positions based on phase - smooth continuous flow
-  const getPhaseAnimation = (blobIndex: number) => {
-    const shouldAnimate = !isPaused && !isUserActive;
-
-    if (!shouldAnimate) {
-      // Static position when paused or user active
-      return {
-        opacity: 0.7,
-        x: 0,
-        y: 0,
-        scale: 1,
-      };
-    }
-
-    // Smooth offsets for each blob
-    const offsets = [
-      { x: -100, y: -80 },  // blob 0
-      { x: 120, y: 60 },    // blob 1
-      { x: -50, y: 100 },   // blob 2
-    ];
-
-    switch (phase) {
-      case 0: // Hidden - starting point
-        return { opacity: 0, x: 0, y: 0, scale: 0.3 };
-      case 1: // Fade in - appear at center
-        return { opacity: 0.8, x: 0, y: 0, scale: 0.6 };
-      case 2: // Gentle spread - move outward smoothly
-        return {
-          opacity: 0.9,
-          x: offsets[blobIndex].x,
-          y: offsets[blobIndex].y,
-          scale: 0.9
-        };
-      case 3: // Gather back - return to center
-        return { opacity: 1, x: 0, y: 0, scale: 0.7 };
-      case 4: // Zoom expand - smooth expansion
-        return { opacity: 0.8, x: 0, y: 0, scale: 2.2 };
-      case 5: // Fade out - disappear
-        return { opacity: 0, x: 0, y: 0, scale: 2.5 };
-      default:
-        return { opacity: 0.7, x: 0, y: 0, scale: 1 };
-    }
-  };
-
-  // Smooth transition for all phases
-  const transitionForPhase = {
-    duration: phase === 4 ? 2 : 1.5,
-    ease: "easeInOut" as const,
-  };
-
+// Animated Music-themed Background with CSS Animations
+function AnimatedMusicBackground({ isDark }: { isDark: boolean }) {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4">
-      {/* Apple Music Style - Phase-based Animated Background */}
+    <div className="absolute inset-0 overflow-hidden">
+      {/* Base gradient layer */}
+      <div
+        className={`absolute inset-0 ${isDark
+          ? 'bg-gradient-to-br from-[#1a0a10] via-[#2d0f1a] to-[#0a0508]'
+          : 'bg-gradient-to-br from-rose-100 via-pink-50 to-rose-50'
+          }`}
+      />
+
+      {/* Animated pulse waves - music visualizer effect */}
       <div className="absolute inset-0">
-        {/* Base layer */}
-        <div className={`absolute inset-0 ${isDark ? 'bg-black' : 'bg-rose-50'}`} />
-
-        {/* BLOB 1 - Pink/Maroon */}
-        <motion.div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+        {/* Wave 1 - Largest */}
+        <div
+          className="absolute left-1/2 top-1/2 w-[120vw] h-[120vh] rounded-full"
           style={{
-            width: '60vw',
-            height: '60vh',
+            transform: 'translate(-50%, -50%)',
             background: isDark
-              ? 'radial-gradient(circle, #DC2626 0%, #7F1D1D 40%, transparent 70%)'
-              : 'radial-gradient(circle, #FB7185 0%, #BE185D 40%, transparent 70%)',
-            filter: 'blur(80px)',
+              ? 'radial-gradient(circle, rgba(123, 30, 60, 0.4) 0%, rgba(91, 14, 44, 0.2) 50%, transparent 70%)'
+              : 'radial-gradient(circle, rgba(251, 113, 133, 0.5) 0%, rgba(244, 114, 182, 0.3) 50%, transparent 70%)',
+            filter: 'blur(40px)',
+            animation: 'pulse-expand 4s ease-in-out infinite'
           }}
-          animate={getPhaseAnimation(0)}
-          transition={transitionForPhase}
         />
-
-        {/* BLOB 2 - Purple */}
-        <motion.div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+        {/* Wave 2 - Medium */}
+        <div
+          className="absolute left-1/2 top-1/2 w-[100vw] h-[100vh] rounded-full"
           style={{
-            width: '50vw',
-            height: '50vh',
+            transform: 'translate(-50%, -50%)',
             background: isDark
-              ? 'radial-gradient(circle, #A855F7 0%, #7C3AED 35%, transparent 65%)'
-              : 'radial-gradient(circle, #C4B5FD 0%, #A855F7 35%, transparent 65%)',
-            filter: 'blur(75px)',
+              ? 'radial-gradient(circle, rgba(155, 62, 92, 0.35) 0%, rgba(123, 30, 60, 0.2) 50%, transparent 70%)'
+              : 'radial-gradient(circle, rgba(244, 114, 182, 0.45) 0%, rgba(251, 207, 232, 0.25) 50%, transparent 70%)',
+            filter: 'blur(35px)',
+            animation: 'pulse-expand 4s ease-in-out infinite 1s'
           }}
-          animate={getPhaseAnimation(1)}
-          transition={transitionForPhase}
         />
-
-        {/* BLOB 3 - Orange */}
-        <motion.div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+        {/* Wave 3 - Smallest, brightest */}
+        <div
+          className="absolute left-1/2 top-1/2 w-[80vw] h-[80vh] rounded-full"
           style={{
-            width: '45vw',
-            height: '45vh',
+            transform: 'translate(-50%, -50%)',
             background: isDark
-              ? 'radial-gradient(circle, #F97316 0%, #EA580C 30%, transparent 60%)'
-              : 'radial-gradient(circle, #FDBA74 0%, #F97316 30%, transparent 60%)',
-            filter: 'blur(70px)',
+              ? 'radial-gradient(circle, rgba(187, 94, 124, 0.3) 0%, rgba(155, 62, 92, 0.15) 50%, transparent 70%)'
+              : 'radial-gradient(circle, rgba(253, 164, 175, 0.4) 0%, rgba(251, 207, 232, 0.2) 50%, transparent 70%)',
+            filter: 'blur(30px)',
+            animation: 'pulse-expand 4s ease-in-out infinite 2s'
           }}
-          animate={getPhaseAnimation(2)}
-          transition={transitionForPhase}
         />
       </div>
+
+      {/* Floating music note particles effect */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div
+          className="absolute w-6 h-6 rounded-full"
+          style={{
+            left: '20%', top: '30%',
+            background: isDark ? 'rgba(123, 30, 60, 0.5)' : 'rgba(251, 113, 133, 0.4)',
+            filter: 'blur(3px)',
+            animation: 'float-up 6s ease-in-out infinite'
+          }}
+        />
+        <div
+          className="absolute w-4 h-4 rounded-full"
+          style={{
+            left: '70%', top: '60%',
+            background: isDark ? 'rgba(155, 62, 92, 0.45)' : 'rgba(244, 114, 182, 0.35)',
+            filter: 'blur(2px)',
+            animation: 'float-up 5s ease-in-out infinite 1s'
+          }}
+        />
+        <div
+          className="absolute w-8 h-8 rounded-full"
+          style={{
+            left: '40%', top: '70%',
+            background: isDark ? 'rgba(91, 14, 44, 0.4)' : 'rgba(253, 164, 175, 0.3)',
+            filter: 'blur(4px)',
+            animation: 'float-up 7s ease-in-out infinite 2s'
+          }}
+        />
+        <div
+          className="absolute w-3 h-3 rounded-full"
+          style={{
+            left: '85%', top: '40%',
+            background: isDark ? 'rgba(187, 94, 124, 0.5)' : 'rgba(244, 114, 182, 0.4)',
+            filter: 'blur(1px)',
+            animation: 'float-up 4s ease-in-out infinite 0.5s'
+          }}
+        />
+        <div
+          className="absolute w-5 h-5 rounded-full"
+          style={{
+            left: '10%', top: '60%',
+            background: isDark ? 'rgba(123, 30, 60, 0.35)' : 'rgba(251, 113, 133, 0.3)',
+            filter: 'blur(2px)',
+            animation: 'float-up 5.5s ease-in-out infinite 1.5s'
+          }}
+        />
+      </div>
+
+      {/* Vignette overlay for text focus */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: isDark
+            ? 'radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.5) 100%)'
+            : 'radial-gradient(ellipse at center, transparent 0%, rgba(255,255,255,0.3) 100%)'
+        }}
+      />
+    </div>
+  );
+}
+
+// Hero Section with Animated Music Background
+function HeroSection({ isDark, t, isPaused, setIsPaused }: { isDark: boolean; t: (key: string) => string; isPaused: boolean; setIsPaused: (v: boolean) => void }) {
+  return (
+    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4">
+      {/* Animated Music Background */}
+      <AnimatedMusicBackground isDark={isDark} />
 
       {/* Content */}
       <div className="relative z-10 text-center max-w-6xl mx-auto flex-1 flex flex-col items-center justify-center">
@@ -430,29 +344,8 @@ function HeroSection({ isDark, t, isPaused, setIsPaused }: { isDark: boolean; t:
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </a>
             <DashboardButton isDark={isDark} />
-
-            {/* Pause Animation Button */}
-            <button
-              onClick={() => setIsPaused(!isPaused)}
-              className={`px-4 py-4 rounded-full font-medium transition-all duration-300 flex items-center justify-center gap-2 ${isDark
-                ? 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              title={isPaused ? 'Play Animation' : 'Pause Animation'}
-            >
-              {isPaused ? (
-                <Play className="w-5 h-5" />
-              ) : (
-                <Pause className="w-5 h-5" />
-              )}
-            </button>
           </motion.div>
         </motion.div>
-      </div>
-
-      {/* Swipe Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
-        <SwipeIndicator isDark={isDark} />
       </div>
 
       {/* Gradient fade to next section */}
@@ -1053,8 +946,6 @@ function HomeContent() {
 
   return (
     <main className={`min-h-screen overflow-x-hidden transition-colors duration-300 ${isDark ? 'bg-black text-white' : 'bg-white text-gray-900'}`}>
-      <ScrollToTopButton isDark={isDark} />
-      <FloatingProfileButton />
       <HeroSection isDark={isDark} t={t} isPaused={isAnimationPaused} setIsPaused={setIsAnimationPaused} />
       <FeaturesSection isDark={isDark} t={t} />
       <SourcesSection isDark={isDark} t={t} />
@@ -1066,10 +957,6 @@ function HomeContent() {
 }
 
 export default function Home() {
-  return (
-    <SessionProvider>
-      <HomeContent />
-    </SessionProvider>
-  );
+  return <HomeContent />;
 }
 

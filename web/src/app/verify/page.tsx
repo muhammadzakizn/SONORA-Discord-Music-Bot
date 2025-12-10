@@ -10,7 +10,6 @@ import {
     RefreshCw,
     CheckCircle,
     XCircle,
-    ArrowRight,
     AlertTriangle,
 } from "lucide-react";
 import { useSession, getAvatarUrl } from "@/contexts/SessionContext";
@@ -146,10 +145,7 @@ export default function VerifyPage() {
         }
     };
 
-    // Skip verification (for development)
-    const skipVerification = () => {
-        router.push("/admin");
-    };
+
 
     if (isLoading) {
         return (
@@ -341,16 +337,7 @@ export default function VerifyPage() {
                         </AnimatePresence>
                     </div>
 
-                    {/* Footer - Skip for Dev */}
-                    <div className="px-8 pb-8 pt-2">
-                        <button
-                            onClick={skipVerification}
-                            className="w-full flex items-center justify-center gap-2 py-3 text-zinc-500 hover:text-white transition-colors text-sm"
-                        >
-                            <span>Skip for now</span>
-                            <ArrowRight className="w-4 h-4" />
-                        </button>
-                    </div>
+
                 </div>
 
                 {/* Warning */}

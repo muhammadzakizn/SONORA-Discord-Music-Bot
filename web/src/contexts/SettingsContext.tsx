@@ -50,6 +50,8 @@ const translations: Record<Language, Record<string, string>> = {
     en: {
         // Navigation
         'nav.home': 'Home',
+        'nav.explore': 'Explore',
+        'nav.profile': 'Profile',
         'nav.dashboard': 'Dashboard',
         'nav.settings': 'Settings',
         'nav.logout': 'Logout',
@@ -301,6 +303,8 @@ const translations: Record<Language, Record<string, string>> = {
     id: {
         // Navigation
         'nav.home': 'Beranda',
+        'nav.explore': 'Eksplorasi',
+        'nav.profile': 'Profil',
         'nav.dashboard': 'Dasbor',
         'nav.settings': 'Pengaturan',
         'nav.logout': 'Keluar',
@@ -552,6 +556,8 @@ const translations: Record<Language, Record<string, string>> = {
     zh: {
         // Navigation
         'nav.home': '首页',
+        'nav.explore': '探索',
+        'nav.profile': '个人资料',
         'nav.dashboard': '仪表板',
         'nav.settings': '设置',
         'nav.logout': '登出',
@@ -758,6 +764,8 @@ const translations: Record<Language, Record<string, string>> = {
     },
     ru: {
         'nav.home': 'Главная',
+        'nav.explore': 'Обзор',
+        'nav.profile': 'Профиль',
         'nav.dashboard': 'Панель',
         'nav.settings': 'Настройки',
         'nav.logout': 'Выйти',
@@ -916,6 +924,8 @@ const translations: Record<Language, Record<string, string>> = {
     },
     ja: {
         'nav.home': 'ホーム',
+        'nav.explore': '探索',
+        'nav.profile': 'プロフィール',
         'nav.dashboard': 'ダッシュボード',
         'nav.settings': '設定',
         'nav.logout': 'ログアウト',
@@ -1074,6 +1084,8 @@ const translations: Record<Language, Record<string, string>> = {
     },
     th: {
         'nav.home': 'หน้าแรก',
+        'nav.explore': 'สำรวจ',
+        'nav.profile': 'โปรไฟล์',
         'nav.dashboard': 'แดชบอร์ด',
         'nav.settings': 'การตั้งค่า',
         'nav.logout': 'ออกจากระบบ',
@@ -1232,6 +1244,8 @@ const translations: Record<Language, Record<string, string>> = {
     },
     ar: {
         'nav.home': 'الرئيسية',
+        'nav.explore': 'استكشاف',
+        'nav.profile': 'الملف الشخصي',
         'nav.dashboard': 'لوحة التحكم',
         'nav.settings': 'الإعدادات',
         'nav.logout': 'تسجيل الخروج',

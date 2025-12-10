@@ -2,10 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { SessionProvider } from "@/contexts/SessionContext";
 import { BotStatusProvider } from "@/contexts/BotStatusProvider";
-import FloatingSettings from "@/components/FloatingSettings";
+import NavLiquidGlass from "@/components/NavLiquidGlass";
 import PageTransition from "@/components/PageTransition";
 import BotStatusBanner from "@/components/BotStatusBanner";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -114,26 +116,28 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <SettingsProvider>
-          <BotStatusProvider>
-            {/* Bot offline banner */}
-            <BotStatusBanner />
+          <SessionProvider>
+            <BotStatusProvider>
+              {/* Bot offline banner */}
+              <BotStatusBanner />
 
-            {/* Skip to main content link for accessibility */}
-            <a
-              href="#main-content"
-              className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-purple-600 focus:text-white focus:rounded-lg"
-            >
-              Skip to main content
-            </a>
+              {/* Skip to main content link for accessibility */}
+              <a
+                href="#main-content"
+                className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-purple-600 focus:text-white focus:rounded-lg"
+              >
+                Skip to main content
+              </a>
 
-            <main id="main-content">
-              <PageTransition>
-                {children}
-              </PageTransition>
-            </main>
+              <main id="main-content">
+                <PageTransition>
+                  {children}
+                </PageTransition>
+              </main>
 
-            <FloatingSettings />
-          </BotStatusProvider>
+              <NavLiquidGlass />
+            </BotStatusProvider>
+          </SessionProvider>
         </SettingsProvider>
       </body>
     </html>

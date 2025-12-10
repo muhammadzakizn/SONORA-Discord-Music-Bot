@@ -10,7 +10,6 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useSession, getAvatarUrl } from "@/contexts/SessionContext";
 import { cn } from "@/lib/utils";
 
-// HD background images from Unsplash (music/abstract themed)
 const backgroundImages = [
   {
     url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1920&q=80",
@@ -37,6 +36,40 @@ const backgroundImages = [
     photographer: "Nainoa Shizuru",
     photographerUrl: "https://unsplash.com/@nainoa"
   },
+  {
+    url: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=1920&q=80",
+    photographer: "Austin Neill",
+    photographerUrl: "https://unsplash.com/@austinneill"
+  },
+  {
+    url: "https://images.unsplash.com/photo-1501612780327-45045538702b?w=1920&q=80",
+    photographer: "Vishnu R Nair",
+    photographerUrl: "https://unsplash.com/@vishnurnair"
+  },
+];
+
+// Inspirational quotes about music - expanded collection
+const inspirationalQuotes = [
+  { text: "Music can change the world because it can change people.", author: "Bono" },
+  { text: "Where words fail, music speaks.", author: "Hans Christian Andersen" },
+  { text: "Music is the soundtrack of your life.", author: "Dick Clark" },
+  { text: "One good thing about music, when it hits you, you feel no pain.", author: "Bob Marley" },
+  { text: "Music gives a soul to the universe, wings to the mind, flight to the imagination.", author: "Plato" },
+  { text: "Without music, life would be a mistake.", author: "Friedrich Nietzsche" },
+  { text: "Music expresses that which cannot be said and on which it is impossible to be silent.", author: "Victor Hugo" },
+  { text: "Music is the universal language of mankind.", author: "Henry Wadsworth Longfellow" },
+  { text: "Life is like a beautiful melody, only the lyrics are messed up.", author: "Hans Christian Andersen" },
+  { text: "Music is the strongest form of magic.", author: "Marilyn Manson" },
+  { text: "Music is the art of the prophets and the gift of God.", author: "Martin Luther" },
+  { text: "After silence, that which comes nearest to expressing the inexpressible is music.", author: "Aldous Huxley" },
+  { text: "Music produces a kind of pleasure which human nature cannot do without.", author: "Confucius" },
+  { text: "Where there is music, there can be no evil.", author: "Miguel de Cervantes" },
+  { text: "Music is the wine that fills the cup of silence.", author: "Robert Fripp" },
+  { text: "Music is to the soul what words are to the mind.", author: "Modest Mouse" },
+  { text: "Play it loud, play it proud.", author: "Unknown" },
+  { text: "Without music, life is a journey through a desert.", author: "Pat Conroy" },
+  { text: "Music is the great uniter.", author: "Melissa Etheridge" },
+  { text: "Where words leave off, music begins.", author: "Heinrich Heine" },
 ];
 
 // Discord SVG Icon
@@ -54,6 +87,109 @@ function LoginPageLoading() {
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center bg-black">
       <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// Typewriter Quote Component with character-by-character animation and glow effect
+function TypewriterQuote({ quotes }: { quotes: typeof inspirationalQuotes }) {
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
+  const [displayedChars, setDisplayedChars] = useState(0);
+  const [showAuthor, setShowAuthor] = useState(false);
+  const [isTyping, setIsTyping] = useState(true);
+
+  const currentQuote = quotes[currentQuoteIndex];
+  const fullText = currentQuote.text;
+
+  useEffect(() => {
+    if (!isTyping) return;
+
+    if (displayedChars < fullText.length) {
+      // Type next character - slower animation (80ms per char)
+      const timeout = setTimeout(() => {
+        setDisplayedChars(prev => prev + 1);
+      }, 80);
+      return () => clearTimeout(timeout);
+    } else {
+      // All chars typed, show author
+      const timeout = setTimeout(() => {
+        setShowAuthor(true);
+        setIsTyping(false);
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [displayedChars, fullText.length, isTyping]);
+
+  // Cycle to next quote after display completes - longer display time
+  useEffect(() => {
+    if (!isTyping && showAuthor) {
+      const timeout = setTimeout(() => {
+        setCurrentQuoteIndex((prev) => (prev + 1) % quotes.length);
+        setDisplayedChars(0);
+        setShowAuthor(false);
+        setIsTyping(true);
+      }, 6000); // Show complete quote for 6 seconds before switching
+      return () => clearTimeout(timeout);
+    }
+  }, [isTyping, showAuthor, quotes.length]);
+
+  // Reset when quote changes
+  useEffect(() => {
+    setDisplayedChars(0);
+    setShowAuthor(false);
+    setIsTyping(true);
+  }, [currentQuoteIndex]);
+
+  const displayedText = fullText.slice(0, displayedChars);
+  const lastCharIndex = displayedChars - 1;
+
+  return (
+    <div className="text-white">
+      {/* Quote Text with Character-by-Character Typewriter + Glow Effect */}
+      <p className="text-2xl md:text-3xl lg:text-4xl font-light leading-relaxed mb-4">
+        <span className="text-white/90">"</span>
+        {displayedText.split('').map((char, index) => (
+          <motion.span
+            key={`${currentQuoteIndex}-${index}`}
+            initial={{ opacity: 0, textShadow: '0 0 20px rgba(255,255,255,0.8)' }}
+            animate={{
+              opacity: 1,
+              textShadow: index === lastCharIndex
+                ? '0 0 15px rgba(255,255,255,0.6), 0 0 30px rgba(167,139,250,0.4)'
+                : '0 0 0px transparent'
+            }}
+            transition={{ duration: 0.3 }}
+            className="inline"
+          >
+            {char}
+          </motion.span>
+        ))}
+        {displayedChars === fullText.length && (
+          <span className="text-white/90">"</span>
+        )}
+        {isTyping && (
+          <motion.span
+            animate={{ opacity: [1, 0] }}
+            transition={{ duration: 0.5, repeat: Infinity }}
+            className="inline-block w-0.5 h-6 bg-white/70 ml-1 align-middle"
+            style={{ boxShadow: '0 0 8px rgba(255,255,255,0.6)' }}
+          />
+        )}
+      </p>
+
+      {/* Author */}
+      <AnimatePresence>
+        {showAuthor && (
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="text-lg text-white/60 font-medium"
+          >
+            — {currentQuote.author}
+          </motion.p>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -245,35 +381,31 @@ function LoginPageContent() {
 
   const currentImage = backgroundImages[currentImageIndex];
 
-  // Slide animation variants
-  const slideVariants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? '100%' : '-100%',
+  // Fade animation variants (changed from slide)
+  const fadeVariants = {
+    enter: {
       opacity: 0,
-    }),
+    },
     center: {
-      x: 0,
       opacity: 1,
     },
-    exit: (direction: number) => ({
-      x: direction > 0 ? '-100%' : '100%',
+    exit: {
       opacity: 0,
-    }),
+    },
   };
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Full-Screen Background Slideshow */}
+      {/* Full-Screen Background Fadeshow */}
       <div className="absolute inset-0">
-        <AnimatePresence mode="popLayout" custom={slideDirection}>
+        <AnimatePresence mode="popLayout">
           <motion.div
             key={currentImageIndex}
-            custom={slideDirection}
-            variants={slideVariants}
+            variants={fadeVariants}
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: 1.2, ease: "easeInOut" }}
             className="absolute inset-0"
           >
             <Image
@@ -296,463 +428,467 @@ function LoginPageContent() {
         <div className="absolute top-2/3 left-1/3 w-64 h-64 bg-primary/20 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      {/* Centered Liquid Glass Login Container */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{
-            opacity: 1,
-            y: 0,
-            scale: isZooming ? 20 : 1,
-          }}
-          transition={{
-            duration: isZooming ? 1.2 : 0.6,
-            ease: isZooming ? [0.4, 0, 0.2, 1] : "easeOut"
-          }}
-          className="w-full max-w-md"
-        >
-          {/* Liquid Glass Card */}
+      {/* Split Layout Container - Quotes Left, Login Right */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-6 lg:p-12">
+        <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center lg:items-stretch gap-8 lg:gap-16">
+
+          {/* Left Side - Quotes Section (hidden on mobile) */}
+          <div className="hidden lg:flex flex-col justify-center flex-1 max-w-xl">
+            {/* Typewriter Quotes */}
+            <TypewriterQuote quotes={inspirationalQuotes} />
+
+            {/* Photo Credit - Below Quotes */}
+            <div className="mt-12 pt-8 border-t border-white/10">
+              <a
+                href={currentImage.photographerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-white/40 hover:text-white/70 transition-colors"
+              >
+                Photo by {currentImage.photographer} on Unsplash
+              </a>
+            </div>
+          </div>
+
+          {/* Right Side - Login Box */}
           <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{
-              borderRadius: isZooming ? "0px" : "24px",
-              backgroundColor: isZooming ? "rgb(0, 0, 0)" : "rgba(255, 255, 255, 0.08)",
+              opacity: 1,
+              y: 0,
+              scale: isZooming ? 20 : 1,
             }}
-            transition={{ duration: isZooming ? 0.4 : 0.5 }}
-            className={cn(
-              "relative p-8 overflow-hidden",
-              !isZooming && "backdrop-blur-2xl border border-white/[0.15]",
-              !isZooming && "shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)]",
-              !isZooming && "rounded-3xl"
-            )}
+            transition={{
+              duration: isZooming ? 1.2 : 0.6,
+              ease: isZooming ? [0.4, 0, 0.2, 1] : "easeOut"
+            }}
+            className="w-full max-w-md lg:mr-8"
           >
-            {/* Glass Shimmer Effect - hide when zooming */}
-            {!isZooming && (
-              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.1] via-transparent to-transparent pointer-events-none rounded-3xl" />
-            )}
+            {/* Liquid Glass Card */}
+            <motion.div
+              animate={{
+                borderRadius: isZooming ? "0px" : "24px",
+                backgroundColor: isZooming ? "rgb(0, 0, 0)" : "rgba(255, 255, 255, 0.08)",
+              }}
+              transition={{ duration: isZooming ? 0.4 : 0.5 }}
+              className={cn(
+                "relative p-8 overflow-hidden",
+                !isZooming && "backdrop-blur-2xl border border-white/[0.15]",
+                !isZooming && "shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)]",
+                !isZooming && "rounded-3xl"
+              )}
+            >
+              {/* Glass Shimmer Effect - hide when zooming */}
+              {!isZooming && (
+                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.1] via-transparent to-transparent pointer-events-none rounded-3xl" />
+              )}
 
-            <AnimatePresence mode="wait">
-              {loginMode === "select" && (
-                <motion.div
-                  key="select"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="relative z-10"
-                >
-                  {/* Logo - Larger and centered at top */}
-                  <div className="flex flex-col items-center mb-8">
-                    <Image
-                      src="/sonora-logo.png"
-                      alt="SONORA"
-                      width={180}
-                      height={72}
-                      className="h-20 w-auto drop-shadow-lg mb-4"
-                    />
-                    <p className="text-white/60 text-sm">{t('hero.subtitle')}</p>
-                  </div>
-
-                  <h2 className="text-2xl font-bold text-white mb-2 text-center">{t('login.welcome')}</h2>
-                  <p className="text-white/60 mb-8 text-center">{t('login.chooseMethod')}</p>
-
-                  <div className="space-y-4">
-                    {/* Admin - Discord Login */}
-                    <motion.button
-                      whileHover={{ scale: 1.02, y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setLoginMode("admin")}
-                      className="w-full flex items-center gap-4 p-4 rounded-2xl 
-                        bg-white/[0.08] backdrop-blur-xl
-                        border border-white/[0.1] 
-                        hover:bg-white/[0.15] hover:border-purple-500/40
-                        shadow-[0_4px_24px_rgba(0,0,0,0.3)]
-                        transition-all duration-300 group"
-                    >
-                      <div className="p-3 rounded-xl bg-purple-500/30 group-hover:bg-purple-500/40 transition-colors">
-                        <DiscordIcon />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <span className="block font-semibold text-white">{t('login.admin')}</span>
-                        <span className="text-sm text-white/50">{t('login.admin.desc')}</span>
-                      </div>
-                    </motion.button>
-
-                    <div className="relative flex items-center gap-4 py-2">
-                      <div className="flex-1 h-px bg-white/[0.1]" />
-                      <span className="text-sm text-white/40">{t('login.or')}</span>
-                      <div className="flex-1 h-px bg-white/[0.1]" />
+              <AnimatePresence mode="wait">
+                {loginMode === "select" && (
+                  <motion.div
+                    key="select"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    {/* Logo - Larger and centered at top */}
+                    <div className="flex flex-col items-center mb-8">
+                      <Image
+                        src="/sonora-logo.png"
+                        alt="SONORA"
+                        width={180}
+                        height={72}
+                        className="h-20 w-auto drop-shadow-lg mb-4"
+                      />
+                      <p className="text-white/60 text-sm">{t('hero.subtitle')}</p>
                     </div>
 
-                    {/* Developer - Private Login */}
-                    <motion.button
-                      whileHover={{ scale: 1.02, y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setLoginMode("developer")}
-                      className="w-full flex items-center gap-4 p-4 rounded-2xl 
-                        bg-white/[0.08] backdrop-blur-xl
-                        border border-white/[0.1]
-                        hover:bg-white/[0.15] hover:border-green-500/40
-                        shadow-[0_4px_24px_rgba(0,0,0,0.3)]
-                        transition-all duration-300 group"
-                    >
-                      <div className="p-3 rounded-xl bg-green-500/30 group-hover:bg-green-500/40 transition-colors">
-                        <Lock className="w-5 h-5 text-green-400" />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <span className="block font-semibold text-white">{t('login.developer')}</span>
-                        <span className="text-sm text-white/50">{t('login.developer.desc')}</span>
-                      </div>
-                    </motion.button>
-                  </div>
+                    <h2 className="text-2xl font-bold text-white mb-2 text-center">{t('login.welcome')}</h2>
+                    <p className="text-white/60 mb-8 text-center">{t('login.chooseMethod')}</p>
 
-                  <div className="mt-8 text-center">
-                    <Link
-                      href="/"
-                      className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
+                    <div className="space-y-4">
+                      {/* Admin - Discord Login */}
+                      <motion.button
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setLoginMode("admin")}
+                        className="w-full flex items-center gap-4 p-4 rounded-2xl 
+                          bg-white/[0.08] backdrop-blur-xl
+                          border border-white/[0.1] 
+                          hover:bg-white/[0.15] hover:border-purple-500/40
+                          shadow-[0_4px_24px_rgba(0,0,0,0.3)]
+                          transition-all duration-300 group"
+                      >
+                        <div className="p-3 rounded-xl bg-purple-500/30 group-hover:bg-purple-500/40 transition-colors">
+                          <DiscordIcon />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <span className="block font-semibold text-white">{t('login.admin')}</span>
+                          <span className="text-sm text-white/50">{t('login.admin.desc')}</span>
+                        </div>
+                      </motion.button>
+
+                      <div className="relative flex items-center gap-4 py-2">
+                        <div className="flex-1 h-px bg-white/[0.1]" />
+                        <span className="text-sm text-white/40">{t('login.or')}</span>
+                        <div className="flex-1 h-px bg-white/[0.1]" />
+                      </div>
+
+                      {/* Developer - Private Login */}
+                      <motion.button
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setLoginMode("developer")}
+                        className="w-full flex items-center gap-4 p-4 rounded-2xl 
+                          bg-white/[0.08] backdrop-blur-xl
+                          border border-white/[0.1]
+                          hover:bg-white/[0.15] hover:border-green-500/40
+                          shadow-[0_4px_24px_rgba(0,0,0,0.3)]
+                          transition-all duration-300 group"
+                      >
+                        <div className="p-3 rounded-xl bg-green-500/30 group-hover:bg-green-500/40 transition-colors">
+                          <Lock className="w-5 h-5 text-green-400" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <span className="block font-semibold text-white">{t('login.developer')}</span>
+                          <span className="text-sm text-white/50">{t('login.developer.desc')}</span>
+                        </div>
+                      </motion.button>
+                    </div>
+
+                    <div className="mt-8 text-center">
+                      <Link
+                        href="/"
+                        className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                        {t('common.backToHome')}
+                      </Link>
+                    </div>
+                  </motion.div>
+                )}
+
+                {loginMode === "admin" && (
+                  <motion.div
+                    key="admin"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    <button
+                      onClick={() => setLoginMode("select")}
+                      className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors mb-6"
                     >
                       <ArrowLeft className="w-4 h-4" />
-                      {t('common.backToHome')}
-                    </Link>
-                  </div>
-                </motion.div>
-              )}
+                      {t('common.back')}
+                    </button>
 
-              {loginMode === "admin" && (
-                <motion.div
-                  key="admin"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="relative z-10"
-                >
-                  <button
-                    onClick={() => setLoginMode("select")}
-                    className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors mb-6"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    {t('common.back')}
-                  </button>
-
-                  {/* Logo */}
-                  <div className="flex justify-center mb-6">
-                    <Image
-                      src="/sonora-logo.png"
-                      alt="SONORA"
-                      width={120}
-                      height={48}
-                      className="h-12 w-auto drop-shadow-lg"
-                    />
-                  </div>
-
-                  <h2 className="text-2xl font-bold text-white mb-2">{t('login.adminTitle')}</h2>
-                  <p className="text-white/60 mb-8">{t('login.adminDesc')}</p>
-
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleDiscordLogin}
-                    className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl 
-                      bg-[#5865F2] hover:bg-[#4752C4] 
-                      text-white font-semibold transition-colors
-                      shadow-[0_4px_24px_rgba(88,101,242,0.5)]"
-                  >
-                    <DiscordIcon />
-                    {t('login.continueDiscord')}
-                  </motion.button>
-
-                  <p className="mt-6 text-xs text-white/40 text-center">
-                    {t('login.termsNotice')}
-                  </p>
-                </motion.div>
-              )}
-
-              {loginMode === "developer" && (
-                <motion.div
-                  key="developer"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="relative z-10"
-                >
-                  <button
-                    onClick={() => setLoginMode("select")}
-                    className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors mb-6"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    {t('common.back')}
-                  </button>
-
-                  {/* Logo */}
-                  <div className="flex justify-center mb-6">
-                    <Image
-                      src="/sonora-logo.png"
-                      alt="SONORA"
-                      width={120}
-                      height={48}
-                      className="h-12 w-auto drop-shadow-lg"
-                    />
-                  </div>
-
-                  <h2 className="text-2xl font-bold text-white mb-2">{t('login.devTitle')}</h2>
-                  <p className="text-white/60 mb-8">{t('login.devDesc')}</p>
-
-                  <form onSubmit={handleDeveloperLogin} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-white/70 mb-2">
-                        {t('login.username')}
-                      </label>
-                      <div className="relative">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                        <input
-                          type="text"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3 rounded-xl 
-                            bg-white/[0.08] backdrop-blur-xl
-                            border border-white/[0.1] 
-                            text-white placeholder:text-white/30 
-                            focus:outline-none focus:border-green-500/50 focus:bg-white/[0.12]
-                            transition-all"
-                          placeholder={t('login.enterUsername')}
-                          autoComplete="username"
-                          required
-                        />
-                      </div>
+                    {/* Logo */}
+                    <div className="flex justify-center mb-6">
+                      <Image
+                        src="/sonora-logo.png"
+                        alt="SONORA"
+                        width={120}
+                        height={48}
+                        className="h-12 w-auto drop-shadow-lg"
+                      />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-white/70 mb-2">
-                        {t('login.password')}
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full pl-12 pr-12 py-3 rounded-xl 
-                            bg-white/[0.08] backdrop-blur-xl
-                            border border-white/[0.1]
-                            text-white placeholder:text-white/30 
-                            focus:outline-none focus:border-green-500/50 focus:bg-white/[0.12]
-                            transition-all"
-                          placeholder={t('login.enterPassword')}
-                          autoComplete="current-password"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-                        >
-                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {error && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-rose-400 text-sm"
-                      >
-                        {error}
-                      </motion.p>
-                    )}
+                    <h2 className="text-2xl font-bold text-white mb-2">{t('login.adminTitle')}</h2>
+                    <p className="text-white/60 mb-8">{t('login.adminDesc')}</p>
 
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl 
-                        bg-gradient-to-r from-green-600 to-emerald-600 
-                        hover:from-green-500 hover:to-emerald-500 
-                        text-white font-semibold transition-all 
-                        disabled:opacity-50 disabled:cursor-not-allowed
-                        shadow-[0_4px_24px_rgba(34,197,94,0.4)]"
+                      onClick={handleDiscordLogin}
+                      className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl 
+                        bg-[#5865F2] hover:bg-[#4752C4] 
+                        text-white font-semibold transition-colors
+                        shadow-[0_4px_24px_rgba(88,101,242,0.5)]"
                     >
-                      {isLoading ? (
-                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <LogIn className="w-5 h-5" />
-                          {t('login.signIn')}
-                        </>
-                      )}
+                      <DiscordIcon />
+                      {t('login.continueDiscord')}
                     </motion.button>
-                  </form>
-                </motion.div>
-              )}
 
-              {loginMode === "verify" && user && (
-                <motion.div
-                  key="verify"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="relative z-10"
-                >
-                  {/* Header with Shield Icon */}
-                  <div className="flex flex-col items-center mb-6">
-                    <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
-                      <Shield className="w-8 h-8 text-white" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">Verify Your Identity</h2>
-                    <p className="text-white/60 text-sm text-center">
-                      A verification code was sent to your Discord DM
+                    <p className="mt-6 text-xs text-white/40 text-center">
+                      {t('login.termsNotice')}
                     </p>
-                  </div>
+                  </motion.div>
+                )}
 
-                  {/* User Info */}
-                  <div className="flex items-center gap-4 p-4 mb-6 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
-                    <Image
-                      src={getAvatarUrl(user)}
-                      alt={user.username}
-                      width={48}
-                      height={48}
-                      className="rounded-full"
-                    />
-                    <div>
-                      <p className="font-medium text-white">{user.username}</p>
-                      <p className="text-sm text-white/50">Discord ID: {user.id}</p>
-                    </div>
-                  </div>
-
-                  {verifyStatus === "success" ? (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="text-center py-8"
+                {loginMode === "developer" && (
+                  <motion.div
+                    key="developer"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    <button
+                      onClick={() => setLoginMode("select")}
+                      className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors mb-6"
                     >
-                      <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-400" />
-                      <h3 className="text-xl font-bold text-green-400 mb-2">Verified!</h3>
-                      <p className="text-white/60">Redirecting to dashboard...</p>
-                    </motion.div>
-                  ) : (
-                    <>
-                      {/* Code Input */}
-                      <div className="flex justify-center gap-3 mb-6">
-                        {verifyCode.map((digit, i) => (
+                      <ArrowLeft className="w-4 h-4" />
+                      {t('common.back')}
+                    </button>
+
+                    {/* Logo */}
+                    <div className="flex justify-center mb-6">
+                      <Image
+                        src="/sonora-logo.png"
+                        alt="SONORA"
+                        width={120}
+                        height={48}
+                        className="h-12 w-auto drop-shadow-lg"
+                      />
+                    </div>
+
+                    <h2 className="text-2xl font-bold text-white mb-2">{t('login.devTitle')}</h2>
+                    <p className="text-white/60 mb-8">{t('login.devDesc')}</p>
+
+                    <form onSubmit={handleDeveloperLogin} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-white/70 mb-2">
+                          {t('login.username')}
+                        </label>
+                        <div className="relative">
+                          <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                           <input
-                            key={i}
-                            ref={(el) => { verifyInputRefs.current[i] = el; }}
                             type="text"
-                            inputMode="numeric"
-                            maxLength={1}
-                            value={digit}
-                            onChange={(e) => handleVerifyInputChange(i, e.target.value)}
-                            onKeyDown={(e) => handleVerifyKeyDown(i, e)}
-                            disabled={verifyStatus === "verifying"}
-                            className={cn(
-                              "w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 bg-white/[0.08] focus:outline-none transition-colors text-white",
-                              verifyStatus === "error"
-                                ? "border-rose-500"
-                                : "border-white/[0.15] focus:border-purple-500"
-                            )}
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 rounded-xl 
+                              bg-white/[0.08] backdrop-blur-xl
+                              border border-white/[0.1] 
+                              text-white placeholder:text-white/30 
+                              focus:outline-none focus:border-green-500/50 focus:bg-white/[0.12]
+                              transition-all"
+                            placeholder={t('login.enterUsername')}
+                            autoComplete="username"
+                            required
                           />
-                        ))}
+                        </div>
                       </div>
 
-                      {/* Error Message */}
-                      {verifyStatus === "error" && verifyError && (
-                        <motion.div
+                      <div>
+                        <label className="block text-sm font-medium text-white/70 mb-2">
+                          {t('login.password')}
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full pl-12 pr-12 py-3 rounded-xl 
+                              bg-white/[0.08] backdrop-blur-xl
+                              border border-white/[0.1]
+                              text-white placeholder:text-white/30 
+                              focus:outline-none focus:border-green-500/50 focus:bg-white/[0.12]
+                              transition-all"
+                            placeholder={t('login.enterPassword')}
+                            autoComplete="current-password"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                          >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {error && (
+                        <motion.p
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="flex items-center gap-2 justify-center text-rose-400 text-sm mb-4"
+                          className="text-rose-400 text-sm"
                         >
-                          <XCircle className="w-4 h-4" />
-                          <span>{verifyError}</span>
-                        </motion.div>
+                          {error}
+                        </motion.p>
                       )}
 
-                      {/* Verifying State */}
-                      {verifyStatus === "verifying" && (
-                        <div className="flex items-center justify-center gap-2 text-purple-400 mb-4">
-                          <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
-                          <span>Verifying...</span>
-                        </div>
-                      )}
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl 
+                          bg-gradient-to-r from-green-600 to-emerald-600 
+                          hover:from-green-500 hover:to-emerald-500 
+                          text-white font-semibold transition-all 
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          shadow-[0_4px_24px_rgba(34,197,94,0.4)]"
+                      >
+                        {isLoading ? (
+                          <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <LogIn className="w-5 h-5" />
+                            {t('login.signIn')}
+                          </>
+                        )}
+                      </motion.button>
+                    </form>
+                  </motion.div>
+                )}
 
-                      {/* Verify Button */}
-                      {verifyStatus !== "verifying" && (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={handleVerifyCode}
-                          disabled={verifyCode.join("").length !== 6}
-                          className={cn(
-                            "w-full py-3 mb-4 rounded-xl font-semibold transition-all",
-                            verifyCode.join("").length === 6
-                              ? "bg-gradient-to-r from-purple-500 to-cyan-500 text-white hover:opacity-90 shadow-[0_4px_24px_rgba(168,85,247,0.4)]"
-                              : "bg-white/[0.08] text-white/40 cursor-not-allowed"
-                          )}
-                        >
-                          Verify Code
-                        </motion.button>
-                      )}
-
-                      {/* Resend Button */}
-                      <div className="text-center">
-                        <button
-                          onClick={sendVerificationCode}
-                          disabled={verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"}
-                          className={cn(
-                            "flex items-center gap-2 mx-auto text-sm transition-colors",
-                            verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"
-                              ? "text-white/30 cursor-not-allowed"
-                              : "text-purple-400 hover:text-purple-300"
-                          )}
-                        >
-                          <RefreshCw className={cn("w-4 h-4", verifyStatus === "sending" && "animate-spin")} />
-                          {verifyStatus === "sending"
-                            ? "Sending..."
-                            : verifyCountdown > 0
-                              ? `Resend in ${verifyCountdown}s`
-                              : "Resend Code"}
-                        </button>
+                {loginMode === "verify" && user && (
+                  <motion.div
+                    key="verify"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    {/* Header with Shield Icon */}
+                    <div className="flex flex-col items-center mb-6">
+                      <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
+                        <Shield className="w-8 h-8 text-white" />
                       </div>
-                    </>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                      <h2 className="text-2xl font-bold text-white mb-2">Verify Your Identity</h2>
+                      <p className="text-white/60 text-sm text-center">
+                        A verification code was sent to your Discord DM
+                      </p>
+                    </div>
+
+                    {/* User Info */}
+                    <div className="flex items-center gap-4 p-4 mb-6 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
+                      <Image
+                        src={getAvatarUrl(user)}
+                        alt={user.username}
+                        width={48}
+                        height={48}
+                        className="rounded-full"
+                      />
+                      <div>
+                        <p className="font-medium text-white">{user.username}</p>
+                        <p className="text-sm text-white/50">Discord ID: {user.id}</p>
+                      </div>
+                    </div>
+
+                    {verifyStatus === "success" ? (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-center py-8"
+                      >
+                        <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-400" />
+                        <h3 className="text-xl font-bold text-green-400 mb-2">Verified!</h3>
+                        <p className="text-white/60">Redirecting to dashboard...</p>
+                      </motion.div>
+                    ) : (
+                      <>
+                        {/* Code Input */}
+                        <div className="flex justify-center gap-3 mb-6">
+                          {verifyCode.map((digit, i) => (
+                            <input
+                              key={i}
+                              ref={(el) => { verifyInputRefs.current[i] = el; }}
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={1}
+                              value={digit}
+                              onChange={(e) => handleVerifyInputChange(i, e.target.value)}
+                              onKeyDown={(e) => handleVerifyKeyDown(i, e)}
+                              disabled={verifyStatus === "verifying"}
+                              className={cn(
+                                "w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 bg-white/[0.08] focus:outline-none transition-colors text-white",
+                                verifyStatus === "error"
+                                  ? "border-rose-500"
+                                  : "border-white/[0.15] focus:border-purple-500"
+                              )}
+                            />
+                          ))}
+                        </div>
+
+                        {/* Error Message */}
+                        {verifyStatus === "error" && verifyError && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-2 justify-center text-rose-400 text-sm mb-4"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            <span>{verifyError}</span>
+                          </motion.div>
+                        )}
+
+                        {/* Verifying State */}
+                        {verifyStatus === "verifying" && (
+                          <div className="flex items-center justify-center gap-2 text-purple-400 mb-4">
+                            <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+                            <span>Verifying...</span>
+                          </div>
+                        )}
+
+                        {/* Verify Button */}
+                        {verifyStatus !== "verifying" && (
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={handleVerifyCode}
+                            disabled={verifyCode.join("").length !== 6}
+                            className={cn(
+                              "w-full py-3 mb-4 rounded-xl font-semibold transition-all",
+                              verifyCode.join("").length === 6
+                                ? "bg-gradient-to-r from-purple-500 to-cyan-500 text-white hover:opacity-90 shadow-[0_4px_24px_rgba(168,85,247,0.4)]"
+                                : "bg-white/[0.08] text-white/40 cursor-not-allowed"
+                            )}
+                          >
+                            Verify Code
+                          </motion.button>
+                        )}
+
+                        {/* Resend Button */}
+                        <div className="text-center">
+                          <button
+                            onClick={sendVerificationCode}
+                            disabled={verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"}
+                            className={cn(
+                              "flex items-center gap-2 mx-auto text-sm transition-colors",
+                              verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"
+                                ? "text-white/30 cursor-not-allowed"
+                                : "text-purple-400 hover:text-purple-300"
+                            )}
+                          >
+                            <RefreshCw className={cn("w-4 h-4", verifyStatus === "sending" && "animate-spin")} />
+                            {verifyStatus === "sending"
+                              ? "Sending..."
+                              : verifyCountdown > 0
+                                ? `Resend in ${verifyCountdown}s`
+                                : "Resend Code"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+
+            {/* Mobile Only: Photo Credit */}
+            <div className="lg:hidden mt-6 text-center">
+              <a
+                href={currentImage.photographerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-white/40 hover:text-white/70 transition-colors"
+              >
+                Photo by {currentImage.photographer} on Unsplash
+              </a>
+            </div>
           </motion.div>
-
-          {/* Photographer Credit */}
-          <div className="mt-6 text-center">
-            <a
-              href={currentImage.photographerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-white/40 hover:text-white/70 transition-colors"
-            >
-              Photo by {currentImage.photographer} on Unsplash
-            </a>
-          </div>
-
-          {/* Slideshow Indicators */}
-          <div className="flex justify-center gap-2 mt-4">
-            {backgroundImages.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  setSlideDirection(idx > currentImageIndex ? 1 : -1);
-                  setCurrentImageIndex(idx);
-                }}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${idx === currentImageIndex
-                  ? "w-6 bg-white"
-                  : "bg-white/30 hover:bg-white/50"
-                  }`}
-                aria-label={`Go to slide ${idx + 1}`}
-              />
-            ))}
-          </div>
-        </motion.div>
-      </div >
-    </div >
+        </div>
+      </div>
+    </div>
   );
 }
