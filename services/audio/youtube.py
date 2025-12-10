@@ -237,8 +237,8 @@ class YouTubeDownloader(BaseDownloader):
         
         logger.info(f"Downloading from: {url}")
         
-        # Simple download without specifying player_client - let yt-dlp auto-detect
-        # This works better on servers without deno JS runtime
+        # Simple download - use Node.js as JS runtime (already installed for Next.js)
+        # This works on servers without deno JS runtime
         
         output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
         
@@ -255,6 +255,7 @@ class YouTubeDownloader(BaseDownloader):
             '--geo-bypass',
             '--socket-timeout', '30',
             '--retries', '3',
+            '--js-runtimes', 'node',  # Use Node.js for JS signature solving
         ]
         
         # Add cookies if available
@@ -324,6 +325,7 @@ class YouTubeDownloader(BaseDownloader):
             '-o', output_template,
             '--no-playlist',
             '--geo-bypass',
+            '--js-runtimes', 'node',  # Use Node.js for JS signature solving
         ]
         
         if cookies_added:
