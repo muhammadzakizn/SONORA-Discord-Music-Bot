@@ -517,6 +517,17 @@ class SynchronizedMediaPlayer:
         Uses pre-fetched track if available for instant playback
         """
         try:
+            # Check if voice is still connected
+            if not self.voice or not self.voice.is_connected():
+                logger.info("Voice not connected, skipping next track")
+                self._transitioning_to_next = False
+                return
+            
+            # Check if player was stopped
+            if not self.is_playing and not self._transitioning_to_next:
+                logger.info("Player stopped, skipping next track")
+                return
+            
             queue_cog = self.bot.get_cog('QueueCommands')
             if not queue_cog:
                 logger.debug("Queue system not available")

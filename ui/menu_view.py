@@ -164,8 +164,24 @@ class MediaPlayerView(discord.ui.View):
             
             elif action == "stop":
                 if connection:
+                    # Clear queue for this guild
+                    queue_cog = self.bot.get_cog('QueueCommands')
+                    if queue_cog and self.guild_id in queue_cog.queues:
+                        queue_cog.queues[self.guild_id].clear()
+                        logger.info(f"Queue cleared for guild {self.guild_id}")
+                    
+                    # Cancel prefetch and mark player as stopped
+                    if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                        player = self.bot.players[self.guild_id]
+                        player.is_playing = False
+                        player._transitioning_to_next = False
+                        if player.prefetch_task:
+                            player.prefetch_task.cancel()
+                        if player.update_task:
+                            player.update_task.cancel()
+                    
                     await connection.disconnect()
-                    await interaction.response.send_message("⏹️ Stopped & disconnected", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("⏹️ Stopped & queue cleared", ephemeral=True, delete_after=3)
                 else:
                     await interaction.response.send_message("❌ Bot tidak connected", ephemeral=True, delete_after=3)
             
