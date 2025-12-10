@@ -173,13 +173,13 @@ class PlayCommand(commands.Cog):
                     # Send as follow-up message
                     await interaction.followup.send(embed=embed, ephemeral=False)
                     
-                    # Update voice channel status to show queued song
+                    # Update voice channel status to show queued track
                     try:
-                        queue_status = f"⏳ IN QUEUE: {metadata.title[:30]} - {metadata.artist[:20]}"
-                        await voice_channel.edit(status=queue_status)
-                        logger.debug(f"Set queue status on voice channel: {queue_status}")
-                    except Exception as e:
-                        logger.debug(f"Could not set queue status: {e}")
+                        if voice_connection and voice_connection.connection.channel:
+                            status = f"📋 Queue +{position}: {metadata.title[:25]} - {metadata.artist[:15]}"
+                            await voice_connection.connection.channel.edit(status=status[:80])
+                    except Exception:
+                        pass  # Ignore status update errors
                     
                     logger.info(f"✓ Added to queue: {metadata.title} (position #{position})")
                     return

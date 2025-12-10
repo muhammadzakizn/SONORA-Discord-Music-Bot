@@ -97,6 +97,11 @@ class SynchronizedMediaPlayer:
             if self.bot and self.guild_id:
                 self.prefetch_task = asyncio.create_task(self._prefetch_next_track())
             
+            # Update voice channel status
+            await self._update_voice_channel_status(
+                f"🎵 Now Playing: {self.metadata.title[:30]} - {self.metadata.artist[:20]}"
+            )
+            
             logger.info(f"Playback started: {self.metadata.title} (volume={volume})")
         
         except Exception as e:
