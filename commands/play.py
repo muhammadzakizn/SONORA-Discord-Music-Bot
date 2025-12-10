@@ -555,10 +555,22 @@ class PlayCommand(commands.Cog):
             if guild_id not in queue_cog.queues:
                 queue_cog.queues[guild_id] = []
             
+            # CRITICAL: Check if bot is already playing
+            voice_connection = self.bot.voice_manager.connections.get(guild_id)
+            is_already_playing = (
+                voice_connection and 
+                voice_connection.is_connected() and 
+                voice_connection.is_playing()
+            )
+            
+            if is_already_playing:
+                logger.info(f"Bot is already playing, will queue all tracks from new playlist")
+            
             # SPOTIFY: Use progressive loading for faster playback
             if url_type == 'spotify':
                 await self._handle_spotify_playlist_progressive(
-                    interaction, url, loader, voice_channel, queue_cog
+                    interaction, url, loader, voice_channel, queue_cog,
+                    is_already_playing=is_already_playing
                 )
                 return
             
@@ -601,7 +613,8 @@ class PlayCommand(commands.Cog):
                 tracks = tracks[:max_tracks]
             
             await self._play_first_and_queue_rest(
-                interaction, tracks, loader, voice_channel, queue_cog, guild_id, url_type
+                interaction, tracks, loader, voice_channel, queue_cog, guild_id, url_type,
+                is_already_playing=is_already_playing
             )
         
         except Exception as e:
@@ -619,14 +632,17 @@ class PlayCommand(commands.Cog):
         url: str,
         loader: SafeLoadingManager,
         voice_channel: discord.VoiceChannel,
-        queue_cog
+        queue_cog,
+        is_already_playing: bool = False
     ) -> None:
         """
         Handle Spotify playlist with progressive loading
-        First track plays IMMEDIATELY, rest are queued in background
+        
+        If is_already_playing=False: First track plays IMMEDIATELY, rest queued
+        If is_already_playing=True: ALL tracks queued (no playback interruption)
         """
         guild_id = interaction.guild.id
-        first_track_played = False
+        first_track_played = is_already_playing  # Skip first track playback if already playing
         tracks_queued = 0
         
         async def on_first_track(track: TrackInfo):
@@ -756,15 +772,28 @@ class PlayCommand(commands.Cog):
             
             if total > 0 and tracks_queued > 0:
                 # Send confirmation after loading completes
-                await interaction.channel.send(
-                    embed=EmbedBuilder.create_success(
-                        "✅ Playlist Loaded",
-                        f"🎵 Now playing first track\n"
-                        f"📋 **{tracks_queued}** tracks added to queue\n\n"
-                        f"💡 Tracks loaded progressively for faster playback!"
-                    ),
-                    delete_after=15
-                )
+                if is_already_playing:
+                    # All tracks queued (didn't play first one)
+                    await loader.delete()
+                    await interaction.channel.send(
+                        embed=EmbedBuilder.create_success(
+                            "✅ Playlist Added to Queue",
+                            f"📋 **{tracks_queued}** tracks added to queue\n\n"
+                            f"💡 Current playback continues, playlist queued!"
+                        ),
+                        delete_after=15
+                    )
+                else:
+                    # First track playing, rest queued
+                    await interaction.channel.send(
+                        embed=EmbedBuilder.create_success(
+                            "✅ Playlist Loaded",
+                            f"🎵 Now playing first track\n"
+                            f"📋 **{tracks_queued}** tracks added to queue\n\n"
+                            f"💡 Tracks loaded progressively for faster playback!"
+                        ),
+                        delete_after=15
+                    )
             
             logger.info(f"✅ Progressive playlist complete: {total} tracks")
         
@@ -797,10 +826,38 @@ class PlayCommand(commands.Cog):
         voice_channel: discord.VoiceChannel,
         queue_cog,
         guild_id: int,
-        url_type: str
+        url_type: str,
+        is_already_playing: bool = False
     ) -> None:
-        """Standard playlist handling - play first track, queue rest"""
-        # First track will be played immediately
+        """
+        Standard playlist handling
+        
+        If is_already_playing=False: play first track, queue rest
+        If is_already_playing=True: queue ALL tracks (no playback interruption)
+        """
+        
+        # CASE 1: Bot already playing - queue ALL tracks without playing
+        if is_already_playing:
+            await loader.delete()
+            
+            # Add ALL tracks to queue
+            for track in tracks:
+                track.voice_channel_id = voice_channel.id
+                queue_cog.queues[guild_id].append(track)
+            
+            await interaction.channel.send(
+                embed=EmbedBuilder.create_success(
+                    "✅ Playlist Added to Queue",
+                    f"📋 **{len(tracks)}** tracks added to queue\n\n"
+                    f"💡 Current playback continues, playlist queued!"
+                ),
+                delete_after=15
+            )
+            
+            logger.info(f"✓ Playlist queued (bot already playing): {len(tracks)} tracks")
+            return
+        
+        # CASE 2: Bot not playing - play first track, queue rest
         first_track = tracks[0]
         remaining_tracks = tracks[1:]
         
