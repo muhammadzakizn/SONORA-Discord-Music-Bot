@@ -106,7 +106,7 @@ class EmbedBuilder:
                 footer_text += f" • 🎚️ {eq_name}"
         
         if metadata.lyrics and metadata.lyrics.is_synced:
-            footer_text += " • 🎵 Synced Lyrics"
+            footer_text += " • Synced Lyrics"
         elif metadata.lyrics and metadata.lyrics.lines:
             footer_text += " • 📝 Plain Lyrics (use /lyrics show)"
         else:

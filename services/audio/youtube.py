@@ -229,10 +229,10 @@ class YouTubeDownloader(BaseDownloader):
                 command = [
                     'yt-dlp',
                     url,
-                    '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+                    '-f', 'bestaudio/best',  # More flexible format selector
                     '-x',  # Extract audio
                     '--audio-format', 'opus',
-                    '--audio-quality', f"{Settings.AUDIO_BITRATE}k",
+                    '--audio-quality', '0',  # Best quality
                     '-o', output_template,
                     '--no-playlist',
                     '--playlist-items', '1',
@@ -241,7 +241,6 @@ class YouTubeDownloader(BaseDownloader):
                     '--embed-thumbnail',
                     '--add-metadata',
                     '--extractor-args', f'youtube:player_client={client}',
-                    '--postprocessor-args', f'ffmpeg:-b:a {Settings.AUDIO_BITRATE}k'
                 ]
                 
                 # Add cookies if available - IMPORTANT for YouTube Music access
@@ -312,17 +311,16 @@ class YouTubeDownloader(BaseDownloader):
                 command = [
                     'yt-dlp',
                     fallback_url,
-                    '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+                    '-f', 'bestaudio/best',  # More flexible format
                     '-x',
                     '--audio-format', 'opus',
-                    '--audio-quality', f"{Settings.AUDIO_BITRATE}k",
+                    '--audio-quality', '0',  # Best quality
                     '-o', str(self.download_dir / "%(uploader)s - %(title)s.%(ext)s"),
                     '--no-playlist',
                     '--no-warnings',
                     '--geo-bypass',
                     '--embed-thumbnail',
                     '--add-metadata',
-                    '--postprocessor-args', f'ffmpeg:-b:a {Settings.AUDIO_BITRATE}k'
                 ]
                 
                 stdout, stderr, returncode = await self._run_command(command, timeout=300)
