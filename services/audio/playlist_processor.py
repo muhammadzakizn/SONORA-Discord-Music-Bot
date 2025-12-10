@@ -158,8 +158,11 @@ class PlaylistProcessor:
         logger.info(f"🎵 Progressive loading Spotify {content_type}: {content_id}")
         
         try:
-            # Get total count first
-            total_tracks = await self.spotify.get_playlist_total_tracks(content_id)
+            # Get total count first (use correct method for album vs playlist)
+            if content_type == 'album':
+                total_tracks = await self.spotify.get_album_total_tracks(content_id)
+            else:
+                total_tracks = await self.spotify.get_playlist_total_tracks(content_id)
             
             if total_tracks == 0:
                 logger.warning("Playlist/album appears empty")
@@ -189,8 +192,11 @@ class PlaylistProcessor:
                 if on_progress:
                     await on_progress(processed, total_tracks, f"Fetching tracks {offset+1}-{offset+batch_size}...")
                 
-                # Fetch batch
-                tracks = await self.spotify.get_playlist_tracks_batch(content_id, offset, batch_size)
+                # Fetch batch (use correct method for album vs playlist)
+                if content_type == 'album':
+                    tracks = await self.spotify.get_album_tracks_batch(content_id, offset, batch_size)
+                else:
+                    tracks = await self.spotify.get_playlist_tracks_batch(content_id, offset, batch_size)
                 
                 if not tracks:
                     logger.warning(f"No tracks returned for offset {offset}")

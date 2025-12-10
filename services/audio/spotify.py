@@ -546,3 +546,116 @@ class SpotifyDownloader(BaseDownloader):
         except Exception as e:
             logger.error(f"Failed to get playlist total: {e}")
             return 0
+    
+    async def get_album_total_tracks(self, album_id: str) -> int:
+        """
+        Get total number of tracks in an album
+        
+        Args:
+            album_id: Spotify album ID
+        
+        Returns:
+            Total number of tracks, 0 on error
+        """
+        try:
+            import spotipy
+            from spotipy.oauth2 import SpotifyClientCredentials
+            import os
+            
+            client_id = os.environ.get('SPOTIFY_CLIENT_ID', 'f8a606e5583643beaa27ce62c48e3fc1')
+            client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET', 'f6f4c8f73f0649939286cf417c811607')
+            
+            auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+            sp = spotipy.Spotify(auth_manager=auth_manager)
+            
+            results = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: sp.album(album_id)
+            )
+            
+            total = results.get('total_tracks', 0)
+            logger.info(f"Album {album_id} has {total} tracks")
+            return total
+        
+        except Exception as e:
+            logger.error(f"Failed to get album total: {e}")
+            return 0
+    
+    async def get_album_tracks_batch(
+        self,
+        album_id: str,
+        offset: int = 0,
+        limit: int = 50
+    ) -> list:
+        """
+        Get album tracks directly from Spotify API
+        
+        Args:
+            album_id: Spotify album ID
+            offset: Starting position
+            limit: Number of tracks to fetch
+        
+        Returns:
+            List of TrackInfo objects
+        """
+        try:
+            import spotipy
+            from spotipy.oauth2 import SpotifyClientCredentials
+            import os
+            
+            client_id = os.environ.get('SPOTIFY_CLIENT_ID', 'f8a606e5583643beaa27ce62c48e3fc1')
+            client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET', 'f6f4c8f73f0649939286cf417c811607')
+            
+            auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+            sp = spotipy.Spotify(auth_manager=auth_manager)
+            
+            logger.debug(f"Fetching album {album_id} tracks (offset={offset}, limit={limit})")
+            
+            # Get album info first to get artist
+            album_info = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: sp.album(album_id)
+            )
+            
+            album_artist = album_info['artists'][0]['name'] if album_info.get('artists') else 'Unknown'
+            album_name = album_info.get('name', 'Unknown Album')
+            
+            # Album tracks use different API endpoint
+            results = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: sp.album_tracks(album_id, offset=offset, limit=limit)
+            )
+            
+            if not results or 'items' not in results:
+                return []
+            
+            tracks = []
+            for track in results['items']:
+                if not track:
+                    continue
+                
+                # Album tracks may have different artists than album artist
+                artists = [a['name'] for a in track.get('artists', [])]
+                artist_str = ', '.join(artists) if artists else album_artist
+                
+                from database.models import TrackInfo
+                track_info = TrackInfo(
+                    title=track.get('name', 'Unknown'),
+                    artist=artist_str,
+                    album=album_name,
+                    duration=track.get('duration_ms', 0) / 1000,
+                    url=None,  # Will download from YouTube Music
+                    track_id=track.get('id', None)
+                )
+                tracks.append(track_info)
+            
+            logger.info(f"Fetched {len(tracks)} tracks from album API (offset={offset})")
+            return tracks
+        
+        except ImportError:
+            logger.error("spotipy not installed!")
+            return []
+        except Exception as e:
+            logger.error(f"Album API batch fetch failed: {e}", exc_info=True)
+            return []
+
