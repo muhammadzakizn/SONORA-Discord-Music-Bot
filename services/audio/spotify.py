@@ -43,26 +43,49 @@ class SpotifyDownloader(BaseDownloader):
     def _init_spotdl(self) -> None:
         """Initialize spotdl instance (singleton)
         
-        IMPORTANT: We do NOT use custom Spotify API credentials!
-        spotdl v4+ has built-in default access that works for ALL public content.
-        Using custom credentials often causes "invalid_client" errors.
+        spotdl v4+ has built-in default Spotify credentials that work for all public content.
+        We use headless=True and no_cache=True to avoid auth popups and stale cache issues.
         
-        Cookies are used for YouTube Music Premium audio quality only.
+        Default spotdl credentials (from their config):
+        - client_id: f8a606e5583643beaa27ce62c48e3fc1
+        - client_secret: f6f4c8f73f0649939286cf417c811607
         """
         try:
             from spotdl import Spotdl
             
-            # ALWAYS use spotdl's built-in default access
-            # Do NOT pass custom credentials - they often cause issues
-            # spotdl works perfectly fine for public tracks, playlists, and albums
-            logger.info("Initializing spotdl with default access (no custom credentials)")
+            logger.info("Initializing spotdl with default credentials (headless mode)")
             
-            SpotifyDownloader._spotdl_instance = Spotdl()
+            # Use headless mode to avoid browser auth popups
+            # Use no_cache to avoid stale token issues
+            SpotifyDownloader._spotdl_instance = Spotdl(
+                headless=True,
+                no_cache=True
+            )
             logger.info("Spotdl instance initialized successfully")
         
         except Exception as e:
-            logger.error(f"Failed to initialize spotdl: {e}")
-            SpotifyDownloader._spotdl_instance = None
+            error_str = str(e)
+            logger.error(f"Failed to initialize spotdl: {error_str}")
+            
+            # If there's an auth error, try with explicit default credentials
+            if 'invalid_client' in error_str.lower() or 'auth' in error_str.lower():
+                logger.info("Retrying with explicit default credentials...")
+                try:
+                    from spotdl import Spotdl
+                    
+                    # Use spotdl's own default credentials explicitly
+                    SpotifyDownloader._spotdl_instance = Spotdl(
+                        client_id="f8a606e5583643beaa27ce62c48e3fc1",
+                        client_secret="f6f4c8f73f0649939286cf417c811607",
+                        headless=True,
+                        no_cache=True
+                    )
+                    logger.info("Spotdl initialized with explicit default credentials")
+                except Exception as e2:
+                    logger.error(f"Spotdl retry also failed: {e2}")
+                    SpotifyDownloader._spotdl_instance = None
+            else:
+                SpotifyDownloader._spotdl_instance = None
     
     async def search(self, query: str) -> Optional[TrackInfo]:
         """
