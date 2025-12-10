@@ -470,11 +470,12 @@ class SpotifyDownloader(BaseDownloader):
             sp = spotipy.Spotify(auth_manager=auth_manager)
             
             # Fetch playlist tracks with pagination
+            # Use market='US' to access Spotify curated playlists
             logger.debug(f"Fetching playlist {playlist_id} tracks (offset={offset}, limit={limit})")
             
             results = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: sp.playlist_tracks(playlist_id, offset=offset, limit=limit)
+                lambda: sp.playlist_tracks(playlist_id, offset=offset, limit=limit, market='US')
             )
             
             if not results or 'items' not in results:
@@ -543,9 +544,10 @@ class SpotifyDownloader(BaseDownloader):
             sp = spotipy.Spotify(auth_manager=auth_manager)
             
             # Get playlist info (minimal API call)
+            # Use market='US' to access Spotify curated playlists
             results = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: sp.playlist(playlist_id, fields='tracks.total')
+                lambda: sp.playlist(playlist_id, fields='tracks.total', market='US')
             )
             
             total = results.get('tracks', {}).get('total', 0)
