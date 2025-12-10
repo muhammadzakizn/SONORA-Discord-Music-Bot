@@ -265,6 +265,7 @@ class MusicBot(commands.Bot):
             await self.load_extension('commands.volume')
             await self.load_extension('commands.stats')
             await self.load_extension('commands.admin')
+            await self.load_extension('commands.lyrics')
             
             logger.info("Commands loaded successfully")
         
