@@ -18,9 +18,8 @@ try:
     from services.translation import translator
     from services.download_manager import download_manager
     V3_3_FEATURES = True
-    print("✓ v3.3.0 features loaded")
-except ImportError as e:
-    print(f"⚠️  v3.3.0 features not available: {e}")
+except ImportError:
+    # v3.3.0 features are optional - using dummy decorators
     V3_3_FEATURES = False
     # Dummy decorators
     def login_required(f): return f

@@ -104,29 +104,24 @@ def main():
     # Load Opus library (CRITICAL for voice)
     import discord
     if not discord.opus.is_loaded():
-        try:
-            discord.opus.load_opus()
-            logger.info("✓ Opus library loaded")
-        except Exception as e:
-            logger.warning(f"Failed to load opus library: {e}")
-            logger.warning("Trying to find opus in system...")
-            
-            # Try OS-specific paths from settings
-            opus_paths = Settings.get_opus_paths()
-            
-            for path in opus_paths:
-                try:
-                    discord.opus.load_opus(path)
-                    if discord.opus.is_loaded():
-                        logger.info(f"✓ Opus loaded from: {path}")
-                        break
-                except Exception as opus_err:
-                    logger.debug(f"Failed to load opus from {path}: {opus_err}")
-                    continue
-            
-            if not discord.opus.is_loaded():
-                logger.error("❌ Opus library not loaded! Voice may not work.")
-                logger.error("Install with: brew install opus (macOS) or apt install libopus0 (Linux)")
+        # Get OS-specific opus paths and try to load
+        opus_paths = Settings.get_opus_paths()
+        opus_loaded = False
+        
+        for path in opus_paths:
+            try:
+                discord.opus.load_opus(path)
+                if discord.opus.is_loaded():
+                    logger.info(f"✓ Opus loaded from: {path}")
+                    opus_loaded = True
+                    break
+            except Exception as opus_err:
+                logger.debug(f"Failed to load opus from {path}: {opus_err}")
+                continue
+        
+        if not opus_loaded:
+            logger.error("❌ Opus library not loaded! Voice may not work.")
+            logger.error("Install with: brew install opus (macOS) or apt install libopus0 (Linux)")
     
     # Validate configuration
     if not Settings.validate():
