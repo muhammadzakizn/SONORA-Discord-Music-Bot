@@ -253,20 +253,22 @@ class YouTubeDownloader(BaseDownloader):
                 logger.debug(f"Trying with player_client={client}...")
                 
                 # Build yt-dlp command
-                # Use most flexible format selection to avoid "format not available" errors
+                # Use specific format IDs for best compatibility across clients
                 output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
+                
+                # Format priority: opus (251/250/249), m4a (140/139), then any audio, then any
+                format_selector = '251/250/249/140/139/bestaudio/best'
                 
                 command = [
                     'yt-dlp',
                     url,
-                    '-f', 'ba/b',  # bestaudio or best (most flexible)
+                    '-f', format_selector,
                     '-x',  # Extract audio
-                    '--no-check-formats',  # Don't check format availability
-                    '--remote-components', 'ejs:github',  # Download JS solver for signatures
+                    '--audio-format', 'opus',  # Convert to opus if needed
+                    '--audio-quality', '0',  # Best quality
                     '-o', output_template,
                     '--no-playlist',
                     '--playlist-items', '1',
-                    '--no-warnings',
                     '--geo-bypass',
                     '--extractor-args', f'youtube:player_client={client}',
                 ]
