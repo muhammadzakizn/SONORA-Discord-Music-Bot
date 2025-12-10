@@ -453,6 +453,9 @@ class SynchronizedMediaPlayer:
                 
                 for i, item in enumerate(queue):
                     if isinstance(item, TrackInfo):
+                        # Skip tracks that already failed prefetch
+                        if getattr(item, '_prefetch_failed', False):
+                            continue
                         track_index = i
                         track_to_process = item
                         break
@@ -468,9 +471,11 @@ class SynchronizedMediaPlayer:
                     audio_result = await play_cog._download_with_fallback(track_to_process, None)
                     
                     if not audio_result or not audio_result.is_success:
-                        logger.warning(f"Pre-download failed: {track_to_process.title}")
-                        # Don't remove from queue, will be retried when played
-                        await asyncio.sleep(2)
+                        logger.warning(f"Pre-download failed: {track_to_process.title} - skipping to next")
+                        # Mark as failed by setting a flag so we skip it next iteration
+                        track_to_process._prefetch_failed = True
+                        processed_count += 1  # Count as processed (failed) to prevent infinite loop
+                        await asyncio.sleep(1)
                         continue
                     
                     # Process metadata (artwork + lyrics)

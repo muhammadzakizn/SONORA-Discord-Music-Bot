@@ -768,6 +768,17 @@ class PlayCommand(commands.Cog):
             
             logger.info(f"✅ Progressive playlist complete: {total} tracks")
         
+        except ValueError as e:
+            # Private/algorithmic playlist error - show full message
+            logger.warning(f"Playlist access error: {e}")
+            if not first_track_played:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_error(
+                        "Playlist Tidak Dapat Diakses",
+                        str(e)  # Show full error message
+                    )
+                )
+        
         except Exception as e:
             logger.error(f"Progressive playlist failed: {e}", exc_info=True)
             if not first_track_played:

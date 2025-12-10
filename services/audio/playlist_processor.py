@@ -183,8 +183,20 @@ class PlaylistProcessor:
                             await on_progress(i + 1, len(tracks), f"Processing track {i+1}/{len(tracks)}")
                     return len(tracks)
                 else:
+                    # Both API and spotdl failed - likely private/algorithmic playlist
+                    error_msg = (
+                        "❌ **Playlist ini tidak dapat diakses.**\n\n"
+                        "Kemungkinan penyebab:\n"
+                        "• Playlist pribadi/private\n"
+                        "• Playlist algoritmis Spotify (Discover Weekly, Daily Mix, dll)\n"
+                        "• Playlist memerlukan login akun Spotify\n\n"
+                        "💡 **Coba:**\n"
+                        "• Playlist publik yang kamu buat sendiri\n"
+                        "• Playlist curated Spotify (Today's Top Hits, dll)\n"
+                        "• Pastikan playlist visibility diset ke 'Public'"
+                    )
                     logger.warning("Playlist/album appears empty (both API and spotdl failed)")
-                    return 0
+                    raise ValueError(error_msg)
             
             if on_progress:
                 await on_progress(0, total_tracks, f"Found {total_tracks} tracks in {content_type}")
