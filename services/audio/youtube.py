@@ -56,6 +56,9 @@ class YouTubeDownloader(BaseDownloader):
         """
         Search for track on YouTube Music (forced)
         
+        Uses ytmusicsearch: prefix to force search on music.youtube.com
+        Extracts proper track/artist metadata from YouTube Music
+        
         Args:
             query: Search query or YouTube URL
         
@@ -65,22 +68,29 @@ class YouTubeDownloader(BaseDownloader):
         logger.info(f"Searching YouTube Music: {query}")
         
         try:
-            # Convert to YouTube Music URL if it's a YouTube link
-            if 'youtube.com' in query or 'youtu.be' in query:
-                query = self._convert_to_ytmusic_url(query)
-                logger.info(f"Using YouTube Music URL: {query}")
-            
-            # Use yt-dlp to search/get info
-            search_query = query if query.startswith('http') else f"ytsearch1:{query}"
+            # Determine search query
+            if query.startswith('http'):
+                # Convert to YouTube Music URL if it's a YouTube link
+                if 'youtube.com' in query or 'youtu.be' in query:
+                    query = self._convert_to_ytmusic_url(query)
+                    logger.info(f"Using YouTube Music URL: {query}")
+                search_query = query
+            else:
+                # Use ytmusicsearch: prefix to force YouTube Music search
+                # This searches music.youtube.com instead of regular youtube.com
+                search_query = f"https://music.youtube.com/search?q={query.replace(' ', '+')}"
+                logger.info(f"Using YouTube Music search URL")
             
             command = [
                 'yt-dlp',
                 '--dump-json',
                 '--no-playlist',
-                '--default-search', 'ytsearch1',
+                '--flat-playlist',  # Get first result from search
+                '--playlist-items', '1',  # Only first result
                 '--no-check-certificate',
                 '--geo-bypass',
-                '--extractor-args', 'youtube:player_client=android_music',  # Force Music client
+                # Force YouTube Music client for proper metadata
+                '--extractor-args', 'youtube:player_client=tv_music,music_client=tv_music',
                 search_query
             ]
             
@@ -95,16 +105,39 @@ class YouTubeDownloader(BaseDownloader):
             stdout, stderr, returncode = await self._run_command(command, timeout=30)
             
             if returncode != 0:
-                logger.warning(f"yt-dlp search failed: {stderr}")
-                return None
+                logger.warning(f"yt-dlp YTMusic search failed: {stderr}")
+                # Fallback to regular ytsearch
+                logger.info("Falling back to ytsearch1...")
+                fallback_query = query if query.startswith('http') else f"ytsearch1:{query}"
+                fallback_cmd = [
+                    'yt-dlp',
+                    '--dump-json',
+                    '--no-playlist',
+                    '--no-check-certificate',
+                    '--geo-bypass',
+                    '--extractor-args', 'youtube:player_client=android_music',
+                    fallback_query
+                ]
+                stdout, stderr, returncode = await self._run_command(fallback_cmd, timeout=30)
+                
+                if returncode != 0:
+                    logger.warning(f"yt-dlp fallback search also failed: {stderr}")
+                    return None
             
             # Parse JSON output
             try:
                 track_data = json.loads(stdout)
                 
-                # Extract info
-                title_full = track_data.get('title', 'Unknown')
-                artist = track_data.get('uploader', 'Unknown')
+                # Extract info - prefer 'track' over 'title' for YouTube Music
+                # YouTube Music provides proper track metadata
+                title = track_data.get('track') or track_data.get('title', 'Unknown')
+                
+                # Prefer 'artist' over 'uploader' for YouTube Music
+                artist = track_data.get('artist') or track_data.get('creator') or track_data.get('uploader', 'Unknown')
+                
+                # Get album if available (YouTube Music specific)
+                album = track_data.get('album')
+                
                 duration = track_data.get('duration', 0)
                 video_id = track_data.get('id', None)
                 
@@ -115,13 +148,11 @@ class YouTubeDownloader(BaseDownloader):
                     # Get highest resolution thumbnail
                     thumbnail = thumbnails[-1].get('url')
                 
-                # Try to parse "Artist - Title" format
-                if ' - ' in title_full:
-                    parts = title_full.split(' - ', 1)
-                    artist = parts[0]
-                    title = parts[1]
-                else:
-                    title = title_full
+                # If title still has "Artist - Title" format, split it
+                if ' - ' in title and artist in ['Unknown', title.split(' - ')[0]]:
+                    parts = title.split(' - ', 1)
+                    artist = parts[0].strip()
+                    title = parts[1].strip()
                 
                 # Force YouTube Music URL
                 ytmusic_url = f"https://music.youtube.com/watch?v={video_id}" if video_id else None
@@ -131,6 +162,7 @@ class YouTubeDownloader(BaseDownloader):
                 return TrackInfo(
                     title=title,
                     artist=artist,
+                    album=album,
                     duration=duration,
                     url=ytmusic_url,
                     track_id=video_id,
@@ -169,12 +201,15 @@ class YouTubeDownloader(BaseDownloader):
             if url and 'youtube.com/watch' in url and 'music.youtube.com' not in url:
                 url = self._convert_to_ytmusic_url(url)
             elif not url:
-                # If no URL, search
-                url = f"ytsearch1:{track_info.artist} - {track_info.title}"
+                # If no URL, search on YouTube Music
+                url = f"https://music.youtube.com/search?q={track_info.artist}+{track_info.title}".replace(' ', '+')
             
             logger.info(f"Downloading from: {url}")
             
             # Build yt-dlp command optimized for YouTube Music
+            # Use %(track,title)s to prefer track name from YouTube Music metadata
+            output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
+            
             command = [
                 'yt-dlp',
                 url,
@@ -182,13 +217,15 @@ class YouTubeDownloader(BaseDownloader):
                 '-x',  # Extract audio
                 '--audio-format', 'opus',
                 '--audio-quality', f"{Settings.AUDIO_BITRATE}k",
-                '-o', str(output_path.with_suffix('')),  # yt-dlp adds extension
+                '-o', output_template,  # Use template with track/artist
                 '--no-playlist',
+                '--playlist-items', '1',  # Only first result if searching
                 '--no-warnings',
                 '--geo-bypass',
                 '--embed-thumbnail',  # Embed artwork!
                 '--add-metadata',  # Add metadata
-                '--extractor-args', 'youtube:player_client=android_music',  # Force Music client
+                # Force YouTube Music client for proper track/artist metadata
+                '--extractor-args', 'youtube:player_client=tv_music,music_client=tv_music',
                 '--postprocessor-args', f'ffmpeg:-b:a {Settings.AUDIO_BITRATE}k'
             ]
             
