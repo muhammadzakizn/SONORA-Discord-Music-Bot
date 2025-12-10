@@ -256,6 +256,7 @@ class YouTubeDownloader(BaseDownloader):
             '--socket-timeout', '30',
             '--retries', '3',
             '--js-runtimes', 'node',  # Use Node.js for JS signature solving
+            '--remote-components', 'ejs:github',  # Download JS solver from GitHub
         ]
         
         # Add cookies if available
@@ -325,7 +326,8 @@ class YouTubeDownloader(BaseDownloader):
             '-o', output_template,
             '--no-playlist',
             '--geo-bypass',
-            '--js-runtimes', 'node',  # Use Node.js for JS signature solving
+            '--js-runtimes', 'node',
+            '--remote-components', 'ejs:github',
         ]
         
         if cookies_added:
