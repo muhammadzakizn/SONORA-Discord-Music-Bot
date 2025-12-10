@@ -16,7 +16,7 @@ logger = get_logger('metadata.artwork')
 class ArtworkFetcher:
     """
     Artwork fetcher with priority:
-    Apple Music (3000x3000px) → Spotify (640x640px) → Embedded
+    Apple Music (3000x3000px) → Spotify (640x640px) → YouTube Music → Embedded
     """
     
     def __init__(self):
@@ -31,7 +31,8 @@ class ArtworkFetcher:
         prefer_apple: bool = True
     ) -> Optional[tuple]:
         """
-        Fetch artwork for track
+        Fetch artwork for track with fallback chain:
+        Apple Music → Spotify → YouTube Music
         
         Args:
             track_info: Track information
@@ -42,27 +43,20 @@ class ArtworkFetcher:
         """
         logger.info(f"Fetching artwork for: {track_info}")
         
-        # Try sources in order
-        if prefer_apple:
-            # Try Apple Music first
-            result = await self._fetch_from_apple(track_info)
-            if result:
-                return result
-            
-            # Fallback to Spotify
-            result = await self._fetch_from_spotify(track_info)
-            if result:
-                return result
-        else:
-            # Try Spotify first
-            result = await self._fetch_from_spotify(track_info)
-            if result:
-                return result
-            
-            # Fallback to Apple Music
-            result = await self._fetch_from_apple(track_info)
-            if result:
-                return result
+        # Try Apple Music first (highest quality - 3000x3000)
+        result = await self._fetch_from_apple(track_info)
+        if result:
+            return result
+        
+        # Fallback to Spotify (640x640)
+        result = await self._fetch_from_spotify(track_info)
+        if result:
+            return result
+        
+        # Fallback to YouTube Music (using thumbnail from search)
+        result = await self._fetch_from_youtube_music(track_info)
+        if result:
+            return result
         
         logger.warning(f"No artwork found for: {track_info}")
         return None
@@ -124,7 +118,7 @@ class ArtworkFetcher:
     
     async def _fetch_from_spotify(self, track_info: TrackInfo) -> Optional[tuple]:
         """
-        Fetch artwork from Spotify
+        Fetch artwork from Spotify using spotdl save to get cover URL
         
         Args:
             track_info: Track information
@@ -133,14 +127,109 @@ class ArtworkFetcher:
             Tuple of (artwork_url, artwork_source) or None
         """
         try:
-            # This would require Spotify API authentication
-            # For now, we'll skip implementation as it requires more setup
-            # In production, use spotipy library with credentials
-            logger.debug("Spotify artwork fetching not implemented yet")
-            return None
+            import subprocess
+            import tempfile
+            import json
+            import os
+            
+            # Create clean environment (no invalid credentials)
+            clean_env = os.environ.copy()
+            for var in ['SPOTIFY_CLIENT_ID', 'SPOTIFY_CLIENT_SECRET', 'SPOTIPY_CLIENT_ID', 'SPOTIPY_CLIENT_SECRET']:
+                if var in clean_env:
+                    del clean_env[var]
+            
+            # Search on Spotify to get cover URL
+            search_query = f"{track_info.artist} {track_info.title}"
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.spotdl', delete=False) as f:
+                temp_file = f.name
+            
+            try:
+                # Use spotdl save to get metadata including cover_url
+                result = subprocess.run(
+                    ['spotdl', 'save', search_query, '--save-file', temp_file],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    env=clean_env
+                )
+                
+                if result.returncode == 0 and os.path.exists(temp_file):
+                    with open(temp_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        if content.strip():
+                            data = json.loads(content)
+                            if isinstance(data, list) and len(data) > 0:
+                                cover_url = data[0].get('cover_url')
+                                if cover_url:
+                                    logger.info(f"✓ Found artwork on Spotify: {cover_url}")
+                                    return (cover_url, ArtworkSource.SPOTIFY)
+            finally:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+                    
+            logger.debug(f"No Spotify artwork found for: {search_query}")
         
         except Exception as e:
             logger.warning(f"Failed to fetch from Spotify: {e}")
+        
+        return None
+    
+    async def _fetch_from_youtube_music(self, track_info: TrackInfo) -> Optional[tuple]:
+        """
+        Fetch artwork from YouTube Music using yt-dlp
+        
+        Args:
+            track_info: Track information
+        
+        Returns:
+            Tuple of (artwork_url, artwork_source) or None
+        """
+        try:
+            import subprocess
+            import json
+            
+            search_query = f"{track_info.artist} {track_info.title}"
+            search_url = f"https://music.youtube.com/search?q={search_query.replace(' ', '+')}"
+            
+            # Use yt-dlp to get thumbnail from YouTube Music search
+            result = subprocess.run(
+                [
+                    'yt-dlp',
+                    '--dump-json',
+                    '--no-playlist',
+                    '--playlist-items', '1',
+                    '--extractor-args', 'youtube:player_client=android_music',
+                    search_url
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0 and result.stdout:
+                data = json.loads(result.stdout)
+                thumbnails = data.get('thumbnails', [])
+                
+                if thumbnails:
+                    # Get highest resolution thumbnail
+                    best_thumb = thumbnails[-1].get('url')
+                    if best_thumb:
+                        # Convert to high quality if possible
+                        # YouTube thumbnails often have maxresdefault available
+                        video_id = data.get('id')
+                        if video_id:
+                            hq_url = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+                            logger.info(f"✓ Found artwork on YouTube Music: {hq_url}")
+                            return (hq_url, ArtworkSource.YOUTUBE)
+                        else:
+                            logger.info(f"✓ Found artwork on YouTube Music: {best_thumb}")
+                            return (best_thumb, ArtworkSource.YOUTUBE)
+            
+            logger.debug(f"No YouTube Music artwork found for: {search_query}")
+        
+        except Exception as e:
+            logger.warning(f"Failed to fetch from YouTube Music: {e}")
         
         return None
     

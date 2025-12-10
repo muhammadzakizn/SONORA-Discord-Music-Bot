@@ -24,6 +24,7 @@ class ArtworkSource(str, Enum):
     """Artwork source types"""
     APPLE_MUSIC = "Apple Music"
     SPOTIFY = "Spotify"
+    YOUTUBE = "YouTube Music"
     EMBEDDED = "Embedded"
     NONE = "No Artwork"
 
