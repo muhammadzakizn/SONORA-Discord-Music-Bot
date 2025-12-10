@@ -55,6 +55,7 @@ class SynchronizedMediaPlayer:
         self.start_time: Optional[float] = None
         self.is_playing = False
         self.is_paused = False
+        self._transitioning_to_next = False  # Prevent double-call of _play_next_from_queue
         self.update_task: Optional[asyncio.Task] = None
         self.prefetch_task: Optional[asyncio.Task] = None  # Background pre-fetching
         self.prefetched_metadata: Optional[MetadataInfo] = None  # Cache for next track
@@ -80,6 +81,7 @@ class SynchronizedMediaPlayer:
             self.start_time = time.time()
             self.is_playing = True
             self.is_paused = False
+            self._transitioning_to_next = False  # Reset transition flag
             
             # Start playback
             await OptimizedAudioPlayer.play_audio(
@@ -309,6 +311,12 @@ class SynchronizedMediaPlayer:
         # Auto-play next track from queue (works for both natural finish and skip)
         # Note: This callback runs in FFmpeg thread, so we need to schedule coroutine properly
         if self.bot and self.guild_id:
+            # Prevent double-calling (race condition fix)
+            if self._transitioning_to_next:
+                logger.debug("Already transitioning to next track, skipping duplicate call")
+                return
+            self._transitioning_to_next = True
+            
             try:
                 logger.info("Scheduling next track from queue...")
                 # Get the event loop from the bot
@@ -317,6 +325,7 @@ class SynchronizedMediaPlayer:
                 # Validate loop is available and not closed
                 if not loop or loop.is_closed():
                     logger.error("Bot event loop is not available or closed")
+                    self._transitioning_to_next = False
                     return
                 
                 # Schedule coroutine in the bot's event loop from this thread
@@ -324,6 +333,7 @@ class SynchronizedMediaPlayer:
                 logger.debug(f"Next track scheduled: {future}")
             except Exception as e:
                 logger.error(f"Failed to schedule next track: {e}", exc_info=True)
+                self._transitioning_to_next = False
         else:
             logger.warning(f"Cannot schedule next track: bot={self.bot}, guild_id={self.guild_id}")
     
