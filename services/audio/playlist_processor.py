@@ -165,8 +165,26 @@ class PlaylistProcessor:
                 total_tracks = await self.spotify.get_playlist_total_tracks(content_id)
             
             if total_tracks == 0:
-                logger.warning("Playlist/album appears empty")
-                return 0
+                # Fallback to spotdl for Spotify curated playlists (API returns 404 for some)
+                logger.info(f"API returned 0 tracks, trying spotdl fallback for curated playlist...")
+                
+                # Use the old spotdl-based method
+                tracks = await self._get_spotify_playlist_info_only(url)
+                
+                if tracks:
+                    logger.info(f"✅ spotdl fallback found {len(tracks)} tracks")
+                    # Process with callbacks
+                    for i, track in enumerate(tracks):
+                        if i == 0 and on_first_track:
+                            await on_first_track(track)
+                        elif on_track_ready:
+                            await on_track_ready(track, i + 1)
+                        if on_progress:
+                            await on_progress(i + 1, len(tracks), f"Processing track {i+1}/{len(tracks)}")
+                    return len(tracks)
+                else:
+                    logger.warning("Playlist/album appears empty (both API and spotdl failed)")
+                    return 0
             
             if on_progress:
                 await on_progress(0, total_tracks, f"Found {total_tracks} tracks in {content_type}")
