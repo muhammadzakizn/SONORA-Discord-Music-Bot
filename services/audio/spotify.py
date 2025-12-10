@@ -447,8 +447,20 @@ class SpotifyDownloader(BaseDownloader):
             client_id = Settings.SPOTIFY_CLIENT_ID
             client_secret = Settings.SPOTIFY_CLIENT_SECRET
             
+            # Debug logging (masked for security)
+            if client_id:
+                logger.debug(f"Using Spotify client_id: {client_id[:8]}...{client_id[-4:]}")
+            else:
+                logger.warning("SPOTIFY_CLIENT_ID is empty!")
+            
+            if client_secret:
+                logger.debug(f"Using Spotify client_secret: {client_secret[:4]}...{client_secret[-4:]}")
+            else:
+                logger.warning("SPOTIFY_CLIENT_SECRET is empty!")
+            
             if not client_id or not client_secret:
                 logger.error("Spotify credentials not configured in .env!")
+                logger.error("Please add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to your .env file")
                 return []
             
             auth_manager = SpotifyClientCredentials(
