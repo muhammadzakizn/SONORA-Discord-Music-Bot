@@ -630,7 +630,8 @@ class PlaylistProcessor:
                         artist = parts[0]
                         title = parts[1]
                     else:
-                        artist = video_data.get('uploader', 'Unknown')
+                        # Fallback: use uploader, channel, or Unknown
+                        artist = video_data.get('uploader') or video_data.get('channel') or 'Unknown'
                         title = title_full
                     
                     # Return TrackInfo with url=None to download on-demand
@@ -710,7 +711,8 @@ class PlaylistProcessor:
                         artist = parts[0]
                         title = parts[1]
                     else:
-                        artist = video_data.get('uploader', 'Unknown')
+                        # Fallback: use uploader, channel, or Unknown
+                        artist = video_data.get('uploader') or video_data.get('channel') or 'Unknown'
                         title = title_full
                     
                     track = TrackInfo(
