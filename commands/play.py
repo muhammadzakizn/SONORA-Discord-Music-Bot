@@ -574,7 +574,15 @@ class PlayCommand(commands.Cog):
                 )
                 return
             
-            # OTHER SOURCES (YouTube, Apple Music): Use standard loading
+            # YOUTUBE: Use progressive loading (like Spotify)
+            if url_type in ['youtube', 'youtube_music']:
+                await self._handle_youtube_playlist_progressive(
+                    interaction, url, loader, voice_channel, queue_cog,
+                    is_already_playing=is_already_playing
+                )
+                return
+            
+            # OTHER SOURCES (Apple Music): Use standard loading
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
                     "Processing Playlist",
@@ -815,6 +823,204 @@ class PlayCommand(commands.Cog):
                     embed=EmbedBuilder.create_error(
                         "Playlist Error",
                         f"Failed to load playlist: {str(e)[:100]}"
+                    )
+                )
+    
+    async def _handle_youtube_playlist_progressive(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+        loader: SafeLoadingManager,
+        voice_channel: discord.VoiceChannel,
+        queue_cog,
+        is_already_playing: bool = False
+    ) -> None:
+        """
+        Handle YouTube playlist with progressive loading
+        
+        If is_already_playing=False: First track plays IMMEDIATELY, rest queued
+        If is_already_playing=True: ALL tracks queued (no playback interruption)
+        """
+        guild_id = interaction.guild.id
+        first_track_played = is_already_playing  # Skip first track playback if already playing
+        tracks_queued = 0
+        
+        async def on_first_track(track: TrackInfo):
+            """Called when first track is ready - play immediately"""
+            nonlocal first_track_played
+            
+            if is_already_playing:
+                # Bot already playing, queue this track too
+                track.voice_channel_id = voice_channel.id
+                queue_cog.queues[guild_id].append(track)
+                return
+            
+            await self._safe_loader_update(loader, 
+                embed=EmbedBuilder.create_loading(
+                    "Downloading First Track",
+                    f"**{track.title}** - *{track.artist}*"
+                )
+            )
+            
+            # Download first track
+            audio_result = await self._download_with_fallback(track, loader)
+            
+            if not audio_result or not audio_result.is_success:
+                logger.error("Failed to download first YouTube track")
+                return
+            
+            # Process metadata
+            metadata = await self.metadata_processor.process(
+                track,
+                audio_result,
+                requested_by=interaction.user.display_name,
+                requested_by_id=interaction.user.id,
+                prefer_apple_artwork=True,  # Get Apple Music artwork for YouTube
+                voice_channel_id=voice_channel.id
+            )
+            
+            # Connect to voice
+            voice_connection = RobustVoiceConnection()
+            await voice_connection.connect(voice_channel)
+            self.bot.voice_manager.connections[guild_id] = voice_connection
+            
+            # Delete loader
+            await loader.delete()
+            
+            # Delete old player message
+            if hasattr(self.bot, 'player_messages'):
+                old_msg = self.bot.player_messages.get(guild_id)
+                if old_msg:
+                    try:
+                        await old_msg.delete()
+                    except Exception:
+                        pass
+            else:
+                self.bot.player_messages = {}
+            
+            await asyncio.sleep(0.5)
+            
+            # Create and send player
+            view = MediaPlayerView(self.bot, guild_id, timeout=None)
+            player_msg = await interaction.channel.send(
+                embed=EmbedBuilder.create_now_playing(
+                    metadata=metadata,
+                    progress_bar="",
+                    lyrics_lines=["", "", ""],
+                    guild_id=guild_id
+                ),
+                view=view
+            )
+            self.bot.player_messages[guild_id] = player_msg
+            
+            # Get volume
+            volume = 1.0
+            volume_cog = self.bot.get_cog('VolumeCommands')
+            if volume_cog:
+                volume = volume_cog.get_volume(guild_id) / 100.0
+            
+            # Start playback
+            player = SynchronizedMediaPlayer(
+                voice_connection.connection,
+                player_msg,
+                metadata,
+                bot=self.bot,
+                guild_id=guild_id
+            )
+            
+            if not hasattr(self.bot, 'players'):
+                self.bot.players = {}
+            self.bot.players[guild_id] = player
+            
+            await player.start(volume=volume)
+            first_track_played = True
+            
+            logger.info(f"🎵 First YouTube track playing: {track.title}")
+        
+        async def on_track_ready(track: TrackInfo):
+            """Called for each subsequent track - add to queue"""
+            nonlocal tracks_queued
+            
+            # Store voice channel ID for the track
+            track.voice_channel_id = voice_channel.id
+            
+            # Add to queue (raw TrackInfo - will be processed when played)
+            queue_cog.queues[guild_id].append(track)
+            tracks_queued += 1
+            
+            logger.debug(f"📋 Queued: {track.title} (#{tracks_queued})")
+        
+        async def on_progress(current: int, total: int, message: str):
+            """Progress callback - update loading message only before first track"""
+            if not first_track_played:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_loading(
+                        f"Loading YouTube Playlist ({current}/{total})",
+                        message
+                    )
+                )
+        
+        # Start progressive loading
+        await self._safe_loader_update(loader, 
+            embed=EmbedBuilder.create_loading(
+                "🎵 Loading YouTube Playlist",
+                "Using progressive loading for faster playback..."
+            )
+        )
+        
+        try:
+            total = await self.playlist_processor.process_youtube_playlist_progressive(
+                url=url,
+                on_first_track=on_first_track,
+                on_track_ready=on_track_ready,
+                on_progress=on_progress
+            )
+            
+            if total > 0 and tracks_queued > 0:
+                # Send confirmation after loading completes
+                if is_already_playing:
+                    # All tracks queued (didn't play first one)
+                    await loader.delete()
+                    await interaction.channel.send(
+                        embed=EmbedBuilder.create_success(
+                            "✅ YouTube Playlist Added to Queue",
+                            f"📋 **{tracks_queued + 1}** tracks added to queue\n\n"
+                            f"💡 Current playback continues, playlist queued!"
+                        ),
+                        delete_after=15
+                    )
+                else:
+                    # First track playing, rest queued
+                    await interaction.channel.send(
+                        embed=EmbedBuilder.create_success(
+                            "✅ YouTube Playlist Loaded",
+                            f"🎵 Now playing first track\n"
+                            f"📋 **{tracks_queued}** tracks added to queue\n\n"
+                            f"💡 Progressive loading complete!"
+                        ),
+                        delete_after=15
+                    )
+            
+            logger.info(f"✅ YouTube progressive playlist complete: {total} tracks")
+        
+        except ValueError as e:
+            # Playlist access error
+            logger.warning(f"YouTube playlist access error: {e}")
+            if not first_track_played:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_error(
+                        "YouTube Playlist Error",
+                        str(e)
+                    )
+                )
+        
+        except Exception as e:
+            logger.error(f"YouTube progressive playlist failed: {e}", exc_info=True)
+            if not first_track_played:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_error(
+                        "Playlist Error",
+                        f"Failed to load YouTube playlist: {str(e)[:100]}"
                     )
                 )
     

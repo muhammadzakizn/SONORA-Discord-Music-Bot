@@ -654,6 +654,105 @@ class PlaylistProcessor:
             logger.error(f"Error getting YouTube playlist tracks: {e}", exc_info=True)
             return []
     
+    async def process_youtube_playlist_progressive(
+        self,
+        url: str,
+        on_first_track,  # async def callback(track: TrackInfo)
+        on_track_ready,  # async def callback(track: TrackInfo)
+        on_progress      # async def callback(current: int, total: int, message: str)
+    ) -> int:
+        """
+        Process YouTube playlist with progressive loading.
+        First track plays IMMEDIATELY, rest are queued in background.
+        
+        Args:
+            url: YouTube playlist URL
+            on_first_track: Callback when first track is ready (play immediately)
+            on_track_ready: Callback for each subsequent track (queue)
+            on_progress: Progress callback for UI updates
+        
+        Returns:
+            Total number of tracks processed
+        """
+        try:
+            await on_progress(0, 0, "Fetching YouTube playlist info...")
+            
+            # Use yt-dlp to get playlist info (fast, metadata only)
+            command = [
+                'yt-dlp',
+                '--flat-playlist',
+                '--dump-json',
+                url
+            ]
+            
+            stdout, stderr, returncode = await self.youtube._run_command(command, timeout=90)
+            
+            if returncode != 0:
+                logger.error(f"Failed to get YouTube playlist: {stderr}")
+                raise ValueError(f"Cannot access this YouTube playlist: {stderr[:100]}")
+            
+            # Parse each line as JSON
+            import json
+            tracks = []
+            for line in stdout.strip().split('\n'):
+                if not line:
+                    continue
+                
+                try:
+                    video_data = json.loads(line)
+                    
+                    # Extract title and artist
+                    title_full = video_data.get('title', 'Unknown')
+                    
+                    # Try to parse "Artist - Title" format
+                    if ' - ' in title_full:
+                        parts = title_full.split(' - ', 1)
+                        artist = parts[0]
+                        title = parts[1]
+                    else:
+                        artist = video_data.get('uploader', 'Unknown')
+                        title = title_full
+                    
+                    track = TrackInfo(
+                        title=title,
+                        artist=artist,
+                        duration=video_data.get('duration', 0),
+                        url=None,  # Will download on-demand
+                        track_id=video_data.get('id', None)
+                    )
+                    tracks.append(track)
+                    
+                except json.JSONDecodeError:
+                    continue
+            
+            if not tracks:
+                logger.warning("No tracks found in YouTube playlist")
+                return 0
+            
+            total_tracks = len(tracks)
+            logger.info(f"Found {total_tracks} tracks in YouTube playlist")
+            
+            await on_progress(1, total_tracks, f"Found {total_tracks} tracks, processing...")
+            
+            # FIRST TRACK: Play immediately
+            first_track = tracks[0]
+            await on_first_track(first_track)
+            
+            # REMAINING TRACKS: Queue in background
+            for i, track in enumerate(tracks[1:], start=2):
+                await on_track_ready(track)
+                
+                # Progress update every 5 tracks
+                if i % 5 == 0 or i == total_tracks:
+                    await on_progress(i, total_tracks, f"Queued {i-1}/{total_tracks-1} tracks...")
+            
+            logger.info(f"✅ YouTube playlist progressive: {total_tracks} tracks")
+            return total_tracks
+            
+        except Exception as e:
+            logger.error(f"YouTube progressive playlist failed: {e}", exc_info=True)
+            raise
+    
     async def _process_apple_music_url(self, url: str) -> List[TrackInfo]:
         """
         Process Apple Music URL (track, album, or playlist)
