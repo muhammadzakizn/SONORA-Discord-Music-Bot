@@ -18,6 +18,7 @@ class TrackInfo:
     track_id: Optional[str] = None
     isrc: Optional[str] = None  # International Standard Recording Code
     release_year: Optional[int] = None
+    thumbnail_url: Optional[str] = None  # Thumbnail/artwork URL
     
     def __str__(self) -> str:
         return f"{self.title} - {self.artist}"
