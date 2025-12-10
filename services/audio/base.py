@@ -108,6 +108,8 @@ class BaseDownloader(ABC):
             # Verify file is not empty
             if expected_path.stat().st_size > 0:
                 logger.info(f"✓ Found in cache: {expected_path.name}")
+                # Touch file to update access time (for LRU)
+                self._touch_cache_file(expected_path)
                 return expected_path
         
         # Try fuzzy search (case-insensitive, handles slight variations)
@@ -131,11 +133,28 @@ class BaseDownloader(ABC):
                 # Verify file is not empty
                 if file.stat().st_size > 0:
                     logger.info(f"✓ Found in cache (fuzzy match): {file.name}")
+                    # Touch file to update access time (for LRU)
+                    self._touch_cache_file(file)
                     return file
         
         # Not found in cache
         logger.debug(f"Not in cache: {track_info.artist} - {track_info.title}")
         return None
+    
+    def _touch_cache_file(self, file_path: Path) -> None:
+        """
+        Update file access time for LRU cache management
+        
+        Args:
+            file_path: Path to the cached file
+        """
+        try:
+            import os
+            # Update access and modification time to current time
+            os.utime(file_path, None)
+            logger.debug(f"Touched cache file: {file_path.name}")
+        except Exception as e:
+            logger.warning(f"Failed to touch cache file {file_path}: {e}")
     
     async def _run_command(self, command: list, timeout: int = 300, env: dict = None) -> tuple:
         """

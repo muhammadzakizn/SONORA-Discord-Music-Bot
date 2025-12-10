@@ -132,6 +132,14 @@ def main():
     try:
         bot = MusicBot()
         
+        # Initialize and start cache manager
+        try:
+            from services.audio.cache import get_cache_manager
+            cache_manager = get_cache_manager(Settings.DOWNLOADS_DIR)
+            logger.info(f"✓ Cache manager initialized (Max: 2.0GB, TTL: 3 days, Dir: {Settings.DOWNLOADS_DIR})")
+        except Exception as e:
+            logger.warning(f"Failed to initialize cache manager: {e}")
+        
         # Start web dashboard if enabled
         if ENABLE_WEB_DASHBOARD:
             try:
