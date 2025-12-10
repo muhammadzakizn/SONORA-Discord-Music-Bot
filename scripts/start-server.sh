@@ -50,6 +50,53 @@ check_requirements() {
     echo -e "${GREEN}✓ All requirements met${NC}"
 }
 
+# Kill existing processes
+kill_existing() {
+    echo -e "${YELLOW}Checking for existing processes...${NC}"
+    
+    # Kill existing bot process
+    if [ -f /tmp/sonora_bot.pid ]; then
+        OLD_PID=$(cat /tmp/sonora_bot.pid)
+        if kill -0 $OLD_PID 2>/dev/null; then
+            echo -e "${YELLOW}Stopping existing bot (PID: $OLD_PID)...${NC}"
+            kill $OLD_PID 2>/dev/null || true
+            sleep 1
+        fi
+        rm -f /tmp/sonora_bot.pid
+    fi
+    
+    # Kill any process on port 3000 (Next.js)
+    if command -v lsof &> /dev/null; then
+        PID_3000=$(lsof -ti:3000 2>/dev/null || true)
+        if [ -n "$PID_3000" ]; then
+            echo -e "${YELLOW}Killing process on port 3000 (PID: $PID_3000)...${NC}"
+            kill -9 $PID_3000 2>/dev/null || true
+            sleep 1
+        fi
+    elif command -v fuser &> /dev/null; then
+        fuser -k 3000/tcp 2>/dev/null || true
+    fi
+    
+    # Kill any process on port 5000 (Bot API)
+    if command -v lsof &> /dev/null; then
+        PID_5000=$(lsof -ti:5000 2>/dev/null || true)
+        if [ -n "$PID_5000" ]; then
+            echo -e "${YELLOW}Killing process on port 5000 (PID: $PID_5000)...${NC}"
+            kill -9 $PID_5000 2>/dev/null || true
+            sleep 1
+        fi
+    elif command -v fuser &> /dev/null; then
+        fuser -k 5000/tcp 2>/dev/null || true
+    fi
+    
+    # Also kill by process name
+    pkill -f "next start" 2>/dev/null || true
+    pkill -f "main.py" 2>/dev/null || true
+    
+    sleep 2
+    echo -e "${GREEN}✓ Existing processes cleaned up${NC}"
+}
+
 # Install dependencies
 install_deps() {
     echo -e "${YELLOW}Installing dependencies...${NC}"
@@ -159,10 +206,12 @@ main() {
             build_web
             ;;
         run)
+            kill_existing
             start_bot
             start_web
             ;;
         all)
+            kill_existing
             install_deps
             build_web
             start_bot
