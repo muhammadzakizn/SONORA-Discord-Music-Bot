@@ -134,8 +134,10 @@ const translations: Record<Language, Record<string, string>> = {
         'cta.button': 'Add SONORA Now',
 
         // Footer
-        'footer.madeWith': 'Made with ❤️',
-        'footer.copyright': '© 2024 SONORA Bot',
+        'footer.legal': 'Legal',
+        'footer.resources': 'Resources',
+        'footer.rights': 'All rights reserved.',
+        'footer.createdBy': 'Created by',
 
         // Login Page
         'login.welcome': 'Welcome Back',
@@ -393,8 +395,10 @@ const translations: Record<Language, Record<string, string>> = {
         'cta.button': 'Tambahkan SONORA Sekarang',
 
         // Footer
-        'footer.madeWith': 'Dibuat dengan ❤️',
-        'footer.copyright': '© 2024 SONORA Bot',
+        'footer.legal': 'Legal',
+        'footer.resources': 'Sumber Daya',
+        'footer.rights': 'Hak cipta dilindungi.',
+        'footer.createdBy': 'Dibuat oleh',
 
         // Login Page
         'login.welcome': 'Selamat Datang Kembali',
@@ -652,8 +656,10 @@ const translations: Record<Language, Record<string, string>> = {
         'cta.button': '立即添加SONORA',
 
         // Footer
-        'footer.madeWith': '用❤️制作',
-        'footer.copyright': '© 2024 SONORA Bot',
+        'footer.legal': '法律',
+        'footer.resources': '资源',
+        'footer.rights': '版权所有。',
+        'footer.createdBy': '创建者',
 
         // Login Page
         'login.welcome': '欢迎回来',
@@ -847,8 +853,12 @@ const translations: Record<Language, Record<string, string>> = {
         'cta.title': 'Готовы начать?',
         'cta.subtitle': 'Добавьте SONORA на свой сервер',
         'cta.button': 'Добавить SONORA',
-        'footer.madeWith': 'Сделано с ❤️',
-        'footer.copyright': '© 2024 SONORA Bot',
+
+        // Footer
+        'footer.legal': 'Правовая информация',
+        'footer.resources': 'Ресурсы',
+        'footer.rights': 'Все права защищены.',
+        'footer.createdBy': 'Создано',
         'login.welcome': 'С возвращением',
         'login.chooseMethod': 'Выберите способ входа',
         'login.admin': 'Панель администратора',
@@ -1013,8 +1023,12 @@ const translations: Record<Language, Record<string, string>> = {
         'cta.title': '始める準備はできましたか？',
         'cta.subtitle': '今すぐサーバーにSONORAを追加',
         'cta.button': '今すぐSONORAを追加',
-        'footer.madeWith': '❤️で作成',
-        'footer.copyright': '© 2024 SONORA Bot',
+
+        // Footer
+        'footer.legal': '法的情報',
+        'footer.resources': 'リソース',
+        'footer.rights': '全権利所有。',
+        'footer.createdBy': '作成者',
         'login.welcome': 'おかえりなさい',
         'login.chooseMethod': 'サインイン方法を選択',
         'login.admin': '管理者ダッシュボード',
@@ -1179,8 +1193,12 @@ const translations: Record<Language, Record<string, string>> = {
         'cta.title': 'พร้อมเริ่มหรือยัง?',
         'cta.subtitle': 'เพิ่ม SONORA ไปยังเซิร์ฟเวอร์ของคุณตอนนี้',
         'cta.button': 'เพิ่ม SONORA ตอนนี้',
-        'footer.madeWith': 'สร้างด้วย ❤️',
-        'footer.copyright': '© 2024 SONORA Bot',
+
+        // Footer
+        'footer.legal': 'กฎหมาย',
+        'footer.resources': 'แหล่งข้อมูล',
+        'footer.rights': 'สงวนลิขสิทธิ์',
+        'footer.createdBy': 'สร้างโดย',
         'login.welcome': 'ยินดีต้อนรับกลับ',
         'login.chooseMethod': 'เลือกวิธีลงชื่อเข้าใช้',
         'login.admin': 'แดชบอร์ดผู้ดูแล',
@@ -1345,8 +1363,12 @@ const translations: Record<Language, Record<string, string>> = {
         'cta.title': 'مستعد للبدء؟',
         'cta.subtitle': 'أضف SONORA إلى خادمك الآن',
         'cta.button': 'أضف SONORA الآن',
-        'footer.madeWith': 'صنع بـ ❤️',
-        'footer.copyright': '© 2024 SONORA Bot',
+
+        // Footer
+        'footer.legal': 'قانوني',
+        'footer.resources': 'الموارد',
+        'footer.rights': 'جميع الحقوق محفوظة.',
+        'footer.createdBy': 'إنشاء',
         'login.welcome': 'مرحباً بعودتك',
         'login.chooseMethod': 'اختر طريقة تسجيل الدخول',
         'login.admin': 'لوحة تحكم المسؤول',
