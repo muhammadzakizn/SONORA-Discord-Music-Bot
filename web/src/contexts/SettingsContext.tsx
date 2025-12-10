@@ -299,6 +299,12 @@ const translations: Record<Language, Record<string, string>> = {
         'history.playedAt': 'Played at',
         'history.playedBy': 'Played by',
         'history.server': 'Server',
+
+        // Legal & Info Pages
+        'legal.terms': 'Terms of Service',
+        'legal.privacy': 'Privacy Policy',
+        'docs.title': 'Documentation',
+        'support.title': 'Support',
     },
     id: {
         // Navigation
@@ -552,6 +558,12 @@ const translations: Record<Language, Record<string, string>> = {
         'history.playedAt': 'Diputar pada',
         'history.playedBy': 'Diputar oleh',
         'history.server': 'Server',
+
+        // Legal & Info Pages
+        'legal.terms': 'Ketentuan Layanan',
+        'legal.privacy': 'Kebijakan Privasi',
+        'docs.title': 'Dokumentasi',
+        'support.title': 'Dukungan',
     },
     zh: {
         // Navigation
@@ -761,6 +773,12 @@ const translations: Record<Language, Record<string, string>> = {
         'history.title': '播放历史',
         'history.subtitle': '您服务器最近播放的歌曲',
         'history.noHistory': '暂无播放历史',
+
+        // Legal & Info Pages
+        'legal.terms': '服务条款',
+        'legal.privacy': '隐私政策',
+        'docs.title': '文档',
+        'support.title': '支持',
     },
     ru: {
         'nav.home': 'Главная',
@@ -921,6 +939,12 @@ const translations: Record<Language, Record<string, string>> = {
         'history.title': 'История воспроизведения',
         'history.subtitle': 'Недавние треки на ваших серверах',
         'history.noHistory': 'История пуста',
+
+        // Legal & Info Pages
+        'legal.terms': 'Условия использования',
+        'legal.privacy': 'Политика конфиденциальности',
+        'docs.title': 'Документация',
+        'support.title': 'Поддержка',
     },
     ja: {
         'nav.home': 'ホーム',
@@ -1081,6 +1105,12 @@ const translations: Record<Language, Record<string, string>> = {
         'history.title': '再生履歴',
         'history.subtitle': 'サーバーで最近再生されたトラック',
         'history.noHistory': '再生履歴がありません',
+
+        // Legal & Info Pages
+        'legal.terms': '利用規約',
+        'legal.privacy': 'プライバシーポリシー',
+        'docs.title': 'ドキュメント',
+        'support.title': 'サポート',
     },
     th: {
         'nav.home': 'หน้าแรก',
@@ -1241,6 +1271,12 @@ const translations: Record<Language, Record<string, string>> = {
         'history.title': 'ประวัติการเล่น',
         'history.subtitle': 'เพลงล่าสุดที่เล่นในเซิร์ฟเวอร์ของคุณ',
         'history.noHistory': 'ยังไม่มีประวัติการเล่น',
+
+        // Legal & Info Pages
+        'legal.terms': 'ข้อกำหนดการใช้บริการ',
+        'legal.privacy': 'นโยบายความเป็นส่วนตัว',
+        'docs.title': 'เอกสาร',
+        'support.title': 'สนับสนุน',
     },
     ar: {
         'nav.home': 'الرئيسية',
@@ -1401,6 +1437,12 @@ const translations: Record<Language, Record<string, string>> = {
         'history.title': 'سجل التشغيل',
         'history.subtitle': 'المسارات الأخيرة على خوادمك',
         'history.noHistory': 'لا يوجد سجل تشغيل بعد',
+
+        // Legal & Info Pages
+        'legal.terms': 'شروط الخدمة',
+        'legal.privacy': 'سياسة الخصوصية',
+        'docs.title': 'الوثائق',
+        'support.title': 'الدعم',
     },
 };
 
