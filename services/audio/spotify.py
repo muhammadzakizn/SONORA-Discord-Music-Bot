@@ -43,40 +43,26 @@ class SpotifyDownloader(BaseDownloader):
     def _init_spotdl(self) -> None:
         """Initialize spotdl instance (singleton)
         
-        spotdl can work without explicit API credentials for public content.
-        It has built-in default access for public Spotify metadata.
-        Cookies are used primarily for YouTube Music Premium audio quality.
+        IMPORTANT: We do NOT use custom Spotify API credentials!
+        spotdl v4+ has built-in default access that works for ALL public content.
+        Using custom credentials often causes "invalid_client" errors.
+        
+        Cookies are used for YouTube Music Premium audio quality only.
         """
         try:
             from spotdl import Spotdl
             
-            # spotdl settings - credentials are OPTIONAL
-            # spotdl v4+ has built-in default access for public Spotify content
-            spotdl_settings = {}
+            # ALWAYS use spotdl's built-in default access
+            # Do NOT pass custom credentials - they often cause issues
+            # spotdl works perfectly fine for public tracks, playlists, and albums
+            logger.info("Initializing spotdl with default access (no custom credentials)")
             
-            # Add user credentials if available (optional, for private playlists)
-            if Settings.SPOTIFY_CLIENT_ID and Settings.SPOTIFY_CLIENT_SECRET:
-                spotdl_settings['client_id'] = Settings.SPOTIFY_CLIENT_ID
-                spotdl_settings['client_secret'] = Settings.SPOTIFY_CLIENT_SECRET
-                logger.info("Using custom Spotify API credentials")
-            else:
-                # No credentials provided - spotdl will use its default access
-                # This works fine for public tracks, playlists, and albums
-                logger.info("No Spotify API credentials provided - using spotdl default access")
-            
-            SpotifyDownloader._spotdl_instance = Spotdl(**spotdl_settings)
+            SpotifyDownloader._spotdl_instance = Spotdl()
             logger.info("Spotdl instance initialized successfully")
         
         except Exception as e:
             logger.error(f"Failed to initialize spotdl: {e}")
-            # Try initializing without any settings as fallback
-            try:
-                from spotdl import Spotdl
-                SpotifyDownloader._spotdl_instance = Spotdl()
-                logger.info("Spotdl initialized with default settings (fallback)")
-            except Exception as e2:
-                logger.error(f"Spotdl fallback initialization also failed: {e2}")
-                SpotifyDownloader._spotdl_instance = None
+            SpotifyDownloader._spotdl_instance = None
     
     async def search(self, query: str) -> Optional[TrackInfo]:
         """
@@ -186,12 +172,8 @@ class SpotifyDownloader(BaseDownloader):
                 '--overwrite', 'force'
             ]
             
-            # Add Spotify credentials if available
-            if Settings.SPOTIFY_CLIENT_ID and Settings.SPOTIFY_CLIENT_SECRET:
-                command.extend([
-                    '--client-id', Settings.SPOTIFY_CLIENT_ID,
-                    '--client-secret', Settings.SPOTIFY_CLIENT_SECRET
-                ])
+            # NOTE: We do NOT add custom Spotify credentials
+            # spotdl uses its built-in default access which works for all public content
             
             # Add cookies if available
             if Settings.SPOTIFY_COOKIES.exists():
