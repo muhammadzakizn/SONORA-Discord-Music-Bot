@@ -40,23 +40,57 @@ class SpotifyDownloader(BaseDownloader):
             logger.error("spotdl not installed! Install with: pip install spotdl")
             raise RuntimeError("spotdl not installed")
     
+    def _get_clean_spotdl_env(self) -> dict:
+        """Get a clean environment for spotdl without user's invalid Spotify credentials.
+        
+        spotdl has its own built-in default credentials:
+        - client_id: f8a606e5583643beaa27ce62c48e3fc1  
+        - client_secret: f6f4c8f73f0649939286cf417c811607
+        
+        If the user's .env has invalid credentials, they will override spotdl's defaults.
+        This method creates a clean environment without those variables.
+        """
+        import os
+        
+        # Copy current environment
+        clean_env = os.environ.copy()
+        
+        # Remove potentially invalid Spotify credentials from env
+        # This lets spotdl use its own built-in default credentials
+        vars_to_remove = [
+            'SPOTIFY_CLIENT_ID',
+            'SPOTIFY_CLIENT_SECRET', 
+            'SPOTIPY_CLIENT_ID',
+            'SPOTIPY_CLIENT_SECRET'
+        ]
+        
+        for var in vars_to_remove:
+            if var in clean_env:
+                del clean_env[var]
+                logger.debug(f"Removed {var} from spotdl environment")
+        
+        return clean_env
+    
     def _init_spotdl(self) -> None:
         """Initialize spotdl - verify CLI is available
         
-        We use spotdl CLI instead of Python API because:
-        1. CLI automatically uses spotdl's built-in default Spotify credentials
-        2. No authentication issues with Python API
-        3. More reliable for server environments
+        We use spotdl CLI with a clean environment (without user's invalid Spotify credentials)
+        so that spotdl uses its own built-in default credentials.
         """
         try:
             import subprocess
+            import os
             
-            # Just verify spotdl CLI is available
+            # Get clean environment without user's Spotify credentials
+            clean_env = self._get_clean_spotdl_env()
+            
+            # Verify spotdl CLI is available
             result = subprocess.run(
                 ['spotdl', '--version'],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                env=clean_env
             )
             
             if result.returncode == 0:
@@ -73,7 +107,7 @@ class SpotifyDownloader(BaseDownloader):
     
     async def search(self, query: str) -> Optional[TrackInfo]:
         """
-        Search for track on Spotify using spotdl CLI
+        Search for track on Spotify using spotdl CLI with clean environment
         
         Args:
             query: Search query or Spotify URL
@@ -87,44 +121,25 @@ class SpotifyDownloader(BaseDownloader):
         
         logger.info(f"Searching Spotify via CLI: {query}")
         
+        # Get clean environment
+        clean_env = self._get_clean_spotdl_env()
+        
         try:
-            # Use spotdl CLI to get song info (save mode doesn't download)
-            # This uses spotdl's built-in default credentials automatically
-            command = [
-                'spotdl',
-                'url',  # Just get the URL/info, don't download
-                query,
-                '--print-errors'
-            ]
-            
-            stdout, stderr, returncode = await self._run_command(command, timeout=30)
-            
-            if returncode != 0:
-                # Try alternate approach with 'save' to get metadata
-                logger.debug(f"spotdl url failed, trying search approach")
+            # For direct Spotify URLs, use spotdl url command
+            if query.startswith('http') and 'spotify.com' in query:
+                command = [
+                    'spotdl',
+                    'url',
+                    query
+                ]
+                stdout, stderr, returncode = await self._run_command(command, timeout=30, env=clean_env)
                 
-                # For non-URL queries, we need a different approach
-                # Use the download command with --print-errors to get info
-                if not query.startswith('http'):
-                    # Search query - use spotdl's search capability
-                    search_cmd = [
-                        'spotdl',
-                        'download',
-                        query,
-                        '--output', '/dev/null',  # Don't actually save
-                        '--print-errors',
-                        '--headless'
-                    ]
-                    stdout, stderr, returncode = await self._run_command(search_cmd, timeout=30)
-            
-            # Parse output to extract track info
-            if stdout:
-                lines = stdout.strip().split('\n')
-                for line in lines:
-                    # spotdl outputs URLs or track names
-                    if 'spotify.com/track/' in line or ' - ' in line:
-                        # Found track info
-                        if ' - ' in line:
+                if returncode == 0 and stdout:
+                    # Parse "Artist - Title" format from output
+                    lines = stdout.strip().split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        if ' - ' in line and 'error' not in line.lower() and 'exception' not in line.lower():
                             parts = line.split(' - ', 1)
                             if len(parts) == 2:
                                 artist = parts[0].strip()
@@ -133,10 +148,12 @@ class SpotifyDownloader(BaseDownloader):
                                 return TrackInfo(
                                     title=title,
                                     artist=artist,
-                                    url=query if query.startswith('http') else None
+                                    url=query
                                 )
             
-            logger.warning(f"No Spotify results for: {query}")
+            # For text search queries, return None - let YouTube handle it
+            # spotdl doesn't have a good search-only mode for text queries
+            logger.warning(f"No Spotify URL provided, skipping Spotify search for: {query}")
             return None
         
         except Exception as e:
@@ -157,6 +174,9 @@ class SpotifyDownloader(BaseDownloader):
             Exception if download fails
         """
         logger.info(f"Downloading from Spotify: {track_info}")
+        
+        # Get clean environment
+        clean_env = self._get_clean_spotdl_env()
         
         try:
             # Get output path
@@ -181,17 +201,14 @@ class SpotifyDownloader(BaseDownloader):
                 '--overwrite', 'force'
             ]
             
-            # NOTE: We do NOT add custom Spotify credentials
-            # spotdl uses its built-in default access which works for all public content
-            
-            # Add cookies if available
+            # Add cookies if available (for YouTube Music Premium quality)
             if Settings.SPOTIFY_COOKIES.exists():
                 command.extend(['--cookie-file', str(Settings.SPOTIFY_COOKIES)])
             
             logger.debug(f"Running command: {' '.join(command)}")
             
-            # Run download
-            stdout, stderr, returncode = await self._run_command(command, timeout=300)
+            # Run download with CLEAN environment (no invalid Spotify credentials)
+            stdout, stderr, returncode = await self._run_command(command, timeout=300, env=clean_env)
             
             # Log stdout/stderr for debugging
             if stdout:

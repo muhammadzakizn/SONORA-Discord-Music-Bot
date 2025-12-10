@@ -137,22 +137,30 @@ class BaseDownloader(ABC):
         logger.debug(f"Not in cache: {track_info.artist} - {track_info.title}")
         return None
     
-    async def _run_command(self, command: list, timeout: int = 300) -> tuple:
+    async def _run_command(self, command: list, timeout: int = 300, env: dict = None) -> tuple:
         """
         Run shell command asynchronously
         
         Args:
             command: Command and arguments as list
             timeout: Timeout in seconds
+            env: Optional environment variables (None = inherit current, {} = clean)
         
         Returns:
             Tuple of (stdout, stderr, returncode)
         """
         try:
+            import os
+            
+            # If env is None, inherit current environment
+            # If env is provided (even empty dict), use it
+            proc_env = env if env is not None else None
+            
             process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                env=proc_env
             )
             
             stdout, stderr = await asyncio.wait_for(
