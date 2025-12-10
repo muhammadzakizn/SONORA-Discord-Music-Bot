@@ -178,7 +178,7 @@ class PlaylistProcessor:
                         if i == 0 and on_first_track:
                             await on_first_track(track)
                         elif on_track_ready:
-                            await on_track_ready(track, i + 1)
+                            await on_track_ready(track)  # Only pass track, not index
                         if on_progress:
                             await on_progress(i + 1, len(tracks), f"Processing track {i+1}/{len(tracks)}")
                     return len(tracks)
