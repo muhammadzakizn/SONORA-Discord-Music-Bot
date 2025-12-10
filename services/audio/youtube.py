@@ -90,7 +90,7 @@ class YouTubeDownloader(BaseDownloader):
                 '--no-check-certificate',
                 '--geo-bypass',
                 # Force YouTube Music client for proper metadata
-                '--extractor-args', 'youtube:player_client=tv_music,music_client=tv_music',
+                '--extractor-args', 'youtube:player_client=android_music',  # Force Music client
                 search_query
             ]
             
@@ -128,9 +128,12 @@ class YouTubeDownloader(BaseDownloader):
             try:
                 track_data = json.loads(stdout)
                 
-                # Extract info - prefer 'track' over 'title' for YouTube Music
-                # YouTube Music provides proper track metadata
-                title = track_data.get('track') or track_data.get('title', 'Unknown')
+                # Extract info - YouTube Music metadata fields
+                # Priority: track > alt_title > fulltitle > title
+                title = (track_data.get('track') or 
+                         track_data.get('alt_title') or 
+                         track_data.get('fulltitle') or 
+                         track_data.get('title', 'Unknown'))
                 
                 # Prefer 'artist' over 'uploader' for YouTube Music
                 artist = track_data.get('artist') or track_data.get('creator') or track_data.get('uploader', 'Unknown')
@@ -225,7 +228,7 @@ class YouTubeDownloader(BaseDownloader):
                 '--embed-thumbnail',  # Embed artwork!
                 '--add-metadata',  # Add metadata
                 # Force YouTube Music client for proper track/artist metadata
-                '--extractor-args', 'youtube:player_client=tv_music,music_client=tv_music',
+                '--extractor-args', 'youtube:player_client=android_music',
                 '--postprocessor-args', f'ffmpeg:-b:a {Settings.AUDIO_BITRATE}k'
             ]
             
