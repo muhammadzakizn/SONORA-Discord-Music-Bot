@@ -231,9 +231,9 @@ class YouTubeDownloader(BaseDownloader):
         if url and 'youtube.com/watch' in url and 'music.youtube.com' not in url:
             url = self._convert_to_ytmusic_url(url)
         elif not url:
-            # If no URL, search on YouTube Music with cleaned query
+            # If no URL, use ytsearch1: prefix (reliable yt-dlp search)
             clean_query = self._clean_search_query(track_info.artist, track_info.title)
-            url = f"https://music.youtube.com/search?q={clean_query}".replace(' ', '+')
+            url = f"ytsearch1:{clean_query}"
         
         logger.info(f"Downloading from: {url}")
         
@@ -255,10 +255,6 @@ class YouTubeDownloader(BaseDownloader):
             '--geo-bypass',
             '--socket-timeout', '30',
             '--retries', '3',
-            '--js-runtimes', 'node',  # Use Node.js for JS signature solving
-            '--remote-components', 'ejs:github',  # Download JS solver from GitHub
-            '--allow-unplayable-formats',  # Try to bypass DRM check
-            # '--ignore-no-streams-error' option removed as it is unsupported
         ]
         
         # Add cookies if available
@@ -328,10 +324,6 @@ class YouTubeDownloader(BaseDownloader):
             '-o', output_template,
             '--no-playlist',
             '--geo-bypass',
-            '--js-runtimes', 'node',
-            '--remote-components', 'ejs:github',
-            '--allow-unplayable-formats',
-            # '--ignore-no-streams-error' option removed as it is unsupported
         ]
         
         if cookies_added:
