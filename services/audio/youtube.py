@@ -257,6 +257,7 @@ class YouTubeDownloader(BaseDownloader):
             '--socket-timeout', '30',
             '--retries', '3',
             '--no-check-certificate',
+            '--js-runtimes', 'node',  # Server doesn't have deno, use Node.js
         ]
         
         # Add cookies if available
@@ -327,6 +328,7 @@ class YouTubeDownloader(BaseDownloader):
             '--no-playlist',
             '--geo-bypass',
             '--no-check-certificate',
+            '--js-runtimes', 'node',  # Server doesn't have deno
         ]
         
         if cookies_added:
