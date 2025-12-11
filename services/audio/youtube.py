@@ -103,30 +103,36 @@ class YouTubeDownloader(BaseDownloader):
                     logger.info(f"Using YouTube Music URL: {query}")
                 search_query = query
             else:
-                # Use ytmusicsearch: prefix to force YouTube Music search
+                # Use music.youtube.com search URL with -I 1 to get first result only
                 # This searches music.youtube.com instead of regular youtube.com
                 search_query = f"https://music.youtube.com/search?q={query.replace(' ', '+')}"
-                logger.info(f"Using YouTube Music search URL")
+                logger.info(f"Using YouTube Music search: {search_query}")
             
             command = [
                 'yt-dlp',
                 '--dump-json',
-                '--no-playlist',
-                '--playlist-items', '1',  # Only first result from search
+                '-I', '1',  # CRITICAL: Only get first item from results
                 '--no-check-certificate',
                 '--geo-bypass',
-                # Force YouTube Music client for proper metadata
+                # Force YouTube Music client for proper metadata (no video intro)
                 '--extractor-args', 'youtube:player_client=android_music',
-                search_query
             ]
             
-            # Add cookies if available
-            cookies_added = False
-            for cookie_file in [Settings.YOUTUBE_COOKIES, Settings.SPOTIFY_COOKIES]:
-                if cookie_file.exists() and not cookies_added:
-                    command.extend(['--cookies', str(cookie_file)])
-                    cookies_added = True
-                    break
+            # ALWAYS add YouTube Music cookies for authenticated access
+            if Settings.YOUTUBE_COOKIES.exists():
+                try:
+                    if Settings.YOUTUBE_COOKIES.stat().st_size > 0:
+                        command.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
+                        logger.info(f"✓ Search: Using YouTube Music cookies")
+                    else:
+                        logger.warning("⚠ YouTube Music cookies file is empty!")
+                except Exception as e:
+                    logger.warning(f"Could not check cookies: {e}")
+            else:
+                logger.warning("⚠ YouTube Music cookies not found - search may fail!")
+            
+            # Add search query last
+            command.append(search_query)
             
             stdout, stderr, returncode = await self._run_command(command, timeout=30)
             
@@ -231,9 +237,11 @@ class YouTubeDownloader(BaseDownloader):
         if url and 'youtube.com/watch' in url and 'music.youtube.com' not in url:
             url = self._convert_to_ytmusic_url(url)
         elif not url:
-            # If no URL, use ytsearch1: prefix (reliable yt-dlp search)
+            # Force music.youtube.com search URL (not ytsearch1: which uses regular YouTube)
             clean_query = self._clean_search_query(track_info.artist, track_info.title)
-            url = f"ytsearch1:{clean_query}"
+            # Use music.youtube.com search URL with proper encoding
+            url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}"
+            logger.info(f"Using YouTube Music search URL: {url}")
         
         logger.info(f"Downloading from: {url}")
         
@@ -242,11 +250,11 @@ class YouTubeDownloader(BaseDownloader):
         
         output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
         
-        # Build base command - simple and reliable
-        # Use tv client which works better on server IPs
+        # Build base command - use android_music client for best YouTube Music compatibility with cookies
         command = [
             'yt-dlp',
             url,
+            '-I', '1',  # Only first result if URL is a search
             '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
             '-x',  # Extract audio
             '--audio-format', 'opus',
@@ -257,22 +265,27 @@ class YouTubeDownloader(BaseDownloader):
             '--socket-timeout', '30',
             '--retries', '3',
             '--no-check-certificate',
-            '--extractor-args', 'youtube:player_client=tv',  # tv client bypasses some 403 blocks
+            # android_music client works with cookies and gets music.youtube.com audio
+            '--extractor-args', 'youtube:player_client=android_music',
         ]
         
-        # Add cookies if available
+        # ALWAYS use YouTube Music cookies for authenticated downloads
+        # This ensures we get music.youtube.com audio (no video intro)
         cookies_added = False
         if Settings.YOUTUBE_COOKIES.exists():
             try:
-                if Settings.YOUTUBE_COOKIES.stat().st_size > 0:
+                cookie_size = Settings.YOUTUBE_COOKIES.stat().st_size
+                if cookie_size > 0:
                     command.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
                     cookies_added = True
-                    logger.info("  Using YouTube Music cookies")
+                    logger.info(f"✓ Download: Using YouTube Music cookies ({cookie_size} bytes)")
+                else:
+                    logger.warning("⚠ YouTube Music cookies file is empty!")
             except Exception as e:
                 logger.warning(f"Could not add cookies: {e}")
         
         if not cookies_added:
-            logger.debug("  No cookies available, using default auth")
+            logger.warning("⚠ No YouTube Music cookies - download may have video intro!")
         
         # Run download
         logger.info(f"  Downloading with yt-dlp (default client)...")
@@ -315,24 +328,28 @@ class YouTubeDownloader(BaseDownloader):
                 sample_rate=Settings.AUDIO_SAMPLE_RATE
             )
         
-        # First attempt failed, try with format 18 (360p mp4 with audio - always available)
-        logger.warning(f"Default download failed, trying format 18 fallback...")
+        # First attempt failed, try with web client (supports cookies, different extraction method)
+        logger.warning(f"android_music client failed, trying web client fallback...")
         
         command_fallback = [
             'yt-dlp',
             url,
-            '-f', '18/best',  # 360p mp4 - almost always works
+            '-I', '1',  # Only first result if URL is a search
+            '-f', 'bestaudio/best',  # More permissive format selection
             '-x',
             '--audio-format', 'opus',
             '-o', output_template,
             '--no-playlist',
             '--geo-bypass',
             '--no-check-certificate',
-            '--extractor-args', 'youtube:player_client=ios',  # iOS client as last resort
+            # web client as fallback - supports cookies and works on most videos
+            '--extractor-args', 'youtube:player_client=web',
         ]
         
+        # Always add cookies for web client
         if cookies_added:
             command_fallback.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
+            logger.info(f"  Fallback: Using YouTube Music cookies")
         
         stdout, stderr, returncode = await self._run_command(command_fallback, timeout=300)
         
@@ -351,7 +368,7 @@ class YouTubeDownloader(BaseDownloader):
                 output_path = possible_files[0]
                 actual_format = output_path.suffix.lstrip('.')
                 
-                logger.info(f"✓ Downloaded (fallback format): {output_path.name}")
+                logger.info(f"✓ Downloaded (web client): {output_path.name}")
                 
                 return AudioResult(
                     file_path=output_path,
@@ -364,11 +381,58 @@ class YouTubeDownloader(BaseDownloader):
                     sample_rate=Settings.AUDIO_SAMPLE_RATE
                 )
         
-        # Both attempts failed
-        last_error = f"yt-dlp failed: {stderr[:200]}"
-        logger.warning(last_error)
+        # Second attempt failed, try with tv_embedded client WITHOUT cookies
+        # Some videos are restricted when using authenticated clients
+        logger.warning(f"web client failed, trying tv_embedded (no cookies) fallback...")
+        
+        command_fallback2 = [
+            'yt-dlp',
+            url,
+            '-I', '1',
+            '-f', 'bestaudio/best',
+            '-x',
+            '--audio-format', 'opus',
+            '-o', output_template,
+            '--no-playlist',
+            '--geo-bypass',
+            '--no-check-certificate',
+            # tv_embedded works for many restricted videos without cookies
+            '--extractor-args', 'youtube:player_client=tv_embedded',
+        ]
+        # Note: NOT adding cookies for tv_embedded - some videos only work without auth
+        
+        stdout, stderr, returncode = await self._run_command(command_fallback2, timeout=300)
+        
+        if returncode == 0:
+            await asyncio.sleep(1.0)
+            
+            audio_extensions = ['*.opus', '*.m4a', '*.webm', '*.mp3', '*.ogg', '*.aac']
+            possible_files = []
+            
+            for ext in audio_extensions:
+                matches = list(self.download_dir.glob(ext))
+                possible_files.extend(matches)
+            
+            if possible_files:
+                possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                output_path = possible_files[0]
+                actual_format = output_path.suffix.lstrip('.')
+                
+                logger.info(f"✓ Downloaded (tv_embedded): {output_path.name}")
+                
+                return AudioResult(
+                    file_path=output_path,
+                    title=track_info.title,
+                    artist=track_info.artist,
+                    duration=track_info.duration,
+                    source=AudioSource.YOUTUBE_MUSIC,
+                    bitrate=Settings.AUDIO_BITRATE,
+                    format=actual_format,
+                    sample_rate=Settings.AUDIO_SAMPLE_RATE
+                )
+        
         # All attempts failed
-        error_msg = f"yt-dlp failed: {last_error}"
-        logger.error(error_msg)
-        raise Exception(error_msg)
+        last_error = f"yt-dlp failed after 3 attempts: {stderr[:200] if stderr else 'unknown error'}"
+        logger.error(last_error)
+        raise Exception(last_error)
 

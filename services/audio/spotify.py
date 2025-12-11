@@ -259,9 +259,20 @@ class SpotifyDownloader(BaseDownloader):
                 '--overwrite', 'force'
             ]
             
-            # Add cookies if available (for YouTube Music Premium quality)
-            if Settings.SPOTIFY_COOKIES.exists():
-                command.extend(['--cookie-file', str(Settings.SPOTIFY_COOKIES)])
+            # spotdl downloads from YouTube, so use YouTube Music cookies for better quality
+            # This ensures we get music.youtube.com audio (no video intro)
+            if Settings.YOUTUBE_COOKIES.exists():
+                try:
+                    cookie_size = Settings.YOUTUBE_COOKIES.stat().st_size
+                    if cookie_size > 0:
+                        command.extend(['--cookie-file', str(Settings.YOUTUBE_COOKIES)])
+                        logger.info(f"✓ spotdl: Using YouTube Music cookies ({cookie_size} bytes)")
+                    else:
+                        logger.warning("⚠ YouTube Music cookies file is empty!")
+                except Exception as e:
+                    logger.warning(f"Could not check YouTube cookies: {e}")
+            else:
+                logger.warning("⚠ YouTube Music cookies not found - spotdl may download from regular YouTube!")
             
             logger.debug(f"Running command: {' '.join(command)}")
             
