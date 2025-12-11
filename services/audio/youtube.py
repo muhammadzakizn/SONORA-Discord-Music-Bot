@@ -243,7 +243,7 @@ class YouTubeDownloader(BaseDownloader):
         output_template = str(self.download_dir / "%(artist,uploader)s - %(track,title)s.%(ext)s")
         
         # Build base command - simple and reliable
-        # Let yt-dlp auto-select the best client (tv, android_sdkless work well)
+        # Use tv client which works better on server IPs
         command = [
             'yt-dlp',
             url,
@@ -257,7 +257,8 @@ class YouTubeDownloader(BaseDownloader):
             '--socket-timeout', '30',
             '--retries', '3',
             '--no-check-certificate',
-            '--js-runtimes', 'node',  # Server doesn't have deno, use Node.js
+            '--js-runtimes', 'node',  # Server doesn't have deno
+            '--extractor-args', 'youtube:player_client=tv',  # tv client bypasses some 403 blocks
         ]
         
         # Add cookies if available
@@ -328,7 +329,8 @@ class YouTubeDownloader(BaseDownloader):
             '--no-playlist',
             '--geo-bypass',
             '--no-check-certificate',
-            '--js-runtimes', 'node',  # Server doesn't have deno
+            '--js-runtimes', 'node',
+            '--extractor-args', 'youtube:player_client=ios',  # iOS client as last resort
         ]
         
         if cookies_added:
