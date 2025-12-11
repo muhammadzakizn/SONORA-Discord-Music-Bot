@@ -257,7 +257,6 @@ class YouTubeDownloader(BaseDownloader):
             '--socket-timeout', '30',
             '--retries', '3',
             '--no-check-certificate',
-            '--js-runtimes', 'node',  # Server doesn't have deno
             '--extractor-args', 'youtube:player_client=tv',  # tv client bypasses some 403 blocks
         ]
         
@@ -329,7 +328,6 @@ class YouTubeDownloader(BaseDownloader):
             '--no-playlist',
             '--geo-bypass',
             '--no-check-certificate',
-            '--js-runtimes', 'node',
             '--extractor-args', 'youtube:player_client=ios',  # iOS client as last resort
         ]
         
