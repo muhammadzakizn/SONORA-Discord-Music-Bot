@@ -258,7 +258,7 @@ class YouTubeDownloader(BaseDownloader):
             '--js-runtimes', 'node',  # Use Node.js for JS signature solving
             '--remote-components', 'ejs:github',  # Download JS solver from GitHub
             '--allow-unplayable-formats',  # Try to bypass DRM check
-            '--ignore-no-streams-error',  # Don't fail if no streams
+            # '--ignore-no-streams-error' option removed as it is unsupported
         ]
         
         # Add cookies if available
@@ -331,7 +331,7 @@ class YouTubeDownloader(BaseDownloader):
             '--js-runtimes', 'node',
             '--remote-components', 'ejs:github',
             '--allow-unplayable-formats',
-            '--ignore-no-streams-error',
+            # '--ignore-no-streams-error' option removed as it is unsupported
         ]
         
         if cookies_added:
