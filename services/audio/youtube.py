@@ -255,6 +255,7 @@ class YouTubeDownloader(BaseDownloader):
             '--geo-bypass',
             '--socket-timeout', '30',
             '--retries', '3',
+            '--js-runtimes', 'node',  # Use Node.js for JS signature solving (deno not available on server)
         ]
         
         # Add cookies if available
@@ -324,6 +325,7 @@ class YouTubeDownloader(BaseDownloader):
             '-o', output_template,
             '--no-playlist',
             '--geo-bypass',
+            '--js-runtimes', 'node',  # Use Node.js for JS signature solving
         ]
         
         if cookies_added:
