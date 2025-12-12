@@ -122,15 +122,21 @@ function ManagedServerCard({ guild, botInstalled, isDark }: { guild: UserGuild; 
               width={48}
               height={48}
               className="rounded-xl object-cover"
+              unoptimized
+              onError={(e) => {
+                // Hide broken image and show fallback
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
             />
-          ) : (
-            <div className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center",
-              isDark ? "bg-white/[0.05]" : "bg-black/[0.05]"
-            )}>
-              <Server className={cn("w-6 h-6", isDark ? "text-white/50" : "text-gray-400")} />
-            </div>
-          )}
+          ) : null}
+          <div className={cn(
+            "w-12 h-12 rounded-xl flex items-center justify-center",
+            isDark ? "bg-white/[0.05]" : "bg-black/[0.05]",
+            iconUrl ? "hidden" : ""
+          )}>
+            <Server className={cn("w-6 h-6", isDark ? "text-white/50" : "text-gray-400")} />
+          </div>
           <div className="flex-1 min-w-0">
             <h3 className={cn(
               "font-semibold truncate flex items-center gap-2",
@@ -196,15 +202,19 @@ function BotGuildCard({ guild, onControl, isDark }: { guild: Guild; onControl: (
             src={guild.icon}
             alt={guild.name}
             className="w-12 h-12 rounded-xl object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+            }}
           />
-        ) : (
-          <div className={cn(
-            "w-12 h-12 rounded-xl flex items-center justify-center",
-            isDark ? "bg-zinc-800" : "bg-gray-100"
-          )}>
-            <Server className={cn("w-6 h-6", isDark ? "text-zinc-500" : "text-gray-400")} />
-          </div>
-        )}
+        ) : null}
+        <div className={cn(
+          "w-12 h-12 rounded-xl flex items-center justify-center",
+          isDark ? "bg-zinc-800" : "bg-gray-100",
+          guild.icon ? "hidden" : ""
+        )}>
+          <Server className={cn("w-6 h-6", isDark ? "text-zinc-500" : "text-gray-400")} />
+        </div>
         <div className="flex-1 min-w-0">
           <h3 className={cn("font-semibold truncate", isDark ? "text-white" : "text-gray-900")}>{guild.name}</h3>
           <p className={cn("text-sm", isDark ? "text-zinc-500" : "text-gray-500")}>{guild.member_count} members</p>
