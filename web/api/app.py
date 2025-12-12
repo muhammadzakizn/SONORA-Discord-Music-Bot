@@ -441,24 +441,27 @@ def api_queue_remove(guild_id: int, position: int):
         # Remove track
         removed = queue.pop(idx)
         
-        # Send Discord notification
+        # Send Discord notification via player message channel
         async def send_notification():
             try:
                 import discord
-                guild = bot.get_guild(guild_id)
-                if not guild:
+                
+                if not hasattr(bot, 'players') or guild_id not in bot.players:
                     return
                 
-                channel = guild.system_channel or (guild.text_channels[0] if guild.text_channels else None)
-                if channel:
-                    embed = discord.Embed(
-                        description=f"🗑️ Removed **{removed.title}** from queue\n"
-                                   f"👤 By **{username}** via Web Dashboard",
-                        color=0x7B1E3C
-                    )
-                    await channel.send(embed=embed, delete_after=30)
+                player = bot.players[guild_id]
+                if not player.message:
+                    return
+                
+                channel = player.message.channel
+                embed = discord.Embed(
+                    description=f"🗑️ Removed **{removed.title}** from queue via Dashboard",
+                    color=0x7B1E3C
+                )
+                await channel.send(embed=embed, delete_after=15)
+                logger.info(f"✓ Queue remove notification sent")
             except Exception as e:
-                logger.error(f"Failed to send notification: {e}")
+                logger.error(f"Queue notification failed: {e}")
         
         asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)
         
@@ -503,24 +506,27 @@ def api_queue_move(guild_id: int):
         track = queue.pop(from_idx)
         queue.insert(to_idx, track)
         
-        # Send Discord notification
+        # Send Discord notification via player message channel
         async def send_notification():
             try:
                 import discord
-                guild = bot.get_guild(guild_id)
-                if not guild:
+                
+                if not hasattr(bot, 'players') or guild_id not in bot.players:
                     return
                 
-                channel = guild.system_channel or (guild.text_channels[0] if guild.text_channels else None)
-                if channel:
-                    embed = discord.Embed(
-                        description=f"↕️ Moved **{track.title}** from #{from_pos} to #{to_pos}\n"
-                                   f"👤 By **{username}** via Web Dashboard",
-                        color=0x7B1E3C
-                    )
-                    await channel.send(embed=embed, delete_after=30)
+                player = bot.players[guild_id]
+                if not player.message:
+                    return
+                
+                channel = player.message.channel
+                embed = discord.Embed(
+                    description=f"↕️ Moved **{track.title}** to #{to_pos} via Dashboard",
+                    color=0x7B1E3C
+                )
+                await channel.send(embed=embed, delete_after=15)
+                logger.info(f"✓ Queue move notification sent")
             except Exception as e:
-                logger.error(f"Failed to send notification: {e}")
+                logger.error(f"Queue notification failed: {e}")
         
         asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)
         
