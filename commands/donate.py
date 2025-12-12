@@ -20,8 +20,8 @@ class DonateView(discord.ui.View):
             style=discord.ButtonStyle.link
         ))
         self.add_item(discord.ui.Button(
-            label="⭐ Rate Bot on Top.gg",
-            url="https://top.gg/bot/1307728538425622579/vote",
+            label="⭐ Vote & Rate",
+            url="https://top.gg/bot/1443855259536461928?s=09bfcce8f1e15",
             style=discord.ButtonStyle.link
         ))
         self.add_item(discord.ui.Button(

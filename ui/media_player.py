@@ -604,6 +604,11 @@ class SynchronizedMediaPlayer:
                                     style=discord.ButtonStyle.link
                                 ))
                                 self.add_item(discord.ui.Button(
+                                    label="⭐ Vote & Rate",
+                                    url="https://top.gg/bot/1443855259536461928?s=09bfcce8f1e15",
+                                    style=discord.ButtonStyle.link
+                                ))
+                                self.add_item(discord.ui.Button(
                                     label="🌐 Website",
                                     url="https://s.id/SONORAbot",
                                     style=discord.ButtonStyle.link
