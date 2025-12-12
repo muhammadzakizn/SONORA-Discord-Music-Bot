@@ -52,7 +52,9 @@ const navItems: NavItem[] = [
   { label: "Messaging", href: "/developer/messaging", icon: MessageSquare },
   { label: "Users", href: "/developer/users", icon: Users },
   { label: "Bans", href: "/developer/bans", icon: Ban },
+  { label: "Access", href: "/developer/access", icon: Shield },
 ];
+
 
 
 // Sidebar width constant
