@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Lock, User, Eye, EyeOff, Shield, CheckCircle, XCircle, RefreshCw, LogIn } from "lucide-react";
+import { ArrowLeft, Lock, User, Eye, EyeOff, Shield, CheckCircle, XCircle, RefreshCw, LogIn, Fingerprint, Smartphone, MessageSquare, Mail, ChevronRight } from "lucide-react";
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -79,7 +79,15 @@ const DiscordIcon = () => (
   </svg>
 );
 
-type LoginMode = "select" | "admin" | "terms" | "developer" | "verify";
+type LoginMode = "select" | "admin" | "terms" | "developer" | "mfa-select" | "mfa-verify";
+type MFAMethod = "discord" | "totp" | "passkey" | "email";
+
+const MFA_METHODS = [
+  { id: "discord" as MFAMethod, label: "Discord DM", icon: MessageSquare, description: "Get code via SONORA bot" },
+  { id: "totp" as MFAMethod, label: "Authenticator App", icon: Smartphone, description: "Google Authenticator, Authy" },
+  { id: "passkey" as MFAMethod, label: "Passkey", icon: Fingerprint, description: "Fingerprint or Face ID" },
+  { id: "email" as MFAMethod, label: "Email", icon: Mail, description: "Get code via email" },
+];
 type VerifyStatus = "idle" | "sending" | "sent" | "verifying" | "success" | "error";
 
 // Loading fallback for Suspense
@@ -231,13 +239,15 @@ function LoginPageContent() {
   const [termsCanContinue, setTermsCanContinue] = useState(false);
   const termsRef = useRef<HTMLDivElement>(null);
 
-  // Detect ?verify=true from OAuth callback and redirect to MFA page
+  // MFA state
+  const [selectedMfaMethod, setSelectedMfaMethod] = useState<MFAMethod | null>(null);
+
+  // Detect ?verify=true from OAuth callback and show MFA selection
   useEffect(() => {
     if (searchParams.get('verify') === 'true' && isLoggedIn && user) {
-      // Redirect to MFA page for proper method selection
-      router.push('/mfa?redirect=/admin');
+      setLoginMode("mfa-select");
     }
-  }, [searchParams, isLoggedIn, user, router]);
+  }, [searchParams, isLoggedIn, user]);
 
   // Countdown timer for resend
   useEffect(() => {
@@ -878,23 +888,24 @@ function LoginPageContent() {
                   </motion.div>
                 )}
 
-                {loginMode === "verify" && user && (
+                {/* MFA Method Selection */}
+                {loginMode === "mfa-select" && user && (
                   <motion.div
-                    key="verify"
+                    key="mfa-select"
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.3 }}
                     className="relative z-10"
                   >
-                    {/* Header with Shield Icon */}
+                    {/* Header */}
                     <div className="flex flex-col items-center mb-6">
                       <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
                         <Shield className="w-8 h-8 text-white" />
                       </div>
                       <h2 className="text-2xl font-bold text-white mb-2">Verify Your Identity</h2>
                       <p className="text-white/60 text-sm text-center">
-                        A verification code was sent to your Discord DM
+                        Choose a verification method
                       </p>
                     </div>
 
@@ -911,6 +922,73 @@ function LoginPageContent() {
                         <p className="font-medium text-white">{user.username}</p>
                         <p className="text-sm text-white/50">Discord ID: {user.id}</p>
                       </div>
+                    </div>
+
+                    {/* MFA Methods */}
+                    <div className="space-y-3">
+                      {MFA_METHODS.map((method) => (
+                        <motion.button
+                          key={method.id}
+                          whileHover={{ scale: 1.02, y: -1 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setSelectedMfaMethod(method.id);
+                            if (method.id === "discord") {
+                              sendVerificationCode();
+                            }
+                            setLoginMode("mfa-verify");
+                          }}
+                          className="w-full flex items-center gap-4 p-4 rounded-2xl 
+                            bg-white/[0.08] backdrop-blur-xl
+                            border border-white/[0.1] 
+                            hover:bg-white/[0.15] hover:border-purple-500/40
+                            shadow-[0_4px_24px_rgba(0,0,0,0.3)]
+                            transition-all duration-300 group"
+                        >
+                          <div className="p-3 rounded-xl bg-purple-500/30 group-hover:bg-purple-500/40 transition-colors">
+                            <method.icon className="w-5 h-5 text-purple-300" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <span className="block font-semibold text-white">{method.label}</span>
+                            <span className="text-sm text-white/50">{method.description}</span>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-white/30 group-hover:text-white/60 transition-colors" />
+                        </motion.button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* MFA Verification */}
+                {loginMode === "mfa-verify" && user && (
+                  <motion.div
+                    key="mfa-verify"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    <button
+                      onClick={() => setLoginMode("mfa-select")}
+                      className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors mb-6"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Change method
+                    </button>
+
+                    {/* Header */}
+                    <div className="flex flex-col items-center mb-6">
+                      <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
+                        <Shield className="w-8 h-8 text-white" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-2">Enter Verification Code</h2>
+                      <p className="text-white/60 text-sm text-center">
+                        {selectedMfaMethod === "discord" && "Code sent to your Discord DM"}
+                        {selectedMfaMethod === "email" && "Code sent to your email"}
+                        {selectedMfaMethod === "totp" && "Enter code from your authenticator app"}
+                        {selectedMfaMethod === "passkey" && "Use your fingerprint or Face ID"}
+                      </p>
                     </div>
 
                     {verifyStatus === "success" ? (
@@ -987,25 +1065,27 @@ function LoginPageContent() {
                         )}
 
                         {/* Resend Button */}
-                        <div className="text-center">
-                          <button
-                            onClick={sendVerificationCode}
-                            disabled={verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"}
-                            className={cn(
-                              "flex items-center gap-2 mx-auto text-sm transition-colors",
-                              verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"
-                                ? "text-white/30 cursor-not-allowed"
-                                : "text-purple-400 hover:text-purple-300"
-                            )}
-                          >
-                            <RefreshCw className={cn("w-4 h-4", verifyStatus === "sending" && "animate-spin")} />
-                            {verifyStatus === "sending"
-                              ? "Sending..."
-                              : verifyCountdown > 0
-                                ? `Resend in ${verifyCountdown}s`
-                                : "Resend Code"}
-                          </button>
-                        </div>
+                        {(selectedMfaMethod === "discord" || selectedMfaMethod === "email") && (
+                          <div className="text-center">
+                            <button
+                              onClick={sendVerificationCode}
+                              disabled={verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"}
+                              className={cn(
+                                "flex items-center gap-2 mx-auto text-sm transition-colors",
+                                verifyCountdown > 0 || verifyStatus === "verifying" || verifyStatus === "sending"
+                                  ? "text-white/30 cursor-not-allowed"
+                                  : "text-purple-400 hover:text-purple-300"
+                              )}
+                            >
+                              <RefreshCw className={cn("w-4 h-4", verifyStatus === "sending" && "animate-spin")} />
+                              {verifyStatus === "sending"
+                                ? "Sending..."
+                                : verifyCountdown > 0
+                                  ? `Resend in ${verifyCountdown}s`
+                                  : "Resend Code"}
+                            </button>
+                          </div>
+                        )}
                       </>
                     )}
                   </motion.div>
@@ -1026,7 +1106,7 @@ function LoginPageContent() {
             </div>
           </motion.div>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
