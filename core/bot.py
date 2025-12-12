@@ -236,18 +236,54 @@ class MusicBot(commands.Bot):
             """Called when bot joins a guild - sends enhanced welcome message with permission check"""
             logger.info(f"Joined guild: {guild.name} (ID: {guild.id})")
             
+            # Initialize pending_welcomes if needed
+            if not hasattr(self, 'pending_welcomes'):
+                self.pending_welcomes = {}
+            
             # Use enhanced welcome system
             from ui.welcome import send_welcome_message
             await send_welcome_message(guild, self)
+        
+        @self.event
+        async def on_guild_channel_update(before: discord.abc.GuildChannel, after: discord.abc.GuildChannel):
+            """Called when channel permissions change - retry pending welcomes"""
+            if not hasattr(self, 'pending_welcomes'):
+                self.pending_welcomes = {}
+                return
+            
+            guild = after.guild
+            if guild.id not in self.pending_welcomes:
+                return
+            
+            # Check if this is a text channel we can now send to
+            if isinstance(after, discord.TextChannel):
+                perms = after.permissions_for(guild.me)
+                if perms.send_messages:
+                    try:
+                        from ui.welcome import WelcomeView
+                        view = WelcomeView(guild, self)
+                        embed = view.create_welcome_embed()
+                        await after.send(embed=embed, view=view)
+                        logger.info(f"[WELCOME] ✓ Retry SUCCESS after permission change in #{after.name}")
+                        del self.pending_welcomes[guild.id]
+                    except discord.Forbidden:
+                        pass  # Still can't send
+                    except Exception as e:
+                        logger.error(f"[WELCOME] Retry error: {e}")
         
         @self.event
         async def on_guild_remove(guild: discord.Guild):
             """Called when bot leaves a guild"""
             logger.info(f"Left guild: {guild.name} (ID: {guild.id})")
             
+            # Cleanup pending welcomes
+            if hasattr(self, 'pending_welcomes') and guild.id in self.pending_welcomes:
+                del self.pending_welcomes[guild.id]
+            
             # Cleanup voice connection
             if self.voice_manager.is_connected(guild.id):
                 await self.voice_manager.disconnect(guild.id, force=True)
+
     
     async def setup_hook(self) -> None:
         """Called when bot is starting up"""

@@ -304,11 +304,15 @@ async def send_welcome_message(guild: discord.Guild, bot: commands.Bot) -> bool:
         if channel not in channels_to_try:
             channels_to_try.append(channel)
     
-    logger.info(f"Trying to send welcome to {guild.name} - {len(channels_to_try)} channels available")
+    logger.info(f"[WELCOME] {guild.name}: Trying {len(channels_to_try)} channels...")
     
     # Try each channel until one works
-    for channel in channels_to_try:
+    for i, channel in enumerate(channels_to_try):
         try:
+            # Log channel permissions for debugging
+            perms = channel.permissions_for(guild.me)
+            logger.info(f"[WELCOME] #{channel.name}: send={perms.send_messages}, embed={perms.embed_links}, view={perms.view_channel}")
+            
             view = WelcomeView(guild, bot)
             embed = view.create_welcome_embed()
             
@@ -316,9 +320,10 @@ async def send_welcome_message(guild: discord.Guild, bot: commands.Bot) -> bool:
             try:
                 message = await channel.send(embed=embed, view=view)
                 view.message = message
-                logger.info(f"✓ Sent welcome to #{channel.name} in {guild.name}")
+                logger.info(f"[WELCOME] ✓ SUCCESS - Sent to #{channel.name}")
                 return True
-            except discord.Forbidden:
+            except discord.Forbidden as e:
+                logger.info(f"[WELCOME] ✗ #{channel.name} embed forbidden: {e.text if hasattr(e, 'text') else str(e)}")
                 # Try plain text without embed
                 try:
                     message = await channel.send(
@@ -329,17 +334,22 @@ async def send_welcome_message(guild: discord.Guild, bot: commands.Bot) -> bool:
                         view=view
                     )
                     view.message = message
-                    logger.info(f"✓ Sent welcome (plain text) to #{channel.name} in {guild.name}")
+                    logger.info(f"[WELCOME] ✓ SUCCESS - Sent plain text to #{channel.name}")
                     return True
-                except discord.Forbidden:
-                    logger.debug(f"✗ Cannot send to #{channel.name} - trying next channel")
+                except discord.Forbidden as e2:
+                    logger.info(f"[WELCOME] ✗ #{channel.name} plain text forbidden: {e2.text if hasattr(e2, 'text') else str(e2)}")
                     continue
         except Exception as e:
-            logger.debug(f"✗ Error with #{channel.name}: {e}")
+            logger.info(f"[WELCOME] ✗ #{channel.name} error: {type(e).__name__}: {e}")
             continue
     
     # All channels failed - try DM to owner
-    logger.warning(f"All {len(channels_to_try)} channels failed for {guild.name}, trying owner DM")
+    logger.warning(f"[WELCOME] All {len(channels_to_try)} channels failed for {guild.name}")
+    
+    # Store as pending welcome for retry later
+    if hasattr(bot, 'pending_welcomes'):
+        bot.pending_welcomes[guild.id] = True
+        logger.info(f"[WELCOME] Added {guild.name} to pending welcomes for retry")
     
     try:
         if guild.owner:
@@ -349,21 +359,56 @@ async def send_welcome_message(guild: discord.Guild, bot: commands.Bot) -> bool:
                     f"Bot telah bergabung ke **{guild.name}** tetapi tidak dapat mengirim pesan ke channel manapun.\n\n"
                     f"*Bot has joined **{guild.name}** but couldn't send messages to any channel.*\n\n"
                     "**Solusi / Solution:**\n"
-                    "Berikan SONORA izin 'Send Messages' di setidaknya satu channel.\n"
-                    "*Grant SONORA 'Send Messages' permission in at least one channel.*"
+                    "1️⃣ Buka **Server Settings → Roles → SONORA**\n"
+                    "2️⃣ Aktifkan **Send Messages** dan **Embed Links**\n"
+                    "3️⃣ Atau buka channel → **Edit Channel → Permissions**\n"
+                    "4️⃣ Tambahkan SONORA dengan izin **Send Messages**\n\n"
+                    "*Bot akan otomatis mengirim pesan selamat datang setelah izin diberikan.*\n"
+                    "*Bot will automatically send welcome message after permissions are granted.*"
                 ),
                 color=0xFEE75C
             )
-            embed.set_footer(text="SONORA Music Bot")
+            embed.set_footer(text="SONORA Music Bot • Ketik '/play' di server untuk memulai")
             await guild.owner.send(embed=embed)
-            logger.info(f"✓ Sent DM to owner of {guild.name}")
+            logger.info(f"[WELCOME] Sent DM to owner of {guild.name}")
             return True
     except discord.Forbidden:
-        logger.warning(f"Cannot DM owner of {guild.name} - DMs are closed")
+        logger.warning(f"[WELCOME] Cannot DM owner of {guild.name} - DMs closed")
     except Exception as e:
-        logger.error(f"Failed to DM owner: {e}")
+        logger.error(f"[WELCOME] Failed to DM owner: {e}")
     
-    logger.error(f"✗ Could not send welcome message to {guild.name} - no accessible channel or owner DM")
+    logger.error(f"[WELCOME] ✗ FAILED completely for {guild.name}")
     return False
+
+
+async def retry_pending_welcomes(bot: commands.Bot):
+    """
+    Retry sending welcome messages to guilds that previously failed
+    Call this periodically or when channel permissions change
+    """
+    if not hasattr(bot, 'pending_welcomes'):
+        bot.pending_welcomes = {}
+        return
+    
+    for guild_id in list(bot.pending_welcomes.keys()):
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            del bot.pending_welcomes[guild_id]
+            continue
+        
+        # Try to find a channel we can send to
+        for channel in guild.text_channels:
+            perms = channel.permissions_for(guild.me)
+            if perms.send_messages:
+                try:
+                    view = WelcomeView(guild, bot)
+                    embed = view.create_welcome_embed()
+                    await channel.send(embed=embed, view=view)
+                    logger.info(f"[WELCOME] ✓ Retry SUCCESS for {guild.name} in #{channel.name}")
+                    del bot.pending_welcomes[guild_id]
+                    break
+                except:
+                    continue
+
 
 
