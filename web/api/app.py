@@ -154,7 +154,7 @@ def api_guilds():
                     }
             
             guilds.append({
-                "id": guild.id,
+                "id": str(guild.id),  # String to prevent JS precision loss
                 "name": guild.name,
                 "icon": str(guild.icon.url) if guild.icon else None,
                 "member_count": guild.member_count,
@@ -219,7 +219,7 @@ def api_guild_detail(guild_id: int):
                     })
         
         return jsonify({
-            "id": guild.id,
+            "id": str(guild.id),  # String to prevent JS precision loss
             "name": guild.name,
             "icon": str(guild.icon.url) if guild.icon else None,
             "member_count": guild.member_count,

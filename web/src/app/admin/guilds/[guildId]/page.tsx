@@ -31,7 +31,7 @@ import { useSession } from "@/contexts/SessionContext";
 import { useSettings } from "@/contexts/SettingsContext";
 
 interface GuildDetail {
-    id: number;
+    id: string;  // String to handle Discord snowflake IDs
     name: string;
     icon: string | null;
     member_count: number;
