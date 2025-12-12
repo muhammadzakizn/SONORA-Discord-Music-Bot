@@ -304,16 +304,23 @@ function LoginPageContent() {
     setError("");
     setIsLoading(true);
 
-    const validUser = process.env.NEXT_PUBLIC_DEV_USER || "developer";
-    const validPass = process.env.NEXT_PUBLIC_DEV_PASS || "sonora2024";
+    // Developer credentials - hardcoded for now
+    const validCredentials = [
+      { user: "developer", pass: "sonora2024" },
+      { user: "devsonora", pass: "dev2005sonora" },
+      { user: "admin", pass: "admin123" },
+    ];
 
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    if (username === validUser && password === validPass) {
+    const isValid = validCredentials.some(c => c.user === username && c.pass === password);
+
+    if (isValid) {
       localStorage.setItem("sonora-dev-auth", btoa(JSON.stringify({
         role: "developer",
         timestamp: Date.now()
       })));
+      document.cookie = "sonora-dev-auth=true; path=/; max-age=86400";
       router.push("/developer");
     } else {
       setError(t('login.invalidCredentials'));
