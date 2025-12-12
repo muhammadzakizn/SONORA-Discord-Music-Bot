@@ -472,23 +472,43 @@ class PlayCommand(commands.Cog):
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
                     "Loading from Cache",
-                    f"✓ Found in cache\n⚡ Loading instantly..."
+                    f"✓ Found in cache\n🔍 Memverifikasi audio..."
                 )
             )
             
-            # Create AudioResult from cached file
-            result = AudioResult(
-                file_path=cached_file,
-                title=track_info.title,
-                artist=track_info.artist,
-                duration=track_info.duration,
-                source="Cache",  # Indicate it's from cache
-                bitrate=256,  # Default assumption
-                format='opus',
-                sample_rate=48000
-            )
+            # VERIFY cached file matches expected track
+            from utils.track_verifier import TrackVerifier
+            verification = await TrackVerifier.verify_track(cached_file, track_info)
             
-            return result
+            if not verification.success:
+                logger.warning(f"Cache verification failed: {verification.message}")
+                # Remove bad cache, continue to download
+                try:
+                    cached_file.unlink()
+                    logger.info(f"Removed mismatched cache: {cached_file}")
+                except:
+                    pass
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_loading(
+                        "Cache Mismatch",
+                        f"⚠️ File cache tidak cocok\n⬇️ Mengunduh ulang..."
+                    )
+                )
+            else:
+                logger.info(f"✓ Cache verified: {track_info.title} (confidence: {verification.confidence:.2f})")
+                # Create AudioResult from cached file
+                result = AudioResult(
+                    file_path=cached_file,
+                    title=track_info.title,
+                    artist=track_info.artist,
+                    duration=track_info.duration,
+                    source="Cache",  # Indicate it's from cache
+                    bitrate=256,  # Default assumption
+                    format='opus',
+                    sample_rate=48000
+                )
+                
+                return result
         
         # Not in cache, proceed with download
         errors = []
@@ -504,7 +524,22 @@ class PlayCommand(commands.Cog):
             
             result = await self.spotify_downloader.download(track_info)
             result.source = "Spotify"
-            logger.info(f"✓ Downloaded from Spotify: {result.title}")
+            
+            # Verify downloaded file
+            await self._safe_loader_update(loader, 
+                embed=EmbedBuilder.create_loading(
+                    "Verifying",
+                    f"✅ Memverifikasi audio...\n**{track_info.title}**"
+                )
+            )
+            from utils.track_verifier import TrackVerifier
+            verification = await TrackVerifier.verify_track(result.file_path, track_info)
+            
+            if not verification.success:
+                logger.warning(f"Spotify verification failed: {verification.message}")
+                raise Exception(f"Verification failed: {verification.message}")
+            
+            logger.info(f"✓ Downloaded & verified from Spotify: {result.title} (confidence: {verification.confidence:.2f})")
             return result
         
         except Exception as e:
@@ -522,7 +557,22 @@ class PlayCommand(commands.Cog):
             
             result = await self.youtube_downloader.download(track_info)
             result.source = "YouTube Music"
-            logger.info(f"✓ Downloaded from YouTube Music (fallback): {result.title}")
+            
+            # Verify downloaded file
+            await self._safe_loader_update(loader, 
+                embed=EmbedBuilder.create_loading(
+                    "Verifying",
+                    f"✅ Memverifikasi audio...\n**{track_info.title}**"
+                )
+            )
+            from utils.track_verifier import TrackVerifier
+            verification = await TrackVerifier.verify_track(result.file_path, track_info)
+            
+            if not verification.success:
+                logger.warning(f"YouTube verification failed: {verification.message}")
+                raise Exception(f"Verification failed: {verification.message}")
+            
+            logger.info(f"✓ Downloaded & verified from YouTube Music: {result.title} (confidence: {verification.confidence:.2f})")
             return result
         
         except Exception as e:
