@@ -99,6 +99,12 @@ export default function GuildDetailPage() {
                 throw new Error(data.error || "Failed to fetch");
             }
             const data = await response.json();
+
+            // Debug log for artwork
+            if (data.current_track) {
+                console.log('[DEBUG] Current track artwork_url:', data.current_track.artwork_url);
+            }
+
             setGuild(data);
             setError(null);
 
