@@ -2,8 +2,8 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.5.0";
-export const BOT_VERSION = "3.5.0";
+export const WEB_VERSION = "3.6.0";
+export const BOT_VERSION = "3.6.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -17,6 +17,49 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.6.0",
+    date: "2025-12-13",
+    title: "Maintenance, Bans & Support System",
+    highlights: [
+      "Maintenance Mode with progress tracking",
+      "User & Server Ban Management",
+      "Support Dashboard for Admin",
+      "Phase 3-6 Complete"
+    ],
+    changes: [
+      {
+        category: "Maintenance System",
+        items: [
+          "Maintenance Mode page with progress stages",
+          "Real-time progress percentage slider",
+          "Maintenance history log",
+          "Status Page integration",
+          "Completion dialog with summary"
+        ]
+      },
+      {
+        category: "Ban Management",
+        items: [
+          "User ban with reason and duration",
+          "Server ban with auto-leave on reinvite",
+          "Ban list with search and filter",
+          "Unban/Reban functionality",
+          "Ban statistics dashboard"
+        ]
+      },
+      {
+        category: "Admin Support Dashboard",
+        items: [
+          "Support ticket management",
+          "Status change: Open, In Progress, Resolved, Closed",
+          "Reply to tickets from dashboard",
+          "Ticket statistics overview",
+          "Filter and search tickets"
+        ]
+      }
+    ]
+  },
   {
     version: "3.5.0",
     date: "2025-12-13",

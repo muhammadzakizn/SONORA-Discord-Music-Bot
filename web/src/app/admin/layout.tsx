@@ -21,6 +21,7 @@ import {
   Home,
   PanelLeft,
   PanelLeftClose,
+  Headphones,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SessionProvider, useSession, getAvatarUrl } from "@/contexts/SessionContext";
@@ -37,8 +38,10 @@ const navItems: NavItem[] = [
   { labelKey: "admin.dashboard", href: "/admin", icon: LayoutDashboard },
   { labelKey: "admin.servers", href: "/admin/guilds", icon: Server },
   { labelKey: "admin.history", href: "/admin/history", icon: History },
+  { labelKey: "Support", href: "/admin/support", icon: Headphones },
   { labelKey: "admin.settings", href: "/admin/settings", icon: Settings },
 ];
+
 
 // Sidebar width constant
 const SIDEBAR_WIDTH = 260; // 16.25rem = 260px

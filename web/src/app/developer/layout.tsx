@@ -29,6 +29,7 @@ import {
   Users,
   Database,
   Code,
+  Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SessionProvider, useSession, getAvatarUrl } from "@/contexts/SessionContext";
@@ -47,9 +48,12 @@ const navItems: NavItem[] = [
   { label: "Servers", href: "/developer/servers", icon: Server },
   { label: "Monitoring", href: "/developer/monitoring", icon: Activity },
   { label: "Controls", href: "/developer/controls", icon: Power },
+  { label: "Maintenance", href: "/developer/maintenance", icon: Wrench },
   { label: "Messaging", href: "/developer/messaging", icon: MessageSquare },
   { label: "Users", href: "/developer/users", icon: Users },
+  { label: "Bans", href: "/developer/bans", icon: Ban },
 ];
+
 
 // Sidebar width constant
 const SIDEBAR_WIDTH = 260;
