@@ -368,46 +368,35 @@ def api_control(guild_id: int, action: str):
         else:
             return jsonify({"error": "Invalid action"}), 400
         
-        # Send Discord notification in bot's channel
+        # Send Discord notification in bot's channel (simple approach)
         async def send_notification():
             try:
                 import discord
-                guild = bot.get_guild(guild_id)
-                if not guild:
+                
+                # ONLY use player message channel - this is guaranteed to work
+                # because the bot already sent the player message there
+                if not hasattr(bot, 'players') or guild_id not in bot.players:
+                    logger.debug("No player for this guild, skipping notification")
                     return
                 
-                # BEST: Use same channel as player message (guaranteed to work!)
-                target_channel = None
+                player = bot.players[guild_id]
+                if not player.message:
+                    logger.debug("Player has no message, skipping notification")
+                    return
                 
-                if hasattr(bot, 'players') and guild_id in bot.players:
-                    player = bot.players[guild_id]
-                    if player.message and hasattr(player.message, 'channel'):
-                        target_channel = player.message.channel
-                        logger.debug(f"Using player message channel: #{target_channel.name}")
+                channel = player.message.channel
+                logger.info(f"[NOTIFY] Sending to #{channel.name} (same as player)")
                 
-                # Fallback: try voice channel category text channel
-                if not target_channel and connection.channel and connection.channel.category:
-                    for ch in guild.text_channels:
-                        if ch.category == connection.channel.category:
-                            perms = ch.permissions_for(guild.me)
-                            if perms.send_messages:
-                                target_channel = ch
-                                break
+                embed = discord.Embed(
+                    description=f"{action_emoji} **{action_text}** via Dashboard",
+                    color=0x7B1E3C
+                )
                 
-                if target_channel:
-                    embed = discord.Embed(
-                        description=f"{action_emoji} **{action_text}** via Web Dashboard\n"
-                                   f"👤 By **{username}**",
-                        color=0x7B1E3C
-                    )
-                    embed.set_footer(text="SONORA Admin Dashboard")
-                    await target_channel.send(embed=embed, delete_after=30)
-                    logger.info(f"✓ Notification sent to #{target_channel.name}")
-                else:
-                    # No channel - just log, don't error
-                    logger.debug(f"No channel for notification in {guild.name}")
+                await channel.send(embed=embed, delete_after=15)
+                logger.info(f"✓ Notification sent to #{channel.name}")
+                
             except Exception as e:
-                logger.warning(f"Notification error: {e}")
+                logger.error(f"Notification failed: {e}")
         
         # Run notification in bot's event loop
         asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)
