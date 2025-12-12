@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { EMAIL_OTP_DAILY_LIMIT } from '@/config/access-control';
 
 // In-memory verification codes storage (in production, use Redis or database)
 // Map: userId -> { code: string, expiresAt: number, method: string }
 const verificationCodes = new Map<string, { code: string; expiresAt: number; method: string }>();
+
+// Email OTP rate limiting
+let emailOTPCount = 0;
+let emailOTPResetDate = new Date().toDateString();
+
+function checkAndResetEmailQuota(): boolean {
+  const today = new Date().toDateString();
+  if (today !== emailOTPResetDate) {
+    // Reset at midnight
+    emailOTPCount = 0;
+    emailOTPResetDate = today;
+  }
+  return emailOTPCount < EMAIL_OTP_DAILY_LIMIT;
+}
+
+function incrementEmailQuota(): void {
+  emailOTPCount++;
+}
 
 export async function POST(request: NextRequest) {
     try {
@@ -15,14 +34,27 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Rate limiting check
+        // Rate limiting check - prevent spam
         const existing = verificationCodes.get(userId);
         if (existing && existing.expiresAt > Date.now() - 55000) {
-            // Less than 5 seconds since last send
             return NextResponse.json(
                 { error: 'Please wait before requesting another code' },
                 { status: 429 }
             );
+        }
+
+        // Check email quota
+        if (method === 'email') {
+            if (!checkAndResetEmailQuota()) {
+                return NextResponse.json(
+                    { 
+                        error: 'Email OTP limit reached for today. Please use Discord DM or Passkey instead.',
+                        quotaExceeded: true,
+                        remaining: 0
+                    },
+                    { status: 429 }
+                );
+            }
         }
 
         // Generate 6-digit code
@@ -67,6 +99,9 @@ export async function POST(request: NextRequest) {
                 });
             }
         } else if (method === 'email') {
+            // Increment email quota
+            incrementEmailQuota();
+            
             // Email OTP - for now just log
             // In production: integrate with SendGrid, Mailgun, or Resend
             console.log(`Email OTP would be sent: ${code}`);
@@ -78,6 +113,7 @@ export async function POST(request: NextRequest) {
                 success: true,
                 message: 'Verification code sent to your email',
                 devCode: process.env.NODE_ENV === 'development' ? code : undefined,
+                remaining: EMAIL_OTP_DAILY_LIMIT - emailOTPCount,
             });
         } else {
             return NextResponse.json(
@@ -92,6 +128,16 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         );
     }
+}
+
+// Get email quota status
+export async function GET() {
+    checkAndResetEmailQuota();
+    return NextResponse.json({
+        remaining: EMAIL_OTP_DAILY_LIMIT - emailOTPCount,
+        limit: EMAIL_OTP_DAILY_LIMIT,
+        available: emailOTPCount < EMAIL_OTP_DAILY_LIMIT,
+    });
 }
 
 // Export the map for use by the check endpoint

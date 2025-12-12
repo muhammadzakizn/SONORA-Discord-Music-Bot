@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { isDeveloperByDiscord } from '@/config/access-control';
 
 export interface DiscordUser {
     id: string;
@@ -28,14 +29,17 @@ export interface UserSession {
 interface SessionContextType {
     session: UserSession | null;
     user: DiscordUser | null;
-    displayName: string; // Custom display name (persisted in localStorage)
+    displayName: string;
     guilds: UserGuild[];
     managedGuilds: UserGuild[];
     isLoggedIn: boolean;
     isLoading: boolean;
+    isMfaVerified: boolean;
+    isDeveloper: boolean;
     logout: () => void;
     refreshSession: () => void;
     setDisplayName: (name: string) => void;
+    setMfaVerified: (verified: boolean) => void;
 }
 
 const SessionContext = createContext<SessionContextType | null>(null);
@@ -58,6 +62,37 @@ function getSessionFromCookie(): UserSession | null {
         return JSON.parse(decoded);
     } catch {
         return null;
+    }
+}
+
+// Helper to get MFA verification status
+function getMfaStatus(userId: string): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+        const stored = localStorage.getItem(`sonora-mfa-verified-${userId}`);
+        if (!stored) return false;
+        const data = JSON.parse(stored);
+        // MFA valid for 30 days
+        if (Date.now() - data.timestamp > 30 * 24 * 60 * 60 * 1000) {
+            localStorage.removeItem(`sonora-mfa-verified-${userId}`);
+            return false;
+        }
+        return data.verified;
+    } catch {
+        return false;
+    }
+}
+
+// Helper to store MFA verification status
+function storeMfaStatus(userId: string, verified: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+        localStorage.setItem(`sonora-mfa-verified-${userId}`, JSON.stringify({
+            verified,
+            timestamp: Date.now(),
+        }));
+    } catch {
+        // Ignore errors
     }
 }
 
@@ -105,6 +140,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<UserSession | null>(null);
     const [displayName, setDisplayNameState] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isMfaVerified, setIsMfaVerifiedState] = useState(false);
 
     const refreshSession = useCallback(() => {
         const userSession = getSessionFromCookie();
@@ -114,6 +150,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (userSession?.user) {
             const storedName = getStoredDisplayName(userSession.user.id);
             setDisplayNameState(storedName || userSession.user.username);
+
+            // Load MFA status
+            const mfaStatus = getMfaStatus(userSession.user.id);
+            setIsMfaVerifiedState(mfaStatus);
         }
 
         setIsLoading(false);
@@ -127,6 +167,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         document.cookie = 'sonora-admin-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         setSession(null);
         setDisplayNameState('');
+        setIsMfaVerifiedState(false);
         window.location.href = '/login';
     }, []);
 
@@ -136,6 +177,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             setDisplayNameState(name);
         }
     }, [session?.user]);
+
+    const setMfaVerified = useCallback((verified: boolean) => {
+        if (session?.user) {
+            storeMfaStatus(session.user.id, verified);
+            setIsMfaVerifiedState(verified);
+        }
+    }, [session?.user]);
+
+    // Check if user is developer
+    const isDeveloper = session?.user
+        ? isDeveloperByDiscord(session.user.username)
+        : false;
 
     // Filter guilds where user is owner or has admin/manage_guild permission
     const managedGuilds = session?.guilds.filter(guild =>
@@ -154,9 +207,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 managedGuilds,
                 isLoggedIn: !!session,
                 isLoading,
+                isMfaVerified,
+                isDeveloper,
                 logout,
                 refreshSession,
                 setDisplayName,
+                setMfaVerified,
             }}
         >
             {children}

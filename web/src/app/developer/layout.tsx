@@ -405,7 +405,7 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
 function DeveloperLayoutContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  const { isLoggedIn, isLoading } = useSession();
+  const { isLoggedIn, isLoading, isMfaVerified, isDeveloper } = useSession();
   const router = useRouter();
   const { isDark } = useSettings();
 
@@ -429,8 +429,19 @@ function DeveloperLayoutContent({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
       router.push('/login');
+      return;
     }
-  }, [isLoading, isLoggedIn, router]);
+    // Check if MFA verified
+    if (!isLoading && isLoggedIn && !isMfaVerified) {
+      router.push('/mfa?redirect=/developer');
+      return;
+    }
+    // Check if developer
+    if (!isLoading && isLoggedIn && !isDeveloper) {
+      router.push('/admin'); // Redirect non-developers to admin
+    }
+  }, [isLoading, isLoggedIn, isMfaVerified, isDeveloper, router]);
+
 
   if (isLoading) {
     return (

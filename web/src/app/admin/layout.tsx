@@ -380,7 +380,7 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
 function AdminLayoutContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  const { isLoggedIn, isLoading } = useSession();
+  const { isLoggedIn, isLoading, isMfaVerified } = useSession();
   const router = useRouter();
   const { t, isDark } = useSettings();
 
@@ -407,8 +407,13 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
       router.push('/login');
+      return;
     }
-  }, [isLoading, isLoggedIn, router]);
+    // Check if MFA verified
+    if (!isLoading && isLoggedIn && !isMfaVerified) {
+      router.push('/mfa?redirect=/admin');
+    }
+  }, [isLoading, isLoggedIn, isMfaVerified, router]);
 
   if (isLoading) {
     return (

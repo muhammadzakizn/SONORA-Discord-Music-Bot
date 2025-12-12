@@ -60,7 +60,7 @@ const MFA_METHODS: { id: MFAMethod; label: string; icon: React.ElementType; desc
 export default function MFAPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { user, isLoggedIn, isLoading } = useSession();
+    const { user, isLoggedIn, isLoading, isMfaVerified, setMfaVerified } = useSession();
 
     const [step, setStep] = useState<MFAStep>("select");
     const [selectedMethod, setSelectedMethod] = useState<MFAMethod | null>(null);
@@ -80,17 +80,29 @@ export default function MFAPage() {
     // Passkey state
     const [supportsPasskey, setSupportsPasskey] = useState(false);
 
+    // Email quota state
+    const [emailAvailable, setEmailAvailable] = useState(true);
+
     const redirectTo = searchParams?.get("redirect") || "/admin";
 
     useEffect(() => {
         if (!isLoading && !isLoggedIn) {
             router.push("/login");
         }
-    }, [isLoading, isLoggedIn, router]);
+        // If already MFA verified, redirect to destination
+        if (!isLoading && isLoggedIn && isMfaVerified) {
+            router.push(redirectTo);
+        }
+    }, [isLoading, isLoggedIn, isMfaVerified, router, redirectTo]);
 
     useEffect(() => {
         setSupportsPasskey(browserSupportsWebAuthn());
+        // Check email quota
+        fetch("/api/verify/send").then(res => res.json()).then(data => {
+            setEmailAvailable(data.available !== false);
+        }).catch(() => { });
     }, []);
+
 
     useEffect(() => {
         if (countdown > 0) {
@@ -135,6 +147,7 @@ export default function MFAPage() {
                 throw new Error("Failed to register passkey");
             }
 
+            setMfaVerified(true);
             setSuccess(true);
             setStep("success");
 
@@ -186,6 +199,7 @@ export default function MFAPage() {
                 throw new Error("Authentication failed");
             }
 
+            setMfaVerified(true);
             setSuccess(true);
             setStep("success");
 
@@ -283,6 +297,7 @@ export default function MFAPage() {
                 throw new Error(data.error || "Invalid code");
             }
 
+            setMfaVerified(true);
             setSuccess(true);
             setStep("success");
 
