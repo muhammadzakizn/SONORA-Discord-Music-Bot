@@ -35,7 +35,7 @@ class EmbedBuilder:
             Discord embed
         """
         embed = discord.Embed(
-            title=f"{EMOJI_MUSIC} NOW PLAYING",
+            title="NOW PLAYING",
             color=COLOR_PLAYING
         )
         
@@ -46,29 +46,12 @@ class EmbedBuilder:
             inline=False
         )
         
-        # Album if available
-        if metadata.album:
-            embed.add_field(
-                name="Album",
-                value=metadata.album,
-                inline=True
-            )
-        
-        # Audio source
-        # Handle both enum and string values
-        audio_source_str = metadata.audio_source.value if hasattr(metadata.audio_source, 'value') else str(metadata.audio_source)
-        embed.add_field(
-            name="Source",
-            value=f"{audio_source_str} • {metadata.bitrate}kbps",
-            inline=True
-        )
-        
-        # Lyrics (3 lines) - tanpa code block agar bold formatting works
+        # Lyrics (3 lines) - dengan spacing atas
         if lyrics_lines and any(lyrics_lines):
             lyrics_text = "\n".join(lyrics_lines)
             embed.add_field(
-                name="",
-                value=lyrics_text if lyrics_text.strip() else "\u200b",  # Zero-width space if empty
+                name="\u200b",  # Zero-width space as spacer
+                value=lyrics_text if lyrics_text.strip() else "\u200b",
                 inline=False
             )
         
@@ -84,8 +67,14 @@ class EmbedBuilder:
         if metadata.artwork_url:
             embed.set_thumbnail(url=metadata.artwork_url)
         
-        # Footer
-        footer_text = f"Requested by {metadata.requested_by}" if metadata.requested_by else ""
+        # Footer - Requested by (dengan mention)
+        footer_parts = []
+        
+        if metadata.requested_by_id and metadata.requested_by_id > 0:
+            # Gunakan mention (user visible as clickable)
+            footer_parts.append(f"Requested by <@{metadata.requested_by_id}>")
+        elif metadata.requested_by:
+            footer_parts.append(f"Requested by {metadata.requested_by}")
         
         # Check if equalizer is active
         if guild_id:
@@ -93,27 +82,18 @@ class EmbedBuilder:
             eq_manager = get_equalizer_manager()
             eq_settings = eq_manager.get_settings(guild_id)
             
-            # Check if EQ is not flat (has changes)
             flat_eq = EqualizerPresets.FLAT
             if eq_settings != flat_eq:
-                # EQ is active, show indicator
-                # Try to find which preset it matches
                 eq_name = "Custom EQ"
                 for preset_name, preset in EqualizerPresets.get_all_presets().items():
                     if eq_settings == preset and preset_name != "Flat":
                         eq_name = preset_name
                         break
-                footer_text += f" • 🎚️ {eq_name}"
+                footer_parts.append(f"🎚️ {eq_name}")
         
-        if metadata.lyrics and metadata.lyrics.is_synced:
-            footer_text += " • Synced Lyrics"
-        elif metadata.lyrics and metadata.lyrics.lines:
-            footer_text += " • 📝 Plain Lyrics (use /lyrics show)"
-        else:
-            footer_text += " • ❌ No lyrics (use /lyrics search)"
-        
-        if footer_text:
-            embed.set_footer(text=footer_text)
+        # Footer text (without synced lyrics indicator)
+        if footer_parts:
+            embed.set_footer(text=" • ".join(footer_parts))
         
         return embed
     

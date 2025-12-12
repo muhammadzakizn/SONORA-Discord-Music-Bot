@@ -485,12 +485,15 @@ class SynchronizedMediaPlayer:
                     
                     # Process metadata (artwork + lyrics)
                     voice_ch_id = getattr(track_to_process, 'voice_channel_id', None)
+                    # Preserve original requester from TrackInfo
+                    orig_requested_by = getattr(track_to_process, 'requested_by', None)
+                    orig_requested_by_id = getattr(track_to_process, 'requested_by_id', 0)
                     
                     processed_metadata = await play_cog.metadata_processor.process(
                         track_to_process,
                         audio_result,
-                        requested_by="Pre-downloaded",
-                        requested_by_id=0,
+                        requested_by=orig_requested_by or "Auto-queue",
+                        requested_by_id=orig_requested_by_id or 0,
                         prefer_apple_artwork=True,
                         voice_channel_id=voice_ch_id
                     )
@@ -702,14 +705,16 @@ class SynchronizedMediaPlayer:
                     
                     # Process metadata (artwork + lyrics)
                     # Auto-play always uses Apple Music artwork (highest quality)
-                    # Use original voice_channel_id if next_item has it
+                    # Preserve original requester from TrackInfo
                     voice_ch_id = getattr(next_item, 'voice_channel_id', None)
+                    orig_requested_by = getattr(next_item, 'requested_by', None)
+                    orig_requested_by_id = getattr(next_item, 'requested_by_id', 0)
                     
                     next_metadata = await play_cog.metadata_processor.process(
                         next_item,
                         audio_result,
-                        requested_by="Auto-queue",
-                        requested_by_id=0,
+                        requested_by=orig_requested_by or "Queue",
+                        requested_by_id=orig_requested_by_id or 0,
                         prefer_apple_artwork=True,  # Auto-play always uses Apple Music
                         voice_channel_id=voice_ch_id  # Preserve original voice channel
                     )
