@@ -2,8 +2,8 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.6.0";
-export const BOT_VERSION = "3.6.0";
+export const WEB_VERSION = "3.7.0";
+export const BOT_VERSION = "3.7.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -17,6 +17,46 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.7.0",
+    date: "2025-12-13",
+    title: "Multi-Factor Authentication",
+    highlights: [
+      "Passkey (WebAuthn) biometric authentication",
+      "TOTP Authenticator App support",
+      "OTP via Discord DM or Email",
+      "Bank-level security"
+    ],
+    changes: [
+      {
+        category: "Authentication Methods",
+        items: [
+          "Passkey (WebAuthn) - fingerprint/Face ID default",
+          "TOTP Authenticator - Google Authenticator, Authy",
+          "OTP via Discord DM - existing method",
+          "OTP via Email - new method"
+        ]
+      },
+      {
+        category: "API Endpoints",
+        items: [
+          "Passkey registration (register + complete)",
+          "Passkey authentication (authenticate + complete)",
+          "TOTP setup with QR code generation",
+          "TOTP verification"
+        ]
+      },
+      {
+        category: "Security",
+        items: [
+          "Challenge-response authentication",
+          "Rate limiting on OTP requests",
+          "@simplewebauthn integration",
+          "otplib TOTP implementation"
+        ]
+      }
+    ]
+  },
   {
     version: "3.6.0",
     date: "2025-12-13",
@@ -34,8 +74,7 @@ export const CHANGELOG: ChangelogEntry[] = [
           "Maintenance Mode page with progress stages",
           "Real-time progress percentage slider",
           "Maintenance history log",
-          "Status Page integration",
-          "Completion dialog with summary"
+          "Status Page integration"
         ]
       },
       {
@@ -44,23 +83,22 @@ export const CHANGELOG: ChangelogEntry[] = [
           "User ban with reason and duration",
           "Server ban with auto-leave on reinvite",
           "Ban list with search and filter",
-          "Unban/Reban functionality",
-          "Ban statistics dashboard"
+          "Unban/Reban functionality"
         ]
       },
       {
         category: "Admin Support Dashboard",
         items: [
           "Support ticket management",
-          "Status change: Open, In Progress, Resolved, Closed",
+          "Status change workflow",
           "Reply to tickets from dashboard",
-          "Ticket statistics overview",
-          "Filter and search tickets"
+          "Ticket statistics overview"
         ]
       }
     ]
   },
   {
+
     version: "3.5.0",
     date: "2025-12-13",
     title: "Developer Dashboard Major Upgrade",
