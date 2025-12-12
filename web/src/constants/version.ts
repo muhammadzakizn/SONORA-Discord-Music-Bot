@@ -2,8 +2,8 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.4.0";
-export const BOT_VERSION = "3.4.0";
+export const WEB_VERSION = "3.5.0";
+export const BOT_VERSION = "3.5.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -17,6 +17,49 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.5.0",
+    date: "2025-12-13",
+    title: "Developer Dashboard Major Upgrade",
+    highlights: [
+      "Complete Developer Dashboard redesign with Admin-style UI",
+      "Real-time System Monitoring with CPU, Memory, Disk metrics",
+      "Bot Controls: Shutdown, Restart, Pause/Resume, Maintenance Mode",
+      "Server & User Management pages"
+    ],
+    changes: [
+      {
+        category: "Developer Dashboard",
+        items: [
+          "New Dashboard overview with system stats and quick actions",
+          "Redesigned layout matching Admin Dashboard style",
+          "Real-time Console page with log filtering and export",
+          "System Monitoring page with live metrics and component status",
+          "Bot Controls page with shutdown, restart, maintenance mode",
+          "Server Management page with search and status display",
+          "Broadcast Messaging page with preview and history",
+          "User Management page with ban/unban functionality"
+        ]
+      },
+      {
+        category: "Backend API",
+        items: [
+          "New /api/developer/stats endpoint for system metrics",
+          "CPU, Memory, Disk usage monitoring",
+          "Bot statistics: servers, voice connections, users"
+        ]
+      },
+      {
+        category: "UI/UX Improvements",
+        items: [
+          "Liquid Glass sidebar design",
+          "Dark/Light mode support on all pages",
+          "Responsive layout for mobile devices",
+          "Smooth animations and transitions"
+        ]
+      }
+    ]
+  },
   {
     version: "3.4.0",
     date: "2025-12-12",

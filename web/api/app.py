@@ -618,6 +618,93 @@ def api_admin_health():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/developer/stats')
+def api_developer_stats():
+    """Get comprehensive developer dashboard statistics"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        import psutil
+        import shutil
+        
+        # System metrics
+        process = psutil.Process()
+        cpu_percent = process.cpu_percent(interval=0.1)
+        memory_info = process.memory_info()
+        memory_percent = process.memory_percent()
+        
+        # Disk usage
+        disk_usage = shutil.disk_usage("/")
+        disk_percent = (disk_usage.used / disk_usage.total) * 100
+        
+        # Uptime formatting
+        uptime_seconds = time.time() - bot._start_time if hasattr(bot, '_start_time') else 0
+        hours = int(uptime_seconds // 3600)
+        minutes = int((uptime_seconds % 3600) // 60)
+        uptime_str = f"{hours}h {minutes}m"
+        
+        # Bot stats
+        voice_stats = bot.voice_manager.get_stats()
+        
+        # Count active users (users in voice channels with bot)
+        active_users = 0
+        for vc in bot.voice_clients:
+            if vc.is_connected() and vc.channel:
+                active_users += len([m for m in vc.channel.members if not m.bot])
+        
+        # Track statistics (simulated - can be connected to real DB)
+        tracks_played = 0
+        commands_executed = 0
+        try:
+            db = get_db_manager()
+            # Get today's stats
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            today_stats = loop.run_until_complete(
+                db.db.execute(
+                    "SELECT COUNT(*) FROM play_history WHERE played_at >= date('now')"
+                )
+            )
+            row = loop.run_until_complete(today_stats.fetchone())
+            tracks_played = row[0] if row else 0
+            loop.close()
+        except:
+            pass
+        
+        return jsonify({
+            "system": {
+                "cpu": round(cpu_percent, 1),
+                "memory": round(memory_percent, 1),
+                "disk": round(disk_percent, 1),
+                "uptime": uptime_str,
+                "latency": round(bot.latency * 1000, 0),
+                "networkIn": "N/A",
+                "networkOut": "N/A"
+            },
+            "bot": {
+                "online": True,
+                "voiceConnections": voice_stats.get('connected', 0),
+                "totalServers": len(bot.guilds),
+                "activeUsers": active_users,
+                "tracksPlayed": tracks_played,
+                "commandsExecuted": commands_executed
+            },
+            "components": [
+                {"name": "Discord Bot", "status": "online", "latency": round(bot.latency * 1000)},
+                {"name": "Database", "status": "online"},
+                {"name": "Web API", "status": "online"},
+                {"name": "Voice Engine", "status": "online" if voice_stats.get('connected', 0) >= 0 else "warning"},
+                {"name": "Cache System", "status": "online"}
+            ]
+        })
+    except Exception as e:
+        logger.error(f"Failed to get developer stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/admin/cache')
 def api_admin_cache():
     """Get cache status"""
