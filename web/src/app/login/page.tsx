@@ -231,14 +231,13 @@ function LoginPageContent() {
   const [termsCanContinue, setTermsCanContinue] = useState(false);
   const termsRef = useRef<HTMLDivElement>(null);
 
-  // Detect ?verify=true from OAuth callback and switch to verify mode
+  // Detect ?verify=true from OAuth callback and redirect to MFA page
   useEffect(() => {
     if (searchParams.get('verify') === 'true' && isLoggedIn && user) {
-      setLoginMode("verify");
-      // Auto-send verification code
-      sendVerificationCode();
+      // Redirect to MFA page for proper method selection
+      router.push('/mfa?redirect=/admin');
     }
-  }, [searchParams, isLoggedIn, user]);
+  }, [searchParams, isLoggedIn, user, router]);
 
   // Countdown timer for resend
   useEffect(() => {
