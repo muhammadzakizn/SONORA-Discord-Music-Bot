@@ -120,6 +120,11 @@ class MediaPlayerView(discord.ui.View):
                 value="stats",
                 description="Statistik bot"
             ),
+            discord.SelectOption(
+                label="💖 Donate",
+                value="donate",
+                description="Support developer SONORA"
+            ),
         ]
     )
     async def menu_select(
@@ -438,6 +443,40 @@ class MediaPlayerView(discord.ui.View):
                 """.strip()
                 
                 await interaction.response.send_message(stats_text, ephemeral=True, delete_after=10)
+            
+            elif action == "donate":
+                # Create donate embed with support button
+                class DonateView(discord.ui.View):
+                    def __init__(self):
+                        super().__init__(timeout=None)
+                        self.add_item(discord.ui.Button(
+                            label="💖 Support Developer",
+                            url="https://teer.id/muhammadzakizn",
+                            style=discord.ButtonStyle.link
+                        ))
+                        self.add_item(discord.ui.Button(
+                            label="⭐ Rate Bot",
+                            url="https://top.gg/bot/1307728538425622579/vote",
+                            style=discord.ButtonStyle.link
+                        ))
+                
+                embed = discord.Embed(
+                    title="💖 Support SONORA",
+                    description=(
+                        "**Terima kasih sudah menggunakan SONORA!** 🎵\n\n"
+                        "Bot ini dikembangkan dengan sepenuh hati untuk memberikan "
+                        "pengalaman musik terbaik di Discord.\n\n"
+                        "Jika kamu menikmati SONORA, pertimbangkan untuk:\n"
+                        "• ☕ **Mentraktir developer kopi**\n"
+                        "• ⭐ **Memberikan vote di Top.gg**\n"
+                        "• 📣 **Share ke teman-temanmu**\n\n"
+                        "*Setiap dukungan membantu SONORA berkembang!* 💖"
+                    ),
+                    color=discord.Color.from_rgb(255, 105, 180)  # Hot pink
+                )
+                embed.set_footer(text="Made with ❤️ by Muhammad Zaky")
+                
+                await interaction.response.send_message(embed=embed, view=DonateView(), ephemeral=True)
         
         except Exception as e:
             logger.error(f"Menu action failed: {e}", exc_info=True)
