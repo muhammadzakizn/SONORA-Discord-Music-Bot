@@ -67,16 +67,22 @@ class EmbedBuilder:
         if metadata.artwork_url:
             embed.set_thumbnail(url=metadata.artwork_url)
         
-        # Footer - Requested by (dengan mention)
-        footer_parts = []
-        
+        # Requested by (as field so mention works - footer doesn't render mentions)
         if metadata.requested_by_id and metadata.requested_by_id > 0:
-            # Gunakan mention (user visible as clickable)
-            footer_parts.append(f"Requested by <@{metadata.requested_by_id}>")
+            embed.add_field(
+                name="",
+                value=f"Requested by <@{metadata.requested_by_id}>",
+                inline=False
+            )
         elif metadata.requested_by:
-            footer_parts.append(f"Requested by {metadata.requested_by}")
+            embed.add_field(
+                name="",
+                value=f"Requested by {metadata.requested_by}",
+                inline=False
+            )
         
-        # Check if equalizer is active
+        # Footer - only EQ indicator
+        footer_text = ""
         if guild_id:
             from services.audio.equalizer import get_equalizer_manager, EqualizerPresets
             eq_manager = get_equalizer_manager()
@@ -89,11 +95,10 @@ class EmbedBuilder:
                     if eq_settings == preset and preset_name != "Flat":
                         eq_name = preset_name
                         break
-                footer_parts.append(f"🎚️ {eq_name}")
+                footer_text = f"🎚️ {eq_name}"
         
-        # Footer text (without synced lyrics indicator)
-        if footer_parts:
-            embed.set_footer(text=" • ".join(footer_parts))
+        if footer_text:
+            embed.set_footer(text=footer_text)
         
         return embed
     
