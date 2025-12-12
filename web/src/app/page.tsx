@@ -32,11 +32,11 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { FloatingProfileButton, DashboardButton } from "@/components/FloatingProfile";
 
-// Animation variants
-const fadeInUp = {
-  initial: { opacity: 0, y: 60 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.6 }
+// Animation variants - Simple fade only
+const fadeIn = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  transition: { duration: 0.5 }
 };
 
 const stagger = {
@@ -289,12 +289,8 @@ function HeroSection({ isDark, t, isPaused, setIsPaused }: { isDark: boolean; t:
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 1, ease: "easeOut" }}
         >
-          {/* SONORA Logo - Smaller like Apple Music */}
-          <motion.div
-            className="mb-2 md:mb-4 inline-block"
-            animate={{ y: [0, -6, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          >
+          {/* SONORA Logo */}
+          <div className="mb-2 md:mb-4 inline-block">
             <Image
               src="/sonora-logo.png"
               alt="SONORA"
@@ -303,7 +299,7 @@ function HeroSection({ isDark, t, isPaused, setIsPaused }: { isDark: boolean; t:
               className="mx-auto h-16 md:h-24 lg:h-28 w-auto drop-shadow-2xl logo-adaptive"
               priority
             />
-          </motion.div>
+          </div>
 
           {/* Animated Subtitle with Word Cycling */}
           <motion.div
@@ -412,7 +408,7 @@ function FlipCard({
   return (
     <motion.div
       className="relative h-72 md:h-80 perspective-1000"
-      variants={fadeInUp}
+      variants={fadeIn}
       onHoverStart={() => setIsFlipped(true)}
       onHoverEnd={() => setIsFlipped(false)}
       onTouchStart={() => setIsFlipped(!isFlipped)}
