@@ -603,6 +603,11 @@ class SynchronizedMediaPlayer:
                                     url="https://teer.id/muhammadzakizn",
                                     style=discord.ButtonStyle.link
                                 ))
+                                self.add_item(discord.ui.Button(
+                                    label="🌐 Website",
+                                    url="https://s.id/SONORAbot",
+                                    style=discord.ButtonStyle.link
+                                ))
                         
                         embed = discord.Embed(
                             title="👋 Sampai Jumpa!",

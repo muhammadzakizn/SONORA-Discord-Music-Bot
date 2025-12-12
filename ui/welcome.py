@@ -146,7 +146,9 @@ class WelcomeView(ui.View):
             "**Halo! Terima kasih telah mengundang SONORA ke server Anda!**\n"
             "*Hello! Thank you for inviting SONORA to your server!*\n\n"
             "Bot musik berkualitas tinggi dengan dukungan Spotify, YouTube, dan Apple Music.\n"
-            "*High-quality music bot with Spotify, YouTube, and Apple Music support.*"
+            "*High-quality music bot with Spotify, YouTube, and Apple Music support.*\n\n"
+            "💡 Ketik `/help` untuk panduan lengkap menggunakan bot.\n"
+            "*Type `/help` for complete usage guide.*"
         )
         
         # Permission status section

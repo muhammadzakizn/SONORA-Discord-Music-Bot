@@ -125,6 +125,16 @@ class MediaPlayerView(discord.ui.View):
                 value="donate",
                 description="Support developer SONORA"
             ),
+            discord.SelectOption(
+                label="🌐 Website",
+                value="website",
+                description="Fitur-fitur website SONORA"
+            ),
+            discord.SelectOption(
+                label="❓ Help",
+                value="help",
+                description="Panduan menggunakan bot"
+            ),
         ]
     )
     async def menu_select(
@@ -477,6 +487,66 @@ class MediaPlayerView(discord.ui.View):
                 embed.set_footer(text="Made with ❤️ by Muhammad Zaky")
                 
                 await interaction.response.send_message(embed=embed, view=DonateView(), ephemeral=True)
+            
+            elif action == "website":
+                # Show website features
+                class WebsiteView(discord.ui.View):
+                    def __init__(self):
+                        super().__init__(timeout=None)
+                        self.add_item(discord.ui.Button(
+                            label="🌐 Kunjungi Website",
+                            url="https://s.id/SONORAbot",
+                            style=discord.ButtonStyle.link
+                        ))
+                
+                embed = discord.Embed(
+                    title="🌐 SONORA Website",
+                    description=(
+                        "**Website resmi SONORA** dengan dashboard admin!\n\n"
+                        "📊 **Dashboard Features:**\n"
+                        "• Monitor semua server sekaligus\n"
+                        "• Kontrol playback dari browser\n"
+                        "• Real-time updates\n\n"
+                        "🎵 **Player Features:**\n"
+                        "• Album artwork HD\n"
+                        "• Synced lyrics\n"
+                        "• Queue management"
+                    ),
+                    color=discord.Color.from_rgb(123, 30, 60)
+                )
+                
+                await interaction.response.send_message(embed=embed, view=WebsiteView(), ephemeral=True)
+            
+            elif action == "help":
+                # Show help guide
+                class HelpView(discord.ui.View):
+                    def __init__(self):
+                        super().__init__(timeout=None)
+                        self.add_item(discord.ui.Button(
+                            label="📖 Dokumentasi",
+                            url="https://s.id/SONORAbotDOCS",
+                            style=discord.ButtonStyle.link
+                        ))
+                
+                embed = discord.Embed(
+                    title="❓ Panduan SONORA",
+                    description=(
+                        "🎵 **Memutar Musik:**\n"
+                        "`/play <query/URL>` - Putar lagu\n\n"
+                        "⏯️ **Kontrol:**\n"
+                        "`/pause` `/resume` `/skip` `/stop`\n\n"
+                        "📋 **Queue:**\n"
+                        "`/queue` `/shuffle` `/clear` `/loop`\n\n"
+                        "🔊 **Audio:**\n"
+                        "`/volume` `/equalizer` `/lyrics`\n\n"
+                        "ℹ️ **Info:**\n"
+                        "`/website` `/donate` `/stats`"
+                    ),
+                    color=discord.Color.blue()
+                )
+                embed.set_footer(text="Gunakan /donate untuk support! 💖")
+                
+                await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=True)
         
         except Exception as e:
             logger.error(f"Menu action failed: {e}", exc_info=True)
