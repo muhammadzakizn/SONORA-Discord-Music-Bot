@@ -376,31 +376,23 @@ def api_control(guild_id: int, action: str):
                 if not guild:
                     return
                 
-                # Find a text channel with send permission
+                # BEST: Use same channel as player message (guaranteed to work!)
                 target_channel = None
                 
-                # Try to find a text channel in the same category as voice channel
-                if connection.channel and connection.channel.category:
+                if hasattr(bot, 'players') and guild_id in bot.players:
+                    player = bot.players[guild_id]
+                    if player.message and hasattr(player.message, 'channel'):
+                        target_channel = player.message.channel
+                        logger.debug(f"Using player message channel: #{target_channel.name}")
+                
+                # Fallback: try voice channel category text channel
+                if not target_channel and connection.channel and connection.channel.category:
                     for ch in guild.text_channels:
                         if ch.category == connection.channel.category:
                             perms = ch.permissions_for(guild.me)
                             if perms.send_messages:
                                 target_channel = ch
                                 break
-                
-                # Fallback: try system channel
-                if not target_channel and guild.system_channel:
-                    perms = guild.system_channel.permissions_for(guild.me)
-                    if perms.send_messages:
-                        target_channel = guild.system_channel
-                
-                # Fallback: any channel with permission
-                if not target_channel:
-                    for ch in guild.text_channels:
-                        perms = ch.permissions_for(guild.me)
-                        if perms.send_messages:
-                            target_channel = ch
-                            break
                 
                 if target_channel:
                     embed = discord.Embed(
@@ -412,13 +404,10 @@ def api_control(guild_id: int, action: str):
                     await target_channel.send(embed=embed, delete_after=30)
                     logger.info(f"✓ Notification sent to #{target_channel.name}")
                 else:
-                    # No channel with permission - log and note for API response
-                    logger.warning(f"⚠ No channel with send permission in {guild.name} - control notification skipped")
-                    # Store this for API response
-                    bot._last_notification_warning = f"No channel with send permission in {guild.name}"
+                    # No channel - just log, don't error
+                    logger.debug(f"No channel for notification in {guild.name}")
             except Exception as e:
-                logger.error(f"Failed to send notification: {e}")
-                bot._last_notification_warning = str(e)
+                logger.warning(f"Notification error: {e}")
         
         # Run notification in bot's event loop
         asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)
