@@ -148,11 +148,41 @@ export default function TermsOfServicePage() {
                         </p>
                     </Section>
 
-                    <Section title="8. Termination" isDark={isDark}>
+                    <Section title="8. Account Suspension and Bans" isDark={isDark}>
                         <p>
-                            We reserve the right to terminate or restrict access to the Bot for any user
-                            or server that violates these Terms of Service or engages in abusive behavior.
+                            We reserve the right to suspend or ban any user or server that violates these Terms of Service.
                         </p>
+                        <h3 className={`font-semibold mt-4 mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>8.1 Ban Reasons</h3>
+                        <ul>
+                            <li>Violation of Discord Terms of Service</li>
+                            <li>Abuse or exploitation of the Bot's functionality</li>
+                            <li>Harassment of other users or bot developers</li>
+                            <li>Spam or automated abuse</li>
+                            <li>Copyright infringement violations</li>
+                            <li>Distribution of malicious content</li>
+                        </ul>
+                        <h3 className={`font-semibold mt-4 mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>8.2 Ban Types</h3>
+                        <ul>
+                            <li><strong>Temporary Ban:</strong> Access restricted for specified duration (hours to months)</li>
+                            <li><strong>Permanent Ban:</strong> Permanent removal of access to the Bot</li>
+                            <li><strong>Server Ban:</strong> Entire server blocked from using the Bot</li>
+                        </ul>
+                        <h3 className={`font-semibold mt-4 mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>8.3 Appeal Process</h3>
+                        <p>
+                            Banned users may appeal their ban by contacting support at{' '}
+                            <a href="https://s.id/SONORAbotSUPPORT" target="_blank" rel="noopener noreferrer" className="text-[#7B1E3C] hover:underline">
+                                https://s.id/SONORAbotSUPPORT
+                            </a>. Appeals are reviewed within 7 business days.
+                        </p>
+                    </Section>
+
+                    <Section title="9. Support Ticket Policies" isDark={isDark}>
+                        <ul>
+                            <li><strong>Data Retention:</strong> Support tickets are automatically deleted 15 days after resolution</li>
+                            <li><strong>Follow-up:</strong> Users may add additional details to a ticket once after submission</li>
+                            <li><strong>Response Time:</strong> We aim to respond within 24-48 hours</li>
+                            <li><strong>Prohibited Content:</strong> Do not submit spam, illegal content, or abusive messages</li>
+                        </ul>
                     </Section>
 
                     <Section title="9. Contact Information" isDark={isDark}>

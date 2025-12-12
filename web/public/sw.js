@@ -1,193 +1,146 @@
-// SONORA Service Worker v3.4.0
-const SW_VERSION = '3.4.0';
-const CACHE_NAME = 'sonora-cache-v3';
-const OFFLINE_URL = '/offline.html';
+// SONORA Push Notification Service Worker
+// Custom sound and offline support
 
-// Assets to cache on install
-const PRECACHE_ASSETS = [
+const CACHE_NAME = 'sonora-v3.8.0';
+const NOTIFICATION_SOUND = '/notification-sound.mp3';
+
+// Files to cache for offline
+const urlsToCache = [
   '/',
-  '/offline.html',
-  '/logo.png',
   '/sonora-logo.png',
-  '/spotify.svg',
-  '/apple-music.svg',
-  '/youtube.svg',
+  '/manifest.json',
+  NOTIFICATION_SOUND,
 ];
 
-// Install event - cache critical assets
+// Install event - cache essential files
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing Service Worker v' + SW_VERSION);
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Precaching assets...');
-      return cache.addAll(PRECACHE_ASSETS);
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
   );
-  // DON'T skip waiting automatically - let the user control when to update
-  // self.skipWaiting();
 });
 
 // Activate event - clean old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating Service Worker v' + SW_VERSION);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
           .filter((name) => name !== CACHE_NAME)
-          .map((name) => {
-            console.log('[SW] Deleting old cache:', name);
-            return caches.delete(name);
-          })
+          .map((name) => caches.delete(name))
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  // Take control of all pages immediately
-  self.clients.claim();
 });
 
-// Message handler - for controlled updates
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[SW] Received SKIP_WAITING, activating new version...');
-    self.skipWaiting();
-  }
-});
-
-// Fetch event - network-first with cache fallback
+// Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // Skip non-GET requests
-  if (request.method !== 'GET') return;
-
-  // Skip external URLs - let browser handle them natively
-  // This fixes CSP issues with Discord CDN, Apple Music, etc.
-  if (url.origin !== self.location.origin) return;
-
-  // Skip API requests - always go to network
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) {
-    return;
-  }
-
-  // For navigation requests (HTML pages)
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Cache successful responses
-          if (response.ok) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // Network failed, try cache then offline page
-          return caches.match(request).then((cachedResponse) => {
-            return cachedResponse || caches.match(OFFLINE_URL);
-          });
-        })
-    );
-    return;
-  }
-
-  // For static assets - cache-first strategy
-  if (
-    url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|ico|woff|woff2)$/) ||
-    url.pathname.startsWith('/_next/static/')
-  ) {
-    event.respondWith(
-      caches.match(request).then((cachedResponse) => {
-        if (cachedResponse) {
-          // Return cached version, update in background
-          fetch(request).then((response) => {
-            if (response.ok) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(request, response);
-              });
-            }
-          });
-          return cachedResponse;
-        }
-        // Not in cache, fetch from network
-        return fetch(request).then((response) => {
-          if (response.ok) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        });
-      })
-    );
-    return;
-  }
-
-  // Default - network first
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
+    caches.match(event.request)
+      .then((response) => response || fetch(event.request))
+      .catch(() => {
+        // Offline fallback
+        if (event.request.destination === 'document') {
+          return caches.match('/');
         }
-        return response;
       })
-      .catch(() => caches.match(request))
   );
 });
 
-// Handle messages from the app
-self.addEventListener('message', (event) => {
-  if (event.data === 'skipWaiting') {
-    self.skipWaiting();
-  }
-});
-
-// Background sync for offline actions (future enhancement)
-self.addEventListener('sync', (event) => {
-  console.log('[SW] Background sync:', event.tag);
-});
-
-// Push notifications (future enhancement)
+// Push notification event
 self.addEventListener('push', (event) => {
+  let data = {
+    title: 'SONORA',
+    body: 'New notification',
+    icon: '/sonora-logo.png',
+    badge: '/sonora-logo.png',
+    tag: 'sonora-notification',
+    requireInteraction: false,
+    data: { url: '/' }
+  };
+
   if (event.data) {
-    const data = event.data.json();
-    const options = {
-      body: data.body,
-      icon: '/logo.png',
-      badge: '/logo.png',
-      vibrate: [100, 50, 100],
-      data: {
-        url: data.url || '/',
-      },
-    };
-    event.waitUntil(
-      self.registration.showNotification(data.title || 'SONORA', options)
-    );
+    try {
+      const payload = event.data.json();
+      data = { ...data, ...payload };
+    } catch (e) {
+      data.body = event.data.text();
+    }
   }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || '/sonora-logo.png',
+    badge: data.badge || '/sonora-logo.png',
+    image: data.image,
+    tag: data.tag || 'sonora-notification',
+    requireInteraction: data.requireInteraction || false,
+    data: data.data || { url: '/' },
+    actions: data.actions || [],
+    vibrate: [200, 100, 200],
+    silent: false,
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+      .then(() => {
+        // Play custom notification sound
+        return playNotificationSound();
+      })
+  );
 });
 
-// Notification click handler
+// Play custom notification sound
+async function playNotificationSound() {
+  try {
+    const clients = await self.clients.matchAll({ type: 'window' });
+    if (clients.length > 0) {
+      // Send message to client to play sound
+      clients[0].postMessage({
+        type: 'PLAY_NOTIFICATION_SOUND',
+        sound: NOTIFICATION_SOUND
+      });
+    }
+  } catch (e) {
+    console.warn('Could not play notification sound:', e);
+  }
+}
+
+// Notification click event
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
   const url = event.notification.data?.url || '/';
+
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then((clientList) => {
-      // Focus existing window or open new one
-      for (const client of clientList) {
-        if (client.url === url && 'focus' in client) {
-          return client.focus();
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Focus existing window if found
+        for (const client of clientList) {
+          if (client.url.includes(self.registration.scope) && 'focus' in client) {
+            client.focus();
+            client.postMessage({ type: 'NOTIFICATION_CLICKED', url });
+            return;
+          }
         }
-      }
-      return clients.openWindow(url);
-    })
+        // Otherwise open new window
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(url);
+        }
+      })
   );
+});
+
+// Notification close event
+self.addEventListener('notificationclose', (event) => {
+  // Analytics: track notification dismissed
+  console.log('Notification dismissed:', event.notification.tag);
+});
+
+// Message event - handle client messages
+self.addEventListener('message', (event) => {
+  if (event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

@@ -144,6 +144,27 @@ export default function PrivacyPolicyPage() {
                         <p>
                             Inactive data may be automatically purged after 12 months of no activity.
                         </p>
+
+                        <SubSection title="5.1 Support Ticket Retention Policy" isDark={isDark}>
+                            <div className={`p-4 rounded-xl border ${isDark ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-200'}`}>
+                                <p className="font-semibold text-rose-500 mb-2">⚠️ IMPORTANT NOTICE</p>
+                                <ul>
+                                    <li><strong>Maximum Retention:</strong> All support tickets and related data are automatically deleted <strong>15 days after resolution or closure</strong></li>
+                                    <li><strong>Immutable Policy:</strong> This is our maximum retention period and <strong>cannot be extended</strong> under any circumstances</li>
+                                    <li><strong>Accelerated Deletion:</strong> Users may request earlier deletion for privacy concerns</li>
+                                    <li><strong>Minimal Metadata:</strong> Only ticket code hash and deletion timestamp kept for 30 days for verification only</li>
+                                    <li><strong>No Personal Information:</strong> No personal data retained after deletion</li>
+                                </ul>
+                            </div>
+                        </SubSection>
+
+                        <SubSection title="5.2 Ban Records Retention" isDark={isDark}>
+                            <ul>
+                                <li><strong>Active Bans:</strong> Ban records maintained while ban is active</li>
+                                <li><strong>Expired Bans:</strong> Automatically deleted 90 days after ban expiration</li>
+                                <li><strong>Appeal Records:</strong> Kept for 30 days after appeal resolution</li>
+                            </ul>
+                        </SubSection>
                     </Section>
 
                     <Section title="6. Your Rights" isDark={isDark}>
