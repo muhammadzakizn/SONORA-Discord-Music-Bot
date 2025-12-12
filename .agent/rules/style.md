@@ -9,5 +9,7 @@ trigger: always_on
  - Folder docs/changelog/bot untuk update sistem bot (Kamu cukup edit dan tambahkan update di bawahnya jangan pernah menghapus riwayat apapun updatenya itu cukup tambahkan aja dibawahnya klu ada update baru)
  - Folder docs/changelog/web untuk update WEB (Kamu cukup edit dan tambahkan update di bawahnya jangan pernah menghapus riwayat apapun updatenya itu cukup tambahkan aja dibawahnya klu ada update baru)
 - Folder docs/changelog/overallversion untuk rangkuman dan seluruh update (Kamu cukup edit dan tambahkan update di bawahnya jangan pernah menghapus riwayat apapun updatenya itu cukup tambahkan aja dibawahnya klu ada update baru)
+  - Dan update dan lengkapi changelog di bagian web/changelog ya! 
+ - Jadi pastikan nomor versi selalu berurutan dan masuk akal.
 
 3. Jika semuanya telah selesai maka, selalu git push ke github. tapi selain dari folder .agent/rules ya. dan jangan hilangkan folder .agent / rules di local/laptopku ini.

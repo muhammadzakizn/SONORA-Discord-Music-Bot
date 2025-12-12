@@ -29,10 +29,17 @@ import {
     Accessibility,
     Lock,
     Menu,
+    Info,
+    Download,
+    Sparkles,
+    ExternalLink,
 } from "lucide-react";
 import { useSession, getAvatarUrl, DiscordUser } from "@/contexts/SessionContext";
 import { useSettings, LANGUAGES, Language } from "@/contexts/SettingsContext";
 import { cn } from "@/lib/utils";
+import { WEB_VERSION } from "@/constants/version";
+import { useUpdate } from "@/contexts/UpdateContext";
+import { UpdateDialog } from "@/components/UpdateDialog";
 
 // SONORA Brand Colors
 const BRAND = {
@@ -887,6 +894,22 @@ function SettingsMenu({
                         />
                     </div>
                 </div>
+
+                {/* About Section */}
+                <div>
+                    <label
+                        className={cn(
+                            "flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-2 px-1",
+                            isDark ? "text-white/50" : "text-gray-400"
+                        )}
+                    >
+                        <Info className="w-3.5 h-3.5" />
+                        About
+                    </label>
+                    <div className="space-y-2">
+                        <AboutButton isDark={isDark} />
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -934,5 +957,71 @@ function ToggleOption({
                 />
             </div>
         </button>
+    );
+}
+
+// About Button with Version and Update
+function AboutButton({ isDark }: { isDark: boolean }) {
+    const { updateAvailable, currentVersion, newVersion, postponeCount } = useUpdate();
+    const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+
+    return (
+        <>
+            <button
+                onClick={() => setShowUpdateDialog(true)}
+                className={cn(
+                    "w-full p-3 rounded-xl flex items-center gap-3 transition-all text-left",
+                    isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"
+                )}
+            >
+                <div className="relative">
+                    <Sparkles className={cn("w-4 h-4", isDark ? "text-purple-400" : "text-purple-500")} />
+                    {updateAvailable && (
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className={cn("text-sm font-medium", isDark ? "text-white" : "text-gray-900")}>
+                        SONORA v{currentVersion}
+                    </p>
+                    <p className={cn("text-xs truncate", isDark ? "text-white/50" : "text-gray-500")}>
+                        {updateAvailable
+                            ? `Update v${newVersion} tersedia!`
+                            : "Aplikasi terbaru"
+                        }
+                    </p>
+                </div>
+                {updateAvailable && (
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-green-500/20 text-green-500 text-xs font-medium">
+                        <Download className="w-3 h-3" />
+                        Update
+                    </div>
+                )}
+            </button>
+
+            <Link
+                href="/explore/changelog"
+                className={cn(
+                    "w-full p-3 rounded-xl flex items-center gap-3 transition-all",
+                    isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"
+                )}
+            >
+                <FileText className={cn("w-4 h-4", isDark ? "text-white/50" : "text-gray-400")} />
+                <div className="flex-1 min-w-0">
+                    <p className={cn("text-sm font-medium", isDark ? "text-white" : "text-gray-900")}>
+                        Changelog
+                    </p>
+                    <p className={cn("text-xs truncate", isDark ? "text-white/50" : "text-gray-500")}>
+                        Lihat riwayat perubahan
+                    </p>
+                </div>
+                <ExternalLink className={cn("w-4 h-4", isDark ? "text-white/30" : "text-gray-300")} />
+            </Link>
+
+            <UpdateDialog
+                isOpen={showUpdateDialog && updateAvailable}
+                onClose={() => setShowUpdateDialog(false)}
+            />
+        </>
     );
 }

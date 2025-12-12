@@ -1,5 +1,6 @@
-// SONORA Service Worker v2.0.0
-const CACHE_NAME = 'sonora-cache-v2';
+// SONORA Service Worker v3.4.0
+const SW_VERSION = '3.4.0';
+const CACHE_NAME = 'sonora-cache-v3';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache on install
@@ -15,20 +16,20 @@ const PRECACHE_ASSETS = [
 
 // Install event - cache critical assets
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing Service Worker...');
+  console.log('[SW] Installing Service Worker v' + SW_VERSION);
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[SW] Precaching assets...');
       return cache.addAll(PRECACHE_ASSETS);
     })
   );
-  // Activate immediately
-  self.skipWaiting();
+  // DON'T skip waiting automatically - let the user control when to update
+  // self.skipWaiting();
 });
 
 // Activate event - clean old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating Service Worker...');
+  console.log('[SW] Activating Service Worker v' + SW_VERSION);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -43,6 +44,14 @@ self.addEventListener('activate', (event) => {
   );
   // Take control of all pages immediately
   self.clients.claim();
+});
+
+// Message handler - for controlled updates
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[SW] Received SKIP_WAITING, activating new version...');
+    self.skipWaiting();
+  }
 });
 
 // Fetch event - network-first with cache fallback

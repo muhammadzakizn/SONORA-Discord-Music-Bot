@@ -1,0 +1,170 @@
+/**
+ * Version and Changelog Constants for SONORA Web Dashboard
+ */
+
+export const WEB_VERSION = "3.4.0";
+export const BOT_VERSION = "3.4.0";
+
+export interface ChangelogEntry {
+  version: string;
+  date: string;
+  title: string;
+  highlights: string[];
+  changes: {
+    category: string;
+    items: string[];
+  }[];
+}
+
+export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.4.0",
+    date: "2025-12-12",
+    title: "Dashboard Controls & Donate Features",
+    highlights: [
+      "Full dashboard control integration with Discord bot",
+      "Donate, Website, Help commands and menu options",
+      "Auto-disconnect after queue empty",
+      "CSP fixes for CDN images"
+    ],
+    changes: [
+      {
+        category: "New Features",
+        items: [
+          "Added /donate, /website, /help slash commands",
+          "Added Donate, Website, Help options to Menu Kontrol",
+          "Auto-disconnect after 5 seconds when queue empty",
+          "Vote & Rate button with Top.gg link",
+          "Queue remove/move notifications from dashboard"
+        ]
+      },
+      {
+        category: "Dashboard Improvements",
+        items: [
+          "Stop action now clears queue and disconnects (like /stop)",
+          "Fixed Content Security Policy for external images",
+          "Service Worker now skips external URLs",
+          "Dashboard correctly shows idle state when not playing",
+          "Server icon fallback for broken images"
+        ]
+      },
+      {
+        category: "Bug Fixes",
+        items: [
+          "Fixed notification sending to player message channel",
+          "Fixed progress bar sync issues",
+          "Fixed 403 Forbidden errors for dashboard notifications"
+        ]
+      }
+    ]
+  },
+  {
+    version: "3.3.0",
+    date: "2025-12-11",
+    title: "YouTube Music & Track Verification",
+    highlights: [
+      "Force YouTube Music downloads for better audio",
+      "Track verification with fuzzy matching",
+      "Cookie support for all platforms"
+    ],
+    changes: [
+      {
+        category: "Audio Quality",
+        items: [
+          "All Spotify/YouTube Music tracks now download from music.youtube.com",
+          "Track verification with metadata matching",
+          "3-attempt retry logic for failed downloads"
+        ]
+      },
+      {
+        category: "Improvements",
+        items: [
+          "Cookie integration for Spotify, Apple Music, YouTube",
+          "Improved download reliability",
+          "Better error messages"
+        ]
+      }
+    ]
+  },
+  {
+    version: "3.2.0",
+    date: "2025-12-10",
+    title: "Media Player Embed Cleanup",
+    highlights: [
+      "Cleaner now playing embed",
+      "Fixed Requested by attribution",
+      "Removed unnecessary fields"
+    ],
+    changes: [
+      {
+        category: "UI Improvements",
+        items: [
+          "Removed music emoji from NOW PLAYING title",
+          "Removed album name and source from embed",
+          "Added spacing for live lyrics",
+          "Requested by now shows clickable mention"
+        ]
+      }
+    ]
+  },
+  {
+    version: "3.1.0",
+    date: "2025-12-09",
+    title: "Dashboard Integration",
+    highlights: [
+      "Full Next.js dashboard integration",
+      "Real-time console and controls",
+      "Liquid Glass UI design"
+    ],
+    changes: [
+      {
+        category: "Dashboard",
+        items: [
+          "New Next.js dashboard replaces old Flask UI",
+          "Real-time bot console",
+          "Guild controls (pause, resume, skip, stop)",
+          "Queue management from browser"
+        ]
+      },
+      {
+        category: "Design",
+        items: [
+          "Liquid Glass UI standard",
+          "Dark/Light mode support",
+          "Responsive design for all devices"
+        ]
+      }
+    ]
+  },
+  {
+    version: "3.0.0",
+    date: "2025-12-08",
+    title: "Initial Dashboard Release",
+    highlights: [
+      "Web dashboard for bot management",
+      "Discord OAuth login",
+      "Multi-server support"
+    ],
+    changes: [
+      {
+        category: "Core Features",
+        items: [
+          "Web-based admin dashboard",
+          "Discord OAuth2 authentication",
+          "Multi-guild management",
+          "System health monitoring"
+        ]
+      }
+    ]
+  }
+];
+
+// Get latest version
+export const getLatestVersion = () => CHANGELOG[0].version;
+
+// Check if version is latest
+export const isLatestVersion = (version: string) => version === getLatestVersion();
+
+// Get changelog for specific version
+export const getVersionChangelog = (version: string) => 
+  CHANGELOG.find(c => c.version === version);

@@ -4,6 +4,7 @@ import "./globals.css";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { BotStatusProvider } from "@/contexts/BotStatusProvider";
+import { UpdateProvider } from "@/contexts/UpdateContext";
 import NavLiquidGlass from "@/components/NavLiquidGlass";
 import PageTransition from "@/components/PageTransition";
 import BotStatusBanner from "@/components/BotStatusBanner";
@@ -117,26 +118,28 @@ export default function RootLayout({
       >
         <SettingsProvider>
           <SessionProvider>
-            <BotStatusProvider>
-              {/* Bot offline banner */}
-              <BotStatusBanner />
+            <UpdateProvider>
+              <BotStatusProvider>
+                {/* Bot offline banner */}
+                <BotStatusBanner />
 
-              {/* Skip to main content link for accessibility */}
-              <a
-                href="#main-content"
-                className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-purple-600 focus:text-white focus:rounded-lg"
-              >
-                Skip to main content
-              </a>
+                {/* Skip to main content link for accessibility */}
+                <a
+                  href="#main-content"
+                  className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-purple-600 focus:text-white focus:rounded-lg"
+                >
+                  Skip to main content
+                </a>
 
-              <main id="main-content">
-                <PageTransition>
-                  {children}
-                </PageTransition>
-              </main>
+                <main id="main-content">
+                  <PageTransition>
+                    {children}
+                  </PageTransition>
+                </main>
 
-              <NavLiquidGlass />
-            </BotStatusProvider>
+                <NavLiquidGlass />
+              </BotStatusProvider>
+            </UpdateProvider>
           </SessionProvider>
         </SettingsProvider>
       </body>
