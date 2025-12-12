@@ -109,12 +109,12 @@ class WelcomeView(ui.View):
         ))
         self.add_item(ui.Button(
             label="📜 Terms of Service",
-            url="https://s.id/SONORAbot/terms",
+            url="https://s.id/SONORAbotTERMS",
             style=discord.ButtonStyle.link
         ))
         self.add_item(ui.Button(
             label="🔒 Privacy Policy",
-            url="https://s.id/SONORAbot/privacy",
+            url="https://s.id/SONORAbotPRIVACY",
             style=discord.ButtonStyle.link
         ))
     
