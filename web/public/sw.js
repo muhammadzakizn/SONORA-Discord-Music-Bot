@@ -53,6 +53,10 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (request.method !== 'GET') return;
 
+  // Skip external URLs - let browser handle them natively
+  // This fixes CSP issues with Discord CDN, Apple Music, etc.
+  if (url.origin !== self.location.origin) return;
+
   // Skip API requests - always go to network
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) {
     return;
