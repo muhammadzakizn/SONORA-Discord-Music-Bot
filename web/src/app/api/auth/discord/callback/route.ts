@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     try {
         // Exchange code for access token
-        const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || '1443855259536461928';
+        const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || process.env.DISCORD_CLIENT_ID || '1448899538499928137';
         const clientSecret = process.env.DISCORD_CLIENT_SECRET;
         
         // Use NEXT_PUBLIC_APP_URL for the redirect URI (for server deployment with public domain)
@@ -110,10 +110,10 @@ export async function GET(request: NextRequest) {
         };
 
         // Create response - redirect based on environment
-        // For server deployment: use verification flow with DM code
+        // For server deployment: use verification flow with DM code (stay on login page, switch to verify mode)
         // For Vercel (cloud): skip verification (no access to local bot)
         const isVercelDeployment = process.env.VERCEL === '1';
-        const redirectPath = isVercelDeployment ? '/admin' : '/verify';
+        const redirectPath = isVercelDeployment ? '/admin' : '/login?verify=true';
         const response = NextResponse.redirect(new URL(redirectPath, appUrl));
 
         // Set session cookie (readable by client-side for session context)

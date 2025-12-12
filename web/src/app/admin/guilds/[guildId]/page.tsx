@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,17 +17,18 @@ import {
     VolumeX,
     ListMusic,
     Clock,
-    TrendingUp,
     Settings,
-    ExternalLink,
     RefreshCw,
     Crown,
     Shield,
-    Hash,
+    Trash2,
+    GripVertical,
+    ChevronUp,
+    ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
 import { useSession } from "@/contexts/SessionContext";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface GuildDetail {
     id: number;
@@ -62,14 +63,25 @@ function formatDuration(seconds: number): string {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 export default function GuildDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const { managedGuilds } = useSession();
+    const { managedGuilds, user } = useSession();
+    const { isDark } = useSettings();
     const [guild, setGuild] = useState<GuildDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isControlling, setIsControlling] = useState(false);
+    const [actionMessage, setActionMessage] = useState<string | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // For smooth progress bar animation
+    const [displayProgress, setDisplayProgress] = useState(0);
+    const progressRef = useRef<number>(0);
+    const animationRef = useRef<number | undefined>(undefined);
+    const lastUpdateRef = useRef<number>(Date.now());
 
     const guildId = params.guildId as string;
 
@@ -77,43 +89,156 @@ export default function GuildDetailPage() {
     const managedGuild = managedGuilds?.find(g => g.id === guildId);
     const isManaged = !!managedGuild;
     const userRole = managedGuild?.owner ? "owner" : (managedGuild?.permissions && (managedGuild.permissions & 0x8) === 0x8) ? "admin" : null;
+    const username = user?.username || 'Admin';
 
-    const fetchGuild = async () => {
+    const fetchGuild = useCallback(async () => {
         try {
-            const response = await fetch(`http://localhost:5000/api/guild/${guildId}`);
-            if (!response.ok) throw new Error("Failed to fetch");
+            const response = await fetch(`${API_BASE}/api/guild/${guildId}`);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || "Failed to fetch");
+            }
             const data = await response.json();
             setGuild(data);
             setError(null);
-        } catch (err) {
-            setError("Failed to load server details");
+
+            // Update progress reference
+            if (data.current_track) {
+                progressRef.current = (data.current_track.current_time / data.current_track.duration) * 100;
+                lastUpdateRef.current = Date.now();
+            }
+        } catch (err: any) {
+            setError(err.message || "Failed to load server details");
         } finally {
             setLoading(false);
         }
-    };
+    }, [guildId]);
+
+    // Smooth progress bar animation
+    useEffect(() => {
+        const animate = () => {
+            if (guild?.current_track && !guild.current_track.is_paused) {
+                const elapsed = (Date.now() - lastUpdateRef.current) / 1000;
+                const additionalProgress = (elapsed / guild.current_track.duration) * 100;
+                const newProgress = Math.min(progressRef.current + additionalProgress, 100);
+                setDisplayProgress(newProgress);
+            }
+            animationRef.current = requestAnimationFrame(animate);
+        };
+
+        animationRef.current = requestAnimationFrame(animate);
+        return () => {
+            if (animationRef.current) {
+                cancelAnimationFrame(animationRef.current);
+            }
+        };
+    }, [guild?.current_track, guild?.current_track?.is_paused]);
 
     useEffect(() => {
         fetchGuild();
-        const interval = setInterval(fetchGuild, 5000);
+        // Polling every 3 seconds
+        const interval = setInterval(fetchGuild, 3000);
         return () => clearInterval(interval);
-    }, [guildId]);
+    }, [fetchGuild]);
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchGuild();
+        setTimeout(() => setIsRefreshing(false), 500);
+    };
 
     const handleControl = async (action: string) => {
         if (!isManaged) return;
         setIsControlling(true);
+        setActionMessage(null);
+
         try {
-            await api.control(Number(guildId), action as "pause" | "resume" | "skip" | "stop");
-            await fetchGuild();
+            const response = await fetch(`${API_BASE}/api/control/${guildId}/${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                setActionMessage(`⚠️ ${data.error || 'Action failed'}`);
+            } else {
+                const actionLabels: Record<string, string> = {
+                    pause: '⏸️ Paused',
+                    resume: '▶️ Resumed',
+                    skip: '⏭️ Skipped',
+                    stop: '⏹️ Stopped'
+                };
+                setActionMessage(actionLabels[action] || '✓ Action completed');
+                await fetchGuild();
+            }
         } catch (err) {
-            console.error("Control failed:", err);
+            setActionMessage('❌ Connection error');
         }
-        setTimeout(() => setIsControlling(false), 300);
+
+        setTimeout(() => {
+            setIsControlling(false);
+            setTimeout(() => setActionMessage(null), 3000);
+        }, 300);
+    };
+
+    const handleQueueRemove = async (position: number) => {
+        if (!isManaged) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/api/queue/${guildId}/remove/${position}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+
+            if (response.ok) {
+                setActionMessage('🗑️ Track removed');
+                await fetchGuild();
+            } else {
+                const data = await response.json();
+                setActionMessage(`⚠️ ${data.error || 'Failed to remove'}`);
+            }
+        } catch (err) {
+            setActionMessage('❌ Failed to remove track');
+        }
+
+        setTimeout(() => setActionMessage(null), 3000);
+    };
+
+    const handleQueueMove = async (position: number, direction: 'up' | 'down') => {
+        if (!isManaged) return;
+        const newPosition = direction === 'up' ? position - 1 : position + 1;
+
+        if (newPosition < 1 || (guild && newPosition > guild.queue_length)) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/api/queue/${guildId}/move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    from_position: position,
+                    to_position: newPosition,
+                    username
+                })
+            });
+
+            if (response.ok) {
+                setActionMessage(`↕️ Moved to #${newPosition}`);
+                await fetchGuild();
+            }
+        } catch (err) {
+            setActionMessage('❌ Failed to move track');
+        }
+
+        setTimeout(() => setActionMessage(null), 3000);
     };
 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+                <div className="w-8 h-8 border-4 border-[#7B1E3C]/30 border-t-[#7B1E3C] rounded-full animate-spin" />
             </div>
         );
     }
@@ -121,21 +246,37 @@ export default function GuildDetailPage() {
     if (error || !guild) {
         return (
             <div className="text-center py-16">
-                <Server className="w-16 h-16 text-zinc-700 mx-auto mb-4" />
-                <p className="text-xl text-zinc-500">{error || "Server not found"}</p>
-                <Link
-                    href="/admin/guilds"
-                    className="inline-flex items-center gap-2 mt-4 text-purple-400 hover:text-purple-300"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to Servers
-                </Link>
+                <Server className={cn("w-16 h-16 mx-auto mb-4", isDark ? "text-zinc-700" : "text-gray-300")} />
+                <p className={cn("text-xl", isDark ? "text-zinc-500" : "text-gray-500")}>{error || "Server not found"}</p>
+                <p className={cn("text-sm mt-2", isDark ? "text-zinc-600" : "text-gray-400")}>
+                    Make sure the bot is running and connected to this server
+                </p>
+                <div className="flex items-center justify-center gap-4 mt-6">
+                    <button
+                        onClick={handleRefresh}
+                        className={cn(
+                            "px-4 py-2 rounded-xl flex items-center gap-2 transition-colors",
+                            isDark ? "bg-zinc-800 hover:bg-zinc-700 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-900"
+                        )}
+                    >
+                        <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+                        Retry
+                    </button>
+                    <Link
+                        href="/admin/guilds"
+                        className="inline-flex items-center gap-2 text-[#7B1E3C] hover:text-[#9B2E4C]"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        Back to Servers
+                    </Link>
+                </div>
             </div>
         );
     }
 
-    const progress = guild.current_track
-        ? (guild.current_track.current_time / guild.current_track.duration) * 100
+    // Calculate display time from smooth progress
+    const displayTime = guild.current_track
+        ? (displayProgress / 100) * guild.current_track.duration
         : 0;
 
     return (
@@ -143,7 +284,10 @@ export default function GuildDetailPage() {
             {/* Back Button */}
             <Link
                 href="/admin/guilds"
-                className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
+                className={cn(
+                    "inline-flex items-center gap-2 transition-colors",
+                    isDark ? "text-zinc-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
+                )}
             >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Servers
@@ -156,15 +300,24 @@ export default function GuildDetailPage() {
                         src={guild.icon}
                         alt={guild.name}
                         className="w-24 h-24 rounded-2xl object-cover"
+                        onError={(e) => {
+                            // Fallback if image fails to load
+                            e.currentTarget.style.display = 'none';
+                        }}
                     />
                 ) : (
-                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-500/20 to-cyan-500/20 flex items-center justify-center">
-                        <Server className="w-12 h-12 text-zinc-500" />
+                    <div className={cn(
+                        "w-24 h-24 rounded-2xl flex items-center justify-center",
+                        "bg-gradient-to-br from-[#7B1E3C]/20 to-[#C4314B]/20"
+                    )}>
+                        <Server className={cn("w-12 h-12", isDark ? "text-zinc-500" : "text-gray-400")} />
                     </div>
                 )}
                 <div className="flex-1">
                     <div className="flex items-center gap-3 flex-wrap">
-                        <h1 className="text-3xl font-bold">{guild.name}</h1>
+                        <h1 className={cn("text-3xl font-bold", isDark ? "text-white" : "text-gray-900")}>
+                            {guild.name}
+                        </h1>
                         {userRole === "owner" && (
                             <span className="px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-sm flex items-center gap-1">
                                 <Crown className="w-4 h-4" />
@@ -172,13 +325,16 @@ export default function GuildDetailPage() {
                             </span>
                         )}
                         {userRole === "admin" && (
-                            <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-sm flex items-center gap-1">
+                            <span className="px-3 py-1 rounded-full bg-[#7B1E3C]/20 text-[#C4314B] text-sm flex items-center gap-1">
                                 <Shield className="w-4 h-4" />
                                 Admin
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-6 mt-2 text-zinc-400">
+                    <div className={cn(
+                        "flex items-center gap-6 mt-2",
+                        isDark ? "text-zinc-400" : "text-gray-500"
+                    )}>
                         <span className="flex items-center gap-2">
                             <Users className="w-4 h-4" />
                             {guild.member_count?.toLocaleString()} members
@@ -192,54 +348,137 @@ export default function GuildDetailPage() {
                     </div>
                 </div>
 
-                {isManaged && (
-                    <Link
-                        href={`/admin/guilds/${guildId}/settings`}
-                        className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-colors flex items-center gap-2"
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleRefresh}
+                        className={cn(
+                            "p-3 rounded-xl transition-colors",
+                            isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-100 hover:bg-gray-200"
+                        )}
+                        title="Refresh"
                     >
-                        <Settings className="w-4 h-4" />
-                        Settings
-                    </Link>
-                )}
+                        <RefreshCw className={cn("w-5 h-5", isRefreshing && "animate-spin")} />
+                    </button>
+                    {isManaged && (
+                        <Link
+                            href={`/admin/guilds/${guildId}/settings`}
+                            className={cn(
+                                "px-4 py-2 rounded-xl transition-colors flex items-center gap-2",
+                                isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-100 hover:bg-gray-200"
+                            )}
+                        >
+                            <Settings className="w-4 h-4" />
+                            Settings
+                        </Link>
+                    )}
+                </div>
             </div>
+
+            {/* Action Message */}
+            <AnimatePresence>
+                {actionMessage && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className={cn(
+                            "p-4 rounded-xl border",
+                            actionMessage.includes('⚠️') || actionMessage.includes('❌')
+                                ? "bg-rose-500/20 border-rose-500/30 text-rose-400"
+                                : "bg-green-500/20 border-green-500/30 text-green-400"
+                        )}
+                    >
+                        {actionMessage}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <div className="grid lg:grid-cols-3 gap-6">
                 {/* Now Playing */}
-                <div className="lg:col-span-2 p-6 rounded-2xl bg-zinc-900 border border-zinc-800">
-                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Music className="w-5 h-5 text-purple-400" />
+                <div className={cn(
+                    "lg:col-span-2 p-6 rounded-2xl border",
+                    isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
+                )}>
+                    <h2 className={cn(
+                        "text-lg font-semibold mb-4 flex items-center gap-2",
+                        isDark ? "text-white" : "text-gray-900"
+                    )}>
+                        <Music className="w-5 h-5 text-[#7B1E3C]" />
                         Now Playing
+                        {guild.is_playing && (
+                            <span className="ml-auto flex items-center gap-1.5 text-sm text-green-400">
+                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                Live
+                            </span>
+                        )}
                     </h2>
 
                     {guild.current_track ? (
                         <div className="space-y-4">
                             <div className="flex items-center gap-4">
-                                <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center shrink-0">
+                                {/* Album Artwork - supports all formats including GIF */}
+                                {guild.current_track.artwork_url ? (
+                                    <img
+                                        src={guild.current_track.artwork_url}
+                                        alt={guild.current_track.title}
+                                        className="w-20 h-20 rounded-xl object-cover shrink-0"
+                                        onError={(e) => {
+                                            // Hide broken image, show fallback
+                                            e.currentTarget.style.display = 'none';
+                                            const fallback = e.currentTarget.nextElementSibling;
+                                            if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                                        }}
+                                    />
+                                ) : null}
+                                {/* Fallback for missing/broken artwork */}
+                                <div
+                                    className={cn(
+                                        "w-20 h-20 rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] items-center justify-center shrink-0",
+                                        guild.current_track.artwork_url ? "hidden" : "flex"
+                                    )}
+                                >
                                     <Music className="w-10 h-10 text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-xl font-semibold truncate">{guild.current_track.title}</p>
-                                    <p className="text-zinc-400 truncate">{guild.current_track.artist}</p>
+                                    <p className={cn(
+                                        "text-xl font-semibold truncate",
+                                        isDark ? "text-white" : "text-gray-900"
+                                    )}>
+                                        {guild.current_track.title}
+                                    </p>
+                                    <p className={cn(
+                                        "truncate",
+                                        isDark ? "text-zinc-400" : "text-gray-500"
+                                    )}>
+                                        {guild.current_track.artist}
+                                    </p>
                                     {guild.current_track.requested_by && (
-                                        <p className="text-sm text-zinc-500 mt-1">
+                                        <p className={cn(
+                                            "text-sm mt-1",
+                                            isDark ? "text-zinc-500" : "text-gray-400"
+                                        )}>
                                             Requested by {guild.current_track.requested_by}
                                         </p>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Progress Bar */}
+                            {/* Smooth Progress Bar */}
                             <div className="space-y-2">
-                                <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                                    <motion.div
-                                        className="h-full bg-gradient-to-r from-purple-500 to-cyan-500"
-                                        style={{ width: `${progress}%` }}
-                                        animate={{ width: `${progress}%` }}
-                                        transition={{ duration: 0.5 }}
+                                <div className={cn(
+                                    "h-2 rounded-full overflow-hidden",
+                                    isDark ? "bg-zinc-800" : "bg-gray-200"
+                                )}>
+                                    <div
+                                        className="h-full bg-gradient-to-r from-[#7B1E3C] to-[#C4314B] transition-[width] duration-100 ease-linear"
+                                        style={{ width: `${displayProgress}%` }}
                                     />
                                 </div>
-                                <div className="flex justify-between text-sm text-zinc-500">
-                                    <span>{formatDuration(guild.current_track.current_time)}</span>
+                                <div className={cn(
+                                    "flex justify-between text-sm tabular-nums",
+                                    isDark ? "text-zinc-500" : "text-gray-400"
+                                )}>
+                                    <span>{formatDuration(displayTime)}</span>
                                     <span>{formatDuration(guild.current_track.duration)}</span>
                                 </div>
                             </div>
@@ -250,46 +489,80 @@ export default function GuildDetailPage() {
                                     <button
                                         onClick={() => handleControl(guild.current_track?.is_paused ? "resume" : "pause")}
                                         disabled={isControlling}
-                                        className="p-4 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50"
+                                        className={cn(
+                                            "p-4 rounded-full transition-colors disabled:opacity-50",
+                                            isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
+                                        )}
+                                        title={guild.current_track?.is_paused ? "Resume" : "Pause"}
                                     >
                                         {guild.current_track?.is_paused ? (
-                                            <Play className="w-6 h-6" />
+                                            <Play className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
                                         ) : (
-                                            <Pause className="w-6 h-6" />
+                                            <Pause className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
                                         )}
                                     </button>
                                     <button
                                         onClick={() => handleControl("skip")}
                                         disabled={isControlling}
-                                        className="p-4 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50"
+                                        className={cn(
+                                            "p-4 rounded-full transition-colors disabled:opacity-50",
+                                            isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
+                                        )}
+                                        title="Skip"
                                     >
-                                        <SkipForward className="w-6 h-6" />
+                                        <SkipForward className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
                                     </button>
                                     <button
                                         onClick={() => handleControl("stop")}
                                         disabled={isControlling}
                                         className="p-4 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition-colors disabled:opacity-50"
+                                        title="Stop & Disconnect"
                                     >
                                         <Square className="w-6 h-6" />
                                     </button>
                                 </div>
                             )}
+
+                            {!isManaged && (
+                                <p className={cn(
+                                    "text-center text-sm pt-4",
+                                    isDark ? "text-zinc-500" : "text-gray-400"
+                                )}>
+                                    You need admin access to control playback
+                                </p>
+                            )}
                         </div>
                     ) : (
                         <div className="text-center py-12">
-                            <VolumeX className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                            <p className="text-zinc-500">No track currently playing</p>
+                            <VolumeX className={cn(
+                                "w-12 h-12 mx-auto mb-3",
+                                isDark ? "text-zinc-700" : "text-gray-300"
+                            )} />
+                            <p className={isDark ? "text-zinc-500" : "text-gray-500"}>
+                                No track currently playing
+                            </p>
                         </div>
                     )}
                 </div>
 
-                {/* Queue */}
-                <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800">
-                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                {/* Queue with Management */}
+                <div className={cn(
+                    "p-6 rounded-2xl border",
+                    isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
+                )}>
+                    <h2 className={cn(
+                        "text-lg font-semibold mb-4 flex items-center gap-2",
+                        isDark ? "text-white" : "text-gray-900"
+                    )}>
                         <ListMusic className="w-5 h-5 text-cyan-400" />
                         Queue
                         {guild.queue_length > 0 && (
-                            <span className="ml-auto text-sm text-zinc-500">{guild.queue_length} tracks</span>
+                            <span className={cn(
+                                "ml-auto px-2 py-0.5 rounded-full text-xs font-medium",
+                                "bg-cyan-500/20 text-cyan-400"
+                            )}>
+                                {guild.queue_length} tracks
+                            </span>
                         )}
                     </h2>
 
@@ -298,21 +571,87 @@ export default function GuildDetailPage() {
                             {guild.queue.map((track, i) => (
                                 <div
                                     key={i}
-                                    className="flex items-center gap-3 p-3 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 transition-colors"
+                                    className={cn(
+                                        "flex items-center gap-2 p-3 rounded-xl transition-colors group",
+                                        isDark ? "bg-zinc-800/50 hover:bg-zinc-800" : "bg-gray-100 hover:bg-gray-200"
+                                    )}
                                 >
-                                    <span className="text-sm text-zinc-500 w-6 text-center">{track.position}</span>
+                                    <span className={cn(
+                                        "text-sm w-6 text-center shrink-0",
+                                        isDark ? "text-zinc-500" : "text-gray-400"
+                                    )}>
+                                        {track.position}
+                                    </span>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{track.title}</p>
-                                        <p className="text-xs text-zinc-500 truncate">{track.artist}</p>
+                                        <p className={cn(
+                                            "text-sm font-medium truncate",
+                                            isDark ? "text-white" : "text-gray-900"
+                                        )}>
+                                            {track.title}
+                                        </p>
+                                        <p className={cn(
+                                            "text-xs truncate",
+                                            isDark ? "text-zinc-500" : "text-gray-400"
+                                        )}>
+                                            {track.artist}
+                                        </p>
                                     </div>
-                                    <span className="text-xs text-zinc-500">{formatDuration(track.duration)}</span>
+                                    <span className={cn(
+                                        "text-xs shrink-0",
+                                        isDark ? "text-zinc-500" : "text-gray-400"
+                                    )}>
+                                        {formatDuration(track.duration)}
+                                    </span>
+
+                                    {/* Queue controls - visible on hover */}
+                                    {isManaged && (
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => handleQueueMove(track.position, 'up')}
+                                                disabled={track.position === 1}
+                                                className={cn(
+                                                    "p-1 rounded-lg transition-colors disabled:opacity-30",
+                                                    isDark ? "hover:bg-zinc-700" : "hover:bg-gray-300"
+                                                )}
+                                                title="Move up"
+                                            >
+                                                <ChevronUp className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleQueueMove(track.position, 'down')}
+                                                disabled={track.position === guild.queue_length}
+                                                className={cn(
+                                                    "p-1 rounded-lg transition-colors disabled:opacity-30",
+                                                    isDark ? "hover:bg-zinc-700" : "hover:bg-gray-300"
+                                                )}
+                                                title="Move down"
+                                            >
+                                                <ChevronDown className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleQueueRemove(track.position)}
+                                                className="p-1 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors"
+                                                title="Remove"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     ) : (
                         <div className="text-center py-8">
-                            <ListMusic className="w-10 h-10 text-zinc-700 mx-auto mb-2" />
-                            <p className="text-sm text-zinc-500">Queue is empty</p>
+                            <ListMusic className={cn(
+                                "w-10 h-10 mx-auto mb-2",
+                                isDark ? "text-zinc-700" : "text-gray-300"
+                            )} />
+                            <p className={cn(
+                                "text-sm",
+                                isDark ? "text-zinc-500" : "text-gray-400"
+                            )}>
+                                Queue is empty
+                            </p>
                         </div>
                     )}
                 </div>
@@ -320,24 +659,39 @@ export default function GuildDetailPage() {
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-                    <p className="text-sm text-zinc-500">Queue Length</p>
-                    <p className="text-2xl font-bold text-purple-400">{guild.queue_length}</p>
+                <div className={cn(
+                    "p-4 rounded-xl border",
+                    isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
+                )}>
+                    <p className={cn("text-sm", isDark ? "text-zinc-500" : "text-gray-500")}>Queue Length</p>
+                    <p className="text-2xl font-bold text-[#7B1E3C]">{guild.queue_length}</p>
                 </div>
-                <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-                    <p className="text-sm text-zinc-500">Status</p>
-                    <p className="text-2xl font-bold text-green-400">
+                <div className={cn(
+                    "p-4 rounded-xl border",
+                    isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
+                )}>
+                    <p className={cn("text-sm", isDark ? "text-zinc-500" : "text-gray-500")}>Status</p>
+                    <p className={cn(
+                        "text-2xl font-bold",
+                        guild.is_playing ? "text-green-400" : isDark ? "text-zinc-500" : "text-gray-400"
+                    )}>
                         {guild.is_playing ? "Playing" : "Idle"}
                     </p>
                 </div>
-                <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-                    <p className="text-sm text-zinc-500">Voice Channel</p>
+                <div className={cn(
+                    "p-4 rounded-xl border",
+                    isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
+                )}>
+                    <p className={cn("text-sm", isDark ? "text-zinc-500" : "text-gray-500")}>Voice Channel</p>
                     <p className="text-2xl font-bold text-cyan-400 truncate">
                         {guild.voice_channel || "None"}
                     </p>
                 </div>
-                <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-                    <p className="text-sm text-zinc-500">Members</p>
+                <div className={cn(
+                    "p-4 rounded-xl border",
+                    isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
+                )}>
+                    <p className={cn("text-sm", isDark ? "text-zinc-500" : "text-gray-500")}>Members</p>
                     <p className="text-2xl font-bold text-yellow-400">{guild.member_count?.toLocaleString()}</p>
                 </div>
             </div>

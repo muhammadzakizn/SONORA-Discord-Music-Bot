@@ -79,7 +79,7 @@ const DiscordIcon = () => (
   </svg>
 );
 
-type LoginMode = "select" | "admin" | "developer" | "verify";
+type LoginMode = "select" | "admin" | "terms" | "developer" | "verify";
 type VerifyStatus = "idle" | "sending" | "sent" | "verifying" | "success" | "error";
 
 // Loading fallback for Suspense
@@ -225,6 +225,12 @@ function LoginPageContent() {
   const [isZooming, setIsZooming] = useState(false);
   const verifyInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Terms & Conditions state
+  const [termsScrolled, setTermsScrolled] = useState(false);
+  const [termsTimer, setTermsTimer] = useState(10);
+  const [termsCanContinue, setTermsCanContinue] = useState(false);
+  const termsRef = useRef<HTMLDivElement>(null);
+
   // Detect ?verify=true from OAuth callback and switch to verify mode
   useEffect(() => {
     if (searchParams.get('verify') === 'true' && isLoggedIn && user) {
@@ -249,6 +255,27 @@ function LoginPageContent() {
       setCurrentImageIndex((prev) => (prev + 1) % backgroundImages.length);
     }, 6000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Terms timer countdown
+  useEffect(() => {
+    if (loginMode === "terms" && termsTimer > 0 && !termsScrolled) {
+      const timer = setTimeout(() => setTermsTimer(termsTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+    if (termsTimer === 0 || termsScrolled) {
+      setTermsCanContinue(true);
+    }
+  }, [loginMode, termsTimer, termsScrolled]);
+
+  // Handle terms scroll
+  const handleTermsScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 20;
+    if (isAtBottom) {
+      setTermsScrolled(true);
+      setTermsCanContinue(true);
+    }
   }, []);
 
   // Handle Discord OAuth for Admin - Fixed redirect URI
@@ -396,6 +423,18 @@ function LoginPageContent() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {/* FULL SCREEN BLACK OVERLAY - appears during zoom */}
+      <AnimatePresence>
+        {isZooming && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="fixed inset-0 bg-black z-[100]"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Full-Screen Background Fadeshow */}
       <div className="absolute inset-0">
         <AnimatePresence mode="popLayout">
@@ -604,7 +643,12 @@ function LoginPageContent() {
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={handleDiscordLogin}
+                      onClick={() => {
+                        setTermsTimer(10);
+                        setTermsScrolled(false);
+                        setTermsCanContinue(false);
+                        setLoginMode("terms");
+                      }}
                       className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl 
                         bg-[#5865F2] hover:bg-[#4752C4] 
                         text-white font-semibold transition-colors
@@ -616,6 +660,101 @@ function LoginPageContent() {
 
                     <p className="mt-6 text-xs text-white/40 text-center">
                       {t('login.termsNotice')}
+                    </p>
+                  </motion.div>
+                )}
+
+                {loginMode === "terms" && (
+                  <motion.div
+                    key="terms"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    <button
+                      onClick={() => setLoginMode("admin")}
+                      className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors mb-4"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      {t('common.back')}
+                    </button>
+
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 rounded-xl bg-purple-500/30">
+                        <Shield className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white">Terms & Conditions</h2>
+                        <p className="text-white/50 text-sm">Please read before continuing</p>
+                      </div>
+                    </div>
+
+                    {/* Scrollable Terms Content */}
+                    <div
+                      ref={termsRef}
+                      onScroll={handleTermsScroll}
+                      className="h-48 overflow-y-auto mb-4 p-4 rounded-xl bg-black/30 border border-white/10 text-sm text-white/70 space-y-3"
+                    >
+                      <h3 className="font-semibold text-white">📜 Terms of Service</h3>
+                      <p>By using SONORA Bot, you agree to the following terms:</p>
+
+                      <h4 className="font-medium text-white/90 mt-3">1. Usage</h4>
+                      <p>SONORA Bot is provided for personal, non-commercial use. You may not use this bot for any illegal activities.</p>
+
+                      <h4 className="font-medium text-white/90 mt-3">2. Privacy</h4>
+                      <p>We collect minimal data necessary for bot functionality, including your Discord ID and listening history. This data is stored securely and never shared with third parties.</p>
+
+                      <h4 className="font-medium text-white/90 mt-3">3. Content</h4>
+                      <p>All music content is streamed from third-party services. We do not host any copyrighted material.</p>
+
+                      <h4 className="font-medium text-white/90 mt-3">4. Liability</h4>
+                      <p>SONORA Bot is provided "as is" without warranties. We are not responsible for any damages arising from use of this service.</p>
+
+                      <h4 className="font-medium text-white/90 mt-3">5. Changes</h4>
+                      <p>We reserve the right to modify these terms at any time. Continued use constitutes acceptance of modified terms.</p>
+
+                      <div className="pt-4 border-t border-white/10 mt-4">
+                        <p className="text-white/50 text-xs">Last updated: December 2024</p>
+                      </div>
+                    </div>
+
+                    {/* Progress indicator */}
+                    <div className="flex items-center justify-between mb-4 text-sm">
+                      <span className="text-white/50">
+                        {termsScrolled ? (
+                          <span className="text-green-400 flex items-center gap-1">
+                            <CheckCircle className="w-4 h-4" /> Read complete
+                          </span>
+                        ) : (
+                          <span>Scroll to bottom or wait {termsTimer}s</span>
+                        )}
+                      </span>
+                      {!termsCanContinue && (
+                        <span className="text-purple-400 font-mono">{termsTimer}s</span>
+                      )}
+                    </div>
+
+                    {/* Continue Button */}
+                    <motion.button
+                      whileHover={termsCanContinue ? { scale: 1.02 } : {}}
+                      whileTap={termsCanContinue ? { scale: 0.98 } : {}}
+                      onClick={termsCanContinue ? handleDiscordLogin : undefined}
+                      disabled={!termsCanContinue}
+                      className={cn(
+                        "w-full flex items-center justify-center gap-3 p-4 rounded-2xl font-semibold transition-all",
+                        termsCanContinue
+                          ? "bg-[#5865F2] hover:bg-[#4752C4] text-white shadow-[0_4px_24px_rgba(88,101,242,0.5)] cursor-pointer"
+                          : "bg-white/10 text-white/40 cursor-not-allowed"
+                      )}
+                    >
+                      <DiscordIcon />
+                      {termsCanContinue ? "Continue to Discord" : "Please read the terms"}
+                    </motion.button>
+
+                    <p className="mt-4 text-xs text-white/40 text-center">
+                      By continuing, you agree to our Terms & Privacy Policy
                     </p>
                   </motion.div>
                 )}

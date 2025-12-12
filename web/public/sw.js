@@ -1,5 +1,5 @@
-// SONORA Service Worker v1.0.0
-const CACHE_NAME = 'sonora-cache-v1';
+// SONORA Service Worker v2.0.0
+const CACHE_NAME = 'sonora-cache-v2';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache on install

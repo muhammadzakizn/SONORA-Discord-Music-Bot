@@ -233,8 +233,143 @@ class MusicBot(commands.Bot):
         
         @self.event
         async def on_guild_join(guild: discord.Guild):
-            """Called when bot joins a guild"""
+            """Called when bot joins a guild - sends welcome message with permission check"""
             logger.info(f"Joined guild: {guild.name} (ID: {guild.id})")
+            
+            # Find a channel to send welcome message
+            target_channel = None
+            permission_issues = []
+            accessible_text_channels = 0
+            accessible_voice_channels = 0
+            
+            # Check all text channels
+            for channel in guild.text_channels:
+                perms = channel.permissions_for(guild.me)
+                if perms.send_messages and perms.embed_links:
+                    accessible_text_channels += 1
+                    if target_channel is None:
+                        target_channel = channel
+            
+            # Check all voice channels
+            for channel in guild.voice_channels:
+                perms = channel.permissions_for(guild.me)
+                if perms.connect and perms.speak:
+                    accessible_voice_channels += 1
+            
+            # Check for permission issues
+            bot_perms = guild.me.guild_permissions
+            
+            # Voice permissions
+            if not bot_perms.connect:
+                permission_issues.append("❌ **Connect** - Cannot join voice channels")
+            if not bot_perms.speak:
+                permission_issues.append("❌ **Speak** - Cannot play audio in voice channels")
+            if not bot_perms.use_voice_activation:
+                permission_issues.append("⚠️ **Use Voice Activity** - May affect audio quality")
+            
+            # Text channel permissions  
+            if not bot_perms.send_messages:
+                permission_issues.append("❌ **Send Messages** - Cannot send messages")
+            if not bot_perms.embed_links:
+                permission_issues.append("⚠️ **Embed Links** - Cannot show rich embeds")
+            if not bot_perms.add_reactions:
+                permission_issues.append("⚠️ **Add Reactions** - Cannot add button reactions")
+            if not bot_perms.use_application_commands:
+                permission_issues.append("❌ **Use Slash Commands** - Cannot use /commands")
+            
+            # Additional checks
+            if accessible_voice_channels == 0:
+                permission_issues.append("❌ **No Voice Access** - Cannot access any voice channel")
+            if accessible_text_channels == 0:
+                permission_issues.append("❌ **No Text Access** - Cannot access any text channel")
+            
+            # Build welcome embed
+            embed = discord.Embed(
+                title="🎵 Terima kasih telah mengundang SONORA!",
+                description="Bot musik Discord dengan fitur lengkap untuk server Anda.",
+                color=0x7B1E3C  # SONORA maroon color
+            )
+            
+            # Quick start guide
+            embed.add_field(
+                name="🚀 Cara Menggunakan",
+                value=(
+                    "1. Join voice channel\n"
+                    "2. Ketik `/play <judul lagu atau link>`\n"
+                    "3. Nikmati musiknya! 🎧"
+                ),
+                inline=False
+            )
+            
+            # Common commands
+            embed.add_field(
+                name="📝 Perintah Utama",
+                value=(
+                    "`/play` - Putar lagu\n"
+                    "`/pause` / `/resume` - Pause/Resume\n"
+                    "`/skip` - Skip lagu\n"
+                    "`/queue` - Lihat antrian\n"
+                    "`/lyrics` - Lihat lirik"
+                ),
+                inline=True
+            )
+            
+            embed.add_field(
+                name="🎛️ Kontrol Lainnya",
+                value=(
+                    "`/volume` - Atur volume\n"
+                    "`/shuffle` - Acak antrian\n"
+                    "`/stop` - Berhenti\n"
+                    "`/stats` - Statistik\n"
+                    "`/history` - Riwayat"
+                ),
+                inline=True
+            )
+            
+            # Permission warnings if any
+            if permission_issues:
+                warnings_text = "\n".join(permission_issues[:5])  # Max 5 issues
+                if len(permission_issues) > 5:
+                    warnings_text += f"\n... dan {len(permission_issues) - 5} masalah lainnya"
+                
+                embed.add_field(
+                    name="⚠️ Perlu Pengaturan",
+                    value=warnings_text,
+                    inline=False
+                )
+                embed.add_field(
+                    name="💡 Solusi",
+                    value="Buka **Server Settings → Roles → SONORA** dan aktifkan permission yang diperlukan.",
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name="✅ Status",
+                    value=f"Bot siap digunakan! Akses: {accessible_voice_channels} voice channel, {accessible_text_channels} text channel",
+                    inline=False
+                )
+            
+            # Info link
+            embed.add_field(
+                name="📖 Informasi Lengkap",
+                value="[**s.id/SONORAbot**](https://s.id/SONORAbot)",
+                inline=False
+            )
+            
+            embed.set_footer(text="SONORA Music Bot • Dibuat dengan ❤️")
+            embed.set_thumbnail(url=self.user.display_avatar.url if self.user.avatar else None)
+            
+            # Send welcome message
+            if target_channel:
+                try:
+                    await target_channel.send(embed=embed)
+                    logger.info(f"Sent welcome message to {target_channel.name} in {guild.name}")
+                except discord.Forbidden:
+                    logger.warning(f"Cannot send welcome message to {guild.name} - forbidden")
+                except Exception as e:
+                    logger.error(f"Failed to send welcome message: {e}")
+            else:
+                logger.warning(f"No accessible channel to send welcome message in {guild.name}")
         
         @self.event
         async def on_guild_remove(guild: discord.Guild):

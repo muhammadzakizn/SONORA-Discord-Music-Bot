@@ -47,138 +47,183 @@ function Sidebar({
   isOpen,
   onClose,
   isDark,
+  isMobile,
 }: {
   isOpen: boolean;
   onClose: () => void;
   isDark: boolean;
+  isMobile: boolean;
 }) {
   const pathname = usePathname();
   const { user, managedGuilds } = useSession();
   const { t } = useSettings();
 
-  return (
-    <motion.aside
-      initial={false}
-      animate={{
-        width: isOpen ? SIDEBAR_WIDTH : 0,
-        marginLeft: isOpen ? 12 : 0,
-        marginTop: isOpen ? 12 : 0,
-        marginBottom: isOpen ? 12 : 0,
-        opacity: isOpen ? 1 : 0,
-      }}
-      transition={{ type: "spring", damping: 25, stiffness: 300 }}
-      className={cn(
-        "flex flex-col overflow-hidden shrink-0",
-        // Liquid Glass Frosted Effect
-        "backdrop-blur-2xl rounded-2xl",
-        isDark
-          ? "bg-zinc-900/70 border border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
-          : "bg-white/70 border border-black/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.15)]"
-      )}
-      style={{ height: isOpen ? 'calc(100% - 24px)' : '100%' }}
-    >
-      <div style={{ width: SIDEBAR_WIDTH }} className="flex flex-col h-full">
-        {/* Header */}
-        <div className={cn(
-          "flex items-center justify-between px-4 py-3 border-b shrink-0",
-          isDark ? "border-white/[0.08]" : "border-black/[0.06]"
-        )}>
-          <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/sonora-logo.png"
-              alt="SONORA"
-              width={100}
-              height={32}
-              className="h-7 w-auto"
-            />
-          </Link>
-        </div>
+  const handleNavClick = () => {
+    // Close sidebar on mobile when nav item clicked
+    if (isMobile) {
+      onClose();
+    }
+  };
 
-        {/* User Info */}
-        {user && (
+  return (
+    <>
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isMobile && isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar */}
+      <motion.aside
+        initial={false}
+        animate={{
+          x: isOpen ? 0 : isMobile ? -SIDEBAR_WIDTH - 20 : 0,
+          width: isMobile ? SIDEBAR_WIDTH : (isOpen ? SIDEBAR_WIDTH : 0),
+          marginLeft: !isMobile && isOpen ? 12 : 0,
+          marginTop: !isMobile && isOpen ? 12 : 0,
+          marginBottom: !isMobile && isOpen ? 12 : 0,
+          opacity: isOpen ? 1 : (isMobile ? 1 : 0),
+        }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        className={cn(
+          "flex flex-col overflow-hidden shrink-0",
+          // Mobile: fixed floating
+          isMobile && "fixed left-3 top-3 bottom-3 z-50",
+          // Liquid Glass Frosted Effect
+          "backdrop-blur-2xl rounded-2xl",
+          isDark
+            ? "bg-zinc-900/90 border border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+            : "bg-white/90 border border-black/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.15)]"
+        )}
+        style={{
+          height: isMobile ? 'calc(100vh - 24px)' : (isOpen ? 'calc(100% - 24px)' : '100%'),
+          width: isMobile ? SIDEBAR_WIDTH : undefined
+        }}
+      >
+        <div style={{ width: SIDEBAR_WIDTH }} className="flex flex-col h-full">
+          {/* Header */}
           <div className={cn(
-            "p-3 border-b shrink-0",
+            "flex items-center justify-between px-4 py-3 border-b shrink-0",
             isDark ? "border-white/[0.08]" : "border-black/[0.06]"
           )}>
-            <div className={cn(
-              "flex items-center gap-3 p-2 rounded-xl",
-              isDark ? "bg-white/[0.05]" : "bg-black/[0.03]"
-            )}>
+            <Link href="/" className="flex items-center gap-2" onClick={handleNavClick}>
               <Image
-                src={getAvatarUrl(user)}
-                alt={user.username}
-                width={40}
-                height={40}
-                className="rounded-full"
+                src="/sonora-logo.png"
+                alt="SONORA"
+                width={100}
+                height={32}
+                className="h-7 w-auto"
               />
-              <div className="flex-1 min-w-0">
-                <p className={cn(
-                  "text-sm font-medium truncate",
-                  isDark ? "text-white" : "text-gray-900"
-                )}>{user.username}</p>
-                <p className={cn(
-                  "text-xs flex items-center gap-1",
-                  isDark ? "text-white/50" : "text-gray-500"
-                )}>
-                  <Shield className="w-3 h-3" />
-                  {managedGuilds?.length || 0} servers
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Navigation */}
-        <nav className="p-2 space-y-0.5 flex-1 overflow-y-auto">
-          <p className={cn(
-            "text-[10px] font-semibold uppercase tracking-wider px-3 py-2",
-            isDark ? "text-white/30" : "text-gray-400"
-          )}>
-            {t('admin.menu')}
-          </p>
-          {navItems.map((item) => {
-            const isActive = pathname === item.href ||
-              (item.href !== "/admin" && pathname?.startsWith(item.href));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
+            </Link>
+            {/* Close button for mobile */}
+            {isMobile && (
+              <button
+                onClick={onClose}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all text-sm",
-                  isActive
-                    ? "bg-[#7B1E3C] text-white"
-                    : isDark
-                      ? "text-white/60 hover:text-white hover:bg-white/[0.08]"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-black/[0.05]"
+                  "p-2 rounded-xl transition-colors",
+                  isDark ? "hover:bg-white/[0.1]" : "hover:bg-black/[0.05]"
                 )}
               >
-                <item.icon className={cn("w-5 h-5", isActive && "text-white")} />
-                <span>{t(item.labelKey)}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Footer */}
-        <div className={cn(
-          "p-2 border-t shrink-0",
-          isDark ? "border-white/[0.08]" : "border-black/[0.06]"
-        )}>
-          <Link
-            href="/"
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm",
-              isDark
-                ? "text-white/50 hover:text-white hover:bg-white/[0.08]"
-                : "text-gray-500 hover:text-gray-900 hover:bg-black/[0.05]"
+                <X className="w-5 h-5" />
+              </button>
             )}
-          >
-            <Home className="w-5 h-5" />
-            <span>{t('admin.backToHome')}</span>
-          </Link>
+          </div>
+
+          {/* User Info */}
+          {user && (
+            <div className={cn(
+              "p-3 border-b shrink-0",
+              isDark ? "border-white/[0.08]" : "border-black/[0.06]"
+            )}>
+              <div className={cn(
+                "flex items-center gap-3 p-2 rounded-xl",
+                isDark ? "bg-white/[0.05]" : "bg-black/[0.03]"
+              )}>
+                <Image
+                  src={getAvatarUrl(user)}
+                  alt={user.username}
+                  width={40}
+                  height={40}
+                  className="rounded-full"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className={cn(
+                    "text-sm font-medium truncate",
+                    isDark ? "text-white" : "text-gray-900"
+                  )}>{user.username}</p>
+                  <p className={cn(
+                    "text-xs flex items-center gap-1",
+                    isDark ? "text-white/50" : "text-gray-500"
+                  )}>
+                    <Shield className="w-3 h-3" />
+                    {managedGuilds?.length || 0} servers
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <nav className="p-2 space-y-0.5 flex-1 overflow-y-auto">
+            <p className={cn(
+              "text-[10px] font-semibold uppercase tracking-wider px-3 py-2",
+              isDark ? "text-white/30" : "text-gray-400"
+            )}>
+              {t('admin.menu')}
+            </p>
+            {navItems.map((item) => {
+              const isActive = pathname === item.href ||
+                (item.href !== "/admin" && pathname?.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all text-sm",
+                    isActive
+                      ? "bg-[#7B1E3C] text-white"
+                      : isDark
+                        ? "text-white/60 hover:text-white hover:bg-white/[0.08]"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-black/[0.05]"
+                  )}
+                >
+                  <item.icon className={cn("w-5 h-5", isActive && "text-white")} />
+                  <span>{t(item.labelKey)}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Footer */}
+          <div className={cn(
+            "p-2 border-t shrink-0",
+            isDark ? "border-white/[0.08]" : "border-black/[0.06]"
+          )}>
+            <Link
+              href="/"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm",
+                isDark
+                  ? "text-white/50 hover:text-white hover:bg-white/[0.08]"
+                  : "text-gray-500 hover:text-gray-900 hover:bg-black/[0.05]"
+              )}
+            >
+              <Home className="w-5 h-5" />
+              <span>{t('admin.backToHome')}</span>
+            </Link>
+          </div>
         </div>
-      </div>
-    </motion.aside>
+      </motion.aside>
+    </>
   );
 }
 
@@ -330,12 +375,31 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
 }
 
 function AdminLayoutContent({ children }: { children: ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true); // Default open
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const { isLoggedIn, isLoading } = useSession();
   const router = useRouter();
   const { t, isDark } = useSettings();
 
   const { showTutorial, completeTutorial, skipTutorial } = useTutorial();
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      // Auto-close sidebar on mobile
+      if (mobile) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -372,14 +436,15 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         "h-screen flex overflow-hidden transition-colors duration-300",
         isDark ? "bg-black text-white" : "bg-gray-50 text-gray-900"
       )}>
-        {/* Sidebar - pushes content */}
+        {/* Sidebar */}
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           isDark={isDark}
+          isMobile={isMobile}
         />
 
-        {/* Main Content - expands when sidebar hidden */}
+        {/* Main Content */}
         <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
           <Header
             onMenuClick={() => setSidebarOpen(!sidebarOpen)}

@@ -425,6 +425,24 @@ function ExploreMenu({ isDark, t, onClose }: { isDark: boolean; t: (key: string)
                     </Link>
                 ))}
             </div>
+            {/* Status Link */}
+            <div className={cn("mt-3 pt-3 border-t", isDark ? "border-white/10" : "border-gray-200")}>
+                <Link
+                    href="/status"
+                    onClick={onClose}
+                    className={cn(
+                        "flex items-center gap-3 p-3 rounded-xl transition-all",
+                        isDark
+                            ? "hover:bg-white/10 text-white/80"
+                            : "hover:bg-black/5 text-gray-700"
+                    )}
+                >
+                    <div className="w-5 h-5 flex items-center justify-center">
+                        <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                    </div>
+                    <span className="text-sm font-medium">System Status</span>
+                </Link>
+            </div>
         </div>
     );
 }

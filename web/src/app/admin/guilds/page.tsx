@@ -312,45 +312,12 @@ export default function GuildsPage() {
             {t('servers.title')}
           </h1>
           <p className={cn("mt-1", isDark ? "text-zinc-500" : "text-gray-500")}>
-            {viewMode === "all"
-              ? `${t('servers.subtitle')} (${guilds.length})`
-              : `${t('servers.yourServers')} (${stats.managed})`
-            }
+            {`${t('servers.subtitle')} (${guilds.length})`}
           </p>
         </div>
 
         {/* Search & Controls */}
         <div className="flex flex-col sm:flex-row gap-3">
-          {/* View Mode Tabs */}
-          <div className={cn(
-            "flex rounded-xl border p-1",
-            isDark ? "bg-zinc-900 border-zinc-800" : "bg-gray-100 border-gray-200"
-          )}>
-            <button
-              onClick={() => setViewMode("all")}
-              className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                viewMode === "all"
-                  ? "bg-[#7B1E3C] text-white"
-                  : isDark ? "text-zinc-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
-              )}
-            >
-              {t('servers.all')}
-            </button>
-            <button
-              onClick={() => setViewMode("managed")}
-              className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
-                viewMode === "managed"
-                  ? "bg-[#7B1E3C] text-white"
-                  : isDark ? "text-zinc-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
-              )}
-            >
-              <Crown className="w-4 h-4" />
-              {t('servers.yourServers')}
-            </button>
-          </div>
-
           {/* Search */}
           <div className="relative">
             <Search className={cn(

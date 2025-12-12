@@ -99,7 +99,7 @@ function ManagedServerCard({ guild, botInstalled, isDark }: { guild: UserGuild; 
   const iconUrl = getServerIconUrl(guild);
 
   return (
-    <Link href={`/admin/guilds/${guild.id}${botInstalled ? '' : '/settings'}`}>
+    <Link href={`/admin/guilds/${guild.id}`}>
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -151,15 +151,16 @@ function ManagedServerCard({ guild, botInstalled, isDark }: { guild: UserGuild; 
             {botInstalled ? (
               <span className="flex items-center gap-1.5 text-sm text-green-400">
                 <Bot className="w-4 h-4" />
-                <span>Bot Active</span>
+                <span>Added</span>
               </span>
             ) : (
               <span
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || "1448899538499928137";
                   window.open(
-                    `https://discord.com/oauth2/authorize?client_id=1443855259536461928&permissions=2534224044489536&guild_id=${guild.id}&scope=bot+applications.commands`,
+                    `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=2534224044489536&guild_id=${guild.id}&scope=bot+applications.commands`,
                     '_blank'
                   );
                 }}

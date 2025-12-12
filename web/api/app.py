@@ -303,15 +303,23 @@ def api_guild_stats(guild_id: int):
 
 @app.route('/api/control/<int:guild_id>/<action>', methods=['POST'])
 def api_control(guild_id: int, action: str):
-    """Control playback"""
+    """Control playback with Discord notification"""
     bot = get_bot()
     if not bot:
         return jsonify({"error": "Bot not connected"}), 503
+    
+    # Get username from request body for notification
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', 'Admin')
     
     try:
         connection = bot.voice_manager.get_connection(guild_id)
         if not connection or not connection.is_connected():
             return jsonify({"error": "Not connected to voice"}), 400
+        
+        # Track action for Discord notification
+        action_emoji = ""
+        action_text = ""
         
         if action == 'pause':
             if connection.connection.is_playing():
@@ -321,7 +329,8 @@ def api_control(guild_id: int, action: str):
                 if hasattr(bot, 'players') and guild_id in bot.players:
                     bot.players[guild_id].is_paused = True
                 
-                return jsonify({"status": "paused"})
+                action_emoji = "⏸️"
+                action_text = "Paused"
             else:
                 return jsonify({"error": "Not playing"}), 400
         
@@ -333,14 +342,16 @@ def api_control(guild_id: int, action: str):
                 if hasattr(bot, 'players') and guild_id in bot.players:
                     bot.players[guild_id].is_paused = False
                 
-                return jsonify({"status": "resumed"})
+                action_emoji = "▶️"
+                action_text = "Resumed"
             else:
                 return jsonify({"error": "Not paused"}), 400
         
         elif action == 'skip':
             if connection.connection.is_playing() or connection.connection.is_paused():
                 connection.connection.stop()
-                return jsonify({"status": "skipped"})
+                action_emoji = "⏭️"
+                action_text = "Skipped"
             else:
                 return jsonify({"error": "Nothing playing"}), 400
         
@@ -349,13 +360,171 @@ def api_control(guild_id: int, action: str):
             # Run disconnect in bot's event loop
             loop = bot.loop
             asyncio.run_coroutine_threadsafe(connection.disconnect(), loop)
-            return jsonify({"status": "stopped"})
+            action_emoji = "⏹️"
+            action_text = "Stopped"
         
         else:
             return jsonify({"error": "Invalid action"}), 400
+        
+        # Send Discord notification in bot's channel
+        async def send_notification():
+            try:
+                import discord
+                guild = bot.get_guild(guild_id)
+                if not guild:
+                    return
+                
+                # Find the text channel where bot was last active or system channel
+                channel = None
+                
+                # Try to find a text channel in the same category as voice channel
+                if connection.channel:
+                    for ch in guild.text_channels:
+                        if ch.category == connection.channel.category:
+                            channel = ch
+                            break
+                
+                # Fallback to system channel or first text channel
+                if not channel:
+                    channel = guild.system_channel or (guild.text_channels[0] if guild.text_channels else None)
+                
+                if channel:
+                    embed = discord.Embed(
+                        description=f"{action_emoji} **{action_text}** via Web Dashboard\n"
+                                   f"👤 By **{username}**",
+                        color=0x7B1E3C
+                    )
+                    embed.set_footer(text="SONORA Admin Dashboard")
+                    await channel.send(embed=embed, delete_after=30)
+            except Exception as e:
+                logger.error(f"Failed to send Discord notification: {e}")
+        
+        # Run notification in bot's event loop
+        asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)
+        
+        return jsonify({"status": action_text.lower()})
     
     except Exception as e:
         logger.error(f"Control action failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/queue/<int:guild_id>/remove/<int:position>', methods=['POST'])
+def api_queue_remove(guild_id: int, position: int):
+    """Remove track from queue by position (1-indexed)"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', 'Admin')
+    
+    try:
+        queue_cog = bot.get_cog('QueueCommands')
+        if not queue_cog or guild_id not in queue_cog.queues:
+            return jsonify({"error": "Queue is empty"}), 400
+        
+        queue = queue_cog.queues[guild_id]
+        idx = position - 1  # Convert to 0-indexed
+        
+        if idx < 0 or idx >= len(queue):
+            return jsonify({"error": "Invalid position"}), 400
+        
+        # Remove track
+        removed = queue.pop(idx)
+        
+        # Send Discord notification
+        async def send_notification():
+            try:
+                import discord
+                guild = bot.get_guild(guild_id)
+                if not guild:
+                    return
+                
+                channel = guild.system_channel or (guild.text_channels[0] if guild.text_channels else None)
+                if channel:
+                    embed = discord.Embed(
+                        description=f"🗑️ Removed **{removed.title}** from queue\n"
+                                   f"👤 By **{username}** via Web Dashboard",
+                        color=0x7B1E3C
+                    )
+                    await channel.send(embed=embed, delete_after=30)
+            except Exception as e:
+                logger.error(f"Failed to send notification: {e}")
+        
+        asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)
+        
+        return jsonify({
+            "status": "removed",
+            "title": removed.title,
+            "new_queue_length": len(queue)
+        })
+    
+    except Exception as e:
+        logger.error(f"Queue remove failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/queue/<int:guild_id>/move', methods=['POST'])
+def api_queue_move(guild_id: int):
+    """Move track to different position in queue"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    data = request.get_json(silent=True) or {}
+    from_pos = data.get('from_position', 0)
+    to_pos = data.get('to_position', 0)
+    username = data.get('username', 'Admin')
+    
+    try:
+        queue_cog = bot.get_cog('QueueCommands')
+        if not queue_cog or guild_id not in queue_cog.queues:
+            return jsonify({"error": "Queue is empty"}), 400
+        
+        queue = queue_cog.queues[guild_id]
+        from_idx = from_pos - 1
+        to_idx = to_pos - 1
+        
+        if from_idx < 0 or from_idx >= len(queue):
+            return jsonify({"error": "Invalid from position"}), 400
+        if to_idx < 0 or to_idx >= len(queue):
+            return jsonify({"error": "Invalid to position"}), 400
+        
+        # Move track
+        track = queue.pop(from_idx)
+        queue.insert(to_idx, track)
+        
+        # Send Discord notification
+        async def send_notification():
+            try:
+                import discord
+                guild = bot.get_guild(guild_id)
+                if not guild:
+                    return
+                
+                channel = guild.system_channel or (guild.text_channels[0] if guild.text_channels else None)
+                if channel:
+                    embed = discord.Embed(
+                        description=f"↕️ Moved **{track.title}** from #{from_pos} to #{to_pos}\n"
+                                   f"👤 By **{username}** via Web Dashboard",
+                        color=0x7B1E3C
+                    )
+                    await channel.send(embed=embed, delete_after=30)
+            except Exception as e:
+                logger.error(f"Failed to send notification: {e}")
+        
+        asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)
+        
+        return jsonify({
+            "status": "moved",
+            "title": track.title,
+            "from": from_pos,
+            "to": to_pos
+        })
+    
+    except Exception as e:
+        logger.error(f"Queue move failed: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1120,6 +1289,11 @@ def run_web_server(host: str = '0.0.0.0', port: int = 5000):
     # Background tasks disabled (SocketIO not available)
     # start_background_tasks()
     
+    # Silence Flask internal logs
+    import logging
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    
     # Run server - use plain Flask
     app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)
 
@@ -1139,7 +1313,7 @@ def start_web_server_thread(host: str = '0.0.0.0', port: int = 5000):
         name="WebDashboard"
     )
     thread.start()
-    logger.info(f"Web dashboard started in background thread")
+    # Silent start - no log message
     return thread
 
 # ==================== v3.3.0 ADMIN CONTROLS API ====================

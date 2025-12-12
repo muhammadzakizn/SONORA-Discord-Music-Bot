@@ -158,27 +158,8 @@ def main():
                     port=WEB_DASHBOARD_PORT
                 )
                 
-                logger.info(f"✓ API server started: http://{WEB_DASHBOARD_HOST}:{WEB_DASHBOARD_PORT}")
-                
-                # Start Next.js frontend (if available)
-                import subprocess
-                import threading
-                
-                next_dir = Path(__file__).parent / 'web'
-                if (next_dir / 'package.json').exists():
-                    def start_nextjs():
-                        try:
-                            subprocess.run(
-                                ['npm', 'run', 'dev'],
-                                cwd=str(next_dir),
-                                capture_output=True
-                            )
-                        except Exception as e:
-                            logger.warning(f"Next.js dashboard failed: {e}")
-                    
-                    next_thread = threading.Thread(target=start_nextjs, daemon=True)
-                    next_thread.start()
-                    logger.info("✓ Web dashboard started: http://localhost:3000")
+                logger.info(f"✓ Bot API started: http://localhost:{WEB_DASHBOARD_PORT}")
+                # Note: Next.js frontend is started separately by launcher.py
                 
             except ImportError as e:
                 logger.warning(f"Web dashboard dependencies not installed: {e}")

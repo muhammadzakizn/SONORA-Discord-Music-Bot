@@ -3,16 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#6a1b3d">
+  <meta name="theme-color" content="#7B1E3C">
   <title>Offline - SONORA</title>
   <style>
     :root {
       --bg-primary: #0a0a0a;
-      --bg-secondary: #1a1a1a;
       --text-primary: #ffffff;
       --text-secondary: #a0a0a0;
-      --accent: #6a1b3d;
-      --accent-light: #8b2a52;
+      --accent: #7B1E3C;
+      --accent-light: #9B2E4C;
     }
 
     * {
@@ -34,160 +33,172 @@
       text-align: center;
     }
 
+    /* Blur backdrop overlay */
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
     .container {
-      max-width: 500px;
-      padding: 40px;
-      background: var(--bg-secondary);
+      position: relative;
+      z-index: 10;
+      max-width: 420px;
+      width: 100%;
+      padding: 32px;
+      background: rgba(26, 26, 26, 0.8);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
       border-radius: 24px;
       border: 1px solid rgba(255, 255, 255, 0.1);
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     }
 
-    .logo {
-      width: 120px;
-      height: 120px;
-      margin: 0 auto 30px;
-      opacity: 0.6;
-      filter: grayscale(50%);
-    }
-
     .icon {
-      width: 80px;
-      height: 80px;
-      margin: 0 auto 20px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-light));
-      border-radius: 20px;
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 24px;
+      background: rgba(239, 68, 68, 0.2);
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      animation: pulse 2s ease-in-out infinite;
     }
 
     .icon svg {
-      width: 40px;
-      height: 40px;
-      stroke: white;
+      width: 36px;
+      height: 36px;
+      stroke: #ef4444;
       fill: none;
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
     }
 
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.05); opacity: 0.8; }
-    }
-
     h1 {
-      font-size: 1.75rem;
+      font-size: 1.5rem;
       font-weight: 600;
-      margin-bottom: 12px;
-      background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      margin-bottom: 8px;
+      color: var(--text-primary);
     }
 
     p {
       color: var(--text-secondary);
       line-height: 1.6;
       margin-bottom: 24px;
+      font-size: 0.95rem;
     }
 
-    .status {
+    .buttons {
       display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      padding: 12px 20px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      margin-bottom: 24px;
-    }
-
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      background: #ef4444;
-      border-radius: 50%;
-      animation: blink 1.5s ease-in-out infinite;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
-    .status-text {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-    }
-
-    .retry-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 14px 28px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-light));
-      color: white;
+      padding: 14px 24px;
       border: none;
-      border-radius: 12px;
-      font-size: 1rem;
+      border-radius: 14px;
+      font-size: 0.95rem;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
+      text-decoration: none;
     }
 
-    .retry-btn:hover {
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      color: white;
+    }
+
+    .btn-primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 10px 30px -10px rgba(106, 27, 61, 0.5);
+      box-shadow: 0 10px 30px -10px rgba(123, 30, 60, 0.5);
     }
 
-    .retry-btn:active {
-      transform: translateY(0);
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
     }
 
-    .retry-btn svg {
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-row .btn {
+      flex: 1;
+    }
+
+    .btn svg {
       width: 18px;
       height: 18px;
     }
 
     .footer {
-      margin-top: 30px;
+      margin-top: 24px;
       font-size: 0.75rem;
       color: var(--text-secondary);
-      opacity: 0.6;
+      opacity: 0.5;
     }
   </style>
 </head>
 <body>
+  <!-- Blur backdrop -->
+  <div class="backdrop"></div>
+
   <div class="container">
+    <!-- WiFi Off Icon -->
     <div class="icon">
       <svg viewBox="0 0 24 24">
         <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
       </svg>
     </div>
     
-    <h1>You're Offline</h1>
+    <h1>System Offline</h1>
     <p>
-      It looks like you've lost your internet connection. 
-      SONORA requires an active connection to communicate with the Discord bot.
+      Unable to connect to SONORA. The bot may be restarting or experiencing issues.
     </p>
     
-    <div class="status">
-      <span class="status-dot"></span>
-      <span class="status-text">No network connection detected</span>
+    <div class="buttons">
+      <!-- Try Again -->
+      <button class="btn btn-primary" onclick="window.location.reload()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        Try Again
+      </button>
+      
+      <!-- Back to Home & Status -->
+      <div class="btn-row">
+        <a href="/" class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          Home
+        </a>
+        <a href="/status" class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+          Status
+        </a>
+      </div>
     </div>
     
-    <button class="retry-btn" onclick="window.location.reload()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M23 4v6h-6M1 20v-6h6"/>
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-      </svg>
-      Try Again
-    </button>
-    
-    <p class="footer">SONORA - Discord Music Bot</p>
+    <p class="footer">Click outside to dismiss</p>
   </div>
 
   <script>
