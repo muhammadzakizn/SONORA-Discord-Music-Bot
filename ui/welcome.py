@@ -283,35 +283,94 @@ async def send_welcome_message(guild: discord.Guild, bot: commands.Bot) -> bool:
     Returns:
         True if message was sent successfully
     """
-    # Find accessible channel
     target_channel = None
     
-    for channel in guild.text_channels:
-        perms = channel.permissions_for(guild.me)
-        if perms.send_messages and perms.embed_links:
-            target_channel = channel
-            break
-    
-    # Fallback to system channel
-    if not target_channel and guild.system_channel:
+    # Priority 1: System channel (where join messages go)
+    if guild.system_channel:
         perms = guild.system_channel.permissions_for(guild.me)
         if perms.send_messages:
             target_channel = guild.system_channel
+            logger.debug(f"Using system channel: {target_channel.name}")
+    
+    # Priority 2: Look for common channel names
+    if not target_channel:
+        common_names = ['general', 'chat', 'bot', 'bots', 'commands', 'music', 'welcome', 'lobby']
+        for channel in guild.text_channels:
+            if any(name in channel.name.lower() for name in common_names):
+                perms = channel.permissions_for(guild.me)
+                if perms.send_messages:
+                    target_channel = channel
+                    logger.debug(f"Using common channel: {target_channel.name}")
+                    break
+    
+    # Priority 3: First accessible text channel
+    if not target_channel:
+        for channel in guild.text_channels:
+            perms = channel.permissions_for(guild.me)
+            if perms.send_messages:
+                target_channel = channel
+                logger.debug(f"Using first accessible channel: {target_channel.name}")
+                break
+    
+    # Priority 4: ANY text channel (even without full permissions)
+    if not target_channel and guild.text_channels:
+        for channel in guild.text_channels:
+            try:
+                perms = channel.permissions_for(guild.me)
+                if perms.view_channel:
+                    target_channel = channel
+                    logger.debug(f"Using viewable channel: {target_channel.name}")
+                    break
+            except:
+                pass
     
     if not target_channel:
         logger.warning(f"No accessible channel in {guild.name} for welcome message")
+        # Try to DM server owner as last resort
+        try:
+            if guild.owner:
+                embed = discord.Embed(
+                    title="🎵 SONORA telah bergabung ke server Anda!",
+                    description=(
+                        f"Bot telah bergabung ke **{guild.name}** tetapi tidak dapat menemukan channel yang dapat diakses.\n\n"
+                        f"*Bot has joined **{guild.name}** but couldn't find an accessible channel.*\n\n"
+                        "Silakan berikan SONORA akses ke setidaknya satu text channel.\n"
+                        "*Please grant SONORA access to at least one text channel.*"
+                    ),
+                    color=0xFEE75C
+                )
+                await guild.owner.send(embed=embed)
+                logger.info(f"Sent DM to owner of {guild.name}")
+        except:
+            pass
         return False
     
     try:
         view = WelcomeView(guild, bot)
         embed = view.create_welcome_embed()
-        message = await target_channel.send(embed=embed, view=view)
+        
+        # Check if we can send embeds
+        perms = target_channel.permissions_for(guild.me)
+        if perms.embed_links:
+            message = await target_channel.send(embed=embed, view=view)
+        else:
+            # Fallback to plain text if no embed permission
+            message = await target_channel.send(
+                "🎵 **SONORA Music Bot** telah bergabung!\n"
+                "*SONORA Music Bot has joined!*\n\n"
+                "Ketik `/play <lagu>` untuk mulai.\n"
+                "*Type `/play <song>` to start.*\n\n"
+                "⚠️ Bot membutuhkan izin **Embed Links** untuk tampilan yang lebih baik.",
+                view=view
+            )
+        
         view.message = message
-        logger.info(f"Sent enhanced welcome message to {guild.name}")
+        logger.info(f"Sent welcome message to #{target_channel.name} in {guild.name}")
         return True
-    except discord.Forbidden:
-        logger.warning(f"Forbidden to send welcome message in {guild.name}")
+    except discord.Forbidden as e:
+        logger.warning(f"Forbidden to send welcome in {guild.name}: {e}")
         return False
     except Exception as e:
-        logger.error(f"Failed to send welcome message: {e}")
+        logger.error(f"Failed to send welcome message: {e}", exc_info=True)
         return False
+
