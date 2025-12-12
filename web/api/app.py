@@ -189,6 +189,8 @@ def api_guild_detail(guild_id: int):
         if hasattr(bot, 'players') and guild_id in bot.players:
             player = bot.players[guild_id]
             if player.metadata:
+                # Debug artwork URL
+                logger.debug(f"[API] Artwork URL for {player.metadata.title}: {player.metadata.artwork_url}")
                 current_track = {
                     "title": player.metadata.title,
                     "artist": player.metadata.artist,
@@ -408,13 +410,27 @@ def api_control(guild_id: int, action: str):
                     )
                     embed.set_footer(text="SONORA Admin Dashboard")
                     await target_channel.send(embed=embed, delete_after=30)
+                    logger.info(f"✓ Notification sent to #{target_channel.name}")
                 else:
-                    logger.debug(f"No channel with send permission for notification in {guild.name}")
+                    # No channel with permission - log and note for API response
+                    logger.warning(f"⚠ No channel with send permission in {guild.name} - control notification skipped")
+                    # Store this for API response
+                    bot._last_notification_warning = f"No channel with send permission in {guild.name}"
             except Exception as e:
                 logger.error(f"Failed to send notification: {e}")
+                bot._last_notification_warning = str(e)
         
         # Run notification in bot's event loop
         asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)
+        
+        # Check for notification warnings
+        notification_warning = getattr(bot, '_last_notification_warning', None)
+        if notification_warning:
+            bot._last_notification_warning = None  # Clear after reading
+            return jsonify({
+                "status": action_text.lower(),
+                "warning": f"Action berhasil, tetapi notifikasi ke Discord gagal: {notification_warning}"
+            })
         
         return jsonify({"status": action_text.lower()})
     
