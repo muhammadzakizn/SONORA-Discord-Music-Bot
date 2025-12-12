@@ -111,6 +111,10 @@ class MusicBot(commands.Bot):
             # Start welcome retry background task
             from ui.welcome import start_welcome_retry_task
             start_welcome_retry_task(self)
+            
+            # Setup permission monitoring
+            from utils.permission_monitor import setup_permission_events
+            await setup_permission_events(self)
 
         
         @self.event

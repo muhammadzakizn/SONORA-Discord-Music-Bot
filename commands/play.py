@@ -78,6 +78,17 @@ class PlayCommand(commands.Cog):
             # Store for later use
             voice_channel = user_voice_channel
             
+            # Proactive permission check - warn if missing critical permissions
+            try:
+                from utils.permission_monitor import get_permission_monitor
+                monitor = get_permission_monitor(self.bot)
+                warning = await monitor.on_command_check(interaction.guild)
+                if warning:
+                    # Send warning but continue
+                    await interaction.followup.send(warning, ephemeral=True)
+            except Exception as e:
+                logger.debug(f"Permission check failed: {e}")
+            
             # Sanitize query
             query = InputValidator.sanitize_query(query)
             
