@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 SONORA Bot - Smart Launcher
+Production-ready for Pterodactyl (Linux, venv, non-root)
 """
 
 import os
@@ -8,6 +9,11 @@ import sys
 import subprocess
 from pathlib import Path
 import time
+
+# Configuration
+WEB_PORT = 9072  # Port untuk web dashboard
+BOT_API_PORT = 5000  # Port untuk bot API
+WEB_DIR = Path('web')
 
 class Colors:
     GREEN = '\033[92m'
@@ -25,27 +31,34 @@ def print_banner():
 {Colors.CYAN}{Colors.BOLD}
 ╔══════════════════════════════════════════════════════════════╗
 ║                      SONORA MUSIC BOT                        ║
-║               Discord Audio Bot - Version 3.4.0              ║
+║               Discord Audio Bot - Version 3.8.0              ║
+║          Production Mode for Pterodactyl Server              ║
 ╚══════════════════════════════════════════════════════════════╝
 {Colors.END}
     """)
 
 def print_menu():
     print(f"{Colors.BOLD}Select Option:{Colors.END}\n")
-    print(f"{Colors.GREEN}1. {Colors.BOLD}🚀 Start Bot + Web Dashboard (Recommended){Colors.END}")
-    print(f"   └─ Runs both bot and web dashboard together")
-    print(f"   └─ Bot API: 5000 | Web: 3000")
+    print(f"{Colors.GREEN}1. {Colors.BOLD}🚀 Start Production (Bot + Web){Colors.END}")
+    print(f"   └─ Recommended for production server")
+    print(f"   └─ Bot API: {BOT_API_PORT} | Web: {WEB_PORT}")
     print()
-    print(f"{Colors.YELLOW}2. {Colors.BOLD}🎵 Start Bot Only{Colors.END}")
+    print(f"{Colors.YELLOW}2. {Colors.BOLD}🔨 Build Web Dashboard{Colors.END}")
+    print(f"   └─ Required before first production start")
+    print()
+    print(f"{Colors.BLUE}3. {Colors.BOLD}🎵 Start Bot Only{Colors.END}")
     print(f"   └─ Discord bot without web dashboard")
     print()
-    print(f"{Colors.WHITE}3. {Colors.BOLD}🌐 Start Web Dashboard Only{Colors.END}")
-    print(f"   └─ For testing web UI (requires bot running)")
+    print(f"{Colors.WHITE}4. {Colors.BOLD}🌐 Start Web Only (Production){Colors.END}")
+    print(f"   └─ Web dashboard only (requires bot running)")
     print()
-    print(f"{Colors.BLUE}4. {Colors.BOLD}⚙️  Configuration{Colors.END}")
-    print(f"   └─ Edit environment file")
+    print(f"{Colors.MAGENTA}5. {Colors.BOLD}🧪 Development Mode{Colors.END}")
+    print(f"   └─ Hot-reload for development")
     print()
-    print(f"{Colors.RED}5. {Colors.BOLD}❌ Exit{Colors.END}")
+    print(f"{Colors.CYAN}6. {Colors.BOLD}⚙️  Configuration{Colors.END}")
+    print(f"   └─ Edit environment files")
+    print()
+    print(f"{Colors.RED}7. {Colors.BOLD}❌ Exit{Colors.END}")
     print()
 
 def check_requirements():
@@ -60,52 +73,100 @@ def check_requirements():
         return False
     return True
 
+def check_web_build():
+    """Check if web dashboard is built"""
+    next_dir = WEB_DIR / '.next'
+    if not next_dir.exists():
+        print(f"{Colors.YELLOW}⚠️  Web dashboard not built. Run option 2 first.{Colors.END}")
+        return False
+    return True
+
 def cleanup_processes():
     """Kill any existing bot/web processes before starting"""
     print(f"{Colors.YELLOW}🧹 Cleaning up existing processes...{Colors.END}")
     
-    # Kill existing processes
-    subprocess.run(['pkill', '-f', 'next dev'], capture_output=True)
-    subprocess.run(['pkill', '-f', 'npm run dev'], capture_output=True)
+    # Kill existing processes (works without root)
+    subprocess.run(['pkill', '-f', 'next'], capture_output=True)
+    subprocess.run(['pkill', '-f', 'npm'], capture_output=True)
     subprocess.run(['pkill', '-f', 'python3 main.py'], capture_output=True)
     
-    # Remove Next.js lock file
-    lock_file = Path('web/.next/dev/lock')
-    if lock_file.exists():
-        lock_file.unlink()
+    # Remove Next.js lock files
+    for lock_file in [WEB_DIR / '.next/dev/lock', WEB_DIR / '.next/build/lock']:
+        if lock_file.exists():
+            try:
+                lock_file.unlink()
+            except:
+                pass
     
-    # Small delay to ensure processes are terminated
     time.sleep(1)
     print(f"{Colors.GREEN}✓ Cleanup complete{Colors.END}\n")
 
-def run_bot_and_web():
-    """Run SONORA Bot + Web Dashboard together"""
+def build_web():
+    """Build web dashboard for production"""
+    print(f"{Colors.YELLOW}{Colors.BOLD}🔨 Building Web Dashboard...{Colors.END}\n")
+    
+    if not WEB_DIR.exists():
+        print(f"{Colors.RED}❌ Web directory not found{Colors.END}")
+        return False
+    
+    # Install dependencies
+    print(f"{Colors.CYAN}📦 Installing dependencies...{Colors.END}")
+    result = subprocess.run(['npm', 'install'], cwd=WEB_DIR)
+    if result.returncode != 0:
+        print(f"{Colors.RED}❌ npm install failed{Colors.END}")
+        return False
+    
+    # Build production
+    print(f"{Colors.CYAN}🔨 Building production bundle...{Colors.END}")
+    result = subprocess.run(['npm', 'run', 'build'], cwd=WEB_DIR)
+    if result.returncode != 0:
+        print(f"{Colors.RED}❌ Build failed{Colors.END}")
+        return False
+    
+    print(f"{Colors.GREEN}✅ Web dashboard built successfully!{Colors.END}")
+    return True
+
+def run_production():
+    """Run Bot + Web in production mode"""
     cleanup_processes()
     
-    print(f"{Colors.GREEN}{Colors.BOLD}🚀 Starting SONORA Bot + Web Dashboard...{Colors.END}\n")
+    if not check_web_build():
+        choice = input(f"{Colors.YELLOW}Build now? (y/n): {Colors.END}")
+        if choice.lower() == 'y':
+            if not build_web():
+                return
+        else:
+            return
     
-    web_dir = Path('web')
+    print(f"{Colors.GREEN}{Colors.BOLD}🚀 Starting SONORA Production...{Colors.END}\n")
+    
     env = os.environ.copy()
     env['BOT_VERSION'] = 'stable'
-    env['WEB_DASHBOARD_PORT'] = '5000'
+    env['WEB_DASHBOARD_PORT'] = str(BOT_API_PORT)
     env['DATABASE_PATH'] = 'bot.db'
+    env['NODE_ENV'] = 'production'
+    env['PORT'] = str(WEB_PORT)
     
     # Start Bot
     print(f"{Colors.CYAN}Starting Discord Bot...{Colors.END}")
     proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
     time.sleep(3)
-    print(f"{Colors.GREEN}✓ Bot started (API: http://localhost:5000){Colors.END}")
+    print(f"{Colors.GREEN}✓ Bot started (API: http://localhost:{BOT_API_PORT}){Colors.END}")
     
-    # Start Web Dashboard
-    print(f"{Colors.CYAN}Starting Web Dashboard...{Colors.END}")
-    proc_web = subprocess.Popen(['npm', 'run', 'dev'], cwd=web_dir)
+    # Start Web Dashboard (Production)
+    print(f"{Colors.CYAN}Starting Web Dashboard (Production)...{Colors.END}")
+    proc_web = subprocess.Popen(
+        ['npm', 'run', 'start', '--', '-p', str(WEB_PORT)],
+        cwd=WEB_DIR,
+        env=env
+    )
     time.sleep(4)
     print(f"{Colors.GREEN}✓ Web Dashboard started{Colors.END}")
     
     print(f"\n{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}")
-    print(f"{Colors.GREEN}  ✅ All services running!{Colors.END}")
-    print(f"{Colors.CYAN}  🌐 Web Dashboard: http://localhost:3000{Colors.END}")
-    print(f"{Colors.CYAN}  🔌 Bot API:       http://localhost:5000{Colors.END}")
+    print(f"{Colors.GREEN}  ✅ SONORA Production Running!{Colors.END}")
+    print(f"{Colors.CYAN}  🌐 Web Dashboard: http://waguri.caliphdev.com:{WEB_PORT}{Colors.END}")
+    print(f"{Colors.CYAN}  🔌 Bot API:       http://localhost:{BOT_API_PORT}{Colors.END}")
     print(f"{Colors.YELLOW}  Press Ctrl+C to stop all services{Colors.END}")
     print(f"{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}\n")
     
@@ -129,13 +190,13 @@ def run_bot_only():
     """Run SONORA Bot only"""
     cleanup_processes()
     
-    print(f"{Colors.YELLOW}{Colors.BOLD}🎵 Starting SONORA Bot...{Colors.END}\n")
+    print(f"{Colors.BLUE}{Colors.BOLD}🎵 Starting SONORA Bot...{Colors.END}\n")
     print(f"{Colors.CYAN}📝 Commands: /play, /pause, /queue, /lyrics, etc.{Colors.END}")
-    print(f"{Colors.CYAN}🔌 API: http://localhost:5000{Colors.END}\n")
+    print(f"{Colors.CYAN}🔌 API: http://localhost:{BOT_API_PORT}{Colors.END}\n")
     
     env = os.environ.copy()
     env['BOT_VERSION'] = 'stable'
-    env['WEB_DASHBOARD_PORT'] = '5000'
+    env['WEB_DASHBOARD_PORT'] = str(BOT_API_PORT)
     env['DATABASE_PATH'] = 'bot.db'
     
     try:
@@ -143,22 +204,77 @@ def run_bot_only():
     except KeyboardInterrupt:
         print(f"\n{Colors.YELLOW}SONORA Bot stopped.{Colors.END}")
 
-def run_web_only():
-    """Run Web Dashboard only"""
+def run_web_production():
+    """Run Web Dashboard only (Production)"""
     cleanup_processes()
     
-    print(f"{Colors.WHITE}{Colors.BOLD}🌐 Starting Web Dashboard...{Colors.END}\n")
+    if not check_web_build():
+        print(f"{Colors.RED}❌ Build the web dashboard first (option 2){Colors.END}")
+        return
+    
+    print(f"{Colors.WHITE}{Colors.BOLD}🌐 Starting Web Dashboard (Production)...{Colors.END}\n")
     print(f"{Colors.YELLOW}⚠️  Note: Bot must be running for full functionality{Colors.END}\n")
     
+    env = os.environ.copy()
+    env['NODE_ENV'] = 'production'
+    env['PORT'] = str(WEB_PORT)
+    
     try:
-        subprocess.run(['npm', 'run', 'dev'], cwd=Path('web'))
+        subprocess.run(
+            ['npm', 'run', 'start', '--', '-p', str(WEB_PORT)],
+            cwd=WEB_DIR,
+            env=env
+        )
     except KeyboardInterrupt:
         print(f"\n{Colors.YELLOW}Web Dashboard stopped.{Colors.END}")
+
+def run_development():
+    """Run in development mode with hot-reload"""
+    cleanup_processes()
+    
+    print(f"{Colors.MAGENTA}{Colors.BOLD}🧪 Starting Development Mode...{Colors.END}\n")
+    
+    env = os.environ.copy()
+    env['BOT_VERSION'] = 'stable'
+    env['WEB_DASHBOARD_PORT'] = str(BOT_API_PORT)
+    env['DATABASE_PATH'] = 'bot.db'
+    
+    # Start Bot
+    print(f"{Colors.CYAN}Starting Discord Bot...{Colors.END}")
+    proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+    time.sleep(3)
+    
+    # Start Web Dashboard (Development)
+    print(f"{Colors.CYAN}Starting Web Dashboard (Development)...{Colors.END}")
+    proc_web = subprocess.Popen(['npm', 'run', 'dev'], cwd=WEB_DIR)
+    time.sleep(4)
+    
+    print(f"\n{Colors.MAGENTA}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}")
+    print(f"{Colors.MAGENTA}  🧪 Development Mode Running!{Colors.END}")
+    print(f"{Colors.CYAN}  🌐 Web Dashboard: http://localhost:3000{Colors.END}")
+    print(f"{Colors.CYAN}  🔌 Bot API:       http://localhost:{BOT_API_PORT}{Colors.END}")
+    print(f"{Colors.YELLOW}  Press Ctrl+C to stop{Colors.END}")
+    print(f"{Colors.MAGENTA}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}\n")
+    
+    try:
+        while proc_bot.poll() is None and proc_web.poll() is None:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print(f"\n{Colors.YELLOW}Stopping...{Colors.END}")
+    finally:
+        proc_bot.terminate()
+        proc_web.terminate()
+        try:
+            proc_bot.wait(timeout=5)
+            proc_web.wait(timeout=5)
+        except:
+            proc_bot.kill()
+            proc_web.kill()
 
 def configuration_menu():
     """Configuration menu"""
     while True:
-        print(f"\n{Colors.BLUE}{Colors.BOLD}⚙️  Configuration Menu{Colors.END}\n")
+        print(f"\n{Colors.CYAN}{Colors.BOLD}⚙️  Configuration Menu{Colors.END}\n")
         print(f"1. Edit .env (Bot)")
         print(f"2. Edit web/.env.local (Web)")
         print(f"3. View configuration")
@@ -168,12 +284,23 @@ def configuration_menu():
         choice = input(f"{Colors.BOLD}Select option: {Colors.END}")
         
         if choice == '1':
-            subprocess.run(['nano', '.env'])
+            # Try nano, then vi
+            if subprocess.run(['which', 'nano'], capture_output=True).returncode == 0:
+                subprocess.run(['nano', '.env'])
+            else:
+                subprocess.run(['vi', '.env'])
         elif choice == '2':
-            subprocess.run(['nano', 'web/.env.local'])
+            if subprocess.run(['which', 'nano'], capture_output=True).returncode == 0:
+                subprocess.run(['nano', 'web/.env.local'])
+            else:
+                subprocess.run(['vi', 'web/.env.local'])
         elif choice == '3':
             print(f"\n{Colors.CYAN}Bot (.env):{Colors.END}")
-            subprocess.run(['grep', '-v', '^#', '.env'])
+            if Path('.env').exists():
+                subprocess.run(['grep', '-v', '^#', '.env'])
+            print(f"\n{Colors.CYAN}Web (web/.env.local):{Colors.END}")
+            if Path('web/.env.local').exists():
+                subprocess.run(['grep', '-v', '^#', 'web/.env.local'])
         elif choice == '4':
             break
 
@@ -186,17 +313,21 @@ def main():
         print_banner()
         print_menu()
         
-        choice = input(f"{Colors.BOLD}Enter your choice (1-5): {Colors.END}")
+        choice = input(f"{Colors.BOLD}Enter your choice (1-7): {Colors.END}")
         
         if choice == '1':
-            run_bot_and_web()
+            run_production()
         elif choice == '2':
-            run_bot_only()
+            build_web()
         elif choice == '3':
-            run_web_only()
+            run_bot_only()
         elif choice == '4':
-            configuration_menu()
+            run_web_production()
         elif choice == '5':
+            run_development()
+        elif choice == '6':
+            configuration_menu()
+        elif choice == '7':
             print(f"\n{Colors.CYAN}Thank you for using SONORA Bot! 👋{Colors.END}\n")
             sys.exit(0)
         else:
