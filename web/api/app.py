@@ -359,9 +359,22 @@ def api_control(guild_id: int, action: str):
         
         elif action == 'stop':
             connection.connection.stop()
-            # Run disconnect in bot's event loop
-            loop = bot.loop
-            asyncio.run_coroutine_threadsafe(connection.disconnect(), loop)
+            
+            # Clear queue (like /stop command)
+            queue_cog = bot.get_cog('QueueCommands')
+            if queue_cog and guild_id in queue_cog.queues:
+                queue_cog.queues[guild_id].clear()
+            
+            # Cleanup player
+            if hasattr(bot, 'players') and guild_id in bot.players:
+                player = bot.players[guild_id]
+                if hasattr(player, 'cleanup'):
+                    asyncio.run_coroutine_threadsafe(player.cleanup(), bot.loop)
+                del bot.players[guild_id]
+            
+            # Disconnect from voice
+            asyncio.run_coroutine_threadsafe(connection.disconnect(), bot.loop)
+            
             action_emoji = "⏹️"
             action_text = "Stopped"
         
