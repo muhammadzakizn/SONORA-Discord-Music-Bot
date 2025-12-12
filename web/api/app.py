@@ -374,30 +374,44 @@ def api_control(guild_id: int, action: str):
                 if not guild:
                     return
                 
-                # Find the text channel where bot was last active or system channel
-                channel = None
+                # Find a text channel with send permission
+                target_channel = None
                 
                 # Try to find a text channel in the same category as voice channel
-                if connection.channel:
+                if connection.channel and connection.channel.category:
                     for ch in guild.text_channels:
                         if ch.category == connection.channel.category:
-                            channel = ch
+                            perms = ch.permissions_for(guild.me)
+                            if perms.send_messages:
+                                target_channel = ch
+                                break
+                
+                # Fallback: try system channel
+                if not target_channel and guild.system_channel:
+                    perms = guild.system_channel.permissions_for(guild.me)
+                    if perms.send_messages:
+                        target_channel = guild.system_channel
+                
+                # Fallback: any channel with permission
+                if not target_channel:
+                    for ch in guild.text_channels:
+                        perms = ch.permissions_for(guild.me)
+                        if perms.send_messages:
+                            target_channel = ch
                             break
                 
-                # Fallback to system channel or first text channel
-                if not channel:
-                    channel = guild.system_channel or (guild.text_channels[0] if guild.text_channels else None)
-                
-                if channel:
+                if target_channel:
                     embed = discord.Embed(
                         description=f"{action_emoji} **{action_text}** via Web Dashboard\n"
                                    f"👤 By **{username}**",
                         color=0x7B1E3C
                     )
                     embed.set_footer(text="SONORA Admin Dashboard")
-                    await channel.send(embed=embed, delete_after=30)
+                    await target_channel.send(embed=embed, delete_after=30)
+                else:
+                    logger.debug(f"No channel with send permission for notification in {guild.name}")
             except Exception as e:
-                logger.error(f"Failed to send Discord notification: {e}")
+                logger.error(f"Failed to send notification: {e}")
         
         # Run notification in bot's event loop
         asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)

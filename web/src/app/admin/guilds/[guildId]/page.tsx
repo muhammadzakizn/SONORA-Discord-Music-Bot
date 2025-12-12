@@ -117,7 +117,7 @@ export default function GuildDetailPage() {
     // Smooth progress bar animation
     useEffect(() => {
         const animate = () => {
-            if (guild?.current_track && !guild.current_track.is_paused) {
+            if (guild?.current_track && guild.current_track.is_paused !== true) {
                 const elapsed = (Date.now() - lastUpdateRef.current) / 1000;
                 const additionalProgress = (elapsed / guild.current_track.duration) * 100;
                 const newProgress = Math.min(progressRef.current + additionalProgress, 100);
@@ -132,7 +132,7 @@ export default function GuildDetailPage() {
                 cancelAnimationFrame(animationRef.current);
             }
         };
-    }, [guild?.current_track, guild?.current_track?.is_paused]);
+    }, [guild?.current_track?.duration, guild?.current_track?.is_paused]);
 
     useEffect(() => {
         fetchGuild();
@@ -416,28 +416,24 @@ export default function GuildDetailPage() {
                     {guild.current_track ? (
                         <div className="space-y-4">
                             <div className="flex items-center gap-4">
-                                {/* Album Artwork - supports all formats including GIF */}
-                                {guild.current_track.artwork_url ? (
-                                    <img
-                                        src={guild.current_track.artwork_url}
-                                        alt={guild.current_track.title}
-                                        className="w-20 h-20 rounded-xl object-cover shrink-0"
-                                        onError={(e) => {
-                                            // Hide broken image, show fallback
-                                            e.currentTarget.style.display = 'none';
-                                            const fallback = e.currentTarget.nextElementSibling;
-                                            if (fallback) (fallback as HTMLElement).style.display = 'flex';
-                                        }}
-                                    />
-                                ) : null}
-                                {/* Fallback for missing/broken artwork */}
-                                <div
-                                    className={cn(
-                                        "w-20 h-20 rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] items-center justify-center shrink-0",
-                                        guild.current_track.artwork_url ? "hidden" : "flex"
+                                {/* Album Artwork */}
+                                <div className="w-20 h-20 rounded-xl shrink-0 overflow-hidden">
+                                    {guild.current_track.artwork_url ? (
+                                        <img
+                                            src={guild.current_track.artwork_url}
+                                            alt={guild.current_track.title}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                // Replace with fallback on error
+                                                (e.target as HTMLImageElement).src = '';
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center">
+                                            <Music className="w-10 h-10 text-white" />
+                                        </div>
                                     )}
-                                >
-                                    <Music className="w-10 h-10 text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className={cn(
