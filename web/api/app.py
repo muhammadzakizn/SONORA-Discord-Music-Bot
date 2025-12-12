@@ -184,9 +184,16 @@ def api_guild_detail(guild_id: int):
         connection = bot.voice_manager.get_connection(guild_id)
         voice_channel = connection.channel if connection else None
         
-        # Get current player
+        # Get current player - only if actually playing/paused
         current_track = None
-        if hasattr(bot, 'players') and guild_id in bot.players:
+        is_actually_playing = False
+        
+        # Check if voice connection is actually playing/paused
+        if connection and connection.connection:
+            is_actually_playing = connection.connection.is_playing() or connection.connection.is_paused()
+        
+        # Only return track info if actually playing
+        if is_actually_playing and hasattr(bot, 'players') and guild_id in bot.players:
             player = bot.players[guild_id]
             if player.metadata:
                 # Debug artwork URL
@@ -200,8 +207,8 @@ def api_guild_detail(guild_id: int):
                     "artwork_url": player.metadata.artwork_url,
                     "audio_source": player.metadata.audio_source,
                     "requested_by": player.metadata.requested_by,
-                    "is_playing": player.is_playing,
-                    "is_paused": player.is_paused
+                    "is_playing": connection.connection.is_playing() if connection and connection.connection else False,
+                    "is_paused": connection.connection.is_paused() if connection and connection.connection else False
                 }
         
         # Get queue
