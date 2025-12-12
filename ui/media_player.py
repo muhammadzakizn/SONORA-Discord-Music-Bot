@@ -553,21 +553,75 @@ class SynchronizedMediaPlayer:
             next_item = queue_cog.get_next(self.guild_id)
             
             if not next_item:
-                logger.info("Queue is empty, playback finished")
+                logger.info("Queue is empty, waiting 5s before disconnect...")
                 
                 # Clear voice channel status
                 await self._clear_voice_channel_status()
                 
-                # Update message to show playback finished
-                try:
-                    embed = EmbedBuilder.create_success(
-                        "Queue Finished",
-                        f"Finished playing: **{self.metadata.title}**"
-                    )
-                    await self.message.edit(embed=embed, view=None)
-                except discord.HTTPException:
-                    pass  # Message no longer exists or cannot be edited
-                return
+                # Wait 5 seconds for new commands
+                await asyncio.sleep(5)
+                
+                # Check again if something was queued during wait
+                next_item_check = queue_cog.get_next(self.guild_id) if queue_cog else None
+                if next_item_check:
+                    logger.info("New track queued during wait, continuing playback")
+                    # Put it back and continue
+                    if self.guild_id in queue_cog.queues:
+                        queue_cog.queues[self.guild_id].insert(0, next_item_check)
+                    # Continue to play next
+                else:
+                    # Still empty, disconnect
+                    logger.info("No new commands, disconnecting to save bandwidth...")
+                    
+                    # Disconnect from voice
+                    try:
+                        if self.voice and self.voice.is_connected():
+                            await self.voice.disconnect()
+                            logger.info("✓ Disconnected from voice channel")
+                    except Exception as e:
+                        logger.warning(f"Error disconnecting: {e}")
+                    
+                    # Clean up connection from voice manager
+                    if self.bot and hasattr(self.bot, 'voice_manager'):
+                        if self.guild_id in self.bot.voice_manager.connections:
+                            del self.bot.voice_manager.connections[self.guild_id]
+                    
+                    # Clean up player reference
+                    if self.bot and hasattr(self.bot, 'players'):
+                        if self.guild_id in self.bot.players:
+                            del self.bot.players[self.guild_id]
+                    
+                    # Send thank you message with Support button
+                    try:
+                        from discord import ui
+                        
+                        class SupportView(discord.ui.View):
+                            def __init__(self):
+                                super().__init__(timeout=None)
+                                self.add_item(discord.ui.Button(
+                                    label="💖 Support Developer",
+                                    url="https://teer.id/muhammadzakizn",
+                                    style=discord.ButtonStyle.link
+                                ))
+                        
+                        embed = discord.Embed(
+                            title="👋 Sampai Jumpa!",
+                            description=(
+                                f"Selesai memutar: **{self.metadata.title}**\n\n"
+                                "Terima kasih sudah menggunakan **SONORA**! 🎵\n\n"
+                                "Jika kamu menyukai bot ini, pertimbangkan untuk mendukung developer "
+                                "agar SONORA terus berkembang dengan fitur-fitur baru! 💖\n\n"
+                                "*Bot telah disconnect untuk menghemat bandwidth.*"
+                            ),
+                            color=discord.Color.from_rgb(123, 30, 60)  # Maroon
+                        )
+                        embed.set_footer(text="SONORA • Premium Discord Music Bot")
+                        
+                        await self.message.edit(embed=embed, view=SupportView())
+                    except discord.HTTPException:
+                        pass  # Message no longer exists or cannot be edited
+                    
+                    return
             
             logger.info(f"Auto-playing next from queue: {next_item.title}")
             
