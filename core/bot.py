@@ -107,6 +107,11 @@ class MusicBot(commands.Bot):
                 logger.info(f"Synced {len(synced)} slash commands")
             except Exception as e:
                 logger.error(f"Failed to sync commands: {e}")
+            
+            # Start welcome retry background task
+            from ui.welcome import start_welcome_retry_task
+            start_welcome_retry_task(self)
+
         
         @self.event
         async def on_command_error(ctx: commands.Context, error: Exception):

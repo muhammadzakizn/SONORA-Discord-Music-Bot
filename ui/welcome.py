@@ -383,32 +383,88 @@ async def send_welcome_message(guild: discord.Guild, bot: commands.Bot) -> bool:
 
 async def retry_pending_welcomes(bot: commands.Bot):
     """
-    Retry sending welcome messages to guilds that previously failed
-    Call this periodically or when channel permissions change
+    Background task that continuously retries sending welcome messages
+    Runs every 30 seconds until successful or max retries reached
     """
     if not hasattr(bot, 'pending_welcomes'):
         bot.pending_welcomes = {}
-        return
     
-    for guild_id in list(bot.pending_welcomes.keys()):
-        guild = bot.get_guild(guild_id)
-        if not guild:
-            del bot.pending_welcomes[guild_id]
+    while True:
+        await asyncio.sleep(30)  # Wait 30 seconds between retries
+        
+        if not bot.pending_welcomes:
             continue
         
-        # Try to find a channel we can send to
-        for channel in guild.text_channels:
-            perms = channel.permissions_for(guild.me)
-            if perms.send_messages:
+        for guild_id in list(bot.pending_welcomes.keys()):
+            guild = bot.get_guild(guild_id)
+            if not guild:
+                del bot.pending_welcomes[guild_id]
+                continue
+            
+            # Get retry info
+            retry_info = bot.pending_welcomes[guild_id]
+            if isinstance(retry_info, bool):
+                # Convert old format to new format
+                retry_info = {'count': 0, 'last_dm': None}
+                bot.pending_welcomes[guild_id] = retry_info
+            
+            retry_info['count'] = retry_info.get('count', 0) + 1
+            logger.info(f"[WELCOME] Retry #{retry_info['count']} for {guild.name}")
+            
+            # Try to find a channel we can send to
+            success = False
+            for channel in guild.text_channels:
+                perms = channel.permissions_for(guild.me)
+                if perms.send_messages:
+                    try:
+                        view = WelcomeView(guild, bot)
+                        embed = view.create_welcome_embed()
+                        await channel.send(embed=embed, view=view)
+                        logger.info(f"[WELCOME] ✓ Retry SUCCESS for {guild.name} in #{channel.name}")
+                        del bot.pending_welcomes[guild_id]
+                        success = True
+                        break
+                    except discord.Forbidden:
+                        continue
+                    except Exception as e:
+                        logger.debug(f"[WELCOME] Retry error in #{channel.name}: {e}")
+                        continue
+            
+            if not success:
+                # Still failed - DM owner every 30 seconds as requested
+                logger.warning(f"[WELCOME] Retry #{retry_info['count']} failed for {guild.name}")
+                
                 try:
-                    view = WelcomeView(guild, bot)
-                    embed = view.create_welcome_embed()
-                    await channel.send(embed=embed, view=view)
-                    logger.info(f"[WELCOME] ✓ Retry SUCCESS for {guild.name} in #{channel.name}")
+                    if guild.owner:
+                        embed = discord.Embed(
+                            title="⚠️ SONORA masih tidak dapat mengirim pesan!",
+                            description=(
+                                f"**Percobaan ke-{retry_info['count']}** - Bot masih tidak dapat mengirim pesan ke channel manapun di **{guild.name}**.\n\n"
+                                f"*Attempt #{retry_info['count']}* - Bot still cannot send messages to any channel in **{guild.name}**.\n\n"
+                                "**Langkah yang perlu dilakukan:**\n"
+                                "1️⃣ Buka **Server Settings → Roles → SONORA**\n"
+                                "2️⃣ Aktifkan **Send Messages** dan **Embed Links**\n"
+                                "3️⃣ Pastikan tidak ada channel override yang memblokir bot\n\n"
+                                "*Bot akan otomatis mendeteksi dan mengirim pesan selamat datang.*"
+                            ),
+                            color=0xED4245  # Red for urgency
+                        )
+                        embed.set_footer(text=f"SONORA • Retry #{retry_info['count']} • Cek ulang tiap 30 detik")
+                        await guild.owner.send(embed=embed)
+                        logger.info(f"[WELCOME] Sent retry DM #{retry_info['count']} to owner of {guild.name}")
+                except discord.Forbidden:
+                    logger.debug(f"[WELCOME] Cannot DM owner - DMs closed")
+                except Exception as e:
+                    logger.error(f"[WELCOME] DM error: {e}")
+                
+                # Stop retrying after 5 attempts (2.5 minutes)
+                if retry_info['count'] >= 5:
+                    logger.warning(f"[WELCOME] Max retries reached for {guild.name}, stopping")
                     del bot.pending_welcomes[guild_id]
-                    break
-                except:
-                    continue
 
 
-
+def start_welcome_retry_task(bot: commands.Bot):
+    """Start the background welcome retry task"""
+    if not hasattr(bot, 'welcome_retry_task') or bot.welcome_retry_task is None:
+        bot.welcome_retry_task = asyncio.create_task(retry_pending_welcomes(bot))
+        logger.info("[WELCOME] Started background retry task")
