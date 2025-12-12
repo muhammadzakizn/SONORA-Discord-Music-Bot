@@ -125,14 +125,50 @@ class PlayCommand(commands.Cog):
                 )
             )
             
-            # Stage 2: Parallel Download
-            audio_result = await self._download_with_fallback(track_info, loader)
+            # Stage 2: Download with Verification (3x retry)
+            MAX_DOWNLOAD_RETRIES = 3
+            audio_result = None
+            last_error = None
+            
+            for attempt in range(1, MAX_DOWNLOAD_RETRIES + 1):
+                try:
+                    await self._safe_loader_update(loader, 
+                        embed=EmbedBuilder.create_loading(
+                            f"Downloading ({attempt}/{MAX_DOWNLOAD_RETRIES})",
+                            f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                            f"🔄 Mengunduh dan memverifikasi audio..."
+                        )
+                    )
+                    
+                    audio_result = await self._download_with_fallback(track_info, loader)
+                    
+                    if audio_result and audio_result.is_success:
+                        logger.info(f"✓ Download & verification success (attempt {attempt})")
+                        break  # Success, exit retry loop
+                    else:
+                        last_error = "Download returned empty result"
+                        logger.warning(f"Download attempt {attempt} failed: {last_error}")
+                        
+                except Exception as e:
+                    last_error = str(e)
+                    logger.warning(f"Download attempt {attempt} error: {e}")
+                    
+                    if attempt < MAX_DOWNLOAD_RETRIES:
+                        await self._safe_loader_update(loader, 
+                            embed=EmbedBuilder.create_loading(
+                                f"Retry ({attempt}/{MAX_DOWNLOAD_RETRIES})",
+                                f"⚠️ Percobaan {attempt} gagal\n"
+                                f"🔄 Mencoba ulang dalam 2 detik..."
+                            )
+                        )
+                        await asyncio.sleep(2)
             
             if not audio_result or not audio_result.is_success:
                 await self._safe_loader_update(loader, 
                     embed=EmbedBuilder.create_error(
                         "Download Failed",
-                        "Failed to download audio from all sources"
+                        f"❌ Gagal setelah {MAX_DOWNLOAD_RETRIES} percobaan\n\n"
+                        f"**Error:** {last_error or 'Unknown'}"
                     )
                 )
                 return
