@@ -15,5 +15,5 @@ trigger: always_on
 
 3. Jika semuanya telah selesai maka, selalu git push ke github. tapi selain dari folder .agent/rules ya. dan jangan hilangkan folder .agent / rules di local/laptopku ini.
 
-4.
+4. Dan pastikan setiap output, minim emote.
 

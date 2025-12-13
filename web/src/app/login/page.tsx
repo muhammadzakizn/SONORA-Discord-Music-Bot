@@ -243,27 +243,42 @@ function LoginPageContent() {
   const [selectedMfaMethod, setSelectedMfaMethod] = useState<MFAMethod | null>(null);
 
   // Detect ?verify=true from OAuth callback
-  // Wait until session is fully loaded before checking
+  // Check cookie directly and handle redirect
   useEffect(() => {
-    // Refresh session when page loads with verify=true (ensure cookie is read)
-    if (searchParams.get('verify') === 'true') {
-      refreshSession();
-    }
-  }, [searchParams, refreshSession]);
-
-  // Handle redirect after session is loaded
-  useEffect(() => {
-    // Don't do anything while session is still loading
-    if (sessionLoading) return;
-
     const isVerifyFlow = searchParams.get('verify') === 'true';
 
-    if (isVerifyFlow && isLoggedIn && user) {
-      // For now, skip MFA and go directly to admin dashboard
-      // MFA can be enabled later for enhanced security
-      router.push('/admin');
+    if (!isVerifyFlow) return;
+
+    // Debug: Check if cookie exists
+    const cookies = document.cookie;
+    const hasSessionCookie = cookies.includes('sonora-admin-session');
+
+    console.log('[Login] Verify flow detected');
+    console.log('[Login] Cookies:', cookies.substring(0, 200));
+    console.log('[Login] Has session cookie:', hasSessionCookie);
+    console.log('[Login] sessionLoading:', sessionLoading);
+    console.log('[Login] isLoggedIn:', isLoggedIn);
+    console.log('[Login] user:', user?.username);
+
+    // If cookie exists but session not loaded, try refresh
+    if (hasSessionCookie && !isLoggedIn && !sessionLoading) {
+      console.log('[Login] Cookie exists but not logged in, refreshing session...');
+      refreshSession();
+      return;
     }
-  }, [searchParams, isLoggedIn, user, sessionLoading, router]);
+
+    // If session is loaded and user is logged in, redirect to admin
+    if (!sessionLoading && isLoggedIn && user) {
+      console.log('[Login] Session loaded, redirecting to /admin...');
+      router.push('/admin');
+      return;
+    }
+
+    // If no cookie at all after OAuth, something went wrong
+    if (!hasSessionCookie && !sessionLoading) {
+      console.log('[Login] No session cookie found after OAuth - possible redirect_uri mismatch');
+    }
+  }, [searchParams, isLoggedIn, user, sessionLoading, router, refreshSession]);
 
   // Countdown timer for resend
   useEffect(() => {
