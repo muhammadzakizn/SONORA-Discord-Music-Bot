@@ -51,30 +51,34 @@ const levelBgColors = {
     ERROR: "bg-rose-500/10",
 };
 
-function LogLine({ log, isDark }: { log: LogEntry; isDark: boolean }) {
+function LogLine({ log, isDark, isNew }: { log: LogEntry; isDark: boolean; isNew?: boolean }) {
     const Icon = levelIcons[log.level] || Info;
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
+        <div
             className={cn(
-                "flex items-start gap-3 px-4 py-2 font-mono text-sm",
+                "flex items-start gap-3 px-4 py-1.5 font-mono text-xs transition-all duration-300",
                 isDark ? "hover:bg-white/5" : "hover:bg-black/5",
-                levelBgColors[log.level] || "bg-zinc-500/10"
+                isNew && "bg-green-500/10 border-l-2 border-green-500"
             )}
         >
             <span className={cn(
-                "w-20 shrink-0",
+                "w-16 shrink-0 tabular-nums",
                 isDark ? "text-zinc-600" : "text-gray-400"
             )}>{log.timestamp}</span>
-            <div className={cn("flex items-center gap-1 w-20 shrink-0", levelColors[log.level] || "text-zinc-500")}>
-                <Icon className="w-4 h-4" />
-                <span className="uppercase text-xs">{log.level}</span>
+            <div className={cn("flex items-center gap-1 w-16 shrink-0", levelColors[log.level] || "text-zinc-500")}>
+                <Icon className="w-3 h-3" />
+                <span className="uppercase text-[10px] font-medium">{log.level}</span>
             </div>
-            <span className="text-cyan-400 w-24 shrink-0">[{log.module}]</span>
-            <span className={isDark ? "text-zinc-300" : "text-gray-700"}>{log.message}</span>
-        </motion.div>
+            <span className={cn(
+                "w-20 shrink-0 truncate",
+                "text-cyan-400"
+            )}>[{log.module}]</span>
+            <span className={cn(
+                "flex-1 break-all",
+                isDark ? "text-zinc-300" : "text-gray-700"
+            )}>{log.message}</span>
+        </div>
     );
 }
 
@@ -89,7 +93,8 @@ export default function DeveloperConsole() {
     const [bootProgress, setBootProgress] = useState(0);
     const logContainerRef = useRef<HTMLDivElement>(null);
     const [consoleInput, setConsoleInput] = useState("");
-    const lastLogId = useRef(0);
+    const [newLogIds, setNewLogIds] = useState<Set<number>>(new Set());
+    const prevLogCount = useRef(0);
 
     // Fetch logs from real API
     const fetchLogs = useCallback(async () => {
@@ -105,27 +110,63 @@ export default function DeveloperConsole() {
             const data = await response.json();
 
             if (data.logs && Array.isArray(data.logs)) {
-                // Parse logs from API response
-                const parsedLogs: LogEntry[] = data.logs.map((log: { timestamp: string; level: string; message: string }, index: number) => {
-                    // Extract module from message if present (e.g., "[voice] Message")
-                    const moduleMatch = log.message?.match(/^\[([^\]]+)\]/);
-                    const module = moduleMatch ? moduleMatch[1] : log.level === 'ERROR' ? 'error' : 'system';
-                    const message = moduleMatch ? log.message.replace(moduleMatch[0], '').trim() : log.message;
+                // Parse logs from API response - better parsing
+                const parsedLogs: LogEntry[] = data.logs.map((log: { timestamp: string; level: string; message: string; file?: string }, index: number) => {
+                    let timestamp = log.timestamp || '';
+                    let level = log.level || 'INFO';
+                    let message = log.message || '';
+                    let module = 'system';
+
+                    // Clean up timestamp (extract just HH:MM:SS)
+                    const timeMatch = timestamp.match(/(\d{2}:\d{2}:\d{2})/);
+                    if (timeMatch) {
+                        timestamp = timeMatch[1];
+                    }
+
+                    // Extract module from message patterns like "[WELCOME]" or "load_commands:319"
+                    const bracketMatch = message.match(/^\[([A-Za-z_]+)\]/);
+                    const colonMatch = message.match(/^([a-z_]+):/i);
+
+                    if (bracketMatch) {
+                        module = bracketMatch[1].toLowerCase();
+                        message = message.replace(bracketMatch[0], '').trim();
+                    } else if (colonMatch) {
+                        module = colonMatch[1];
+                    } else if (message.includes('Bot is ready') || message.includes('Bot started')) {
+                        module = 'bot';
+                    } else if (message.includes('voice') || message.includes('Voice')) {
+                        module = 'voice';
+                    } else if (message.includes('Commands loaded') || message.includes('Synced')) {
+                        module = 'cogs';
+                    }
+
+                    // Remove line numbers from message (e.g., ":319 - ")
+                    message = message.replace(/^:\d+\s*-?\s*/, '').trim();
 
                     return {
-                        id: lastLogId.current + index + 1,
-                        timestamp: log.timestamp || new Date().toLocaleTimeString("en-US", { hour12: false }),
-                        level: (log.level?.toUpperCase() || 'INFO') as LogEntry['level'],
-                        module: module,
-                        message: message || '',
+                        id: index + 1,
+                        timestamp,
+                        level: level.toUpperCase() as LogEntry['level'],
+                        module,
+                        message,
                     };
                 });
 
-                if (parsedLogs.length > 0) {
-                    lastLogId.current = parsedLogs[parsedLogs.length - 1].id;
-                    setLogs(parsedLogs);
-                    setConnectionStatus("connected");
+                // Identify new logs for animation
+                const newCount = parsedLogs.length;
+                if (newCount > prevLogCount.current && prevLogCount.current > 0) {
+                    const newIds = new Set<number>();
+                    for (let i = prevLogCount.current; i < newCount; i++) {
+                        newIds.add(parsedLogs[i].id);
+                    }
+                    setNewLogIds(newIds);
+                    // Clear new log animation after 1 second
+                    setTimeout(() => setNewLogIds(new Set()), 1000);
                 }
+                prevLogCount.current = newCount;
+
+                setLogs(parsedLogs);
+                setConnectionStatus("connected");
             }
         } catch (error) {
             console.error('Failed to fetch logs:', error);
@@ -361,22 +402,22 @@ export default function DeveloperConsole() {
             >
                 {/* Header */}
                 <div className={cn(
-                    "sticky top-0 border-b px-4 py-2 flex items-center gap-4 font-mono text-xs z-10",
+                    "sticky top-0 border-b px-4 py-2 flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider z-10",
                     isDark
                         ? "bg-zinc-900 border-zinc-800 text-zinc-500"
                         : "bg-gray-100 border-gray-200 text-gray-500"
                 )}>
-                    <span className="w-20">TIME</span>
-                    <span className="w-20">LEVEL</span>
-                    <span className="w-24">MODULE</span>
-                    <span>MESSAGE</span>
+                    <span className="w-16">Time</span>
+                    <span className="w-16">Level</span>
+                    <span className="w-20">Module</span>
+                    <span className="flex-1">Message</span>
                 </div>
 
                 {/* Logs */}
                 <div className="h-full overflow-auto">
                     <div className="py-2">
                         {filteredLogs.map((log) => (
-                            <LogLine key={log.id} log={log} isDark={isDark} />
+                            <LogLine key={log.id} log={log} isDark={isDark} isNew={newLogIds.has(log.id)} />
                         ))}
 
                         {filteredLogs.length === 0 && (
