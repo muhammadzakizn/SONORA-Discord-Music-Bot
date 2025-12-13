@@ -42,18 +42,15 @@ export default function ControlsPage() {
         }
     };
 
-    const getApiBase = () => {
-        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-            return `${window.location.protocol}//${window.location.hostname}:5000`;
-        }
-        return process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
-    };
-    const API_BASE = getApiBase();
+    // Use internal Next.js API proxy to Flask backend
+    const API_BASE = '/api/bot';
 
     const handleAction = async (action: string, endpoint: string, method: string = 'POST') => {
         setActionState(action, { loading: true });
         try {
-            const fullEndpoint = endpoint.startsWith('/') ? `${API_BASE}${endpoint}` : endpoint;
+            // Convert endpoint from /api/admin/xxx to /admin/xxx for proxy
+            const cleanEndpoint = endpoint.replace(/^\/api\//, '/');
+            const fullEndpoint = `${API_BASE}${cleanEndpoint}`;
             const response = await fetch(fullEndpoint, { method });
             const data = await response.json();
 

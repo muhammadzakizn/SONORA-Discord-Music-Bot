@@ -46,13 +46,8 @@ const MAINTENANCE_STAGES = [
     { value: "complete", label: "Completing" },
 ];
 
-const getApiBase = (): string => {
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        return `${window.location.protocol}//${window.location.hostname}:5000`;
-    }
-    return process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
-};
-const API_BASE = getApiBase();
+// Use internal Next.js API proxy to Flask backend
+const API_BASE = '/api/bot';
 
 export default function MaintenancePage() {
     const { isDark } = useSettings();
@@ -76,7 +71,7 @@ export default function MaintenancePage() {
     // Fetch maintenance status
     const fetchStatus = useCallback(async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/admin/maintenance/status`);
+            const response = await fetch(`${API_BASE}/admin/maintenance/status`);
             if (response.ok) {
                 const data = await response.json();
                 setState(data);
@@ -97,7 +92,7 @@ export default function MaintenancePage() {
 
         setIsSaving(true);
         try {
-            const response = await fetch(`${API_BASE}/api/admin/maintenance/activate`, {
+            const response = await fetch(`${API_BASE}/admin/maintenance/activate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason: newReason })
@@ -122,7 +117,7 @@ export default function MaintenancePage() {
     const handleSaveProgress = async () => {
         setIsSaving(true);
         try {
-            const response = await fetch(`${API_BASE}/api/admin/maintenance/progress`, {
+            const response = await fetch(`${API_BASE}/admin/maintenance/progress`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -150,7 +145,7 @@ export default function MaintenancePage() {
         if (!newChangelogItem.trim()) return;
 
         try {
-            const response = await fetch(`${API_BASE}/api/admin/maintenance/changelog-item`, {
+            const response = await fetch(`${API_BASE}/admin/maintenance/changelog-item`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ item: newChangelogItem })
@@ -168,7 +163,7 @@ export default function MaintenancePage() {
 
     const handleRemoveChangelogItem = async (item: string) => {
         try {
-            const response = await fetch(`${API_BASE}/api/admin/maintenance/changelog-item`, {
+            const response = await fetch(`${API_BASE}/admin/maintenance/changelog-item`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ item })
@@ -188,7 +183,7 @@ export default function MaintenancePage() {
 
         setIsSaving(true);
         try {
-            const response = await fetch(`${API_BASE}/api/admin/maintenance/complete`, {
+            const response = await fetch(`${API_BASE}/admin/maintenance/complete`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

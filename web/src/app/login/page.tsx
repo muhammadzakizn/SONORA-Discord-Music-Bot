@@ -304,14 +304,10 @@ function LoginPageContent() {
     setError("");
     setIsLoading(true);
 
-    const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL ||
-      (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? `${window.location.protocol}//${window.location.hostname}:5000`
-        : 'http://localhost:5000');
-
     try {
-      // Call secure backend API for authentication
-      const response = await fetch(`${API_BASE}/api/developer/auth`, {
+      // Use internal Next.js API proxy to Flask backend
+      // This works without exposing port 5000 externally
+      const response = await fetch('/api/bot/developer/auth', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

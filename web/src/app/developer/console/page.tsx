@@ -28,13 +28,8 @@ interface LogEntry {
     message: string;
 }
 
-const getApiBase = (): string => {
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        return `${window.location.protocol}//${window.location.hostname}:5000`;
-    }
-    return process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
-};
-const API_BASE = getApiBase();
+// Use internal Next.js API proxy to Flask backend
+const API_BASE = '/api/bot';
 
 const levelIcons = {
     DEBUG: Info,
@@ -105,7 +100,7 @@ export default function DeveloperConsole() {
     // Fetch logs from real API
     const fetchLogs = useCallback(async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/admin/logs?lines=200`, {
+            const response = await fetch(`${API_BASE}/admin/logs?lines=200`, {
                 cache: 'no-store',
             });
 

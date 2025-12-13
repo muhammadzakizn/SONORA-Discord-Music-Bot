@@ -56,13 +56,8 @@ interface SystemStatus {
     };
 }
 
-const getApiBase = (): string => {
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        return `${window.location.protocol}//${window.location.hostname}:5000`;
-    }
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-};
-const API_BASE = getApiBase();
+// Use internal Next.js API proxy to Flask backend
+const API_BASE = '/api/bot';
 
 function StatusIndicator({ status }: { status: "operational" | "degraded" | "outage" | "unknown" | "maintenance" }) {
     const config = {
@@ -167,8 +162,8 @@ export default function StatusPage() {
         try {
             // Fetch both health and maintenance status
             const [healthResponse, maintenanceResponse] = await Promise.all([
-                fetch(`${API_BASE}/api/admin/health`, { cache: 'no-store' }),
-                fetch(`${API_BASE}/api/admin/maintenance/status`, { cache: 'no-store' })
+                fetch(`${API_BASE}/admin/health`, { cache: 'no-store' }),
+                fetch(`${API_BASE}/admin/maintenance/status`, { cache: 'no-store' })
             ]);
 
             if (!healthResponse.ok) {
