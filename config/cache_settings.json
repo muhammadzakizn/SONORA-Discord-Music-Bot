@@ -1,5 +1,5 @@
 {
-  "max_size_gb": 3.0,
+  "max_size_gb": 2.0,
   "max_age_days": 2,
   "warning_threshold_gb": 2.0,
   "autoclean_enabled": true

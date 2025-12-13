@@ -72,13 +72,114 @@ class MusicBot(commands.Bot):
                     
                     # 1. Check maintenance mode
                     if self.maintenance_mode:
-                        embed = discord.Embed(
-                            title="🔧 Maintenance Mode",
-                            description=self.maintenance_reason,
-                            color=0xFFC107
-                        )
-                        embed.set_footer(text="Bot is currently under maintenance")
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        # Get maintenance details from API state
+                        try:
+                            from web.api.app import _maintenance_mode, _save_maintenance_state, MAINTENANCE_STAGES
+                            
+                            progress = _maintenance_mode.get("progress", 0)
+                            stage = _maintenance_mode.get("stage", "starting")
+                            reason = _maintenance_mode.get("reason", self.maintenance_reason)
+                            started_at = _maintenance_mode.get("started_at")
+                            stage_label = MAINTENANCE_STAGES.get(stage, {}).get("label", "In Progress")
+                            
+                            # Calculate time elapsed
+                            import time as time_module
+                            elapsed = ""
+                            if started_at:
+                                elapsed_secs = int(time_module.time() - started_at)
+                                elapsed_mins = elapsed_secs // 60
+                                if elapsed_mins > 0:
+                                    elapsed = f" ({elapsed_mins} menit)"
+                                else:
+                                    elapsed = f" ({elapsed_secs} detik)"
+                            
+                            # Create detailed embed
+                            embed = discord.Embed(
+                                title="🔧 SONORA dalam Mode Maintenance",
+                                description=(
+                                    f"**📋 Alasan:**\n{reason}\n\n"
+                                    f"**📊 Progress:** {progress}%\n"
+                                    f"**🔄 Tahap:** {stage_label}{elapsed}"
+                                ),
+                                color=0xFFC107
+                            )
+                            
+                            # Add progress bar
+                            progress_bar = "▓" * (progress // 10) + "░" * (10 - progress // 10)
+                            embed.add_field(
+                                name="Progress",
+                                value=f"`[{progress_bar}]` {progress}%",
+                                inline=False
+                            )
+                            
+                            embed.set_footer(text="🔗 Pantau status di: bit.ly/SONORAbotSTATUS")
+                            
+                            # Create buttons
+                            view = discord.ui.View()
+                            view.add_item(discord.ui.Button(
+                                label="Status Page",
+                                url="https://bit.ly/SONORAbotSTATUS",
+                                style=discord.ButtonStyle.link,
+                                emoji="📊"
+                            ))
+                            view.add_item(discord.ui.Button(
+                                label="Changelog",
+                                url="https://bit.ly/changeLog",
+                                style=discord.ButtonStyle.link,
+                                emoji="📋"
+                            ))
+                            
+                            guild_id = str(interaction.guild_id) if interaction.guild_id else ""
+                            channel_id = str(interaction.channel_id) if interaction.channel_id else ""
+                            
+                            # Check if we have existing message for this channel
+                            message_ids = _maintenance_mode.get("message_ids", {})
+                            existing_msg_id = message_ids.get(guild_id, {}).get(channel_id)
+                            
+                            if existing_msg_id:
+                                # Try to delete old message
+                                try:
+                                    channel = interaction.channel
+                                    if channel:
+                                        old_msg = await channel.fetch_message(int(existing_msg_id))
+                                        await old_msg.delete()
+                                except Exception:
+                                    pass  # Message might already be deleted
+                            
+                            # Send new message
+                            await interaction.response.send_message(embed=embed, view=view)
+                            
+                            # Get the message ID and store it
+                            try:
+                                message = await interaction.original_response()
+                                if message and guild_id and channel_id:
+                                    if guild_id not in _maintenance_mode.get("message_ids", {}):
+                                        if "message_ids" not in _maintenance_mode:
+                                            _maintenance_mode["message_ids"] = {}
+                                        _maintenance_mode["message_ids"][guild_id] = {}
+                                    _maintenance_mode["message_ids"][guild_id][channel_id] = str(message.id)
+                                    _save_maintenance_state(_maintenance_mode)
+                            except Exception as e:
+                                logger.debug(f"Could not store message ID: {e}")
+                            
+                        except ImportError:
+                            # Fallback if API not loaded
+                            embed = discord.Embed(
+                                title="🔧 Maintenance Mode",
+                                description=self.maintenance_reason,
+                                color=0xFFC107
+                            )
+                            embed.set_footer(text="Bot is currently under maintenance")
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
+                        except Exception as e:
+                            logger.error(f"Maintenance check error: {e}")
+                            embed = discord.Embed(
+                                title="🔧 Maintenance Mode",
+                                description=self.maintenance_reason,
+                                color=0xFFC107
+                            )
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
+                        
                         return False
                     
                     # 2. Check banned users

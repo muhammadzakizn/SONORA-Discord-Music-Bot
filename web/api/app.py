@@ -1858,24 +1858,62 @@ def api_admin_resume():
         return jsonify({"error": str(e)}), 500
 
 
-# Global maintenance mode state
-_maintenance_mode = {
-    "enabled": False,
-    "reason": "",
-    "started_at": None
+# Global maintenance mode state - loaded from/saved to config file
+_maintenance_state_file = Path(__file__).parent.parent.parent / 'config' / 'maintenance_state.json'
+
+def _load_maintenance_state():
+    """Load maintenance state from file"""
+    try:
+        if _maintenance_state_file.exists():
+            with open(_maintenance_state_file, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load maintenance state: {e}")
+    
+    return {
+        "enabled": False,
+        "reason": "",
+        "progress": 0,
+        "stage": "starting",
+        "started_at": None,
+        "message_ids": {},
+        "changelog_items": [],
+        "history": []
+    }
+
+def _save_maintenance_state(state):
+    """Save maintenance state to file"""
+    try:
+        with open(_maintenance_state_file, 'w') as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save maintenance state: {e}")
+
+# Load initial state
+_maintenance_mode = _load_maintenance_state()
+
+MAINTENANCE_STAGES = {
+    "starting": {"label": "Starting Maintenance", "progress_min": 0},
+    "backup": {"label": "Creating Backups", "progress_min": 10},
+    "updating": {"label": "Applying Updates", "progress_min": 30},
+    "testing": {"label": "Testing Systems", "progress_min": 60},
+    "finalizing": {"label": "Finalizing Changes", "progress_min": 80},
+    "complete": {"label": "Completing", "progress_min": 95}
 }
 
 
 @app.route('/api/admin/maintenance', methods=['GET', 'POST'])
 def api_admin_maintenance():
-    """Get or set maintenance mode"""
+    """Get or toggle maintenance mode (legacy endpoint)"""
     global _maintenance_mode
     
     if request.method == 'GET':
         return jsonify({
-            "enabled": _maintenance_mode["enabled"],
-            "reason": _maintenance_mode["reason"],
-            "started_at": _maintenance_mode["started_at"]
+            "enabled": _maintenance_mode.get("enabled", False),
+            "reason": _maintenance_mode.get("reason", ""),
+            "progress": _maintenance_mode.get("progress", 0),
+            "stage": _maintenance_mode.get("stage", "starting"),
+            "started_at": _maintenance_mode.get("started_at")
         })
     
     # POST - toggle maintenance mode
@@ -1885,23 +1923,36 @@ def api_admin_maintenance():
     
     try:
         data = request.json or {}
-        enable = data.get('enable', not _maintenance_mode["enabled"])
+        enable = data.get('enable', not _maintenance_mode.get("enabled", False))
         reason = data.get('reason', 'Scheduled maintenance')
         
         if enable:
-            _maintenance_mode = {
+            _maintenance_mode.update({
                 "enabled": True,
                 "reason": reason,
-                "started_at": time.time()
-            }
+                "progress": 0,
+                "stage": "starting",
+                "started_at": time.time(),
+                "message_ids": {},
+                "changelog_items": []
+            })
+            bot.maintenance_mode = True
+            bot.maintenance_reason = reason
             logger.warning(f"Maintenance mode ENABLED: {reason}")
         else:
-            _maintenance_mode = {
+            _maintenance_mode.update({
                 "enabled": False,
                 "reason": "",
-                "started_at": None
-            }
+                "progress": 0,
+                "stage": "starting",
+                "started_at": None,
+                "message_ids": {},
+                "changelog_items": []
+            })
+            bot.maintenance_mode = False
             logger.info("Maintenance mode DISABLED")
+        
+        _save_maintenance_state(_maintenance_mode)
         
         return jsonify({
             "status": "success",
@@ -1912,6 +1963,310 @@ def api_admin_maintenance():
     except Exception as e:
         logger.error(f"Maintenance mode toggle failed: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/maintenance/status', methods=['GET'])
+def api_admin_maintenance_status():
+    """Get full maintenance status including message IDs and changelog items"""
+    global _maintenance_mode
+    
+    stage_info = MAINTENANCE_STAGES.get(_maintenance_mode.get("stage", "starting"), {})
+    
+    return jsonify({
+        "enabled": _maintenance_mode.get("enabled", False),
+        "reason": _maintenance_mode.get("reason", ""),
+        "progress": _maintenance_mode.get("progress", 0),
+        "stage": _maintenance_mode.get("stage", "starting"),
+        "stage_label": stage_info.get("label", "Unknown"),
+        "started_at": _maintenance_mode.get("started_at"),
+        "message_ids": _maintenance_mode.get("message_ids", {}),
+        "changelog_items": _maintenance_mode.get("changelog_items", []),
+        "history": _maintenance_mode.get("history", [])[-10:]  # Last 10 entries
+    })
+
+
+@app.route('/api/admin/maintenance/activate', methods=['POST'])
+def api_admin_maintenance_activate():
+    """Activate maintenance mode with reason"""
+    global _maintenance_mode
+    
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        data = request.json or {}
+        reason = data.get('reason', 'Scheduled maintenance')
+        
+        if not reason.strip():
+            return jsonify({"error": "Reason is required"}), 400
+        
+        _maintenance_mode.update({
+            "enabled": True,
+            "reason": reason,
+            "progress": 0,
+            "stage": "starting",
+            "started_at": time.time(),
+            "message_ids": {},
+            "changelog_items": []
+        })
+        
+        # Update bot state
+        bot.maintenance_mode = True
+        bot.maintenance_reason = reason
+        bot.maintenance_progress = 0
+        bot.maintenance_stage = "starting"
+        
+        _save_maintenance_state(_maintenance_mode)
+        logger.warning(f"Maintenance mode ACTIVATED: {reason}")
+        
+        return jsonify({
+            "status": "success",
+            "message": "Maintenance mode activated",
+            "state": {
+                "enabled": True,
+                "reason": reason,
+                "progress": 0,
+                "stage": "starting"
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Maintenance activation failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/maintenance/progress', methods=['POST'])
+def api_admin_maintenance_progress():
+    """Update maintenance progress and stage"""
+    global _maintenance_mode
+    
+    if not _maintenance_mode.get("enabled"):
+        return jsonify({"error": "Maintenance mode not active"}), 400
+    
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        data = request.json or {}
+        progress = data.get('progress', _maintenance_mode.get("progress", 0))
+        stage = data.get('stage', _maintenance_mode.get("stage", "starting"))
+        reason = data.get('reason', _maintenance_mode.get("reason", ""))
+        
+        # Validate progress
+        progress = max(0, min(100, int(progress)))
+        
+        # Validate stage
+        if stage not in MAINTENANCE_STAGES:
+            stage = "starting"
+        
+        _maintenance_mode.update({
+            "progress": progress,
+            "stage": stage,
+            "reason": reason
+        })
+        
+        # Update bot state
+        bot.maintenance_reason = reason
+        bot.maintenance_progress = progress
+        bot.maintenance_stage = stage
+        
+        _save_maintenance_state(_maintenance_mode)
+        logger.info(f"Maintenance progress updated: {progress}% - {stage}")
+        
+        return jsonify({
+            "status": "success",
+            "message": "Progress updated",
+            "state": {
+                "progress": progress,
+                "stage": stage,
+                "stage_label": MAINTENANCE_STAGES[stage]["label"],
+                "reason": reason
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Progress update failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/maintenance/message-id', methods=['POST', 'DELETE'])
+def api_admin_maintenance_message_id():
+    """Store or remove Discord message IDs for maintenance notifications"""
+    global _maintenance_mode
+    
+    try:
+        data = request.json or {}
+        guild_id = str(data.get('guild_id', ''))
+        channel_id = str(data.get('channel_id', ''))
+        message_id = str(data.get('message_id', ''))
+        
+        if not guild_id or not channel_id:
+            return jsonify({"error": "guild_id and channel_id required"}), 400
+        
+        if "message_ids" not in _maintenance_mode:
+            _maintenance_mode["message_ids"] = {}
+        
+        if request.method == 'POST':
+            if guild_id not in _maintenance_mode["message_ids"]:
+                _maintenance_mode["message_ids"][guild_id] = {}
+            _maintenance_mode["message_ids"][guild_id][channel_id] = message_id
+            _save_maintenance_state(_maintenance_mode)
+            
+            return jsonify({"status": "success", "message": "Message ID stored"})
+        
+        else:  # DELETE
+            if guild_id in _maintenance_mode["message_ids"]:
+                if channel_id in _maintenance_mode["message_ids"][guild_id]:
+                    del _maintenance_mode["message_ids"][guild_id][channel_id]
+                    if not _maintenance_mode["message_ids"][guild_id]:
+                        del _maintenance_mode["message_ids"][guild_id]
+            _save_maintenance_state(_maintenance_mode)
+            
+            return jsonify({"status": "success", "message": "Message ID removed"})
+        
+    except Exception as e:
+        logger.error(f"Message ID operation failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/maintenance/changelog-item', methods=['POST', 'DELETE'])
+def api_admin_maintenance_changelog_item():
+    """Add or remove changelog item for maintenance completion"""
+    global _maintenance_mode
+    
+    try:
+        data = request.json or {}
+        item = data.get('item', '').strip()
+        
+        if not item:
+            return jsonify({"error": "Item text required"}), 400
+        
+        if "changelog_items" not in _maintenance_mode:
+            _maintenance_mode["changelog_items"] = []
+        
+        if request.method == 'POST':
+            if item not in _maintenance_mode["changelog_items"]:
+                _maintenance_mode["changelog_items"].append(item)
+                _save_maintenance_state(_maintenance_mode)
+            
+            return jsonify({
+                "status": "success",
+                "message": "Changelog item added",
+                "items": _maintenance_mode["changelog_items"]
+            })
+        
+        else:  # DELETE
+            if item in _maintenance_mode["changelog_items"]:
+                _maintenance_mode["changelog_items"].remove(item)
+                _save_maintenance_state(_maintenance_mode)
+            
+            return jsonify({
+                "status": "success",
+                "message": "Changelog item removed",
+                "items": _maintenance_mode["changelog_items"]
+            })
+        
+    except Exception as e:
+        logger.error(f"Changelog item operation failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/maintenance/complete', methods=['POST'])
+def api_admin_maintenance_complete():
+    """Complete maintenance mode and update changelog"""
+    global _maintenance_mode
+    
+    if not _maintenance_mode.get("enabled"):
+        return jsonify({"error": "Maintenance mode not active"}), 400
+    
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        data = request.json or {}
+        completion_reason = data.get('reason', 'Maintenance completed')
+        changelog_items = data.get('changelog_items', _maintenance_mode.get("changelog_items", []))
+        
+        # Create history entry
+        history_entry = {
+            "reason": _maintenance_mode.get("reason", ""),
+            "completion_reason": completion_reason,
+            "started_at": _maintenance_mode.get("started_at"),
+            "completed_at": time.time(),
+            "changelog_items": changelog_items
+        }
+        
+        if "history" not in _maintenance_mode:
+            _maintenance_mode["history"] = []
+        _maintenance_mode["history"].append(history_entry)
+        
+        # Get message IDs to notify channels
+        message_ids_to_notify = _maintenance_mode.get("message_ids", {}).copy()
+        
+        # Reset maintenance state
+        _maintenance_mode.update({
+            "enabled": False,
+            "reason": "",
+            "progress": 100,
+            "stage": "complete",
+            "started_at": None,
+            "message_ids": {},
+            "changelog_items": []
+        })
+        
+        # Update bot state
+        bot.maintenance_mode = False
+        bot.maintenance_reason = ""
+        
+        _save_maintenance_state(_maintenance_mode)
+        logger.info(f"Maintenance mode COMPLETED: {completion_reason}")
+        
+        # Auto-append to changelog if items provided
+        if changelog_items:
+            try:
+                _append_to_changelog(changelog_items, completion_reason)
+            except Exception as e:
+                logger.error(f"Failed to update changelog: {e}")
+        
+        return jsonify({
+            "status": "success",
+            "message": "Maintenance completed",
+            "completion_reason": completion_reason,
+            "changelog_items": changelog_items,
+            "message_ids_to_notify": message_ids_to_notify
+        })
+        
+    except Exception as e:
+        logger.error(f"Maintenance completion failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+def _append_to_changelog(items, reason):
+    """Append maintenance items to changelog file"""
+    from datetime import datetime
+    
+    changelog_dir = Path(__file__).parent.parent.parent / 'docs' / 'changelog' / 'bot'
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    # Find or create today's changelog
+    changelog_files = sorted(changelog_dir.glob('v*.md'), reverse=True)
+    
+    if changelog_files:
+        latest_file = changelog_files[0]
+        
+        # Append to existing file
+        with open(latest_file, 'a') as f:
+            f.write(f"\n\n## Maintenance Update ({today})\n\n")
+            f.write(f"**{reason}**\n\n")
+            for item in items:
+                f.write(f"- {item}\n")
+        
+        logger.info(f"Appended {len(items)} items to {latest_file.name}")
+    else:
+        logger.warning("No changelog file found to append to")
 
 
 # ==================== USER MANAGEMENT ENDPOINTS ====================

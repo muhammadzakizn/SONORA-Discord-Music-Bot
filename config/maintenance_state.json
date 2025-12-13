@@ -1,0 +1,10 @@
+{
+  "enabled": false,
+  "reason": "",
+  "progress": 0,
+  "stage": "starting",
+  "started_at": null,
+  "message_ids": {},
+  "changelog_items": [],
+  "history": []
+}

@@ -95,7 +95,13 @@ export default function MonitoringPage() {
 
     // Simulate real-time updates
     useEffect(() => {
-        const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+        const getApiBase = () => {
+            if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                return `${window.location.protocol}//${window.location.hostname}:5000`;
+            }
+            return process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+        };
+        const API_BASE = getApiBase();
 
         const fetchMetrics = async () => {
             // In production, fetch from API

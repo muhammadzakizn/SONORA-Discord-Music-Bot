@@ -23,7 +23,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import NavLiquidGlass from "@/components/NavLiquidGlass";
 
 interface SystemStatus {
-    status: "operational" | "degraded" | "outage" | "unknown";
+    status: "operational" | "degraded" | "outage" | "unknown" | "maintenance";
     lastChecked: Date;
     uptime: number;
     components: {
@@ -46,23 +46,38 @@ interface SystemStatus {
         latency: number;
         uptime: number;
     } | null;
+    maintenance?: {
+        enabled: boolean;
+        reason: string;
+        progress: number;
+        stage: string;
+        stage_label: string;
+        started_at: number | null;
+    };
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const getApiBase = (): string => {
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        return `${window.location.protocol}//${window.location.hostname}:5000`;
+    }
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+};
+const API_BASE = getApiBase();
 
-function StatusIndicator({ status }: { status: "operational" | "degraded" | "outage" | "unknown" }) {
+function StatusIndicator({ status }: { status: "operational" | "degraded" | "outage" | "unknown" | "maintenance" }) {
     const config = {
         operational: { color: "bg-green-500", text: "Operational", icon: CheckCircle2 },
         degraded: { color: "bg-yellow-500", text: "Degraded", icon: AlertTriangle },
         outage: { color: "bg-red-500", text: "Outage", icon: XCircle },
         unknown: { color: "bg-gray-500", text: "Unknown", icon: AlertTriangle },
+        maintenance: { color: "bg-yellow-500", text: "Under Maintenance", icon: AlertTriangle },
     };
 
     const { color, text, icon: Icon } = config[status];
 
     return (
         <div className="flex items-center gap-2">
-            <span className={cn("w-3 h-3 rounded-full", color, status === "operational" && "animate-pulse")} />
+            <span className={cn("w-3 h-3 rounded-full", color, (status === "operational" || status === "maintenance") && "animate-pulse")} />
             <Icon className={cn("w-5 h-5", color.replace("bg-", "text-"))} />
             <span className="font-medium">{text}</span>
         </div>
@@ -150,19 +165,33 @@ export default function StatusPage() {
 
     const fetchStatus = useCallback(async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/admin/health`, {
-                cache: 'no-store',
-            });
+            // Fetch both health and maintenance status
+            const [healthResponse, maintenanceResponse] = await Promise.all([
+                fetch(`${API_BASE}/api/admin/health`, { cache: 'no-store' }),
+                fetch(`${API_BASE}/api/admin/maintenance/status`, { cache: 'no-store' })
+            ]);
 
-            if (!response.ok) {
+            if (!healthResponse.ok) {
                 throw new Error('Bot offline');
             }
 
-            const data = await response.json();
+            const data = await healthResponse.json();
+            let maintenanceData = null;
+
+            if (maintenanceResponse.ok) {
+                maintenanceData = await maintenanceResponse.json();
+            }
+
+            // Determine overall status
+            let overallStatus: "operational" | "degraded" | "outage" | "unknown" | "maintenance" = "operational";
+
+            if (maintenanceData?.enabled) {
+                overallStatus = "maintenance";
+            }
 
             // Build status from health data
             setStatus({
-                status: "operational",
+                status: overallStatus,
                 lastChecked: new Date(),
                 uptime: data.system?.uptime_seconds || 0,
                 components: [
@@ -195,6 +224,14 @@ export default function StatusPage() {
                     latency: data.bot?.latency_ms || 0,
                     uptime: data.system?.uptime_seconds || 0,
                 },
+                maintenance: maintenanceData?.enabled ? {
+                    enabled: maintenanceData.enabled,
+                    reason: maintenanceData.reason || '',
+                    progress: maintenanceData.progress || 0,
+                    stage: maintenanceData.stage || 'starting',
+                    stage_label: maintenanceData.stage_label || 'In Progress',
+                    started_at: maintenanceData.started_at
+                } : undefined
             });
         } catch (err) {
             setStatus(prev => ({
@@ -274,6 +311,62 @@ export default function StatusPage() {
             </div>
 
             <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 pb-32">
+                {/* Maintenance Banner */}
+                {status.status === "maintenance" && status.maintenance && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-6 rounded-2xl border bg-yellow-500/10 border-yellow-500/30"
+                    >
+                        <div className="flex items-center gap-3 mb-4">
+                            <AlertTriangle className="w-6 h-6 text-yellow-400" />
+                            <h2 className={cn(
+                                "text-xl font-bold",
+                                isDark ? "text-white" : "text-gray-900"
+                            )}>
+                                🔧 Maintenance in Progress
+                            </h2>
+                        </div>
+                        <p className={cn(
+                            "mb-4",
+                            isDark ? "text-white/80" : "text-gray-700"
+                        )}>
+                            {status.maintenance.reason}
+                        </p>
+
+                        {/* Progress Bar */}
+                        <div className="mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className={cn(
+                                    "text-sm font-medium",
+                                    isDark ? "text-white/70" : "text-gray-600"
+                                )}>
+                                    {status.maintenance.stage_label}
+                                </span>
+                                <span className="text-yellow-400 font-bold">{status.maintenance.progress}%</span>
+                            </div>
+                            <div className={cn(
+                                "h-2 rounded-full overflow-hidden",
+                                isDark ? "bg-zinc-800" : "bg-gray-200"
+                            )}>
+                                <div
+                                    className="h-full bg-yellow-500 transition-all duration-500 rounded-full"
+                                    style={{ width: `${status.maintenance.progress}%` }}
+                                />
+                            </div>
+                        </div>
+
+                        {status.maintenance.started_at && (
+                            <p className={cn(
+                                "text-sm",
+                                isDark ? "text-white/50" : "text-gray-500"
+                            )}>
+                                Started: {new Date(status.maintenance.started_at * 1000).toLocaleString()}
+                            </p>
+                        )}
+                    </motion.div>
+                )}
+
                 {/* Overall Status */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -284,7 +377,9 @@ export default function StatusPage() {
                             ? "bg-green-500/10 border-green-500/30"
                             : status.status === "degraded"
                                 ? "bg-yellow-500/10 border-yellow-500/30"
-                                : "bg-red-500/10 border-red-500/30"
+                                : status.status === "maintenance"
+                                    ? "bg-yellow-500/10 border-yellow-500/30"
+                                    : "bg-red-500/10 border-red-500/30"
                     )}
                 >
                     <div className="flex items-center justify-between">
@@ -297,7 +392,9 @@ export default function StatusPage() {
                                     ? "All Systems Operational"
                                     : status.status === "degraded"
                                         ? "Some Systems Degraded"
-                                        : "System Outage Detected"}
+                                        : status.status === "maintenance"
+                                            ? "Scheduled Maintenance"
+                                            : "System Outage Detected"}
                             </h2>
                             <p className={isDark ? "text-white/60" : "text-gray-600"}>
                                 Last checked: {status.lastChecked.toLocaleTimeString()}
