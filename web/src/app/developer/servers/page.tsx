@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Server,
@@ -17,6 +17,7 @@ import {
     LogOut,
     Hash,
     Mic,
+    Radio,
     X,
     Ban,
     ToggleLeft,
@@ -24,6 +25,8 @@ import {
     AlertTriangle,
     CheckCircle,
     Info,
+    List,
+    HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -40,6 +43,32 @@ interface Guild {
         duration: number;
         current_time: number;
     };
+}
+
+interface Channel {
+    id: string;
+    name: string;
+    type: "text" | "voice" | "stage";
+    position: number;
+    isDisabled: boolean;
+    disableInfo?: {
+        disabled_at: string;
+        disabled_by: string;
+        reason: string;
+    };
+    permissions?: {
+        sendMessages: boolean;
+        embedLinks: boolean;
+    };
+    members?: number;
+}
+
+interface QueueItem {
+    position: number;
+    title: string;
+    artist: string;
+    duration: number;
+    requested_by: string;
 }
 
 interface GuildDetails {
@@ -61,33 +90,15 @@ interface GuildDetails {
         artwork_url?: string;
     } | null;
     queueLength: number;
-    textChannels: {
-        id: string;
-        name: string;
-        position: number;
-        isDisabled: boolean;
-        disableInfo?: {
-            disabled_at: string;
-            disabled_by: string;
-            reason: string;
-        };
-        permissions: {
-            sendMessages: boolean;
-            embedLinks: boolean;
-        };
-    }[];
-    voiceChannels: {
-        id: string;
-        name: string;
-        position: number;
-        members: number;
-    }[];
+    queueItems: QueueItem[];
+    channels: Channel[];
     members: {
         id: string;
         username: string;
         displayName: string;
         avatar: string | null;
         isBanned: boolean;
+        banReason?: string;
     }[];
 }
 
@@ -110,6 +121,10 @@ export default function ServersPage() {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
+    // Dropdown menu state
+    const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
     // Ban modal
     const [showBanModal, setShowBanModal] = useState(false);
     const [banTarget, setBanTarget] = useState<{ id: string; username: string } | null>(null);
@@ -118,6 +133,17 @@ export default function ServersPage() {
 
     useEffect(() => {
         fetchGuilds();
+    }, []);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setDropdownOpen(null);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     const fetchGuilds = async () => {
@@ -170,9 +196,16 @@ export default function ServersPage() {
         setTimeout(() => setToast(null), 3000);
     };
 
+    const formatDuration = (seconds: number): string => {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     // Server control actions
     const handleStopAudio = async (guildId: string) => {
         setActionLoading("stop");
+        setDropdownOpen(null);
         try {
             const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/stop-audio`, {
                 method: 'POST',
@@ -193,6 +226,7 @@ export default function ServersPage() {
 
     const handleClearQueue = async (guildId: string) => {
         setActionLoading("clear");
+        setDropdownOpen(null);
         try {
             const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/clear-queue`, {
                 method: 'POST',
@@ -213,13 +247,16 @@ export default function ServersPage() {
 
     const handleKickBot = async (guildId: string) => {
         setActionLoading("kick");
+        setDropdownOpen(null);
         try {
             const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/kick`, {
                 method: 'POST',
             });
             if (response.ok) {
                 showToast("Bot disconnected from voice", "success");
-                closeModal();
+                if (selectedGuild) {
+                    await fetchGuildDetails(guildId);
+                }
                 fetchGuilds();
             } else {
                 const data = await response.json();
@@ -293,6 +330,14 @@ export default function ServersPage() {
             (filter === "idle" && !guild.is_playing);
         return matchesSearch && matchesFilter;
     });
+
+    const getChannelIcon = (type: string) => {
+        switch (type) {
+            case "voice": return Mic;
+            case "stage": return Radio;
+            default: return Hash;
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -545,16 +590,78 @@ export default function ServersPage() {
                                     <ExternalLink className="w-4 h-4" />
                                     View
                                 </button>
-                                <button
-                                    className={cn(
-                                        "p-2 rounded-lg transition-colors",
-                                        isDark
-                                            ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                    )}
-                                >
-                                    <MoreVertical className="w-4 h-4" />
-                                </button>
+                                <div className="relative" ref={dropdownOpen === guild.id ? dropdownRef : null}>
+                                    <button
+                                        onClick={() => setDropdownOpen(dropdownOpen === guild.id ? null : guild.id)}
+                                        className={cn(
+                                            "p-2 rounded-lg transition-colors",
+                                            dropdownOpen === guild.id
+                                                ? "bg-purple-500/20 text-purple-400"
+                                                : isDark
+                                                    ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                        )}
+                                    >
+                                        <MoreVertical className="w-4 h-4" />
+                                    </button>
+
+                                    {/* Dropdown Menu */}
+                                    <AnimatePresence>
+                                        {dropdownOpen === guild.id && (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                className={cn(
+                                                    "absolute right-0 top-full mt-2 w-48 rounded-xl shadow-xl z-50 overflow-hidden border",
+                                                    isDark
+                                                        ? "bg-zinc-900 border-white/10"
+                                                        : "bg-white border-gray-200"
+                                                )}
+                                            >
+                                                <button
+                                                    onClick={() => handleStopAudio(guild.id)}
+                                                    disabled={actionLoading === "stop"}
+                                                    className={cn(
+                                                        "w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors",
+                                                        isDark
+                                                            ? "hover:bg-red-500/10 text-red-400"
+                                                            : "hover:bg-red-50 text-red-500"
+                                                    )}
+                                                >
+                                                    <Square className="w-4 h-4" />
+                                                    Stop Audio
+                                                </button>
+                                                <button
+                                                    onClick={() => handleClearQueue(guild.id)}
+                                                    disabled={actionLoading === "clear"}
+                                                    className={cn(
+                                                        "w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors",
+                                                        isDark
+                                                            ? "hover:bg-orange-500/10 text-orange-400"
+                                                            : "hover:bg-orange-50 text-orange-500"
+                                                    )}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                    Clear Queue
+                                                </button>
+                                                <button
+                                                    onClick={() => handleKickBot(guild.id)}
+                                                    disabled={actionLoading === "kick"}
+                                                    className={cn(
+                                                        "w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors",
+                                                        isDark
+                                                            ? "hover:bg-purple-500/10 text-purple-400"
+                                                            : "hover:bg-purple-50 text-purple-500"
+                                                    )}
+                                                >
+                                                    <LogOut className="w-4 h-4" />
+                                                    Kick Bot
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
                             </div>
                         </motion.div>
                     ))}
@@ -653,7 +760,7 @@ export default function ServersPage() {
 
                             {/* Tabs */}
                             <div className={cn(
-                                "flex border-b px-4",
+                                "flex border-b px-4 overflow-x-auto",
                                 isDark ? "border-white/10" : "border-gray-200"
                             )}>
                                 {[
@@ -666,7 +773,7 @@ export default function ServersPage() {
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id as typeof activeTab)}
                                         className={cn(
-                                            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px",
+                                            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap",
                                             activeTab === tab.id
                                                 ? "border-purple-500 text-purple-400"
                                                 : isDark
@@ -740,14 +847,14 @@ export default function ServersPage() {
                                                         "p-4 rounded-xl border text-center",
                                                         isDark ? "border-white/10 bg-zinc-800/50" : "border-gray-200 bg-gray-50"
                                                     )}>
-                                                        <p className="text-2xl font-bold text-purple-400">{guildDetails.textChannels.length}</p>
+                                                        <p className="text-2xl font-bold text-purple-400">{guildDetails.channels?.filter(c => c.type === 'text').length || 0}</p>
                                                         <p className={isDark ? "text-white/50 text-sm" : "text-gray-500 text-sm"}>Text Channels</p>
                                                     </div>
                                                     <div className={cn(
                                                         "p-4 rounded-xl border text-center",
                                                         isDark ? "border-white/10 bg-zinc-800/50" : "border-gray-200 bg-gray-50"
                                                     )}>
-                                                        <p className="text-2xl font-bold text-blue-400">{guildDetails.voiceChannels.length}</p>
+                                                        <p className="text-2xl font-bold text-blue-400">{guildDetails.channels?.filter(c => c.type === 'voice').length || 0}</p>
                                                         <p className={isDark ? "text-white/50 text-sm" : "text-gray-500 text-sm"}>Voice Channels</p>
                                                     </div>
                                                     <div className={cn(
@@ -761,7 +868,7 @@ export default function ServersPage() {
                                             </div>
                                         )}
 
-                                        {/* Channels Tab */}
+                                        {/* Channels Tab - Now shows ALL channels */}
                                         {activeTab === "channels" && guildDetails && (
                                             <div className="space-y-2">
                                                 <p className={cn(
@@ -770,54 +877,67 @@ export default function ServersPage() {
                                                 )}>
                                                     Disabled channels will show a warning when users try to use bot commands.
                                                 </p>
-                                                {guildDetails.textChannels.map(channel => (
-                                                    <div
-                                                        key={channel.id}
-                                                        className={cn(
-                                                            "flex items-center justify-between p-3 rounded-lg",
-                                                            channel.isDisabled
-                                                                ? "bg-red-500/10 border border-red-500/20"
-                                                                : isDark
-                                                                    ? "bg-zinc-800/50"
-                                                                    : "bg-gray-50"
-                                                        )}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <Hash className={cn(
-                                                                "w-4 h-4",
-                                                                channel.isDisabled ? "text-red-400" : isDark ? "text-white/50" : "text-gray-500"
-                                                            )} />
-                                                            <span className={cn(
-                                                                channel.isDisabled ? "text-red-400" : isDark ? "text-white" : "text-gray-900"
-                                                            )}>
-                                                                {channel.name}
-                                                            </span>
-                                                            {channel.isDisabled && (
-                                                                <span className="text-xs text-red-400 bg-red-500/20 px-2 py-0.5 rounded">
-                                                                    Disabled
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <button
-                                                            onClick={() => handleToggleChannel(selectedGuild.id, channel.id, channel.isDisabled)}
-                                                            disabled={actionLoading === `channel-${channel.id}`}
+                                                {guildDetails.channels?.map(channel => {
+                                                    const ChannelIcon = getChannelIcon(channel.type);
+                                                    return (
+                                                        <div
+                                                            key={channel.id}
                                                             className={cn(
-                                                                "p-2 rounded-lg transition-colors",
+                                                                "flex items-center justify-between p-3 rounded-lg",
                                                                 channel.isDisabled
-                                                                    ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                                                                    : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                                                    ? "bg-red-500/10 border border-red-500/20"
+                                                                    : isDark
+                                                                        ? "bg-zinc-800/50"
+                                                                        : "bg-gray-50"
                                                             )}
                                                         >
-                                                            {actionLoading === `channel-${channel.id}` ? (
-                                                                <RefreshCw className="w-4 h-4 animate-spin" />
-                                                            ) : channel.isDisabled ? (
-                                                                <ToggleRight className="w-4 h-4" />
-                                                            ) : (
-                                                                <ToggleLeft className="w-4 h-4" />
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                                            <div className="flex items-center gap-2">
+                                                                <ChannelIcon className={cn(
+                                                                    "w-4 h-4",
+                                                                    channel.isDisabled ? "text-red-400" : isDark ? "text-white/50" : "text-gray-500"
+                                                                )} />
+                                                                <span className={cn(
+                                                                    channel.isDisabled ? "text-red-400" : isDark ? "text-white" : "text-gray-900"
+                                                                )}>
+                                                                    {channel.name}
+                                                                </span>
+                                                                <span className={cn(
+                                                                    "text-xs px-1.5 py-0.5 rounded",
+                                                                    channel.type === 'voice'
+                                                                        ? "bg-blue-500/20 text-blue-400"
+                                                                        : channel.type === 'stage'
+                                                                            ? "bg-purple-500/20 text-purple-400"
+                                                                            : "bg-zinc-500/20 text-zinc-400"
+                                                                )}>
+                                                                    {channel.type}
+                                                                </span>
+                                                                {channel.isDisabled && (
+                                                                    <span className="text-xs text-red-400 bg-red-500/20 px-2 py-0.5 rounded">
+                                                                        Disabled
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleToggleChannel(selectedGuild.id, channel.id, channel.isDisabled)}
+                                                                disabled={actionLoading === `channel-${channel.id}`}
+                                                                className={cn(
+                                                                    "p-2 rounded-lg transition-colors",
+                                                                    channel.isDisabled
+                                                                        ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                                                                        : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                                                )}
+                                                            >
+                                                                {actionLoading === `channel-${channel.id}` ? (
+                                                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                                                ) : channel.isDisabled ? (
+                                                                    <ToggleRight className="w-4 h-4" />
+                                                                ) : (
+                                                                    <ToggleLeft className="w-4 h-4" />
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
 
@@ -873,7 +993,7 @@ export default function ServersPage() {
                                                             </div>
                                                             {member.isBanned && (
                                                                 <span className="text-xs text-red-400 bg-red-500/20 px-2 py-0.5 rounded">
-                                                                    Banned
+                                                                    Banned{member.banReason ? `: ${member.banReason}` : ''}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -950,6 +1070,80 @@ export default function ServersPage() {
                                                             Kick Bot
                                                         </button>
                                                     </div>
+                                                </div>
+
+                                                {/* Queue Display */}
+                                                <div className={cn(
+                                                    "p-4 rounded-xl border",
+                                                    isDark ? "border-white/10 bg-zinc-800/50" : "border-gray-200 bg-gray-50"
+                                                )}>
+                                                    <div className="flex items-center gap-2 mb-4">
+                                                        <List className="w-5 h-5 text-purple-400" />
+                                                        <h3 className={cn(
+                                                            "font-semibold",
+                                                            isDark ? "text-white" : "text-gray-900"
+                                                        )}>
+                                                            Queue ({guildDetails.queueLength} tracks)
+                                                        </h3>
+                                                    </div>
+                                                    {guildDetails.queueItems && guildDetails.queueItems.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {guildDetails.queueItems.map((item, idx) => (
+                                                                <div
+                                                                    key={idx}
+                                                                    className={cn(
+                                                                        "flex items-center justify-between p-3 rounded-lg",
+                                                                        isDark ? "bg-zinc-700/50" : "bg-gray-100"
+                                                                    )}
+                                                                >
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className={cn(
+                                                                            "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                                                                            isDark ? "bg-zinc-600 text-white" : "bg-gray-300 text-gray-700"
+                                                                        )}>
+                                                                            {item.position}
+                                                                        </span>
+                                                                        <div>
+                                                                            <p className={cn(
+                                                                                "font-medium text-sm",
+                                                                                isDark ? "text-white" : "text-gray-900"
+                                                                            )}>
+                                                                                {item.title}
+                                                                            </p>
+                                                                            <p className={cn(
+                                                                                "text-xs",
+                                                                                isDark ? "text-white/40" : "text-gray-500"
+                                                                            )}>
+                                                                                {item.artist}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className={cn(
+                                                                        "text-xs",
+                                                                        isDark ? "text-white/40" : "text-gray-500"
+                                                                    )}>
+                                                                        {formatDuration(item.duration)}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                            {guildDetails.queueLength > 20 && (
+                                                                <p className={cn(
+                                                                    "text-sm text-center py-2",
+                                                                    isDark ? "text-white/40" : "text-gray-500"
+                                                                )}>
+                                                                    +{guildDetails.queueLength - 20} more tracks...
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className={cn(
+                                                            "text-center py-6",
+                                                            isDark ? "text-white/40" : "text-gray-500"
+                                                        )}>
+                                                            <Music className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                                            <p className="text-sm">Queue is empty</p>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className={cn(
@@ -1064,12 +1258,18 @@ export default function ServersPage() {
                                 </div>
                             </div>
 
-                            <p className={cn(
-                                "text-xs mt-4",
-                                isDark ? "text-white/40" : "text-gray-500"
+                            <div className={cn(
+                                "flex items-start gap-2 mt-4 p-3 rounded-xl",
+                                isDark ? "bg-yellow-500/10" : "bg-yellow-50"
                             )}>
-                                User will be added to the global ban list and notified with support link.
-                            </p>
+                                <HelpCircle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                                <p className={cn(
+                                    "text-xs",
+                                    isDark ? "text-white/60" : "text-gray-600"
+                                )}>
+                                    User will be shown a warning message with reason and support link when trying to use bot commands.
+                                </p>
+                            </div>
 
                             <div className="flex gap-3 mt-6">
                                 <button

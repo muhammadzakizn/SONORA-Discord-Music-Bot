@@ -1746,20 +1746,34 @@ def api_admin_guild_details(guild_id):
                         "artwork_url": player.metadata.artwork_url
                     }
         
-        # Get queue info
+        # Get queue info with items
         queue_length = 0
+        queue_items = []
         queue_cog = bot.get_cog('QueueCommands')
         if queue_cog and int(guild_id) in queue_cog.queues:
-            queue_length = len(queue_cog.queues[int(guild_id)])
+            queue = queue_cog.queues[int(guild_id)]
+            queue_length = len(queue)
+            # Get first 20 queue items
+            for i, item in enumerate(list(queue)[:20]):
+                queue_items.append({
+                    "position": i + 1,
+                    "title": item.get('title', 'Unknown'),
+                    "artist": item.get('artist', 'Unknown'),
+                    "duration": item.get('duration', 0),
+                    "requested_by": item.get('requested_by', 'Unknown')
+                })
         
-        # Get text channels
-        text_channels = []
+        # Get ALL channels (text + voice) combined
+        all_channels = []
+        
+        # Text channels
         for channel in guild.text_channels:
             permissions = channel.permissions_for(guild.me)
             is_disabled = str(channel.id) in _disabled_channels.get(guild_id, {})
-            text_channels.append({
+            all_channels.append({
                 "id": str(channel.id),
                 "name": channel.name,
+                "type": "text",
                 "position": channel.position,
                 "isDisabled": is_disabled,
                 "disableInfo": _disabled_channels.get(guild_id, {}).get(str(channel.id)),
@@ -1769,14 +1783,29 @@ def api_admin_guild_details(guild_id):
                 }
             })
         
-        # Get voice channels
-        voice_channels = []
+        # Voice channels
         for channel in guild.voice_channels:
-            voice_channels.append({
+            is_disabled = str(channel.id) in _disabled_channels.get(guild_id, {})
+            all_channels.append({
                 "id": str(channel.id),
                 "name": channel.name,
+                "type": "voice",
                 "position": channel.position,
+                "isDisabled": is_disabled,
+                "disableInfo": _disabled_channels.get(guild_id, {}).get(str(channel.id)),
                 "members": len(channel.members)
+            })
+        
+        # Stage channels (if any)
+        for channel in guild.stage_channels:
+            is_disabled = str(channel.id) in _disabled_channels.get(guild_id, {})
+            all_channels.append({
+                "id": str(channel.id),
+                "name": channel.name,
+                "type": "stage",
+                "position": channel.position,
+                "isDisabled": is_disabled,
+                "disableInfo": _disabled_channels.get(guild_id, {}).get(str(channel.id))
             })
         
         # Get member count (limit to prevent performance issues)
@@ -1785,12 +1814,14 @@ def api_admin_guild_details(guild_id):
             if member.bot:
                 continue
             is_banned = str(member.id) in _banned_users
+            ban_info = _banned_users.get(str(member.id))
             member_list.append({
                 "id": str(member.id),
                 "username": member.name,
                 "displayName": member.display_name,
                 "avatar": str(member.avatar.url) if member.avatar else None,
-                "isBanned": is_banned
+                "isBanned": is_banned,
+                "banReason": ban_info.get("reason") if ban_info else None
             })
         
         return jsonify({
@@ -1802,8 +1833,8 @@ def api_admin_guild_details(guild_id):
             "isPlaying": is_playing,
             "currentTrack": current_track,
             "queueLength": queue_length,
-            "textChannels": sorted(text_channels, key=lambda x: x['position']),
-            "voiceChannels": sorted(voice_channels, key=lambda x: x['position']),
+            "queueItems": queue_items,
+            "channels": sorted(all_channels, key=lambda x: (0 if x['type'] == 'text' else 1, x['position'])),
             "members": member_list
         })
         

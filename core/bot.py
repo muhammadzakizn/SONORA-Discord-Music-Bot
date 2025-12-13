@@ -61,7 +61,7 @@ class MusicBot(commands.Bot):
         _original_interaction_check = self.tree.interaction_check
         
         async def maintenance_check(interaction: discord.Interaction) -> bool:
-            """Check maintenance mode before processing commands"""
+            """Check maintenance mode, banned users, and disabled channels before processing commands"""
             # Check if it's a command interaction
             if interaction.type == discord.InteractionType.application_command:
                 # Get command name
@@ -69,6 +69,8 @@ class MusicBot(commands.Bot):
                 
                 # Skip check for admin commands
                 if command_name not in ['admin', 'maintenance']:
+                    
+                    # 1. Check maintenance mode
                     if self.maintenance_mode:
                         embed = discord.Embed(
                             title="🔧 Maintenance Mode",
@@ -78,6 +80,80 @@ class MusicBot(commands.Bot):
                         embed.set_footer(text="Bot is currently under maintenance")
                         await interaction.response.send_message(embed=embed, ephemeral=True)
                         return False
+                    
+                    # 2. Check banned users
+                    try:
+                        from web.api.app import _banned_users
+                        user_id = str(interaction.user.id)
+                        if user_id in _banned_users:
+                            ban_info = _banned_users[user_id]
+                            ban_reason = ban_info.get('reason', 'No reason provided')
+                            
+                            embed = discord.Embed(
+                                title="🚫 Access Denied",
+                                description=(
+                                    f"You have been banned from using SONORA.\n\n"
+                                    f"**Reason:** {ban_reason}\n\n"
+                                    f"If you believe this is an error, please contact support."
+                                ),
+                                color=0xE53935
+                            )
+                            embed.set_footer(text="SONORA Support: https://sonora.muhamza.my.id/support")
+                            
+                            # Add support button
+                            view = discord.ui.View()
+                            view.add_item(discord.ui.Button(
+                                label="Contact Support",
+                                url="https://sonora.muhamza.my.id/support",
+                                style=discord.ButtonStyle.link,
+                                emoji="💬"
+                            ))
+                            
+                            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+                            return False
+                    except ImportError:
+                        pass  # Flask API not loaded yet
+                    except Exception as e:
+                        logger.error(f"Error checking banned users: {e}")
+                    
+                    # 3. Check disabled channels
+                    try:
+                        from web.api.app import _disabled_channels
+                        guild_id = str(interaction.guild_id) if interaction.guild_id else None
+                        channel_id = str(interaction.channel_id) if interaction.channel_id else None
+                        
+                        if guild_id and channel_id:
+                            guild_channels = _disabled_channels.get(guild_id, {})
+                            if channel_id in guild_channels:
+                                disable_info = guild_channels[channel_id]
+                                disable_reason = disable_info.get('reason', 'This channel has been disabled')
+                                
+                                embed = discord.Embed(
+                                    title="🚫 Channel Disabled",
+                                    description=(
+                                        f"Bot commands are disabled in this channel.\n\n"
+                                        f"**Reason:** {disable_reason}\n\n"
+                                        f"Please use another channel or contact server admin."
+                                    ),
+                                    color=0xE53935
+                                )
+                                embed.set_footer(text="SONORA Support: https://sonora.muhamza.my.id/support")
+                                
+                                # Add support button
+                                view = discord.ui.View()
+                                view.add_item(discord.ui.Button(
+                                    label="Contact Support",
+                                    url="https://sonora.muhamza.my.id/support",
+                                    style=discord.ButtonStyle.link,
+                                    emoji="💬"
+                                ))
+                                
+                                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+                                return False
+                    except ImportError:
+                        pass  # Flask API not loaded yet
+                    except Exception as e:
+                        logger.error(f"Error checking disabled channels: {e}")
             
             # Call original check if exists
             if _original_interaction_check:
