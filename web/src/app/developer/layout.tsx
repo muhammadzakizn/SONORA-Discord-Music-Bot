@@ -257,7 +257,31 @@ function Sidebar({
 
 function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void; sidebarOpen: boolean; isDark: boolean }) {
   const [showProfile, setShowProfile] = useState(false);
-  const { user, displayName, logout } = useSession();
+  const { user, displayName, logout, devSession, devLogout } = useSession();
+
+  // Get display name - prefer devSession displayName, then devSession username, then Discord
+  const currentDisplayName = devSession?.displayName || devSession?.username || displayName || user?.username || 'Developer';
+
+  // Get avatar - prefer devSession avatar, then Discord avatar
+  const avatarContent = devSession?.avatar ? (
+    <img
+      src={devSession.avatar}
+      alt="Profile"
+      className="w-8 h-8 rounded-full object-cover"
+    />
+  ) : user ? (
+    <Image
+      src={getAvatarUrl(user)}
+      alt={user.username}
+      width={32}
+      height={32}
+      className="rounded-full"
+    />
+  ) : (
+    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+      {currentDisplayName.charAt(0).toUpperCase()}
+    </div>
+  );
 
   return (
     <header className={cn(
@@ -314,24 +338,12 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
               isDark ? "hover:bg-white/[0.08]" : "hover:bg-black/[0.05]"
             )}
           >
-            {user ? (
-              <Image
-                src={getAvatarUrl(user)}
-                alt={user.username}
-                width={32}
-                height={32}
-                className="rounded-full"
-              />
-            ) : (
-              <div className="w-8 h-8 bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
-              </div>
-            )}
+            {avatarContent}
             <div className="hidden sm:block text-left">
               <p className={cn(
                 "text-sm font-medium",
                 isDark ? "text-white/90" : "text-gray-900"
-              )}>{displayName || user?.username || 'Developer'}</p>
+              )}>{currentDisplayName}</p>
             </div>
             <ChevronDown className={cn(
               "w-4 h-4 transition-transform",
