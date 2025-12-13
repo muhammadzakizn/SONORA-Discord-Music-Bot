@@ -80,7 +80,7 @@ const DiscordIcon = () => (
   </svg>
 );
 
-type LoginMode = "select" | "admin" | "terms" | "developer" | "mfa-select" | "mfa-verify" | "mfa-setup" | "backup-codes";
+type LoginMode = "select" | "admin" | "terms" | "developer" | "mfa-select" | "mfa-verify" | "mfa-setup" | "mfa-discord-first" | "backup-codes";
 type MFAMethod = "discord" | "totp" | "passkey" | "email";
 
 const MFA_METHODS = [
@@ -297,8 +297,8 @@ function LoginPageContent() {
 
         // Handle different flow types
         if (effectiveFlow === 'setup') {
-          // New user - need to setup MFA
-          console.log('[Login] New user flow - going to MFA setup');
+          // New user - first verify via Discord DM, then setup TOTP
+          console.log('[Login] New user flow - going to Discord verification first');
           const userId = sessionData.authUserId || Date.now(); // Use timestamp as fallback ID
 
           setAuthUser({
@@ -315,19 +315,22 @@ function LoginPageContent() {
             created_at: new Date().toISOString(),
           });
 
-          // Request TOTP setup from API
+          // Pre-fetch TOTP setup for later
           setupTOTP(userId).then((result) => {
-            console.log('[Login] TOTP setup result:', result);
+            console.log('[Login] TOTP setup pre-fetched:', result);
             if (result.success && result.qr_code && result.secret) {
               setTotpSetup({ qrCode: result.qr_code, secret: result.secret });
-              setLoginMode('mfa-setup');
-            } else {
-              console.error('[Login] TOTP setup failed:', result.error);
-              // Fallback - skip MFA for now
-              setHasRedirected(true);
-              window.location.href = '/admin';
             }
           });
+
+          // Set Discord as selected method and go to Discord-first verification
+          setSelectedMfaMethod('discord');
+          setLoginMode('mfa-discord-first');
+
+          // Auto-trigger Discord DM send
+          setTimeout(() => {
+            sendVerificationCode();
+          }, 500);
           return;
         } else if (effectiveFlow === 'verify') {
           // Existing user with MFA - need to verify
@@ -492,7 +495,7 @@ function LoginPageContent() {
 
     try {
       // If in MFA mode, use MFA-specific API with button approval
-      if (loginMode === 'mfa-select' || loginMode === 'mfa-verify') {
+      if (loginMode === 'mfa-select' || loginMode === 'mfa-verify' || loginMode === 'mfa-discord-first') {
         const userId = authUser?.id || user.id;
         const result = await sendDiscordDMCode(userId, user.id);
 
@@ -534,13 +537,42 @@ function LoginPageContent() {
             console.log('[MFA] Approval status:', status.status);
 
             if (status.status === 'approved') {
-              // Approved! Now user can enter code
+              // Approved!
               if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
               if (approvalPollingRef.current) clearInterval(approvalPollingRef.current);
               setDiscordApprovalStatus('approved');
-              setVerifyStatus("idle"); // Ready for code input
-              // Focus first input
-              setTimeout(() => verifyInputRefs.current[0]?.focus(), 100);
+
+              // Different behavior for discord-first vs mfa-verify
+              if (loginMode === 'mfa-discord-first') {
+                // New user - proceed to TOTP setup
+                console.log('[MFA] Discord approved, proceeding to TOTP setup');
+                setTimeout(() => {
+                  if (totpSetup) {
+                    setLoginMode('mfa-setup');
+                  } else {
+                    // TOTP not ready yet, wait and retry
+                    console.log('[MFA] Waiting for TOTP setup...');
+                    const checkTotp = setInterval(() => {
+                      if (totpSetup) {
+                        clearInterval(checkTotp);
+                        setLoginMode('mfa-setup');
+                      }
+                    }, 500);
+                    // Timeout after 10s
+                    setTimeout(() => {
+                      clearInterval(checkTotp);
+                      if (!totpSetup) {
+                        console.error('[MFA] TOTP setup failed to load');
+                        setVerifyError('Failed to load authenticator setup. Please try again.');
+                      }
+                    }, 10000);
+                  }
+                }, 1500);
+              } else {
+                // Existing user - ready for code input
+                setVerifyStatus("idle");
+                setTimeout(() => verifyInputRefs.current[0]?.focus(), 100);
+              }
             } else if (status.status === 'denied') {
               // Denied! Go back to login
               if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
@@ -1409,6 +1441,123 @@ function LoginPageContent() {
                   </motion.div>
                 )}
 
+                {/* Discord First Verification (for new users) */}
+                {loginMode === "mfa-discord-first" && user && (
+                  <motion.div
+                    key="mfa-discord-first"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    {/* Header */}
+                    <div className="flex flex-col items-center mb-6">
+                      <div className={cn(
+                        "w-20 h-20 mb-4 rounded-full flex items-center justify-center",
+                        discordApprovalStatus === 'waiting'
+                          ? "bg-gradient-to-br from-orange-500 to-yellow-500 animate-pulse"
+                          : discordApprovalStatus === 'approved'
+                            ? "bg-gradient-to-br from-green-500 to-emerald-500"
+                            : discordApprovalStatus === 'denied' || discordApprovalStatus === 'expired'
+                              ? "bg-gradient-to-br from-red-500 to-rose-500"
+                              : "bg-gradient-to-br from-indigo-500 to-purple-500"
+                      )}>
+                        <MessageSquare className="w-10 h-10 text-white" />
+                      </div>
+
+                      {discordApprovalStatus === 'waiting' ? (
+                        <>
+                          <h2 className="text-2xl font-bold text-white mb-2">Verify Your Identity</h2>
+                          <p className="text-white/60 text-sm text-center mb-4">
+                            We sent a verification request to your Discord DMs.<br />
+                            Please check and tap <strong className="text-green-400">Approve</strong>.
+                          </p>
+                          {/* Countdown */}
+                          <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-orange-500/20 border border-orange-500/30">
+                            <RefreshCw className="w-5 h-5 text-orange-400 animate-spin" />
+                            <span className="text-orange-300 font-mono text-lg">{approvalCountdown}s</span>
+                          </div>
+                        </>
+                      ) : discordApprovalStatus === 'approved' ? (
+                        <>
+                          <h2 className="text-2xl font-bold text-green-400 mb-2">Verified!</h2>
+                          <p className="text-white/60 text-sm text-center">
+                            Now setting up your authenticator app...
+                          </p>
+                          <div className="mt-4 flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin" />
+                            <span className="text-green-300 text-sm">Loading TOTP setup...</span>
+                          </div>
+                        </>
+                      ) : discordApprovalStatus === 'denied' ? (
+                        <>
+                          <h2 className="text-2xl font-bold text-red-400 mb-2">Access Denied</h2>
+                          <p className="text-white/60 text-sm text-center mb-4">
+                            You denied the login request in Discord.
+                          </p>
+                          <button
+                            onClick={() => {
+                              setDiscordApprovalStatus('idle');
+                              setLoginMode('select');
+                            }}
+                            className="px-6 py-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                          >
+                            Return to Login
+                          </button>
+                        </>
+                      ) : discordApprovalStatus === 'expired' ? (
+                        <>
+                          <h2 className="text-2xl font-bold text-yellow-400 mb-2">Request Expired</h2>
+                          <p className="text-white/60 text-sm text-center mb-4">
+                            The 15-second window has passed.
+                          </p>
+                          <button
+                            onClick={() => {
+                              setDiscordApprovalStatus('idle');
+                              setApprovalCountdown(15);
+                              sendVerificationCode();
+                            }}
+                            className="px-6 py-2 rounded-full bg-purple-500 text-white hover:bg-purple-600 transition-colors"
+                          >
+                            Try Again
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <h2 className="text-2xl font-bold text-white mb-2">Sending Request...</h2>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        </>
+                      )}
+                    </div>
+
+                    {/* User Info */}
+                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
+                      <Image
+                        src={getAvatarUrl(user)}
+                        alt={user.username}
+                        width={48}
+                        height={48}
+                        className="rounded-full"
+                      />
+                      <div>
+                        <p className="font-medium text-white">{user.username}</p>
+                        <p className="text-sm text-white/50">Discord: {user.id}</p>
+                      </div>
+                    </div>
+
+                    {/* Instructions */}
+                    {discordApprovalStatus === 'waiting' && (
+                      <div className="mt-6 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                        <p className="text-xs text-indigo-300 text-center">
+                          Check your Discord app for a message from <strong>SONORA</strong> bot.<br />
+                          It will show your device info and location for security.
+                        </p>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
                 {/* MFA Setup (for new users) */}
                 {loginMode === "mfa-setup" && user && (
                   <motion.div
@@ -1428,6 +1577,13 @@ function LoginPageContent() {
                       <p className="text-white/60 text-sm text-center">
                         Scan the QR code with your authenticator app
                       </p>
+                      {/* Supported Apps */}
+                      <div className="mt-3 flex flex-wrap justify-center gap-2">
+                        <span className="px-3 py-1 rounded-full bg-white/10 text-xs text-white/70">Google Authenticator</span>
+                        <span className="px-3 py-1 rounded-full bg-white/10 text-xs text-white/70">Authy</span>
+                        <span className="px-3 py-1 rounded-full bg-white/10 text-xs text-white/70">Microsoft Authenticator</span>
+                        <span className="px-3 py-1 rounded-full bg-white/10 text-xs text-white/70">1Password</span>
+                      </div>
                     </div>
 
                     {/* QR Code Display */}
@@ -1445,9 +1601,18 @@ function LoginPageContent() {
                           </div>
                         </div>
 
+                        {/* Instructions */}
+                        <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                          <p className="text-xs text-purple-300 text-center">
+                            <strong>Step 1:</strong> Open your authenticator app<br />
+                            <strong>Step 2:</strong> Tap &quot;Add account&quot; or &quot;+&quot;<br />
+                            <strong>Step 3:</strong> Scan this QR code
+                          </p>
+                        </div>
+
                         {/* Manual Entry */}
                         <div className="p-4 rounded-xl bg-white/[0.08] border border-white/[0.1]">
-                          <p className="text-xs text-white/50 mb-2">Can't scan? Enter this code manually:</p>
+                          <p className="text-xs text-white/50 mb-2">Can&apos;t scan? Enter this code manually:</p>
                           <div className="flex items-center justify-between gap-2">
                             <code className="flex-1 text-sm font-mono text-purple-300 bg-black/30 px-3 py-2 rounded-lg break-all">
                               {totpSetup.secret}
@@ -1468,6 +1633,7 @@ function LoginPageContent() {
                             </button>
                           </div>
                         </div>
+
 
                         {/* Verification Code Input */}
                         <div>
