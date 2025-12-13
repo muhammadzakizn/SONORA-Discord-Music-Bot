@@ -304,21 +304,49 @@ function LoginPageContent() {
     setError("");
     setIsLoading(true);
 
-    // Developer credentials - hardcoded for now
+    // Developer credentials - hardcoded master accounts
     const validCredentials = [
       { user: "developer", pass: "sonora2024" },
       { user: "devsonora", pass: "dev2005sonora" },
       { user: "admin", pass: "admin123" },
     ];
 
+    // Owner emails from Access Management (these are always valid)
+    const ownerEmails = [
+      "muhammadzakizn.07@gmail.com",
+      "muhammadzakizn@icloud.com",
+    ];
+
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const isValid = validCredentials.some(c => c.user === username && c.pass === password);
+    // Check username/password credentials
+    const isValidCredentials = validCredentials.some(c => c.user === username && c.pass === password);
 
-    if (isValid) {
+    // Check if username is an owner email (email-only login for owners)
+    const isOwnerEmail = ownerEmails.some(email =>
+      email.toLowerCase() === username.toLowerCase()
+    );
+
+    // Check localStorage developer accounts (by email or username)
+    let isValidDeveloper = false;
+    try {
+      const stored = localStorage.getItem("sonora-developer-accounts");
+      if (stored) {
+        const devAccounts = JSON.parse(stored);
+        isValidDeveloper = devAccounts.some((acc: { discordUsername?: string; email?: string }) =>
+          acc.email?.toLowerCase() === username.toLowerCase() ||
+          acc.discordUsername?.toLowerCase() === username.toLowerCase()
+        );
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+
+    if (isValidCredentials || isOwnerEmail || isValidDeveloper) {
       // Store auth in localStorage
       localStorage.setItem("sonora-dev-auth", btoa(JSON.stringify({
         role: "developer",
+        username: username,
         timestamp: Date.now()
       })));
 
