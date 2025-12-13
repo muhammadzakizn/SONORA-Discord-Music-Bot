@@ -243,22 +243,53 @@ function LoginPageContent() {
   const [selectedMfaMethod, setSelectedMfaMethod] = useState<MFAMethod | null>(null);
 
   // Detect ?verify=true from OAuth callback
-  // Check cookie directly and handle redirect
+  // Handle session from query param (workaround for SameSite cookie issues)
   useEffect(() => {
     const isVerifyFlow = searchParams.get('verify') === 'true';
+    const sessionFromUrl = searchParams.get('session');
 
     if (!isVerifyFlow) return;
 
-    // Debug: Check if cookie exists
+    console.log('[Login] Verify flow detected');
+    console.log('[Login] Session from URL:', sessionFromUrl ? 'present' : 'missing');
+
+    // If session is passed via URL, store it in cookie manually
+    if (sessionFromUrl) {
+      console.log('[Login] Storing session from URL to cookie...');
+
+      // Decode to make sure it's valid, then store
+      try {
+        const decoded = atob(decodeURIComponent(sessionFromUrl));
+        const sessionData = JSON.parse(decoded);
+        console.log('[Login] Session user:', sessionData.user?.username);
+
+        // Store in cookie (client-side)
+        document.cookie = `sonora-admin-session=${decodeURIComponent(sessionFromUrl)}; path=/; max-age=${60 * 60 * 24 * 7}`;
+
+        // Clean URL (remove session param for security)
+        window.history.replaceState({}, '', '/login?verify=true');
+
+        // Refresh session context to read the new cookie
+        refreshSession();
+
+        // Redirect to admin after a short delay to allow session to load
+        setTimeout(() => {
+          console.log('[Login] Redirecting to /admin...');
+          router.push('/admin');
+        }, 500);
+        return;
+      } catch (e) {
+        console.error('[Login] Failed to parse session from URL:', e);
+      }
+    }
+
+    // Check existing cookie
     const cookies = document.cookie;
     const hasSessionCookie = cookies.includes('sonora-admin-session');
 
-    console.log('[Login] Verify flow detected');
-    console.log('[Login] Cookies:', cookies.substring(0, 200));
     console.log('[Login] Has session cookie:', hasSessionCookie);
     console.log('[Login] sessionLoading:', sessionLoading);
     console.log('[Login] isLoggedIn:', isLoggedIn);
-    console.log('[Login] user:', user?.username);
 
     // If cookie exists but session not loaded, try refresh
     if (hasSessionCookie && !isLoggedIn && !sessionLoading) {
@@ -272,11 +303,6 @@ function LoginPageContent() {
       console.log('[Login] Session loaded, redirecting to /admin...');
       router.push('/admin');
       return;
-    }
-
-    // If no cookie at all after OAuth, something went wrong
-    if (!hasSessionCookie && !sessionLoading) {
-      console.log('[Login] No session cookie found after OAuth - possible redirect_uri mismatch');
     }
   }, [searchParams, isLoggedIn, user, sessionLoading, router, refreshSession]);
 

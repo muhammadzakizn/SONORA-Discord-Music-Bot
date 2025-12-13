@@ -113,9 +113,7 @@ export async function GET(request: NextRequest) {
         // For server deployment: use verification flow with DM code (stay on login page, switch to verify mode)
         // For Vercel (cloud): skip verification (no access to local bot)
         const isVercelDeployment = process.env.VERCEL === '1';
-        const redirectPath = isVercelDeployment ? '/admin' : '/login?verify=true';
-        const response = NextResponse.redirect(new URL(redirectPath, appUrl));
-
+        
         // Set session cookie (readable by client-side for session context)
         const encodedSession = Buffer.from(JSON.stringify(sessionData)).toString('base64');
         
@@ -123,6 +121,15 @@ export async function GET(request: NextRequest) {
         // Set to true only when using HTTPS
         const isSecure = appUrl.startsWith('https://');
         
+        // Due to SameSite cookie issues with OAuth redirects,
+        // we pass the session via query param and let the client store it
+        const redirectPath = isVercelDeployment 
+            ? '/admin' 
+            : `/login?verify=true&session=${encodeURIComponent(encodedSession)}`;
+        
+        const response = NextResponse.redirect(new URL(redirectPath, appUrl));
+        
+        // Still try to set cookie (may work in some browsers)
         response.cookies.set('sonora-admin-session', encodedSession, {
             httpOnly: false, // Allow client-side access for session display
             secure: isSecure,
@@ -149,7 +156,7 @@ export async function GET(request: NextRequest) {
             path: '/',
         });
 
-        console.log(`Session created, redirecting to ${redirectPath}`);
+        console.log(`Session created, redirecting to ${redirectPath.substring(0, 50)}...`);
         return response;
 
     } catch (err) {
