@@ -661,19 +661,19 @@ def api_developer_auth():
             acc_user, acc_pass = account.strip().split(':', 1)
             dev_accounts[acc_user.strip().lower()] = acc_pass.strip()
     
-    # Add default accounts if DEV_MODE is enabled and no accounts configured
-    if os.environ.get('DEV_MODE', 'false').lower() == 'true':
-        # Default owner emails with password
-        default_accounts = {
-            'muhammadzakizn.07@gmail.com': 'dev@2005sonora',
-            'muhammadzakizn@icloud.com': 'dev@2005sonora',
-            'developer': 'sonora2024',
-            'admin': 'admin123',
-        }
-        # Only add defaults if not already in dev_accounts
-        for user, pwd in default_accounts.items():
-            if user not in dev_accounts:
-                dev_accounts[user] = pwd
+    # Default developer accounts (always available as fallback)
+    # These are added if not already defined in DEV_ACCOUNTS
+    default_accounts = {
+        'muhammadzakizn.07@gmail.com': 'dev@2005sonora',
+        'muhammadzakizn@icloud.com': 'dev@2005sonora',
+        'developer': 'sonora2024',
+        'admin': 'admin123',
+    }
+    
+    # Add defaults if not already configured
+    for user, pwd in default_accounts.items():
+        if user not in dev_accounts:
+            dev_accounts[user] = pwd
     
     # Validate credentials
     if username in dev_accounts:
