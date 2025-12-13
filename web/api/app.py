@@ -2287,60 +2287,201 @@ _banned_servers = {}  # {server_id: {reason, banned_at, expires_at, banned_by}}
 _disabled_channels = {}  # {guild_id: {channel_id: {disabled_at, disabled_by, reason}}}
 
 
+# ==================== PERSISTENT USER DATABASE ====================
+_users_database_file = Path(__file__).parent.parent.parent / 'config' / 'users_database.json'
+
+def _load_users_database():
+    """Load users database from file"""
+    try:
+        if _users_database_file.exists():
+            with open(_users_database_file, 'r') as f:
+                data = json.load(f)
+                return data.get("users", {})
+    except Exception as e:
+        logger.error(f"Failed to load users database: {e}")
+    return {}
+
+def _save_users_database(users_dict):
+    """Save users database to file"""
+    try:
+        from datetime import datetime
+        data = {
+            "users": users_dict,
+            "last_updated": datetime.now().isoformat()
+        }
+        with open(_users_database_file, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save users database: {e}")
+
+# Load users database at startup
+_persistent_users = _load_users_database()
+
+
 @app.route('/api/admin/users', methods=['GET'])
 def api_admin_users():
-    """Get list of users who have interacted with the bot"""
+    """Get list of ALL users - persistent storage, survives bot restarts"""
+    global _persistent_users
     bot = get_bot()
-    if not bot:
-        return jsonify({"error": "Bot not connected"}), 503
     
     try:
-        users = []
-        
-        # Collect unique users from guilds (increased limit)
-        seen_users = {}  # {user_id: user_data}
-        max_users = 500  # Increased from 100
-        
-        for guild in bot.guilds:
-            for member in guild.members:
-                if member.bot:
-                    continue
-                if len(seen_users) >= max_users:
-                    break
+        # If bot is connected, sync current guild members to persistent database
+        if bot:
+            from datetime import datetime
+            updated = False
+            
+            for guild in bot.guilds:
+                for member in guild.members:
+                    if member.bot:
+                        continue
                     
-                user_id_str = str(member.id)
-                
-                if user_id_str in seen_users:
-                    # Add this server to the user's server list
-                    if guild.name not in seen_users[user_id_str].get("servers", []):
-                        seen_users[user_id_str]["servers"].append(guild.name)
-                    continue
-                
-                # Check if banned
-                is_banned = user_id_str in _banned_users
-                ban_info = _banned_users.get(user_id_str, {})
-                
-                seen_users[user_id_str] = {
-                    "id": user_id_str,
-                    "username": member.name,
-                    "discriminator": member.discriminator or "0",
-                    "avatar": str(member.avatar.url) if member.avatar else None,
-                    "isBanned": is_banned,
-                    "banReason": ban_info.get("reason") if is_banned else None,
-                    "banExpiry": ban_info.get("expires_at") if is_banned else None,
-                    "totalPlays": 0,  # Would need activity tracking
-                    "lastActive": member.joined_at.isoformat() if member.joined_at else "Unknown",
-                    "serverName": guild.name,  # Primary server
-                    "servers": [guild.name]  # List of all servers
-                }
+                    user_id_str = str(member.id)
+                    
+                    if user_id_str in _persistent_users:
+                        # Update existing user - add server if not in list
+                        if guild.name not in _persistent_users[user_id_str].get("servers", []):
+                            _persistent_users[user_id_str]["servers"].append(guild.name)
+                            updated = True
+                        # Update online status
+                        is_online = member.status.name != "offline"
+                        if _persistent_users[user_id_str].get("isOnline") != is_online:
+                            _persistent_users[user_id_str]["isOnline"] = is_online
+                            updated = True
+                        # Update avatar if changed
+                        avatar_url = str(member.avatar.url) if member.avatar else None
+                        if _persistent_users[user_id_str].get("avatar") != avatar_url:
+                            _persistent_users[user_id_str]["avatar"] = avatar_url
+                            updated = True
+                    else:
+                        # Add new user to persistent database
+                        is_banned = user_id_str in _banned_users
+                        ban_info = _banned_users.get(user_id_str, {})
+                        
+                        _persistent_users[user_id_str] = {
+                            "id": user_id_str,
+                            "username": member.name,
+                            "discriminator": member.discriminator or "0",
+                            "displayName": member.display_name,
+                            "avatar": str(member.avatar.url) if member.avatar else None,
+                            "isBanned": is_banned,
+                            "banReason": ban_info.get("reason") if is_banned else None,
+                            "banExpiry": ban_info.get("expires_at") if is_banned else None,
+                            "totalPlays": 0,
+                            "firstSeen": datetime.now().isoformat(),
+                            "lastActive": datetime.now().isoformat(),
+                            "isOnline": member.status.name != "offline",
+                            "serverName": guild.name,
+                            "servers": [guild.name]
+                        }
+                        updated = True
+            
+            # Save if there were updates
+            if updated:
+                _save_users_database(_persistent_users)
         
-        # Convert dict to list
-        users = list(seen_users.values())
+        # Update ban status for all users
+        for user_id, user_data in _persistent_users.items():
+            is_banned = user_id in _banned_users
+            ban_info = _banned_users.get(user_id, {})
+            user_data["isBanned"] = is_banned
+            user_data["banReason"] = ban_info.get("reason") if is_banned else None
+            user_data["banExpiry"] = ban_info.get("expires_at") if is_banned else None
+        
+        # Return all users from persistent database
+        users = list(_persistent_users.values())
         
         return jsonify(users)
         
     except Exception as e:
         logger.error(f"Failed to get users: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/users/<user_id>', methods=['DELETE'])
+def api_admin_delete_user(user_id):
+    """Delete a user from the persistent database"""
+    global _persistent_users
+    
+    try:
+        if user_id in _persistent_users:
+            deleted_user = _persistent_users.pop(user_id)
+            _save_users_database(_persistent_users)
+            logger.info(f"User deleted from database: {deleted_user.get('username', user_id)}")
+            return jsonify({
+                "success": True,
+                "message": f"User {deleted_user.get('username', user_id)} deleted"
+            })
+        else:
+            return jsonify({"error": "User not found"}), 404
+            
+    except Exception as e:
+        logger.error(f"Failed to delete user: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/users/sync', methods=['POST'])
+def api_admin_sync_users():
+    """Force sync all users from all guilds to persistent database"""
+    global _persistent_users
+    bot = get_bot()
+    
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        from datetime import datetime
+        new_users = 0
+        updated_users = 0
+        
+        for guild in bot.guilds:
+            for member in guild.members:
+                if member.bot:
+                    continue
+                
+                user_id_str = str(member.id)
+                
+                if user_id_str in _persistent_users:
+                    # Update existing user
+                    if guild.name not in _persistent_users[user_id_str].get("servers", []):
+                        _persistent_users[user_id_str]["servers"].append(guild.name)
+                    _persistent_users[user_id_str]["isOnline"] = member.status.name != "offline"
+                    _persistent_users[user_id_str]["lastActive"] = datetime.now().isoformat()
+                    _persistent_users[user_id_str]["avatar"] = str(member.avatar.url) if member.avatar else None
+                    updated_users += 1
+                else:
+                    # Add new user
+                    is_banned = user_id_str in _banned_users
+                    ban_info = _banned_users.get(user_id_str, {})
+                    
+                    _persistent_users[user_id_str] = {
+                        "id": user_id_str,
+                        "username": member.name,
+                        "discriminator": member.discriminator or "0",
+                        "displayName": member.display_name,
+                        "avatar": str(member.avatar.url) if member.avatar else None,
+                        "isBanned": is_banned,
+                        "banReason": ban_info.get("reason") if is_banned else None,
+                        "banExpiry": ban_info.get("expires_at") if is_banned else None,
+                        "totalPlays": 0,
+                        "firstSeen": datetime.now().isoformat(),
+                        "lastActive": datetime.now().isoformat(),
+                        "isOnline": member.status.name != "offline",
+                        "serverName": guild.name,
+                        "servers": [guild.name]
+                    }
+                    new_users += 1
+        
+        _save_users_database(_persistent_users)
+        
+        return jsonify({
+            "success": True,
+            "total_users": len(_persistent_users),
+            "new_users": new_users,
+            "updated_users": updated_users
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to sync users: {e}")
         return jsonify({"error": str(e)}), 500
 
 

@@ -58,6 +58,7 @@ export default function UsersServersPage() {
     // Users state
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [syncing, setSyncing] = useState(false);
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<"all" | "active" | "banned">("all");
 
@@ -148,8 +149,19 @@ export default function UsersServersPage() {
     };
 
     const deleteUser = async (userId: string) => {
-        // Remove user from the list (frontend only for now)
-        setUsers(prev => prev.filter(u => u.id !== userId));
+        // Permanently delete user from database
+        try {
+            const response = await fetch(`${API_BASE}/admin/users/${userId}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                setUsers(prev => prev.filter(u => u.id !== userId));
+            } else {
+                console.error('Failed to delete user');
+            }
+        } catch (error) {
+            console.error('Delete user failed:', error);
+        }
     };
 
     const fetchUsers = async () => {
@@ -162,16 +174,30 @@ export default function UsersServersPage() {
                 const data = await response.json();
                 setUsers(data);
             } else {
-                // Fallback to mock data if API fails
-                setUsers([
-                    { id: "1", username: "MusicLover", discriminator: "1234", avatar: null, isBanned: false, totalPlays: 150, lastActive: "2 hours ago" },
-                    { id: "2", username: "DJMaster", discriminator: "5678", avatar: null, isBanned: false, totalPlays: 320, lastActive: "5 min ago" },
-                ]);
+                setUsers([]);
             }
         } catch {
             setUsers([]);
         }
         setLoading(false);
+    };
+
+    const syncUsers = async () => {
+        setSyncing(true);
+        try {
+            const response = await fetch(`${API_BASE}/admin/users/sync`, {
+                method: 'POST',
+            });
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`Synced ${data.new_users} new users, ${data.updated_users} updated. Total: ${data.total_users}`);
+                // Refresh the users list after sync
+                fetchUsers();
+            }
+        } catch (error) {
+            console.error('Sync failed:', error);
+        }
+        setSyncing(false);
     };
 
     const toggleBan = async (userId: string) => {
@@ -237,19 +263,35 @@ export default function UsersServersPage() {
                         </p>
                     </div>
                 </div>
-                <button
-                    onClick={mainTab === "users" ? fetchUsers : fetchAllServers}
-                    disabled={mainTab === "users" ? loading : loadingServers}
-                    className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-xl transition-colors text-sm font-medium",
-                        isDark
-                            ? "bg-white/10 hover:bg-white/15 text-white"
-                            : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                <div className="flex gap-2">
+                    {mainTab === "users" && (
+                        <button
+                            onClick={syncUsers}
+                            disabled={syncing}
+                            className={cn(
+                                "flex items-center gap-2 px-4 py-2 rounded-xl transition-colors text-sm font-medium",
+                                "bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30",
+                                syncing && "opacity-50 cursor-not-allowed"
+                            )}
+                        >
+                            <RefreshCw className={cn("w-4 h-4", syncing && "animate-spin")} />
+                            {syncing ? "Syncing..." : "Sync All"}
+                        </button>
                     )}
-                >
-                    <RefreshCw className={cn("w-4 h-4", (loading || loadingServers) && "animate-spin")} />
-                    Refresh
-                </button>
+                    <button
+                        onClick={mainTab === "users" ? fetchUsers : fetchAllServers}
+                        disabled={mainTab === "users" ? loading : loadingServers}
+                        className={cn(
+                            "flex items-center gap-2 px-4 py-2 rounded-xl transition-colors text-sm font-medium",
+                            isDark
+                                ? "bg-white/10 hover:bg-white/15 text-white"
+                                : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                        )}
+                    >
+                        <RefreshCw className={cn("w-4 h-4", (loading || loadingServers) && "animate-spin")} />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {/* Main Tabs */}
@@ -504,14 +546,14 @@ export default function UsersServersPage() {
                                                 )}
                                             </button>
                                             <button
+                                                onClick={() => deleteUser(user.id)}
                                                 className={cn(
                                                     "p-1.5 rounded-lg transition-colors",
-                                                    isDark
-                                                        ? "hover:bg-white/10 text-white/40"
-                                                        : "hover:bg-gray-100 text-gray-400"
+                                                    "bg-red-500/10 text-red-400 hover:bg-red-500/20"
                                                 )}
+                                                title="Delete user permanently"
                                             >
-                                                <MoreVertical className="w-4 h-4" />
+                                                <XCircle className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </motion.div>
