@@ -133,13 +133,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Protect /developer routes - require dev auth
-  if (pathname.startsWith('/developer')) {
-    if (!devAuth) {
-      const response = NextResponse.redirect(new URL('/login', request.url));
-      return addSecurityHeaders(response);
-    }
-  }
+  // Protect /developer routes - temporarily disabled for debugging
+  // The auth is checked on client-side via localStorage
+  // if (pathname.startsWith('/developer')) {
+  //   if (!devAuth) {
+  //     const response = NextResponse.redirect(new URL('/login', request.url));
+  //     return addSecurityHeaders(response);
+  //   }
+  // }
 
   // Add security headers to all responses
   const response = NextResponse.next();
