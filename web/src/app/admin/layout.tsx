@@ -380,7 +380,7 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
 function AdminLayoutContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  const { isLoggedIn, isLoading, isMfaVerified } = useSession();
+  const { isLoggedIn, isLoading } = useSession();
   const router = useRouter();
   const { t, isDark } = useSettings();
 
@@ -409,11 +409,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       router.push('/login');
       return;
     }
-    // Check if MFA verified
-    if (!isLoading && isLoggedIn && !isMfaVerified) {
-      router.push('/mfa?redirect=/admin');
-    }
-  }, [isLoading, isLoggedIn, isMfaVerified, router]);
+    // MFA check disabled for now - OAuth is sufficient
+    // MFA can be re-enabled after integration into login page
+    // if (!isLoading && isLoggedIn && !isMfaVerified) {
+    //   router.push('/mfa?redirect=/admin');
+    // }
+  }, [isLoading, isLoggedIn, router]);
 
   if (isLoading) {
     return (
