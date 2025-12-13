@@ -30,6 +30,7 @@ import {
   Database,
   Code,
   Ban,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SessionProvider, useSession, getAvatarUrl } from "@/contexts/SessionContext";
@@ -49,6 +50,7 @@ const navItems: NavItem[] = [
   { label: "Monitoring", href: "/developer/monitoring", icon: Activity },
   { label: "Controls", href: "/developer/controls", icon: Power },
   { label: "Maintenance", href: "/developer/maintenance", icon: Wrench },
+  { label: "Changelog", href: "/developer/changelog", icon: FileText },
   { label: "Messaging", href: "/developer/messaging", icon: MessageSquare },
   { label: "Users & Servers", href: "/developer/users-servers", icon: Users },
   { label: "Bans", href: "/developer/bans", icon: Ban },

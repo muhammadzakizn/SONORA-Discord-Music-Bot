@@ -1,0 +1,134 @@
+{
+  "web_version": "3.8.0",
+  "bot_version": "3.8.0",
+  "last_updated": "2025-12-13T22:30:00+08:00",
+  "entries": [
+    {
+      "id": "v3.8.0",
+      "version": "3.8.0",
+      "date": "2025-12-13",
+      "title": "Messaging & User Tracking Overhaul",
+      "highlights": [
+        "Broadcast to DM Users",
+        "@everyone/@here mention options",
+        "Persistent user database",
+        "Maintenance mode persists across restarts"
+      ],
+      "changes": [
+        {
+          "category": "Messaging System",
+          "items": [
+            "3 target types: All Servers, Specific Channel, DM Users",
+            "@everyone and @here mention options",
+            "Channel permission indicators",
+            "Voice/Stage channel visibility"
+          ]
+        },
+        {
+          "category": "User Tracking",
+          "items": [
+            "Persistent user database in JSON",
+            "Users stored even after leaving server",
+            "Manual delete from dashboard only",
+            "Sync function to refresh users"
+          ]
+        },
+        {
+          "category": "Maintenance Mode",
+          "items": [
+            "CRITICAL: Maintenance now persists across bot restarts",
+            "State saved to config/maintenance_state.json",
+            "Loaded on bot startup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "v3.7.0",
+      "version": "3.7.0",
+      "date": "2025-12-13",
+      "title": "Multi-Factor Authentication",
+      "highlights": [
+        "Passkey (WebAuthn) biometric authentication",
+        "TOTP Authenticator App support",
+        "OTP via Discord DM or Email",
+        "Bank-level security"
+      ],
+      "changes": [
+        {
+          "category": "Authentication Methods",
+          "items": [
+            "Passkey (WebAuthn) - fingerprint/Face ID default",
+            "TOTP Authenticator - Google Authenticator, Authy",
+            "OTP via Discord DM - existing method",
+            "OTP via Email - new method"
+          ]
+        },
+        {
+          "category": "API Endpoints",
+          "items": [
+            "Passkey registration (register + complete)",
+            "Passkey authentication (authenticate + complete)",
+            "TOTP setup with QR code generation",
+            "TOTP verification"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "v3.6.0",
+      "version": "3.6.0",
+      "date": "2025-12-13",
+      "title": "Maintenance, Bans & Support System",
+      "highlights": [
+        "Maintenance Mode with progress tracking",
+        "User & Server Ban Management",
+        "Support Dashboard for Admin",
+        "Phase 3-6 Complete"
+      ],
+      "changes": [
+        {
+          "category": "Maintenance System",
+          "items": [
+            "Maintenance Mode page with progress stages",
+            "Real-time progress percentage slider",
+            "Maintenance history log",
+            "Status Page integration"
+          ]
+        },
+        {
+          "category": "Ban Management",
+          "items": [
+            "User ban with reason and duration",
+            "Server ban with auto-leave on reinvite",
+            "Ban list with search and filter",
+            "Unban/Reban functionality"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "v3.5.0",
+      "version": "3.5.0",
+      "date": "2025-12-13",
+      "title": "Developer Dashboard Major Upgrade",
+      "highlights": [
+        "Complete Developer Dashboard redesign",
+        "Real-time System Monitoring",
+        "Bot Controls: Shutdown, Restart, Pause",
+        "Server & User Management"
+      ],
+      "changes": [
+        {
+          "category": "Developer Dashboard",
+          "items": [
+            "Dashboard overview with system stats",
+            "Real-time Console with log filtering",
+            "System Monitoring with live metrics",
+            "Bot Controls with maintenance mode"
+          ]
+        }
+      ]
+    }
+  ]
+}

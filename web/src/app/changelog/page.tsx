@@ -1,13 +1,81 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowLeft, Sparkles, Calendar, Tag, ChevronRight } from 'lucide-react';
-import { CHANGELOG, WEB_VERSION, BOT_VERSION } from '@/constants/version';
+import { ArrowLeft, Sparkles, Calendar, Tag, ChevronRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+interface ChangelogEntry {
+    id: string;
+    version: string;
+    date: string;
+    title: string;
+    highlights: string[];
+    changes: {
+        category: string;
+        items: string[];
+    }[];
+}
+
+interface ChangelogData {
+    web_version: string;
+    bot_version: string;
+    entries: ChangelogEntry[];
+}
+
+// Fallback data in case API fails
+const FALLBACK_CHANGELOG: ChangelogEntry[] = [
+    {
+        id: "v3.8.0",
+        version: "3.8.0",
+        date: "2025-12-13",
+        title: "Messaging & User Tracking",
+        highlights: ["Broadcast to DM Users", "@everyone/@here mention", "Persistent user database"],
+        changes: [{ category: "Features", items: ["New messaging system"] }]
+    }
+];
+
 export default function ChangelogPage() {
+    const [changelog, setChangelog] = useState<ChangelogData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchChangelog();
+    }, []);
+
+    const fetchChangelog = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch('/api/bot/changelog', {
+                cache: 'no-store'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setChangelog(data);
+            } else {
+                // Use fallback
+                setChangelog({
+                    web_version: "3.8.0",
+                    bot_version: "3.8.0",
+                    entries: FALLBACK_CHANGELOG
+                });
+            }
+        } catch (error) {
+            console.error('Failed to fetch changelog:', error);
+            setChangelog({
+                web_version: "3.8.0",
+                bot_version: "3.8.0",
+                entries: FALLBACK_CHANGELOG
+            });
+        }
+        setLoading(false);
+    };
+
+    const entries = changelog?.entries || [];
+    const webVersion = changelog?.web_version || "3.8.0";
+    const botVersion = changelog?.bot_version || "3.8.0";
+
     return (
         <div className="min-h-screen bg-black text-white">
             {/* Header */}
@@ -21,9 +89,18 @@ export default function ChangelogPage() {
                             <ArrowLeft className="w-5 h-5" />
                             <span>Kembali</span>
                         </Link>
-                        <div className="flex items-center gap-2 text-sm text-zinc-500">
-                            <Tag className="w-4 h-4" />
-                            Web v{WEB_VERSION} • Bot v{BOT_VERSION}
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={fetchChangelog}
+                                disabled={loading}
+                                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                            >
+                                <RefreshCw className={cn("w-4 h-4 text-zinc-400", loading && "animate-spin")} />
+                            </button>
+                            <div className="flex items-center gap-2 text-sm text-zinc-500">
+                                <Tag className="w-4 h-4" />
+                                Web v{webVersion} • Bot v{botVersion}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -45,14 +122,21 @@ export default function ChangelogPage() {
                     </p>
                 </motion.div>
 
+                {/* Loading State */}
+                {loading && entries.length === 0 && (
+                    <div className="flex justify-center py-12">
+                        <RefreshCw className="w-8 h-8 text-purple-400 animate-spin" />
+                    </div>
+                )}
+
                 {/* Changelog List */}
                 <div className="space-y-8">
-                    {CHANGELOG.map((entry, index) => {
+                    {entries.map((entry, index) => {
                         const isLatest = index === 0;
 
                         return (
                             <motion.div
-                                key={entry.version}
+                                key={entry.id || entry.version}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.1 }}
@@ -92,45 +176,56 @@ export default function ChangelogPage() {
                                 </div>
 
                                 {/* Highlights */}
-                                <div className="mb-6 p-4 rounded-xl bg-black/30 border border-white/5">
-                                    <p className="text-sm font-medium text-zinc-400 mb-3">Highlights</p>
-                                    <ul className="grid sm:grid-cols-2 gap-2">
-                                        {entry.highlights.map((highlight, i) => (
-                                            <li key={i} className="flex items-start gap-2 text-sm">
-                                                <ChevronRight className={cn(
-                                                    "w-4 h-4 shrink-0 mt-0.5",
-                                                    isLatest ? "text-purple-400" : "text-zinc-500"
-                                                )} />
-                                                <span className="text-zinc-300">{highlight}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
+                                {entry.highlights && entry.highlights.length > 0 && (
+                                    <div className="mb-6 p-4 rounded-xl bg-black/30 border border-white/5">
+                                        <p className="text-sm font-medium text-zinc-400 mb-3">Highlights</p>
+                                        <ul className="grid sm:grid-cols-2 gap-2">
+                                            {entry.highlights.map((highlight, i) => (
+                                                <li key={i} className="flex items-start gap-2 text-sm">
+                                                    <ChevronRight className={cn(
+                                                        "w-4 h-4 shrink-0 mt-0.5",
+                                                        isLatest ? "text-purple-400" : "text-zinc-500"
+                                                    )} />
+                                                    <span className="text-zinc-300">{highlight}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
 
                                 {/* Detailed Changes */}
-                                <div className="space-y-4">
-                                    {entry.changes.map((change, i) => (
-                                        <div key={i}>
-                                            <p className={cn(
-                                                "text-sm font-semibold mb-2",
-                                                isLatest ? "text-purple-300" : "text-zinc-400"
-                                            )}>
-                                                {change.category}
-                                            </p>
-                                            <ul className="space-y-1 pl-4">
-                                                {change.items.map((item, j) => (
-                                                    <li key={j} className="text-sm text-zinc-400 list-disc list-outside">
-                                                        {item}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ))}
-                                </div>
+                                {entry.changes && entry.changes.length > 0 && (
+                                    <div className="space-y-4">
+                                        {entry.changes.map((change, i) => (
+                                            <div key={i}>
+                                                <p className={cn(
+                                                    "text-sm font-semibold mb-2",
+                                                    isLatest ? "text-purple-300" : "text-zinc-400"
+                                                )}>
+                                                    {change.category}
+                                                </p>
+                                                <ul className="space-y-1 pl-4">
+                                                    {change.items.map((item, j) => (
+                                                        <li key={j} className="text-sm text-zinc-400 list-disc list-outside">
+                                                            {item}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </motion.div>
                         );
                     })}
                 </div>
+
+                {/* Empty State */}
+                {!loading && entries.length === 0 && (
+                    <div className="text-center py-12 text-zinc-500">
+                        <p>Belum ada changelog tersedia</p>
+                    </div>
+                )}
 
                 {/* Footer */}
                 <div className="text-center mt-12 text-zinc-500 text-sm">

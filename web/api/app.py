@@ -2437,6 +2437,172 @@ def _append_to_changelog(items, reason):
         logger.warning("No changelog file found to append to")
 
 
+# ==================== CHANGELOG API ====================
+_changelog_file = Path(__file__).parent.parent.parent / 'config' / 'changelog.json'
+
+def _load_changelog():
+    """Load changelog from JSON file"""
+    try:
+        if _changelog_file.exists():
+            with open(_changelog_file, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load changelog: {e}")
+    return {"web_version": "0.0.0", "bot_version": "0.0.0", "entries": []}
+
+def _save_changelog(data):
+    """Save changelog to JSON file"""
+    try:
+        from datetime import datetime
+        data["last_updated"] = datetime.now().isoformat()
+        with open(_changelog_file, 'w') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save changelog: {e}")
+        return False
+
+
+@app.route('/api/changelog', methods=['GET'])
+def api_changelog_get():
+    """Get all changelog entries"""
+    changelog = _load_changelog()
+    return jsonify(changelog)
+
+
+@app.route('/api/changelog/entries', methods=['GET', 'POST'])
+def api_changelog_entries():
+    """Get or add changelog entries"""
+    changelog = _load_changelog()
+    
+    if request.method == 'GET':
+        return jsonify(changelog.get('entries', []))
+    
+    # POST - add new entry
+    try:
+        data = request.json
+        
+        new_entry = {
+            "id": f"v{data.get('version', '0.0.0')}",
+            "version": data.get('version', '0.0.0'),
+            "date": data.get('date', datetime.now().strftime('%Y-%m-%d')),
+            "title": data.get('title', 'New Update'),
+            "highlights": data.get('highlights', []),
+            "changes": data.get('changes', [])
+        }
+        
+        # Insert at beginning (newest first)
+        changelog['entries'].insert(0, new_entry)
+        
+        # Update versions
+        if data.get('update_version'):
+            changelog['web_version'] = data.get('version', changelog['web_version'])
+            changelog['bot_version'] = data.get('version', changelog['bot_version'])
+        
+        if _save_changelog(changelog):
+            return jsonify({
+                "success": True,
+                "entry": new_entry
+            })
+        else:
+            return jsonify({"error": "Failed to save"}), 500
+            
+    except Exception as e:
+        logger.error(f"Failed to add changelog entry: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/changelog/entries/<entry_id>', methods=['GET', 'PUT', 'DELETE'])
+def api_changelog_entry(entry_id):
+    """Get, update, or delete a specific changelog entry"""
+    changelog = _load_changelog()
+    
+    # Find entry
+    entry_index = None
+    for i, entry in enumerate(changelog.get('entries', [])):
+        if entry.get('id') == entry_id or entry.get('version') == entry_id:
+            entry_index = i
+            break
+    
+    if entry_index is None:
+        return jsonify({"error": "Entry not found"}), 404
+    
+    if request.method == 'GET':
+        return jsonify(changelog['entries'][entry_index])
+    
+    elif request.method == 'PUT':
+        try:
+            data = request.json
+            
+            # Update entry
+            changelog['entries'][entry_index].update({
+                "version": data.get('version', changelog['entries'][entry_index]['version']),
+                "date": data.get('date', changelog['entries'][entry_index]['date']),
+                "title": data.get('title', changelog['entries'][entry_index]['title']),
+                "highlights": data.get('highlights', changelog['entries'][entry_index]['highlights']),
+                "changes": data.get('changes', changelog['entries'][entry_index]['changes'])
+            })
+            
+            if _save_changelog(changelog):
+                return jsonify({
+                    "success": True,
+                    "entry": changelog['entries'][entry_index]
+                })
+            else:
+                return jsonify({"error": "Failed to save"}), 500
+                
+        except Exception as e:
+            logger.error(f"Failed to update changelog entry: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    elif request.method == 'DELETE':
+        try:
+            deleted = changelog['entries'].pop(entry_index)
+            if _save_changelog(changelog):
+                return jsonify({
+                    "success": True,
+                    "deleted": deleted['version']
+                })
+            else:
+                return jsonify({"error": "Failed to save"}), 500
+        except Exception as e:
+            logger.error(f"Failed to delete changelog entry: {e}")
+            return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/changelog/version', methods=['GET', 'PUT'])
+def api_changelog_version():
+    """Get or update current version numbers"""
+    changelog = _load_changelog()
+    
+    if request.method == 'GET':
+        return jsonify({
+            "web_version": changelog.get('web_version', '0.0.0'),
+            "bot_version": changelog.get('bot_version', '0.0.0')
+        })
+    
+    # PUT - update versions
+    try:
+        data = request.json
+        if 'web_version' in data:
+            changelog['web_version'] = data['web_version']
+        if 'bot_version' in data:
+            changelog['bot_version'] = data['bot_version']
+        
+        if _save_changelog(changelog):
+            return jsonify({
+                "success": True,
+                "web_version": changelog['web_version'],
+                "bot_version": changelog['bot_version']
+            })
+        else:
+            return jsonify({"error": "Failed to save"}), 500
+            
+    except Exception as e:
+        logger.error(f"Failed to update version: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ==================== USER MANAGEMENT ENDPOINTS ====================
 
 # In-memory storage for bans (in production, use database)
