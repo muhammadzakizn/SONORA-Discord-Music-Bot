@@ -428,19 +428,42 @@ function DeveloperLayoutContent({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Check for localStorage developer auth (for direct developer login)
   useEffect(() => {
+    const devAuth = localStorage.getItem('sonora-dev-auth');
+    if (devAuth) {
+      try {
+        const parsed = JSON.parse(atob(devAuth));
+        if (parsed.role === 'developer') {
+          // Developer logged in via developer portal - allow access
+          return;
+        }
+      } catch {
+        // Invalid auth, continue to check session
+      }
+    }
+
+    // If no dev auth, check Discord session
     if (!isLoading && !isLoggedIn) {
-      router.push('/login');
+      // Check localStorage again before redirecting
+      const devAuthCheck = localStorage.getItem('sonora-dev-auth');
+      if (!devAuthCheck) {
+        router.push('/login');
+      }
       return;
     }
-    // Check if MFA verified
+    // Check if MFA verified (only for Discord users, not for dev login)
     if (!isLoading && isLoggedIn && !isMfaVerified) {
       router.push('/mfa?redirect=/developer');
       return;
     }
-    // Check if developer
+    // Check if developer (only for Discord users)
     if (!isLoading && isLoggedIn && !isDeveloper) {
-      router.push('/admin'); // Redirect non-developers to admin
+      // Check if they have dev localStorage auth
+      const devAuth = localStorage.getItem('sonora-dev-auth');
+      if (!devAuth) {
+        router.push('/admin'); // Redirect non-developers to admin
+      }
     }
   }, [isLoading, isLoggedIn, isMfaVerified, isDeveloper, router]);
 

@@ -1,23 +1,26 @@
 // SONORA Push Notification Service Worker
 // Custom sound and offline support
 
-const CACHE_NAME = 'sonora-v3.8.0';
-const NOTIFICATION_SOUND = '/notification-sound.mp3';
+const CACHE_NAME = 'sonora-v3.8.6';
 
-// Files to cache for offline
+// Files to cache for offline (only files that definitely exist)
 const urlsToCache = [
-  '/',
   '/sonora-logo.png',
   '/manifest.json',
-  NOTIFICATION_SOUND,
 ];
 
-// Install event - cache essential files
+// Install event - cache essential files with error handling
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
+      .then((cache) => {
+        // Add files one by one so one failure doesn't break everything
+        return Promise.allSettled(
+          urlsToCache.map(url => cache.add(url).catch(() => console.warn('Failed to cache:', url)))
+        );
+      })
       .then(() => self.skipWaiting())
+      .catch((err) => console.warn('SW install error:', err))
   );
 });
 
