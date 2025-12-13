@@ -298,67 +298,52 @@ function LoginPageContent() {
     window.location.href = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
   }, []);
 
-  // Handle Developer login
+  // Handle Developer login - SECURE: calls backend API, no credentials in frontend
   const handleDeveloperLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
-    // Developer credentials - hardcoded master accounts
-    const validCredentials = [
-      { user: "developer", pass: "sonora2024" },
-      { user: "devsonora", pass: "dev2005sonora" },
-      { user: "admin", pass: "admin123" },
-    ];
+    const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
 
-    // Owner emails from Access Management (these are always valid)
-    const ownerEmails = [
-      "muhammadzakizn.07@gmail.com",
-      "muhammadzakizn@icloud.com",
-    ];
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Check username/password credentials
-    const isValidCredentials = validCredentials.some(c => c.user === username && c.pass === password);
-
-    // Check if username is an owner email (email-only login for owners)
-    const isOwnerEmail = ownerEmails.some(email =>
-      email.toLowerCase() === username.toLowerCase()
-    );
-
-    // Check localStorage developer accounts (by email or username)
-    let isValidDeveloper = false;
     try {
-      const stored = localStorage.getItem("sonora-developer-accounts");
-      if (stored) {
-        const devAccounts = JSON.parse(stored);
-        isValidDeveloper = devAccounts.some((acc: { discordUsername?: string; email?: string }) =>
-          acc.email?.toLowerCase() === username.toLowerCase() ||
-          acc.discordUsername?.toLowerCase() === username.toLowerCase()
-        );
+      // Call secure backend API for authentication
+      const response = await fetch(`${API_BASE}/api/developer/auth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Store auth token securely in localStorage
+        localStorage.setItem("sonora-dev-auth", btoa(JSON.stringify({
+          role: data.role || "developer",
+          username: data.username,
+          token: data.token,
+          timestamp: Date.now()
+        })));
+
+        // Set cookie for middleware
+        document.cookie = "sonora-dev-auth=authenticated; path=/; max-age=86400; SameSite=Lax";
+
+        // Redirect to developer dashboard
+        setTimeout(() => {
+          window.location.href = "/developer";
+        }, 100);
+      } else {
+        setError(data.error || t('login.invalidCredentials'));
+        setIsLoading(false);
       }
-    } catch {
-      // Ignore parsing errors
-    }
-
-    if (isValidCredentials || isOwnerEmail || isValidDeveloper) {
-      // Store auth in localStorage
-      localStorage.setItem("sonora-dev-auth", btoa(JSON.stringify({
-        role: "developer",
-        username: username,
-        timestamp: Date.now()
-      })));
-
-      // Set cookie for middleware (ensure it's set before redirect)
-      document.cookie = "sonora-dev-auth=authenticated; path=/; max-age=86400; SameSite=Lax";
-
-      // Use window.location for proper cookie handling
-      setTimeout(() => {
-        window.location.href = "/developer";
-      }, 100);
-    } else {
-      setError(t('login.invalidCredentials'));
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(t('login.serverError') || 'Server error. Please try again.');
       setIsLoading(false);
     }
   }, [username, password, t]);
