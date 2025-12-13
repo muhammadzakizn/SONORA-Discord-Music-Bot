@@ -316,6 +316,14 @@ class MusicBot(commands.Bot):
             # Setup permission monitoring
             from utils.permission_monitor import setup_permission_events
             await setup_permission_events(self)
+            
+            # Connect bot instance to auth API for Discord DM MFA
+            try:
+                from web.api.auth_api import set_auth_bot_instance
+                set_auth_bot_instance(self)
+                logger.info("✓ Auth API connected to bot for Discord DM MFA")
+            except Exception as e:
+                logger.warning(f"Auth API not available: {e}")
 
         
         @self.event
