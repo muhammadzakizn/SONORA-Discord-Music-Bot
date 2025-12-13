@@ -62,7 +62,7 @@ type PopupType = "explore" | "profile" | "settings" | null;
 
 export default function NavLiquidGlass() {
     const pathname = usePathname();
-    const { user, isLoggedIn, logout } = useSession();
+    const { user, isLoggedIn, logout, devSession, isDevLoggedIn, devLogout } = useSession();
     const {
         isDark,
         t,
@@ -153,7 +153,7 @@ export default function NavLiquidGlass() {
         setIsNavHidden(!isNavHidden);
     };
 
-    const isDeveloper = user ? DEVELOPER_IDS.includes(user.id) : false;
+    const isDeveloper = (user ? DEVELOPER_IDS.includes(user.id) : false) || isDevLoggedIn;
 
     return (
         <>
@@ -189,6 +189,9 @@ export default function NavLiquidGlass() {
                                 t={t}
                                 logout={logout}
                                 onClose={() => setActivePopup(null)}
+                                devSession={devSession}
+                                isDevLoggedIn={isDevLoggedIn}
+                                devLogout={devLogout}
                             />
                         )}
                         {activePopup === "settings" && (
@@ -273,13 +276,22 @@ export default function NavLiquidGlass() {
 
                             {/* Profile */}
                             <NavButton
-                                icon={isLoggedIn && user ? undefined : User}
-                                avatarUrl={isLoggedIn && user ? getAvatarUrl(user) : undefined}
+                                icon={(isLoggedIn && user) || isDevLoggedIn ? undefined : User}
+                                avatarUrl={
+                                    isLoggedIn && user
+                                        ? getAvatarUrl(user)
+                                        : isDevLoggedIn && devSession?.avatar
+                                            ? devSession.avatar
+                                            : isDevLoggedIn
+                                                ? '/default-dev-avatar.png'
+                                                : undefined
+                                }
                                 label={t("nav.profile") || "Profile"}
                                 isActive={activePopup === "profile"}
                                 onClick={() => togglePopup("profile")}
                                 isDark={isDark}
                                 data-nav-button
+                                showBadge={isDevLoggedIn}
                             />
                         </motion.nav>
                     ) : null}
@@ -466,6 +478,9 @@ function ProfileMenu({
     t,
     logout,
     onClose,
+    devSession,
+    isDevLoggedIn,
+    devLogout,
 }: {
     user: DiscordUser | null;
     isLoggedIn: boolean;
@@ -474,7 +489,95 @@ function ProfileMenu({
     t: (key: string) => string;
     logout: () => void;
     onClose: () => void;
+    devSession: { role: string; username: string; displayName?: string; avatar?: string } | null;
+    isDevLoggedIn: boolean;
+    devLogout: () => void;
 }) {
+    // Developer session active - show developer profile
+    if (isDevLoggedIn && devSession) {
+        return (
+            <div className="p-3">
+                <div className="flex items-center justify-between mb-3 px-2">
+                    <h3 className={cn("text-sm font-semibold", isDark ? "text-white" : "text-gray-900")}>
+                        Developer Profile
+                    </h3>
+                    <button
+                        onClick={onClose}
+                        className={cn(
+                            "p-1 rounded-lg transition-colors",
+                            isDark ? "hover:bg-white/10 text-white/50" : "hover:bg-black/5 text-gray-400"
+                        )}
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                {/* Developer Info */}
+                <div
+                    className={cn(
+                        "flex items-center gap-3 p-3 rounded-xl mb-3",
+                        isDark ? "bg-white/5" : "bg-gray-100"
+                    )}
+                >
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
+                        {(devSession.displayName || devSession.username || 'D').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className={cn("font-semibold truncate", isDark ? "text-white" : "text-gray-900")}>
+                            {devSession.displayName || devSession.username}
+                        </p>
+                        <p className={cn("text-sm truncate", isDark ? "text-white/50" : "text-gray-500")}>
+                            {devSession.username}
+                        </p>
+                    </div>
+                    <div className="px-2 py-1 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-400">
+                        {devSession.role === 'owner' ? 'Owner' : 'Dev'}
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-1">
+                    <Link
+                        href="/developer"
+                        onClick={onClose}
+                        className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors",
+                            isDark ? "hover:bg-white/10 text-white/80" : "hover:bg-black/5 text-gray-700"
+                        )}
+                    >
+                        <LayoutDashboard className="w-5 h-5" />
+                        <span className="text-sm font-medium">Developer Dashboard</span>
+                    </Link>
+
+                    <Link
+                        href="/developer/profile"
+                        onClick={onClose}
+                        className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors",
+                            isDark ? "hover:bg-white/10 text-white/80" : "hover:bg-black/5 text-gray-700"
+                        )}
+                    >
+                        <User className="w-5 h-5" />
+                        <span className="text-sm font-medium">Profile Settings</span>
+                    </Link>
+
+                    <div className={cn("my-2 border-t", isDark ? "border-white/10" : "border-gray-200")} />
+
+                    <button
+                        onClick={() => {
+                            devLogout();
+                            onClose();
+                        }}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-left text-rose-500 hover:bg-rose-500/10 transition-colors"
+                    >
+                        <LogOut className="w-5 h-5" />
+                        <span className="text-sm font-medium">Logout</span>
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     if (!isLoggedIn || !user) {
         // Not logged in - show login options
         return (

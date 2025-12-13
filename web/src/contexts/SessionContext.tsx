@@ -26,6 +26,16 @@ export interface UserSession {
     timestamp: number;
 }
 
+// Developer session for developer portal login
+export interface DeveloperSession {
+    role: string;
+    username: string;
+    displayName?: string;
+    avatar?: string;
+    token?: string;
+    timestamp: number;
+}
+
 interface SessionContextType {
     session: UserSession | null;
     user: DiscordUser | null;
@@ -36,6 +46,11 @@ interface SessionContextType {
     isLoading: boolean;
     isMfaVerified: boolean;
     isDeveloper: boolean;
+    // Developer session
+    devSession: DeveloperSession | null;
+    isDevLoggedIn: boolean;
+    devLogout: () => void;
+    updateDevProfile: (profile: Partial<DeveloperSession>) => void;
     logout: () => void;
     refreshSession: () => void;
     setDisplayName: (name: string) => void;
@@ -141,6 +156,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const [displayName, setDisplayNameState] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
     const [isMfaVerified, setIsMfaVerifiedState] = useState(false);
+    const [devSession, setDevSession] = useState<DeveloperSession | null>(null);
+
+    // Load developer session from localStorage
+    const loadDevSession = useCallback(() => {
+        if (typeof window === 'undefined') return null;
+        try {
+            const stored = localStorage.getItem('sonora-dev-auth');
+            if (stored) {
+                const decoded = JSON.parse(atob(stored));
+                // Check if session is still valid (24 hours)
+                if (Date.now() - decoded.timestamp < 24 * 60 * 60 * 1000) {
+                    return decoded as DeveloperSession;
+                } else {
+                    // Session expired, clear it
+                    localStorage.removeItem('sonora-dev-auth');
+                    document.cookie = 'sonora-dev-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                }
+            }
+        } catch {
+            // Invalid session data
+        }
+        return null;
+    }, []);
 
     const refreshSession = useCallback(() => {
         const userSession = getSessionFromCookie();
@@ -156,8 +194,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             setIsMfaVerifiedState(mfaStatus);
         }
 
+        // Load developer session
+        const devSess = loadDevSession();
+        setDevSession(devSess);
+
         setIsLoading(false);
-    }, []);
+    }, [loadDevSession]);
 
     useEffect(() => {
         refreshSession();
@@ -170,6 +212,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setIsMfaVerifiedState(false);
         window.location.href = '/login';
     }, []);
+
+    const devLogout = useCallback(() => {
+        localStorage.removeItem('sonora-dev-auth');
+        document.cookie = 'sonora-dev-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        setDevSession(null);
+        window.location.href = '/';
+    }, []);
+
+    const updateDevProfile = useCallback((profile: Partial<DeveloperSession>) => {
+        if (!devSession) return;
+        const updated = { ...devSession, ...profile };
+        localStorage.setItem('sonora-dev-auth', btoa(JSON.stringify(updated)));
+        setDevSession(updated);
+    }, [devSession]);
 
     const setDisplayName = useCallback((name: string) => {
         if (session?.user) {
@@ -185,10 +241,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
     }, [session?.user]);
 
-    // Check if user is developer
-    const isDeveloper = session?.user
-        ? isDeveloperByDiscord(session.user.username)
-        : false;
+    // Check if user is developer (Discord or dev portal login)
+    const isDeveloper = (session?.user ? isDeveloperByDiscord(session.user.username) : false) || !!devSession;
 
     // Filter guilds where user is owner or has admin/manage_guild permission
     const managedGuilds = session?.guilds.filter(guild =>
@@ -202,13 +256,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             value={{
                 session,
                 user: session?.user || null,
-                displayName,
+                displayName: displayName || devSession?.displayName || devSession?.username || '',
                 guilds: session?.guilds || [],
                 managedGuilds,
                 isLoggedIn: !!session,
                 isLoading,
                 isMfaVerified,
                 isDeveloper,
+                devSession,
+                isDevLoggedIn: !!devSession,
+                devLogout,
+                updateDevProfile,
                 logout,
                 refreshSession,
                 setDisplayName,
