@@ -166,16 +166,25 @@ export default function ServersPage() {
 
     const fetchGuildDetails = useCallback(async (guildId: string) => {
         setLoadingDetails(true);
+        setGuildDetails(null); // Reset previous data
         try {
+            console.log(`Fetching guild details for: ${guildId}`);
             const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/details`, {
                 cache: 'no-store',
             });
+            console.log(`Response status: ${response.status}`);
             if (response.ok) {
                 const data = await response.json();
+                console.log('Guild details:', data);
                 setGuildDetails(data);
+            } else {
+                const errorText = await response.text();
+                console.error('Failed to fetch guild details:', response.status, errorText);
+                showToast(`Failed to load server details: ${response.status}`, "error");
             }
         } catch (error) {
             console.error('Failed to fetch guild details:', error);
+            showToast("Failed to connect to API", "error");
         }
         setLoadingDetails(false);
     }, []);
@@ -792,6 +801,29 @@ export default function ServersPage() {
                                 {loadingDetails ? (
                                     <div className="flex items-center justify-center py-12">
                                         <RefreshCw className="w-8 h-8 animate-spin text-purple-400" />
+                                    </div>
+                                ) : !guildDetails ? (
+                                    <div className="flex flex-col items-center justify-center py-12">
+                                        <AlertTriangle className="w-12 h-12 text-yellow-400 mb-4" />
+                                        <h3 className={cn(
+                                            "font-semibold mb-2",
+                                            isDark ? "text-white" : "text-gray-900"
+                                        )}>
+                                            Failed to load server details
+                                        </h3>
+                                        <p className={cn(
+                                            "text-sm mb-4 text-center",
+                                            isDark ? "text-white/50" : "text-gray-500"
+                                        )}>
+                                            Could not connect to the bot API. Make sure the bot is running.
+                                        </p>
+                                        <button
+                                            onClick={() => fetchGuildDetails(selectedGuild!.id)}
+                                            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-2"
+                                        >
+                                            <RefreshCw className="w-4 h-4" />
+                                            Retry
+                                        </button>
                                     </div>
                                 ) : (
                                     <>
