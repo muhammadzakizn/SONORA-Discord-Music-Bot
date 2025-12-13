@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Power,
@@ -14,6 +15,7 @@ import {
     Shield,
     Volume2,
     VolumeX,
+    ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -26,6 +28,7 @@ interface ActionState {
 
 export default function ControlsPage() {
     const { isDark } = useSettings();
+    const router = useRouter();
     const [actionStates, setActionStates] = useState<Record<string, ActionState>>({});
     const [maintenanceMode, setMaintenanceMode] = useState(false);
     const [showConfirmDialog, setShowConfirmDialog] = useState<string | null>(null);
@@ -418,8 +421,7 @@ export default function ControlsPage() {
                         </div>
                     </div>
                     <button
-                        onClick={() => confirmAction('maintenance')}
-                        disabled={getButtonState('maintenance').loading}
+                        onClick={() => router.push('/developer/maintenance')}
                         className={cn(
                             "px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2",
                             maintenanceMode
@@ -427,19 +429,9 @@ export default function ControlsPage() {
                                 : "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
                         )}
                     >
-                        {getButtonState('maintenance').loading ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                        ) : maintenanceMode ? (
-                            <>
-                                <Shield className="w-5 h-5" />
-                                Disable Maintenance
-                            </>
-                        ) : (
-                            <>
-                                <Wrench className="w-5 h-5" />
-                                Enable Maintenance
-                            </>
-                        )}
+                        <Wrench className="w-5 h-5" />
+                        {maintenanceMode ? "Manage Maintenance" : "Enable Maintenance"}
+                        <ExternalLink className="w-4 h-4" />
                     </button>
                 </div>
             </motion.div>

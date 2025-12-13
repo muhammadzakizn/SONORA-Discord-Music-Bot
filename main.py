@@ -17,6 +17,8 @@ from core.bot import MusicBot
 
 # Lock file to ensure single instance
 LOCK_FILE = Path(__file__).parent / '.bot_instance.lock'
+# Dashboard restart flag file
+DASHBOARD_RESTART_FLAG = Path(__file__).parent / '.dashboard_restart'
 
 # Web dashboard flag
 ENABLE_WEB_DASHBOARD = os.getenv('ENABLE_WEB_DASHBOARD', 'true').lower() == 'true'
@@ -26,6 +28,17 @@ WEB_DASHBOARD_PORT = int(os.getenv('WEB_DASHBOARD_PORT', '5000'))
 
 def check_and_kill_existing_instance(logger):
     """Check if another instance is running and kill it"""
+    # Check if this is a dashboard restart (skip verbose warnings)
+    is_dashboard_restart = DASHBOARD_RESTART_FLAG.exists()
+    
+    if is_dashboard_restart:
+        logger.info("🔄 Dashboard restart detected, taking over from previous instance...")
+        # Clean up the flag file
+        try:
+            DASHBOARD_RESTART_FLAG.unlink()
+        except:
+            pass
+    
     if LOCK_FILE.exists():
         try:
             # Read PID from lock file
@@ -35,8 +48,11 @@ def check_and_kill_existing_instance(logger):
             # Check if process is still running
             try:
                 os.kill(old_pid, 0)  # Check if process exists (doesn't actually kill)
-                logger.warning(f"⚠️  Found existing bot instance (PID: {old_pid})")
-                logger.info("🔄 Terminating old instance...")
+                
+                if not is_dashboard_restart:
+                    # Only show warning if not a dashboard restart
+                    logger.warning(f"⚠️  Found existing bot instance (PID: {old_pid})")
+                    logger.info("🔄 Terminating old instance...")
                 
                 # Try graceful shutdown first
                 try:
@@ -48,13 +64,15 @@ def check_and_kill_existing_instance(logger):
                     try:
                         os.kill(old_pid, 0)
                         # Still running, force kill
-                        logger.warning("⚠️  Old instance still running, force killing...")
+                        if not is_dashboard_restart:
+                            logger.warning("⚠️  Old instance still running, force killing...")
                         os.kill(old_pid, signal.SIGKILL)
                         time.sleep(0.5)
                     except ProcessLookupError:
                         pass  # Successfully terminated
                     
-                    logger.info("✓ Old instance terminated")
+                    if not is_dashboard_restart:
+                        logger.info("✓ Old instance terminated")
                     
                 except ProcessLookupError:
                     logger.debug("Old instance already terminated")

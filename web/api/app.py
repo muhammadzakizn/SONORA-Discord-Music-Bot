@@ -1768,8 +1768,19 @@ def api_admin_restart():
     try:
         import sys
         import os
+        from pathlib import Path
         
         logger.warning("Restart requested via web dashboard")
+        
+        # Create a flag file to indicate dashboard restart
+        # This tells main.py to skip the "found existing instance" warning
+        restart_flag_file = Path(__file__).parent.parent.parent / '.dashboard_restart'
+        try:
+            with open(restart_flag_file, 'w') as f:
+                f.write(str(os.getpid()))
+            logger.info("Created dashboard restart flag")
+        except Exception as e:
+            logger.warning(f"Could not create restart flag: {e}")
         
         def delayed_restart():
             time.sleep(1)
