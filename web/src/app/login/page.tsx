@@ -281,12 +281,20 @@ function LoginPageContent() {
         // Store in cookie (client-side)
         document.cookie = `sonora-admin-session=${decodeURIComponent(sessionFromUrl)}; path=/; max-age=${60 * 60 * 24 * 7}`;
 
+        // Determine flow from authState in session (more reliable than URL param)
+        const effectiveFlow = flowType || (sessionData.authState === 'new' ? 'setup' :
+          sessionData.authState === 'mfa_required' ? 'verify' : null);
+
+        console.log('[Login] Effective flow:', effectiveFlow, 'from authState:', sessionData.authState);
+
         // Handle different flow types
-        if (flowType === 'setup' && sessionData.authUserId) {
+        if (effectiveFlow === 'setup') {
           // New user - need to setup MFA
           console.log('[Login] New user flow - going to MFA setup');
+          const userId = sessionData.authUserId || Date.now(); // Use timestamp as fallback ID
+
           setAuthUser({
-            id: sessionData.authUserId,
+            id: userId,
             discord_id: sessionData.user.id,
             username: sessionData.user.username,
             email: sessionData.user.email,
@@ -300,7 +308,8 @@ function LoginPageContent() {
           });
 
           // Request TOTP setup from API
-          setupTOTP(sessionData.authUserId).then((result) => {
+          setupTOTP(userId).then((result) => {
+            console.log('[Login] TOTP setup result:', result);
             if (result.success && result.qr_code && result.secret) {
               setTotpSetup({ qrCode: result.qr_code, secret: result.secret });
               setLoginMode('mfa-setup');
@@ -312,7 +321,7 @@ function LoginPageContent() {
             }
           });
           return;
-        } else if (flowType === 'verify' && sessionData.authUserId) {
+        } else if (effectiveFlow === 'verify') {
           // Existing user with MFA - need to verify
           console.log('[Login] Existing user flow - going to MFA verify');
           setAuthUser({
@@ -334,8 +343,8 @@ function LoginPageContent() {
           setLoginMode('mfa-select');
           return;
         } else {
-          // No flow specified or trusted device - go directly to admin
-          console.log('[Login] Cookie stored, navigating to /admin...');
+          // trusted state or no MFA needed - go directly to admin
+          console.log('[Login] Trusted or no MFA - navigating to /admin...');
           setHasRedirected(true);
           window.location.href = '/admin';
           return;
