@@ -1755,13 +1755,34 @@ def api_admin_guild_details(guild_id):
             queue_length = len(queue)
             # Get first 20 queue items
             for i, item in enumerate(list(queue)[:20]):
-                queue_items.append({
-                    "position": i + 1,
-                    "title": item.get('title', 'Unknown'),
-                    "artist": item.get('artist', 'Unknown'),
-                    "duration": item.get('duration', 0),
-                    "requested_by": item.get('requested_by', 'Unknown')
-                })
+                # Queue items can be MetadataInfo objects or dicts
+                if hasattr(item, 'title'):
+                    # It's a MetadataInfo object
+                    queue_items.append({
+                        "position": i + 1,
+                        "title": getattr(item, 'title', 'Unknown'),
+                        "artist": getattr(item, 'artist', 'Unknown'),
+                        "duration": getattr(item, 'duration', 0),
+                        "requested_by": getattr(item, 'requested_by', 'Unknown')
+                    })
+                elif isinstance(item, dict):
+                    # It's a dictionary
+                    queue_items.append({
+                        "position": i + 1,
+                        "title": item.get('title', 'Unknown'),
+                        "artist": item.get('artist', 'Unknown'),
+                        "duration": item.get('duration', 0),
+                        "requested_by": item.get('requested_by', 'Unknown')
+                    })
+                else:
+                    # Unknown type, try to convert to string
+                    queue_items.append({
+                        "position": i + 1,
+                        "title": str(item),
+                        "artist": "Unknown",
+                        "duration": 0,
+                        "requested_by": "Unknown"
+                    })
         
         # Get ALL channels (text + voice) combined
         all_channels = []
