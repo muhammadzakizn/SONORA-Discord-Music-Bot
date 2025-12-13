@@ -215,7 +215,7 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useSettings();
-  const { user, isLoggedIn } = useSession();
+  const { user, isLoggedIn, isLoading: sessionLoading, refreshSession } = useSession();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loginMode, setLoginMode] = useState<LoginMode>("select");
   const [showPassword, setShowPassword] = useState(false);
@@ -242,12 +242,28 @@ function LoginPageContent() {
   // MFA state
   const [selectedMfaMethod, setSelectedMfaMethod] = useState<MFAMethod | null>(null);
 
-  // Detect ?verify=true from OAuth callback and show MFA selection
+  // Detect ?verify=true from OAuth callback
+  // Wait until session is fully loaded before checking
   useEffect(() => {
-    if (searchParams.get('verify') === 'true' && isLoggedIn && user) {
-      setLoginMode("mfa-select");
+    // Refresh session when page loads with verify=true (ensure cookie is read)
+    if (searchParams.get('verify') === 'true') {
+      refreshSession();
     }
-  }, [searchParams, isLoggedIn, user]);
+  }, [searchParams, refreshSession]);
+
+  // Handle redirect after session is loaded
+  useEffect(() => {
+    // Don't do anything while session is still loading
+    if (sessionLoading) return;
+
+    const isVerifyFlow = searchParams.get('verify') === 'true';
+
+    if (isVerifyFlow && isLoggedIn && user) {
+      // For now, skip MFA and go directly to admin dashboard
+      // MFA can be enabled later for enhanced security
+      router.push('/admin');
+    }
+  }, [searchParams, isLoggedIn, user, sessionLoading, router]);
 
   // Countdown timer for resend
   useEffect(() => {
