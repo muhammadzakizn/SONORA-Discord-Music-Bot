@@ -428,6 +428,27 @@ class AuthDatabaseManager:
             )
         """)
         
+        # MFA Approval Requests - for Discord button-based approval
+        await self.db.execute("""
+            CREATE TABLE IF NOT EXISTS mfa_approval_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id TEXT UNIQUE NOT NULL,  -- UUID for polling
+                user_id INTEGER,
+                discord_id TEXT NOT NULL,
+                device_info TEXT,
+                ip_address TEXT,
+                user_agent TEXT,
+                status TEXT DEFAULT 'pending',  -- pending, approved, denied, expired
+                code_hash TEXT,  -- OTP code hash (only set when approved)
+                message_id TEXT,  -- Discord message ID for button
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                responded_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES auth_users(id)
+            )
+        """)
+
+        
         # Create indexes for performance
         await self.db.execute("CREATE INDEX IF NOT EXISTS idx_users_discord ON auth_users(discord_id)")
         await self.db.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON auth_users(email)")
@@ -1096,6 +1117,193 @@ class AuthDatabaseManager:
             (identifier, action)
         )
         await self.db.commit()
+
+    # ==================== MFA APPROVAL REQUESTS ====================
+    
+    async def create_mfa_approval_request(
+        self,
+        discord_id: str,
+        device_info: str,
+        ip_address: str,
+        user_agent: str,
+        user_id: Optional[int] = None,
+        expires_seconds: int = 15  # 15 second timeout
+    ) -> str:
+        """
+        Create MFA approval request for Discord button confirmation
+        
+        Returns:
+            request_id (UUID) for polling
+        """
+        import uuid
+        request_id = str(uuid.uuid4())
+        expires_at = datetime.now() + timedelta(seconds=expires_seconds)
+        
+        await self.db.execute("""
+            INSERT INTO mfa_approval_requests 
+            (request_id, user_id, discord_id, device_info, ip_address, user_agent, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (request_id, user_id, discord_id, device_info, ip_address, user_agent, expires_at))
+        
+        await self.db.commit()
+        
+        logger.info(f"Created MFA approval request {request_id[:8]}... for Discord {discord_id}")
+        return request_id
+    
+    async def get_mfa_approval_request(self, request_id: str) -> Optional[dict]:
+        """Get MFA approval request by ID"""
+        async with self.db.execute("""
+            SELECT id, request_id, user_id, discord_id, device_info, ip_address,
+                   user_agent, status, code_hash, message_id, expires_at, created_at, responded_at
+            FROM mfa_approval_requests
+            WHERE request_id = ?
+        """, (request_id,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'request_id': row[1],
+                    'user_id': row[2],
+                    'discord_id': row[3],
+                    'device_info': row[4],
+                    'ip_address': row[5],
+                    'user_agent': row[6],
+                    'status': row[7],
+                    'code_hash': row[8],
+                    'message_id': row[9],
+                    'expires_at': row[10],
+                    'created_at': row[11],
+                    'responded_at': row[12],
+                }
+        return None
+    
+    async def update_mfa_approval_message_id(self, request_id: str, message_id: str) -> bool:
+        """Store Discord message ID for the approval request"""
+        await self.db.execute("""
+            UPDATE mfa_approval_requests 
+            SET message_id = ?
+            WHERE request_id = ?
+        """, (message_id, request_id))
+        await self.db.commit()
+        return True
+    
+    async def approve_mfa_request(self, request_id: str) -> Optional[str]:
+        """
+        Approve MFA request and generate OTP code
+        
+        Returns:
+            Plain text OTP code (only shown once!)
+        """
+        # Check if request exists and is pending
+        request = await self.get_mfa_approval_request(request_id)
+        if not request or request['status'] != 'pending':
+            return None
+        
+        # Check if expired
+        expires_at = datetime.fromisoformat(str(request['expires_at']))
+        if datetime.now() > expires_at:
+            await self.db.execute("""
+                UPDATE mfa_approval_requests 
+                SET status = 'expired', responded_at = CURRENT_TIMESTAMP
+                WHERE request_id = ?
+            """, (request_id,))
+            await self.db.commit()
+            return None
+        
+        # Generate OTP code
+        code = SecureCrypto.generate_otp_code(6)
+        code_hash = self.crypto.hash_code(code)
+        
+        # Update status to approved
+        await self.db.execute("""
+            UPDATE mfa_approval_requests 
+            SET status = 'approved', code_hash = ?, responded_at = CURRENT_TIMESTAMP
+            WHERE request_id = ?
+        """, (code_hash, request_id))
+        await self.db.commit()
+        
+        await self._log_security_event(
+            user_id=request.get('user_id'),
+            event_type='mfa_approval_approved',
+            ip_address=request.get('ip_address'),
+            success=True
+        )
+        
+        logger.info(f"MFA request {request_id[:8]}... approved")
+        return code
+    
+    async def deny_mfa_request(self, request_id: str) -> bool:
+        """Deny MFA request"""
+        request = await self.get_mfa_approval_request(request_id)
+        if not request or request['status'] != 'pending':
+            return False
+        
+        await self.db.execute("""
+            UPDATE mfa_approval_requests 
+            SET status = 'denied', responded_at = CURRENT_TIMESTAMP
+            WHERE request_id = ?
+        """, (request_id,))
+        await self.db.commit()
+        
+        await self._log_security_event(
+            user_id=request.get('user_id'),
+            event_type='mfa_approval_denied',
+            ip_address=request.get('ip_address'),
+            success=False
+        )
+        
+        logger.info(f"MFA request {request_id[:8]}... denied")
+        return True
+    
+    async def verify_mfa_approval_code(self, request_id: str, code: str) -> bool:
+        """Verify OTP code from approved MFA request"""
+        request = await self.get_mfa_approval_request(request_id)
+        if not request or request['status'] != 'approved':
+            return False
+        
+        if not request.get('code_hash'):
+            return False
+        
+        # Verify code hash
+        return self.crypto.verify_code(code, request['code_hash'])
+    
+    async def check_mfa_approval_status(self, request_id: str) -> dict:
+        """
+        Check current status of MFA approval request
+        
+        Returns:
+            {status: 'pending'|'approved'|'denied'|'expired'|'not_found', code?: str}
+        """
+        request = await self.get_mfa_approval_request(request_id)
+        
+        if not request:
+            return {'status': 'not_found'}
+        
+        # Check if expired (even if still pending)
+        expires_at = datetime.fromisoformat(str(request['expires_at']))
+        if request['status'] == 'pending' and datetime.now() > expires_at:
+            # Mark as expired
+            await self.db.execute("""
+                UPDATE mfa_approval_requests 
+                SET status = 'expired'
+                WHERE request_id = ? AND status = 'pending'
+            """, (request_id,))
+            await self.db.commit()
+            return {'status': 'expired'}
+        
+        return {'status': request['status']}
+    
+    async def cleanup_expired_mfa_requests(self) -> int:
+        """Clean up expired MFA approval requests older than 1 hour"""
+        cutoff = datetime.now() - timedelta(hours=1)
+        
+        cursor = await self.db.execute("""
+            DELETE FROM mfa_approval_requests 
+            WHERE expires_at < ? OR (status != 'pending' AND created_at < ?)
+        """, (datetime.now(), cutoff))
+        
+        await self.db.commit()
+        return cursor.rowcount
 
 
 # Singleton instance

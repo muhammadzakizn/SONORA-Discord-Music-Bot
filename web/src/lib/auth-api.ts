@@ -345,28 +345,63 @@ export async function getLoginHistory(userId: number, limit: number = 20): Promi
   }
 }
 
-// ==================== DISCORD DM MFA ====================
+// ==================== DISCORD DM MFA (BUTTON APPROVAL) ====================
+
+interface DiscordSendResponse {
+  success: boolean;
+  request_id?: string;  // For polling approval status
+  message?: string;
+  expires_in?: number;
+  dev_mode?: boolean;
+  dev_code?: string;  // Only in dev mode
+  error?: string;
+}
+
+interface ApprovalStatusResponse {
+  status: 'pending' | 'approved' | 'denied' | 'expired' | 'not_found';
+}
 
 /**
- * Send Discord DM verification code
- * Requires bot to be online to send DM
+ * Send Discord DM approval request with buttons
+ * Returns request_id for polling status (does NOT send code directly)
  */
 export async function sendDiscordDMCode(
   userId: number | string,
-  discordId: string
-): Promise<{ success: boolean; message?: string; expires_in?: number; dev_code?: string; error?: string }> {
+  discordId: string,
+  deviceInfo?: string
+): Promise<DiscordSendResponse> {
   try {
     const response = await fetch(`${BOT_API_URL}/api/auth/mfa/discord/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, discord_id: discordId }),
+      body: JSON.stringify({ 
+        user_id: userId, 
+        discord_id: discordId,
+        device_info: deviceInfo || `${navigator.platform} - ${navigator.userAgent.split(' ').slice(-2).join(' ')}`
+      }),
     });
     return await response.json();
   } catch (error) {
-    console.error('Send Discord DM code error:', error);
+    console.error('Send Discord approval request error:', error);
     return { success: false, error: 'Failed to send Discord DM. Bot may be offline.' };
   }
 }
+
+/**
+ * Check MFA approval status
+ * Poll this every 1-2 seconds after sendDiscordDMCode
+ */
+export async function checkMFAApprovalStatus(requestId: string): Promise<ApprovalStatusResponse> {
+  try {
+    const response = await fetch(`${BOT_API_URL}/api/auth/mfa/discord/status?request_id=${requestId}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Check MFA approval status error:', error);
+    return { status: 'not_found' };
+  }
+}
+
+
 
 /**
  * Verify Discord DM code

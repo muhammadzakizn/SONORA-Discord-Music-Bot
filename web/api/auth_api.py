@@ -704,61 +704,163 @@ def set_auth_bot_instance(bot):
 @auth_bp.route('/mfa/discord/send', methods=['POST'])
 def send_discord_dm_code():
     """
-    Send verification code via Discord DM
-    Uses the bot to send a DM to the user
+    Send MFA approval request via Discord DM with buttons
+    Returns request_id for status polling. Does NOT send code directly.
+    
+    Flow:
+    1. Create approval request in database
+    2. Send DM with device info + Approve/Deny buttons
+    3. Return request_id for frontend to poll status
+    4. When user clicks Approve → generate and send code
+    5. When user clicks Deny → mark as denied
     """
     try:
         data = request.json
         user_id = data.get('user_id')
         discord_id = data.get('discord_id')
+        device_info = data.get('device_info', 'Unknown device')
         
         if not user_id or not discord_id:
             return jsonify({'error': 'User ID and Discord ID required'}), 400
         
+        # Get client info
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ip_address:
+            ip_address = ip_address.split(',')[0].strip()
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        
         db = get_auth_db_manager()
         
-        # Create verification code (database generates and hashes internally)
-        code = run_async(db.create_verification_code(
-            code_type='discord_dm',
-            user_id=user_id,
+        # Create approval request (15 second timeout)
+        request_id = run_async(db.create_mfa_approval_request(
             discord_id=discord_id,
-            expires_minutes=5
+            device_info=device_info,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id if isinstance(user_id, int) else None,
+            expires_seconds=15
         ))
         
-        # Send DM via bot
+        # Send DM with buttons via bot
         if _bot_instance:
             try:
-                # Use asyncio to send DM
-                async def send_dm():
+                async def send_approval_dm():
+                    import discord
+                    from discord import ui
+                    
                     user = await _bot_instance.fetch_user(int(discord_id))
-                    if user:
-                        embed_data = {
-                            'title': '🔐 SONORA Login Verification',
-                            'description': f'Your verification code is:\n\n# `{code}`\n\nThis code expires in 5 minutes.',
-                            'color': 0x9B59B6,  # Purple
-                            'footer': {'text': 'If you did not request this code, please ignore this message.'}
-                        }
+                    if not user:
+                        return False, None
+                    
+                    # Parse user agent for device info
+                    browser = "Unknown Browser"
+                    os_name = "Unknown OS"
+                    if "Chrome" in user_agent:
+                        browser = "Chrome"
+                    elif "Firefox" in user_agent:
+                        browser = "Firefox"
+                    elif "Safari" in user_agent:
+                        browser = "Safari"
+                    elif "Edge" in user_agent:
+                        browser = "Edge"
+                    
+                    if "Windows" in user_agent:
+                        os_name = "Windows"
+                    elif "Mac" in user_agent:
+                        os_name = "macOS"
+                    elif "Linux" in user_agent:
+                        os_name = "Linux"
+                    elif "Android" in user_agent:
+                        os_name = "Android"
+                    elif "iPhone" in user_agent or "iPad" in user_agent:
+                        os_name = "iOS"
+                    
+                    # Create embed with login details
+                    embed = discord.Embed(
+                        title="🔐 Login Attempt Detected",
+                        description="Someone is trying to log in to your SONORA Dashboard account.",
+                        color=0xFFA500  # Orange for warning
+                    )
+                    embed.add_field(name="📱 Device", value=f"{browser} on {os_name}", inline=True)
+                    embed.add_field(name="🌐 IP Address", value=ip_address or "Unknown", inline=True)
+                    embed.add_field(name="⏰ Time", value=f"<t:{int(__import__('time').time())}:F>", inline=False)
+                    embed.add_field(
+                        name="⚠️ Important",
+                        value="If this wasn't you, click **Deny** immediately!",
+                        inline=False
+                    )
+                    embed.set_footer(text="This request expires in 15 seconds")
+                    
+                    # Create buttons
+                    class ApprovalView(ui.View):
+                        def __init__(self):
+                            super().__init__(timeout=15)
+                            self.request_id = request_id
                         
-                        import discord
-                        embed = discord.Embed(
-                            title=embed_data['title'],
-                            description=embed_data['description'],
-                            color=embed_data['color']
-                        )
-                        embed.set_footer(text=embed_data['footer']['text'])
+                        @ui.button(label="✅ Approve", style=discord.ButtonStyle.success)
+                        async def approve_button(self, interaction: discord.Interaction, button: ui.Button):
+                            # Approve the request and generate code
+                            code = await db.approve_mfa_request(self.request_id)
+                            
+                            if code:
+                                # Disable buttons
+                                for item in self.children:
+                                    item.disabled = True
+                                
+                                # Update original message
+                                embed.color = 0x2ECC71  # Green
+                                embed.set_footer(text="✅ Login approved")
+                                await interaction.response.edit_message(embed=embed, view=self)
+                                
+                                # Send code in new message
+                                code_embed = discord.Embed(
+                                    title="🔑 Your Verification Code",
+                                    description=f"# `{code}`",
+                                    color=0x9B59B6  # Purple
+                                )
+                                code_embed.set_footer(text="Enter this code in the dashboard. Valid for 5 minutes.")
+                                await interaction.followup.send(embed=code_embed, ephemeral=True)
+                            else:
+                                await interaction.response.send_message(
+                                    "❌ Request expired. Please try again.",
+                                    ephemeral=True
+                                )
                         
-                        await user.send(embed=embed)
-                        return True
-                    return False
+                        @ui.button(label="❌ Deny", style=discord.ButtonStyle.danger)
+                        async def deny_button(self, interaction: discord.Interaction, button: ui.Button):
+                            # Deny the request
+                            await db.deny_mfa_request(self.request_id)
+                            
+                            # Disable buttons
+                            for item in self.children:
+                                item.disabled = True
+                            
+                            # Update original message
+                            embed.color = 0xE74C3C  # Red
+                            embed.set_footer(text="❌ Login denied - If this wasn't you, secure your account!")
+                            await interaction.response.edit_message(embed=embed, view=self)
+                        
+                        async def on_timeout(self):
+                            # Mark as expired on timeout
+                            await db.check_mfa_approval_status(self.request_id)  # This will mark expired
+                    
+                    view = ApprovalView()
+                    msg = await user.send(embed=embed, view=view)
+                    
+                    # Store message ID for reference
+                    await db.update_mfa_approval_message_id(request_id, str(msg.id))
+                    
+                    return True, msg.id
                 
-                success = run_async(send_dm())
+                success, message_id = run_async(send_approval_dm())
                 
                 if success:
-                    logger.info(f"Sent verification code to Discord user {discord_id}")
+                    logger.info(f"Sent MFA approval request to Discord user {discord_id}")
                     return jsonify({
                         'success': True,
-                        'message': 'Verification code sent to your Discord DM',
-                        'expires_in': 300  # 5 minutes
+                        'request_id': request_id,
+                        'message': 'Approval request sent to Discord. Check your DMs.',
+                        'expires_in': 15
                     })
                 else:
                     return jsonify({
@@ -767,24 +869,54 @@ def send_discord_dm_code():
                     }), 400
                     
             except Exception as dm_error:
-                logger.error(f"Failed to send Discord DM: {dm_error}")
+                logger.error(f"Failed to send Discord approval DM: {dm_error}", exc_info=True)
                 return jsonify({
                     'success': False,
                     'error': 'Failed to send DM. Check your Discord privacy settings.'
                 }), 400
         else:
-            # Bot not available - return code in response (for testing only)
-            logger.warning("Bot not available for DM verification - returning code directly (DEV ONLY)")
+            # Bot not available - auto-approve for testing
+            logger.warning("Bot not available - auto-approving for testing (DEV ONLY)")
+            code = run_async(db.approve_mfa_request(request_id))
             return jsonify({
                 'success': True,
-                'message': 'Code generated (bot offline - shown for testing)',
-                'dev_code': code,  # Remove in production!
-                'expires_in': 300
+                'request_id': request_id,
+                'message': 'Auto-approved (bot offline - testing mode)',
+                'dev_mode': True,
+                'dev_code': code,
+                'expires_in': 15
             })
     
     except Exception as e:
-        logger.error(f"Send Discord DM code error: {e}", exc_info=True)
+        logger.error(f"Send Discord approval DM error: {e}", exc_info=True)
         return jsonify({'error': 'Server error'}), 500
+
+
+@auth_bp.route('/mfa/discord/status', methods=['GET'])
+def check_mfa_approval_status():
+    """
+    Check status of MFA approval request
+    Frontend polls this endpoint every 1-2 seconds
+    
+    Returns:
+        status: 'pending' | 'approved' | 'denied' | 'expired' | 'not_found'
+    """
+    try:
+        request_id = request.args.get('request_id')
+        
+        if not request_id:
+            return jsonify({'error': 'Request ID required'}), 400
+        
+        db = get_auth_db_manager()
+        result = run_async(db.check_mfa_approval_status(request_id))
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        logger.error(f"Check MFA approval status error: {e}", exc_info=True)
+        return jsonify({'error': 'Server error'}), 500
+
+
 
 
 @auth_bp.route('/mfa/discord/verify', methods=['POST'])

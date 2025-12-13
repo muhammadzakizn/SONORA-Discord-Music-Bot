@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useSession, getAvatarUrl } from "@/contexts/SessionContext";
 import { cn } from "@/lib/utils";
-import { checkAuthUser, registerAuthUser, setupTOTP, verifyTOTPSetup, verifyTOTP, verifyBackupCode, checkTrustedDevice, addTrustedDevice, sendDiscordDMCode, verifyDiscordDMCode, type AuthUser } from "@/lib/auth-api";
+import { checkAuthUser, registerAuthUser, setupTOTP, verifyTOTPSetup, verifyTOTP, verifyBackupCode, checkTrustedDevice, addTrustedDevice, sendDiscordDMCode, verifyDiscordDMCode, checkMFAApprovalStatus, type AuthUser } from "@/lib/auth-api";
 
 const backgroundImages = [
   {
@@ -251,6 +251,14 @@ function LoginPageContent() {
   const [trustDevice, setTrustDevice] = useState(true);
   const [copiedCode, setCopiedCode] = useState<number | null>(null);
 
+  // Discord approval flow state
+  const [discordApprovalRequestId, setDiscordApprovalRequestId] = useState<string | null>(null);
+  const [discordApprovalStatus, setDiscordApprovalStatus] = useState<'idle' | 'waiting' | 'approved' | 'denied' | 'expired'>('idle');
+  const [approvalCountdown, setApprovalCountdown] = useState(15);
+  const approvalPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+
   // Detect ?verify=true from OAuth callback
   // Handle session from query param (workaround for SameSite cookie issues)
   useEffect(() => {
@@ -483,24 +491,86 @@ function LoginPageContent() {
     setVerifyError("");
 
     try {
-      // If in MFA mode, use MFA-specific API
+      // If in MFA mode, use MFA-specific API with button approval
       if (loginMode === 'mfa-select' || loginMode === 'mfa-verify') {
         const userId = authUser?.id || user.id;
         const result = await sendDiscordDMCode(userId, user.id);
 
-        if (result.success) {
+        if (result.success && result.request_id) {
+          setDiscordApprovalRequestId(result.request_id);
+          setDiscordApprovalStatus('waiting');
+          setApprovalCountdown(result.expires_in || 15);
           setVerifyStatus("sent");
-          setVerifyCountdown(result.expires_in || 300); // 5 minutes default
-          // If dev_code is returned (for testing), show it
-          if (result.dev_code) {
-            console.log('[MFA] Dev code for testing:', result.dev_code);
+
+          // If dev_mode, auto-fill code (for testing)
+          if (result.dev_mode && result.dev_code) {
+            console.log('[MFA] Dev mode - code:', result.dev_code);
+            // Auto-fill the code input
+            const codeArray = result.dev_code.split('');
+            setVerifyCode(codeArray.slice(0, 6).concat(['', '', '', '', '', '']).slice(0, 6));
           }
+
+          // Start countdown timer
+          countdownIntervalRef.current = setInterval(() => {
+            setApprovalCountdown(prev => {
+              if (prev <= 1) {
+                // Time's up
+                if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+                if (approvalPollingRef.current) clearInterval(approvalPollingRef.current);
+                setDiscordApprovalStatus('expired');
+                setVerifyStatus("error");
+                setVerifyError("Request expired. Please try again.");
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+
+          // Start polling for approval status
+          approvalPollingRef.current = setInterval(async () => {
+            if (!result.request_id) return;
+
+            const status = await checkMFAApprovalStatus(result.request_id);
+            console.log('[MFA] Approval status:', status.status);
+
+            if (status.status === 'approved') {
+              // Approved! Now user can enter code
+              if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+              if (approvalPollingRef.current) clearInterval(approvalPollingRef.current);
+              setDiscordApprovalStatus('approved');
+              setVerifyStatus("idle"); // Ready for code input
+              // Focus first input
+              setTimeout(() => verifyInputRefs.current[0]?.focus(), 100);
+            } else if (status.status === 'denied') {
+              // Denied! Go back to login
+              if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+              if (approvalPollingRef.current) clearInterval(approvalPollingRef.current);
+              setDiscordApprovalStatus('denied');
+              setVerifyStatus("error");
+              setVerifyError("Login denied via Discord. Returning to login...");
+              // Redirect to login after 2 seconds
+              setTimeout(() => {
+                setLoginMode("select");
+                setVerifyCode(["", "", "", "", "", ""]);
+                setVerifyError("");
+                setDiscordApprovalStatus('idle');
+              }, 2000);
+            } else if (status.status === 'expired' || status.status === 'not_found') {
+              // Expired
+              if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+              if (approvalPollingRef.current) clearInterval(approvalPollingRef.current);
+              setDiscordApprovalStatus('expired');
+              setVerifyStatus("error");
+              setVerifyError("Request expired. Please try again.");
+            }
+          }, 1000); // Poll every 1 second
         } else {
           setVerifyStatus("error");
-          setVerifyError(result.error || "Failed to send code. Bot may be offline.");
+          setVerifyError(result.error || "Failed to send approval request. Bot may be offline.");
         }
         return;
       }
+
 
       // Regular email verification
       const response = await fetch("/api/verify/send", {
@@ -1178,17 +1248,66 @@ function LoginPageContent() {
 
                     {/* Header */}
                     <div className="flex flex-col items-center mb-6">
-                      <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
+                      <div className={cn(
+                        "w-16 h-16 mb-4 rounded-full flex items-center justify-center",
+                        discordApprovalStatus === 'waiting' && selectedMfaMethod === 'discord'
+                          ? "bg-gradient-to-br from-orange-500 to-yellow-500"
+                          : discordApprovalStatus === 'approved'
+                            ? "bg-gradient-to-br from-green-500 to-emerald-500"
+                            : discordApprovalStatus === 'denied'
+                              ? "bg-gradient-to-br from-red-500 to-rose-500"
+                              : "bg-gradient-to-br from-purple-500 to-cyan-500"
+                      )}>
                         <Shield className="w-8 h-8 text-white" />
                       </div>
-                      <h2 className="text-2xl font-bold text-white mb-2">Enter Verification Code</h2>
-                      <p className="text-white/60 text-sm text-center">
-                        {selectedMfaMethod === "discord" && "Code sent to your Discord DM"}
-                        {selectedMfaMethod === "email" && "Code sent to your email"}
-                        {selectedMfaMethod === "totp" && "Enter code from your authenticator app"}
-                        {selectedMfaMethod === "passkey" && "Use your fingerprint or Face ID"}
-                      </p>
+
+                      {/* Discord Waiting for Approval */}
+                      {selectedMfaMethod === 'discord' && discordApprovalStatus === 'waiting' ? (
+                        <>
+                          <h2 className="text-2xl font-bold text-white mb-2">Waiting for Approval</h2>
+                          <p className="text-white/60 text-sm text-center mb-4">
+                            Check your Discord DMs and tap Approve
+                          </p>
+                          {/* Countdown Timer */}
+                          <div className="flex items-center gap-2 text-orange-400 font-mono text-lg">
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                            <span>{approvalCountdown}s remaining</span>
+                          </div>
+                        </>
+                      ) : selectedMfaMethod === 'discord' && discordApprovalStatus === 'approved' ? (
+                        <>
+                          <h2 className="text-2xl font-bold text-green-400 mb-2">Approved!</h2>
+                          <p className="text-white/60 text-sm text-center">
+                            Now enter the code from your Discord DM
+                          </p>
+                        </>
+                      ) : selectedMfaMethod === 'discord' && discordApprovalStatus === 'denied' ? (
+                        <>
+                          <h2 className="text-2xl font-bold text-red-400 mb-2">Login Denied</h2>
+                          <p className="text-white/60 text-sm text-center">
+                            You denied the login request. Returning...
+                          </p>
+                        </>
+                      ) : selectedMfaMethod === 'discord' && discordApprovalStatus === 'expired' ? (
+                        <>
+                          <h2 className="text-2xl font-bold text-yellow-400 mb-2">Request Expired</h2>
+                          <p className="text-white/60 text-sm text-center">
+                            Please try again
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <h2 className="text-2xl font-bold text-white mb-2">Enter Verification Code</h2>
+                          <p className="text-white/60 text-sm text-center">
+                            {selectedMfaMethod === "discord" && "Code sent to your Discord DM"}
+                            {selectedMfaMethod === "email" && "Code sent to your email"}
+                            {selectedMfaMethod === "totp" && "Enter code from your authenticator app"}
+                            {selectedMfaMethod === "passkey" && "Use your fingerprint or Face ID"}
+                          </p>
+                        </>
+                      )}
                     </div>
+
 
                     {verifyStatus === "success" ? (
                       <motion.div
