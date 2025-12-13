@@ -640,34 +640,19 @@ def api_developer_auth():
             "error": "Username is required"
         }), 400
     
-    # Rate limiting - simple implementation
-    # In production, use Redis or database for rate limiting
-    
-    # Get credentials from environment variables
-    # Format: DEV_USER_1=username:password_hash,DEV_USER_2=username:password_hash
-    # Or individual: DEV_USERNAME=xxx, DEV_PASSWORD_HASH=xxx
+    if not password:
+        return jsonify({
+            "success": False,
+            "error": "Password is required"
+        }), 400
     
     def hash_password(pwd: str) -> str:
         """Hash password with SHA256 + salt"""
         salt = os.environ.get('DEV_AUTH_SALT', 'sonora-secure-salt-2024')
         return hashlib.sha256(f"{salt}{pwd}".encode()).hexdigest()
     
-    # Owner emails - can login without password
-    owner_emails = os.environ.get('DEV_OWNER_EMAILS', '').split(',')
-    owner_emails = [e.strip().lower() for e in owner_emails if e.strip()]
-    
-    # Check if user is owner email (passwordless login)
-    if username in owner_emails:
-        logger.info(f"Developer owner login: {username}")
-        return jsonify({
-            "success": True,
-            "role": "owner",
-            "username": username,
-            "token": secrets.token_urlsafe(32)
-        })
-    
     # Master developer accounts from environment
-    # Format: username1:password1,username2:password2
+    # Format: username1:password1,username2:password2 (or email:password)
     dev_accounts_raw = os.environ.get('DEV_ACCOUNTS', '')
     dev_accounts = {}
     
@@ -676,20 +661,26 @@ def api_developer_auth():
             acc_user, acc_pass = account.strip().split(':', 1)
             dev_accounts[acc_user.strip().lower()] = acc_pass.strip()
     
-    # Add default if no accounts configured (for development only)
-    if not dev_accounts and os.environ.get('DEV_MODE', 'false').lower() == 'true':
-        logger.warning("No DEV_ACCOUNTS configured, using development defaults")
-        dev_accounts = {
-            'developer': hash_password('sonora2024'),
-            'admin': hash_password('admin123'),
+    # Add default accounts if DEV_MODE is enabled and no accounts configured
+    if os.environ.get('DEV_MODE', 'false').lower() == 'true':
+        # Default owner emails with password
+        default_accounts = {
+            'muhammadzakizn.07@gmail.com': 'dev@2005sonora',
+            'muhammadzakizn@icloud.com': 'dev@2005sonora',
+            'developer': 'sonora2024',
+            'admin': 'admin123',
         }
+        # Only add defaults if not already in dev_accounts
+        for user, pwd in default_accounts.items():
+            if user not in dev_accounts:
+                dev_accounts[user] = pwd
     
     # Validate credentials
     if username in dev_accounts:
-        expected_hash = dev_accounts[username]
-        # Check if stored as plain text (legacy) or hash
-        if len(expected_hash) == 64:  # SHA256 hash
-            if hash_password(password) == expected_hash:
+        expected_pass = dev_accounts[username]
+        # Check if stored as plain text or hash
+        if len(expected_pass) == 64:  # SHA256 hash
+            if hash_password(password) == expected_pass:
                 logger.info(f"Developer login successful: {username}")
                 return jsonify({
                     "success": True,
@@ -698,9 +689,9 @@ def api_developer_auth():
                     "token": secrets.token_urlsafe(32)
                 })
         else:
-            # Plain text comparison (legacy, for migration)
-            if password == expected_hash:
-                logger.info(f"Developer login successful (legacy): {username}")
+            # Plain text comparison
+            if password == expected_pass:
+                logger.info(f"Developer login successful: {username}")
                 return jsonify({
                     "success": True,
                     "role": "developer", 
