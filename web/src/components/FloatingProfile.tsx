@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -183,13 +183,66 @@ export function FloatingProfileButton() {
 
 // Export for use in home page hero
 export function DashboardButton({ isDark }: { isDark: boolean }) {
-    const { user, isLoggedIn } = useSession();
+    const { user, isLoggedIn, devSession, isDevLoggedIn, isLoading } = useSession();
     const { t } = useSettings();
+    const [mounted, setMounted] = useState(false);
+
+    // Ensure hydration is complete
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const isDeveloper = user ? DEVELOPER_IDS.includes(user.id) : false;
 
+    // Show login button during SSR and initial hydration
+    if (!mounted || isLoading) {
+        return (
+            <Link
+                href="/login"
+                className={cn(
+                    "px-6 md:px-8 py-3 md:py-4 rounded-full font-semibold text-base md:text-lg transition-all duration-300 border flex items-center justify-center gap-2",
+                    isDark
+                        ? "bg-white/10 border-white/20 hover:bg-white/20 text-white"
+                        : "bg-gray-900/10 border-gray-900/20 hover:bg-gray-900/20 text-gray-900"
+                )}
+            >
+                <span>Dashboard Login</span>
+            </Link>
+        );
+    }
+
+    // Check if developer is logged in via dev portal
+    if (isDevLoggedIn && devSession) {
+        return (
+            <Link
+                href="/developer"
+                className={cn(
+                    "px-6 md:px-8 py-3 md:py-4 rounded-full font-semibold text-base md:text-lg transition-all duration-300 border flex items-center justify-center gap-3",
+                    isDark
+                        ? "bg-white/10 border-white/20 hover:bg-white/20 text-white"
+                        : "bg-gray-900/10 border-gray-900/20 hover:bg-gray-900/20 text-gray-900"
+                )}
+            >
+                {devSession.avatar ? (
+                    <Image
+                        src={devSession.avatar}
+                        alt={devSession.username}
+                        width={28}
+                        height={28}
+                        className="rounded-full"
+                    />
+                ) : (
+                    <div className="w-7 h-7 rounded-full bg-purple-500 flex items-center justify-center text-white text-sm font-bold">
+                        {devSession.username?.charAt(0).toUpperCase() || 'D'}
+                    </div>
+                )}
+                <span>Developer Panel</span>
+            </Link>
+        );
+    }
+
+    // Check if logged in via Discord OAuth
     if (isLoggedIn && user) {
-        // Show profile photo button when logged in
         return (
             <Link
                 href="/admin"
