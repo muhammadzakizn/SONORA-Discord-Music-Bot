@@ -140,6 +140,9 @@ def run_production():
     
     print(f"{Colors.GREEN}{Colors.BOLD}🚀 Starting SONORA Production...{Colors.END}\n")
     
+    # Restart signal file - checked by launcher to auto-restart bot
+    restart_signal_file = Path('.restart_signal')
+    
     env = os.environ.copy()
     env['BOT_VERSION'] = 'stable'
     env['WEB_DASHBOARD_PORT'] = str(BOT_API_PORT)
@@ -171,8 +174,60 @@ def run_production():
     print(f"{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}\n")
     
     try:
-        while proc_bot.poll() is None and proc_web.poll() is None:
+        while True:
+            # Check for restart signal from dashboard
+            if restart_signal_file.exists():
+                print(f"\n{Colors.YELLOW}🔄 Restart signal detected from dashboard...{Colors.END}")
+                try:
+                    restart_signal_file.unlink()
+                except:
+                    pass
+                
+                # Gracefully stop the bot
+                print(f"{Colors.CYAN}Stopping current bot instance...{Colors.END}")
+                proc_bot.terminate()
+                try:
+                    proc_bot.wait(timeout=5)
+                except:
+                    proc_bot.kill()
+                
+                time.sleep(1)
+                
+                # Start new bot instance
+                print(f"{Colors.CYAN}Starting new bot instance...{Colors.END}")
+                proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+                time.sleep(3)
+                print(f"{Colors.GREEN}✓ Bot restarted successfully!{Colors.END}\n")
+                continue
+            
+            # Check if bot has crashed (not from restart signal)
+            if proc_bot.poll() is not None:
+                # Check if this was a dashboard restart (flag file exists)
+                dashboard_restart = Path('.dashboard_restart').exists()
+                if dashboard_restart:
+                    print(f"\n{Colors.YELLOW}🔄 Dashboard restart in progress...{Colors.END}")
+                    try:
+                        Path('.dashboard_restart').unlink()
+                    except:
+                        pass
+                    
+                    time.sleep(1)
+                    print(f"{Colors.CYAN}Starting new bot instance...{Colors.END}")
+                    proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+                    time.sleep(3)
+                    print(f"{Colors.GREEN}✓ Bot restarted successfully!{Colors.END}\n")
+                    continue
+                else:
+                    print(f"\n{Colors.RED}Bot has stopped unexpectedly!{Colors.END}")
+                    break
+            
+            # Check if web has crashed
+            if proc_web.poll() is not None:
+                print(f"\n{Colors.RED}Web Dashboard has stopped unexpectedly!{Colors.END}")
+                break
+            
             time.sleep(1)
+            
     except KeyboardInterrupt:
         print(f"\n{Colors.YELLOW}Stopping all services...{Colors.END}")
     finally:
@@ -184,6 +239,12 @@ def run_production():
         except:
             proc_bot.kill()
             proc_web.kill()
+        # Clean up signal files
+        for sig_file in [restart_signal_file, Path('.dashboard_restart')]:
+            try:
+                sig_file.unlink()
+            except:
+                pass
         print(f"{Colors.GREEN}✅ All services stopped.{Colors.END}")
 
 def run_bot_only():
@@ -199,10 +260,47 @@ def run_bot_only():
     env['WEB_DASHBOARD_PORT'] = str(BOT_API_PORT)
     env['DATABASE_PATH'] = 'bot.db'
     
+    proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+    
     try:
-        subprocess.run(['python3', 'main.py'], env=env)
+        while True:
+            # Check if bot has stopped
+            if proc_bot.poll() is not None:
+                # Check if this was a dashboard restart
+                dashboard_restart = Path('.dashboard_restart').exists()
+                if dashboard_restart:
+                    print(f"\n{Colors.YELLOW}🔄 Dashboard restart in progress...{Colors.END}")
+                    try:
+                        Path('.dashboard_restart').unlink()
+                    except:
+                        pass
+                    
+                    time.sleep(1)
+                    print(f"{Colors.CYAN}Starting new bot instance...{Colors.END}")
+                    proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+                    time.sleep(3)
+                    print(f"{Colors.GREEN}✓ Bot restarted successfully!{Colors.END}\n")
+                    continue
+                else:
+                    print(f"\n{Colors.RED}Bot has stopped!{Colors.END}")
+                    break
+            
+            time.sleep(1)
+            
     except KeyboardInterrupt:
-        print(f"\n{Colors.YELLOW}SONORA Bot stopped.{Colors.END}")
+        print(f"\n{Colors.YELLOW}Stopping SONORA Bot...{Colors.END}")
+        proc_bot.terminate()
+        try:
+            proc_bot.wait(timeout=5)
+        except:
+            proc_bot.kill()
+    finally:
+        # Clean up flag file
+        try:
+            Path('.dashboard_restart').unlink()
+        except:
+            pass
+        print(f"{Colors.YELLOW}SONORA Bot stopped.{Colors.END}")
 
 def run_web_production():
     """Run Web Dashboard only (Production)"""

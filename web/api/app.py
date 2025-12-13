@@ -1760,7 +1760,7 @@ def api_developer_component_details(component_name: str):
 
 @app.route('/api/admin/bot/restart', methods=['POST'])
 def api_admin_restart():
-    """Restart the bot gracefully"""
+    """Restart the bot gracefully via launcher signal"""
     bot = get_bot()
     if not bot:
         return jsonify({"error": "Bot not connected"}), 503
@@ -1772,23 +1772,25 @@ def api_admin_restart():
         
         logger.warning("Restart requested via web dashboard")
         
-        # Create a flag file to indicate dashboard restart
-        # This tells main.py to skip the "found existing instance" warning
+        # Create a flag file to tell launcher to restart the bot
+        # Launcher will detect this file and restart the bot subprocess
         restart_flag_file = Path(__file__).parent.parent.parent / '.dashboard_restart'
         try:
             with open(restart_flag_file, 'w') as f:
                 f.write(str(os.getpid()))
-            logger.info("Created dashboard restart flag")
+            logger.info("Created dashboard restart flag for launcher")
         except Exception as e:
             logger.warning(f"Could not create restart flag: {e}")
         
-        def delayed_restart():
+        def delayed_shutdown():
+            """Gracefully shutdown bot so launcher can restart it"""
             time.sleep(1)
-            # Restart by re-executing the script
-            os.execv(sys.executable, ['python'] + sys.argv)
+            logger.info("Shutting down for restart...")
+            # Exit with code 0 - launcher will see .dashboard_restart and restart
+            os._exit(0)
         
-        restart_thread = threading.Thread(target=delayed_restart)
-        restart_thread.start()
+        shutdown_thread = threading.Thread(target=delayed_shutdown)
+        shutdown_thread.start()
         
         return jsonify({
             "status": "restart_initiated",
