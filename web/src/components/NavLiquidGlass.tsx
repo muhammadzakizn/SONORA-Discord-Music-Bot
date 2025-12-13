@@ -192,6 +192,7 @@ export default function NavLiquidGlass() {
                                 devSession={devSession}
                                 isDevLoggedIn={isDevLoggedIn}
                                 devLogout={devLogout}
+                                isVerifying={pathname === "/login"}
                             />
                         )}
                         {activePopup === "settings" && (
@@ -486,6 +487,7 @@ function ProfileMenu({
     devSession,
     isDevLoggedIn,
     devLogout,
+    isVerifying = false,
 }: {
     user: DiscordUser | null;
     isLoggedIn: boolean;
@@ -497,6 +499,7 @@ function ProfileMenu({
     devSession: { role: string; username: string; displayName?: string; avatar?: string } | null;
     isDevLoggedIn: boolean;
     devLogout: () => void;
+    isVerifying?: boolean;
 }) {
     // Developer session active - show developer profile
     if (isDevLoggedIn && devSession) {
@@ -652,6 +655,69 @@ function ProfileMenu({
                         </div>
                         <LogIn className="w-4 h-4 text-[#7B1E3C]" />
                     </Link>
+                </div>
+            </div>
+        );
+    }
+
+    // User is in the middle of verification - don't show dashboard links
+    if (isVerifying && isLoggedIn && user) {
+        return (
+            <div className="p-3">
+                <div className="flex items-center justify-between mb-3 px-2">
+                    <h3 className={cn("text-sm font-semibold", isDark ? "text-white" : "text-gray-900")}>
+                        {t("nav.profile") || "Profile"}
+                    </h3>
+                    <button
+                        onClick={onClose}
+                        className={cn(
+                            "p-1 rounded-lg transition-colors",
+                            isDark ? "hover:bg-white/10 text-white/50" : "hover:bg-black/5 text-gray-400"
+                        )}
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                {/* User Info */}
+                <div
+                    className={cn(
+                        "flex items-center gap-3 p-3 rounded-xl mb-3",
+                        isDark ? "bg-white/5" : "bg-gray-100"
+                    )}
+                >
+                    <Image
+                        src={getAvatarUrl(user)}
+                        alt={user.username}
+                        width={48}
+                        height={48}
+                        className="rounded-xl"
+                    />
+                    <div className="flex-1 min-w-0">
+                        <p className={cn("font-semibold truncate", isDark ? "text-white" : "text-gray-900")}>
+                            {user.username}
+                        </p>
+                        <p className={cn("text-sm truncate", isDark ? "text-white/50" : "text-gray-500")}>
+                            @{user.username}
+                        </p>
+                    </div>
+                    <div className="px-2 py-1 rounded-lg text-xs font-medium bg-orange-500/20 text-orange-400">
+                        Verifying
+                    </div>
+                </div>
+
+                {/* Verification in progress message */}
+                <div className={cn(
+                    "p-4 rounded-xl text-center",
+                    isDark ? "bg-orange-500/10 border border-orange-500/20" : "bg-orange-50 border border-orange-200"
+                )}>
+                    <div className="w-8 h-8 mx-auto mb-2 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
+                    <p className={cn("text-sm font-medium", isDark ? "text-orange-300" : "text-orange-600")}>
+                        Completing verification...
+                    </p>
+                    <p className={cn("text-xs mt-1", isDark ? "text-orange-400/60" : "text-orange-500/70")}>
+                        Check your Discord DMs
+                    </p>
                 </div>
             </div>
         );
