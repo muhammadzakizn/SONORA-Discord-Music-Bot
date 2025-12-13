@@ -456,18 +456,16 @@ export default function StatusPage() {
                         <Home className="w-4 h-4" />
                         <span>Home</span>
                     </Link>
-                    <a
-                        href="https://s.id/SONORAbot"
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    <Link
+                        href="/changelog"
                         className={cn(
                             "flex items-center gap-2 px-4 py-2 rounded-xl transition-colors",
                             isDark ? "hover:bg-white/[0.08]" : "hover:bg-black/[0.05]"
                         )}
                     >
                         <ExternalLink className="w-4 h-4" />
-                        <span>Documentation</span>
-                    </a>
+                        <span>Changelog</span>
+                    </Link>
                 </div>
             </div>
 
