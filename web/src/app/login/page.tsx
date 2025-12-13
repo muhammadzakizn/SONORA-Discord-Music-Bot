@@ -316,17 +316,24 @@ function LoginPageContent() {
     const isValid = validCredentials.some(c => c.user === username && c.pass === password);
 
     if (isValid) {
+      // Store auth in localStorage
       localStorage.setItem("sonora-dev-auth", btoa(JSON.stringify({
         role: "developer",
         timestamp: Date.now()
       })));
-      document.cookie = "sonora-dev-auth=true; path=/; max-age=86400";
-      router.push("/developer");
+
+      // Set cookie for middleware (ensure it's set before redirect)
+      document.cookie = "sonora-dev-auth=authenticated; path=/; max-age=86400; SameSite=Lax";
+
+      // Use window.location for proper cookie handling
+      setTimeout(() => {
+        window.location.href = "/developer";
+      }, 100);
     } else {
       setError(t('login.invalidCredentials'));
       setIsLoading(false);
     }
-  }, [username, password, router, t]);
+  }, [username, password, t]);
 
   // Send verification code via Discord DM
   const sendVerificationCode = useCallback(async () => {
