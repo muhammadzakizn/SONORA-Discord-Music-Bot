@@ -47,8 +47,14 @@ export default function ChangelogPage() {
     const fetchChangelog = async () => {
         setLoading(true);
         try {
-            const response = await fetch('/api/bot/changelog', {
-                cache: 'no-store'
+            // Add timestamp to bust cache
+            const timestamp = Date.now();
+            const response = await fetch(`/api/bot/changelog?t=${timestamp}`, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
             });
             if (response.ok) {
                 const data = await response.json();
@@ -91,7 +97,7 @@ export default function ChangelogPage() {
                         </Link>
                         <div className="flex items-center gap-4">
                             <button
-                                onClick={fetchChangelog}
+                                onClick={() => window.location.reload()}
                                 disabled={loading}
                                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                             >

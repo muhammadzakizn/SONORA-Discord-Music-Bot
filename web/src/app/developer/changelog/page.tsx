@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface ChangelogEntry {
     id: string;
@@ -44,6 +45,7 @@ const API_BASE = '/api/bot';
 
 export default function ChangelogManagementPage() {
     const { isDark } = useSettings();
+    const router = useRouter();
     const [changelog, setChangelog] = useState<ChangelogData | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -66,7 +68,15 @@ export default function ChangelogManagementPage() {
     const fetchChangelog = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/changelog`, { cache: 'no-store' });
+            // Add timestamp to bust cache
+            const timestamp = Date.now();
+            const response = await fetch(`${API_BASE}/changelog?t=${timestamp}`, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
             if (response.ok) {
                 const data = await response.json();
                 setChangelog(data);
@@ -154,18 +164,32 @@ export default function ChangelogManagementPage() {
         if (!confirm("Are you sure you want to delete this changelog entry?")) return;
 
         setSaving(true);
+        setStatusMessage("");
+
         try {
             const response = await fetch(`${API_BASE}/changelog/entries/${entryId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
 
-            if (response.ok) {
-                showStatus("Entry deleted!");
-                fetchChangelog();
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                showStatus(`Entry ${data.deleted} deleted!`);
+                // Immediately remove from local state
+                setChangelog(prev => prev ? {
+                    ...prev,
+                    entries: prev.entries.filter(e => e.id !== entryId)
+                } : null);
+                // Then fetch fresh data
+                await fetchChangelog();
             } else {
-                showStatus("Failed to delete", true);
+                showStatus(data.error || "Failed to delete", true);
             }
         } catch (error) {
+            console.error('Delete error:', error);
             showStatus("Failed to delete entry", true);
         }
         setSaving(false);
@@ -250,7 +274,10 @@ export default function ChangelogManagementPage() {
                         View Page
                     </Link>
                     <button
-                        onClick={fetchChangelog}
+                        onClick={() => {
+                            // Hard refresh - reload entire page
+                            window.location.reload();
+                        }}
                         disabled={loading}
                         className={cn(
                             "flex items-center gap-2 px-4 py-2 rounded-xl transition-colors text-sm font-medium",
