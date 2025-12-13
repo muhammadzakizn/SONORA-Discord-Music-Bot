@@ -11,6 +11,15 @@ import time
 
 from config.logging_config import get_logger
 from database.db_manager import get_db_manager
+
+# ==================== v3.8.0 AUTH DATABASE ====================
+try:
+    from database.auth_db_manager import get_auth_db_manager, init_auth_database
+    AUTH_DB_AVAILABLE = True
+except ImportError as e:
+    AUTH_DB_AVAILABLE = False
+    print(f"Auth database not available: {e}")
+
 # ==================== v3.3.0 NEW IMPORTS ====================
 try:
     from datetime import datetime, timedelta
@@ -49,6 +58,15 @@ CORS(app, resources={
 # SocketIO disabled for server deployment - using REST API only
 # WebSocket features handled by Next.js frontend if needed
 socketio = None
+
+# ==================== v3.8.0 AUTH API REGISTRATION ====================
+if AUTH_DB_AVAILABLE:
+    try:
+        from web.api.auth_api import auth_bp
+        app.register_blueprint(auth_bp)
+        logger.info("✓ Auth API blueprint registered")
+    except ImportError as e:
+        logger.warning(f"Auth API not available: {e}")
 
 # Global bot reference (will be set by main.py)
 _bot_instance = None

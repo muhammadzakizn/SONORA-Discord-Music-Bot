@@ -3,12 +3,13 @@
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Lock, User, Eye, EyeOff, Shield, CheckCircle, XCircle, RefreshCw, LogIn, Fingerprint, Smartphone, MessageSquare, Mail, ChevronRight } from "lucide-react";
+import { ArrowLeft, Lock, User, Eye, EyeOff, Shield, CheckCircle, XCircle, RefreshCw, LogIn, Fingerprint, Smartphone, MessageSquare, Mail, ChevronRight, QrCode, Key, Copy, Download } from "lucide-react";
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useSession, getAvatarUrl } from "@/contexts/SessionContext";
 import { cn } from "@/lib/utils";
+import { checkAuthUser, registerAuthUser, setupTOTP, verifyTOTPSetup, verifyTOTP, verifyBackupCode, checkTrustedDevice, addTrustedDevice, type AuthUser } from "@/lib/auth-api";
 
 const backgroundImages = [
   {
@@ -79,7 +80,7 @@ const DiscordIcon = () => (
   </svg>
 );
 
-type LoginMode = "select" | "admin" | "terms" | "developer" | "mfa-select" | "mfa-verify";
+type LoginMode = "select" | "admin" | "terms" | "developer" | "mfa-select" | "mfa-verify" | "mfa-setup" | "backup-codes";
 type MFAMethod = "discord" | "totp" | "passkey" | "email";
 
 const MFA_METHODS = [
@@ -242,6 +243,13 @@ function LoginPageContent() {
   // MFA state
   const [selectedMfaMethod, setSelectedMfaMethod] = useState<MFAMethod | null>(null);
   const [hasRedirected, setHasRedirected] = useState(false);
+
+  // MFA Setup state (for new users)
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [totpSetup, setTotpSetup] = useState<{ qrCode: string; secret: string } | null>(null);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [trustDevice, setTrustDevice] = useState(true);
+  const [copiedCode, setCopiedCode] = useState<number | null>(null);
 
   // Detect ?verify=true from OAuth callback
   // Handle session from query param (workaround for SameSite cookie issues)
@@ -1169,6 +1177,262 @@ function LoginPageContent() {
                         )}
                       </>
                     )}
+                  </motion.div>
+                )}
+
+                {/* MFA Setup (for new users) */}
+                {loginMode === "mfa-setup" && user && (
+                  <motion.div
+                    key="mfa-setup"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    {/* Header */}
+                    <div className="flex flex-col items-center mb-6">
+                      <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-green-500 to-cyan-500 flex items-center justify-center">
+                        <QrCode className="w-8 h-8 text-white" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-2">Setup Authenticator</h2>
+                      <p className="text-white/60 text-sm text-center">
+                        Scan the QR code with your authenticator app
+                      </p>
+                    </div>
+
+                    {/* QR Code Display */}
+                    {totpSetup && (
+                      <div className="space-y-6">
+                        <div className="flex justify-center">
+                          <div className="p-4 bg-white rounded-2xl">
+                            <Image
+                              src={totpSetup.qrCode}
+                              alt="TOTP QR Code"
+                              width={180}
+                              height={180}
+                              className="rounded-lg"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Manual Entry */}
+                        <div className="p-4 rounded-xl bg-white/[0.08] border border-white/[0.1]">
+                          <p className="text-xs text-white/50 mb-2">Can't scan? Enter this code manually:</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <code className="flex-1 text-sm font-mono text-purple-300 bg-black/30 px-3 py-2 rounded-lg break-all">
+                              {totpSetup.secret}
+                            </code>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(totpSetup.secret);
+                                setCopiedCode(-1);
+                                setTimeout(() => setCopiedCode(null), 2000);
+                              }}
+                              className="p-2 rounded-lg bg-white/[0.1] hover:bg-white/[0.2] transition-colors"
+                            >
+                              {copiedCode === -1 ? (
+                                <CheckCircle className="w-4 h-4 text-green-400" />
+                              ) : (
+                                <Copy className="w-4 h-4 text-white/60" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Verification Code Input */}
+                        <div>
+                          <p className="text-sm text-white/60 mb-3 text-center">
+                            Enter the 6-digit code from your app:
+                          </p>
+                          <div className="flex justify-center gap-3 mb-4">
+                            {verifyCode.map((digit, i) => (
+                              <input
+                                key={i}
+                                ref={(el) => { verifyInputRefs.current[i] = el; }}
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={1}
+                                value={digit}
+                                onChange={(e) => handleVerifyInputChange(i, e.target.value)}
+                                onKeyDown={(e) => handleVerifyKeyDown(i, e)}
+                                disabled={verifyStatus === "verifying"}
+                                className={cn(
+                                  "w-11 h-13 text-center text-xl font-bold rounded-xl border-2 bg-white/[0.08] focus:outline-none transition-colors text-white",
+                                  verifyStatus === "error"
+                                    ? "border-rose-500"
+                                    : "border-white/[0.15] focus:border-green-500"
+                                )}
+                              />
+                            ))}
+                          </div>
+
+                          {verifyStatus === "error" && verifyError && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="flex items-center gap-2 justify-center text-rose-400 text-sm mb-4"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              <span>{verifyError}</span>
+                            </motion.div>
+                          )}
+
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={async () => {
+                              const code = verifyCode.join("");
+                              if (code.length !== 6 || !authUser) return;
+
+                              setVerifyStatus("verifying");
+                              const result = await verifyTOTPSetup(authUser.id, code, totpSetup.secret);
+
+                              if (result.success && result.backup_codes) {
+                                setBackupCodes(result.backup_codes);
+                                setVerifyStatus("success");
+                                setLoginMode("backup-codes");
+                              } else {
+                                setVerifyStatus("error");
+                                setVerifyError(result.error || "Invalid code");
+                                setVerifyCode(["", "", "", "", "", ""]);
+                                verifyInputRefs.current[0]?.focus();
+                              }
+                            }}
+                            disabled={verifyCode.join("").length !== 6 || verifyStatus === "verifying"}
+                            className={cn(
+                              "w-full py-3 rounded-xl font-semibold transition-all",
+                              verifyCode.join("").length === 6 && verifyStatus !== "verifying"
+                                ? "bg-gradient-to-r from-green-500 to-cyan-500 text-white hover:opacity-90 shadow-[0_4px_24px_rgba(34,197,94,0.4)]"
+                                : "bg-white/[0.08] text-white/40 cursor-not-allowed"
+                            )}
+                          >
+                            {verifyStatus === "verifying" ? "Verifying..." : "Verify & Activate"}
+                          </motion.button>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* Backup Codes Display */}
+                {loginMode === "backup-codes" && (
+                  <motion.div
+                    key="backup-codes"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    {/* Header */}
+                    <div className="flex flex-col items-center mb-6">
+                      <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                        <Key className="w-8 h-8 text-white" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-2">Backup Codes</h2>
+                      <p className="text-white/60 text-sm text-center">
+                        Save these codes in a safe place. Each code can only be used once.
+                      </p>
+                    </div>
+
+                    {/* Warning */}
+                    <div className="p-4 mb-6 rounded-xl bg-amber-500/20 border border-amber-500/30">
+                      <p className="text-sm text-amber-300">
+                        ⚠️ These codes will only be shown once. Make sure to save them now!
+                      </p>
+                    </div>
+
+                    {/* Codes Grid */}
+                    <div className="grid grid-cols-2 gap-2 mb-6">
+                      {backupCodes.map((code, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            navigator.clipboard.writeText(code);
+                            setCopiedCode(i);
+                            setTimeout(() => setCopiedCode(null), 2000);
+                          }}
+                          className="flex items-center justify-between p-3 rounded-xl bg-white/[0.08] border border-white/[0.1] hover:bg-white/[0.12] transition-colors group"
+                        >
+                          <code className="text-sm font-mono text-white/80">{code}</code>
+                          {copiedCode === i ? (
+                            <CheckCircle className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <Copy className="w-4 h-4 text-white/30 group-hover:text-white/60 transition-colors" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 mb-6">
+                      <button
+                        onClick={() => {
+                          const text = backupCodes.join("\n");
+                          navigator.clipboard.writeText(text);
+                          setCopiedCode(-2);
+                          setTimeout(() => setCopiedCode(null), 2000);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-white/[0.08] border border-white/[0.1] hover:bg-white/[0.12] transition-colors text-white/80"
+                      >
+                        {copiedCode === -2 ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                        Copy All
+                      </button>
+                      <button
+                        onClick={() => {
+                          const text = `SONORA Backup Codes\n==================\n\n${backupCodes.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nGenerated: ${new Date().toLocaleString()}\nEach code can only be used once.`;
+                          const blob = new Blob([text], { type: "text/plain" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = "sonora-backup-codes.txt";
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-white/[0.08] border border-white/[0.1] hover:bg-white/[0.12] transition-colors text-white/80"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download
+                      </button>
+                    </div>
+
+                    {/* Trust Device Checkbox */}
+                    <label className="flex items-center gap-3 p-4 mb-6 rounded-xl bg-white/[0.08] border border-white/[0.1] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={trustDevice}
+                        onChange={(e) => setTrustDevice(e.target.checked)}
+                        className="w-5 h-5 rounded accent-purple-500"
+                      />
+                      <div>
+                        <p className="text-white font-medium">Trust this device</p>
+                        <p className="text-sm text-white/50">Skip MFA on this device for 30 days</p>
+                      </div>
+                    </label>
+
+                    {/* Continue Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={async () => {
+                        // Trust device if checked
+                        if (trustDevice && authUser) {
+                          await addTrustedDevice(authUser.id, navigator.userAgent.split(" ")[0]);
+                        }
+
+                        // Redirect to admin
+                        setVerifyStatus("success");
+                        setIsZooming(true);
+                        setTimeout(() => {
+                          setHasRedirected(true);
+                          window.location.href = "/admin";
+                        }, 1000);
+                      }}
+                      className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-purple-500 to-cyan-500 text-white hover:opacity-90 shadow-[0_4px_24px_rgba(168,85,247,0.4)] transition-all"
+                    >
+                      I've Saved My Codes - Continue to Dashboard
+                    </motion.button>
                   </motion.div>
                 )}
               </AnimatePresence>

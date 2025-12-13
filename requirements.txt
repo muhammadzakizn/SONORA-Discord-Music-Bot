@@ -56,8 +56,12 @@ deep-translator>=1.11.4
 # Enhanced UI/UX
 flask-minify>=0.42
 
-# PWA Support (already have flask, just need manifest)
+# 🔐 SECURITY & AUTHENTICATION (Bank-Level)
+cryptography>=41.0.0    # AES-256-GCM encryption, key derivation
+argon2-cffi>=23.1.0     # Argon2id password hashing (winner of Password Hashing Competition)
+pyotp>=2.9.0            # TOTP/HOTP for authenticator apps
+webauthn>=2.0.0         # WebAuthn/FIDO2 passkey support
 
-# Image processing (already have Pillow)
+# Email sending (for OTP)
+aiosmtplib>=3.0.0       # Async SMTP for email OTP
 
-# Audio metadata enhancement (already have mutagen)
