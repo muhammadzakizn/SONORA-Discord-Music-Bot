@@ -372,7 +372,7 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
                 )}
 
                 <Link
-                  href="/admin"
+                  href="/"
                   onClick={() => setShowProfile(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-2.5 transition-colors text-sm",
@@ -381,8 +381,8 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
                       : "text-gray-600 hover:text-gray-900 hover:bg-black/[0.05]"
                   )}
                 >
-                  <UserCircle className="w-4 h-4" />
-                  <span>Admin Dashboard</span>
+                  <Home className="w-4 h-4" />
+                  <span>Back to Home</span>
                 </Link>
                 <div className={cn(
                   "border-t",

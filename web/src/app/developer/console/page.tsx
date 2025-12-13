@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Terminal,
@@ -28,18 +28,7 @@ interface LogEntry {
     message: string;
 }
 
-// Mock logs for demonstration
-const mockLogs: LogEntry[] = [
-    { id: 1, timestamp: "14:30:01", level: "INFO", module: "bot", message: "Bot started successfully" },
-    { id: 2, timestamp: "14:30:02", level: "INFO", module: "voice", message: "Voice manager initialized" },
-    { id: 3, timestamp: "14:30:03", level: "DEBUG", module: "database", message: "Connected to bot.db" },
-    { id: 4, timestamp: "14:30:05", level: "INFO", module: "cogs", message: "Loaded PlayCommand" },
-    { id: 5, timestamp: "14:30:05", level: "INFO", module: "cogs", message: "Loaded QueueCommands" },
-    { id: 6, timestamp: "14:30:06", level: "WARNING", module: "cache", message: "Cache directory has 500+ files" },
-    { id: 7, timestamp: "14:30:10", level: "INFO", module: "bot", message: "Synced 15 slash commands" },
-    { id: 8, timestamp: "14:31:00", level: "DEBUG", module: "play", message: "Processing /play request" },
-    { id: 9, timestamp: "14:31:01", level: "INFO", module: "spotify", message: "Fetching track metadata..." },
-];
+const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
 
 const levelIcons = {
     DEBUG: Info,
@@ -63,7 +52,7 @@ const levelBgColors = {
 };
 
 function LogLine({ log, isDark }: { log: LogEntry; isDark: boolean }) {
-    const Icon = levelIcons[log.level];
+    const Icon = levelIcons[log.level] || Info;
 
     return (
         <motion.div
@@ -72,14 +61,14 @@ function LogLine({ log, isDark }: { log: LogEntry; isDark: boolean }) {
             className={cn(
                 "flex items-start gap-3 px-4 py-2 font-mono text-sm",
                 isDark ? "hover:bg-white/5" : "hover:bg-black/5",
-                levelBgColors[log.level]
+                levelBgColors[log.level] || "bg-zinc-500/10"
             )}
         >
             <span className={cn(
                 "w-20 shrink-0",
                 isDark ? "text-zinc-600" : "text-gray-400"
             )}>{log.timestamp}</span>
-            <div className={cn("flex items-center gap-1 w-20 shrink-0", levelColors[log.level])}>
+            <div className={cn("flex items-center gap-1 w-20 shrink-0", levelColors[log.level] || "text-zinc-500")}>
                 <Icon className="w-4 h-4" />
                 <span className="uppercase text-xs">{log.level}</span>
             </div>
@@ -91,15 +80,71 @@ function LogLine({ log, isDark }: { log: LogEntry; isDark: boolean }) {
 
 export default function DeveloperConsole() {
     const { isDark } = useSettings();
-    const [logs, setLogs] = useState<LogEntry[]>(mockLogs);
+    const [logs, setLogs] = useState<LogEntry[]>([]);
     const [filter, setFilter] = useState<string>("");
     const [levelFilter, setLevelFilter] = useState<string>("all");
     const [autoScroll, setAutoScroll] = useState(true);
     const [isPaused, setIsPaused] = useState(false);
-    const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "booting">("connected");
+    const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "booting">("booting");
     const [bootProgress, setBootProgress] = useState(0);
     const logContainerRef = useRef<HTMLDivElement>(null);
     const [consoleInput, setConsoleInput] = useState("");
+    const lastLogId = useRef(0);
+
+    // Fetch logs from real API
+    const fetchLogs = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/logs?lines=200`, {
+                cache: 'no-store',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch logs');
+            }
+
+            const data = await response.json();
+
+            if (data.logs && Array.isArray(data.logs)) {
+                // Parse logs from API response
+                const parsedLogs: LogEntry[] = data.logs.map((log: { timestamp: string; level: string; message: string }, index: number) => {
+                    // Extract module from message if present (e.g., "[voice] Message")
+                    const moduleMatch = log.message?.match(/^\[([^\]]+)\]/);
+                    const module = moduleMatch ? moduleMatch[1] : log.level === 'ERROR' ? 'error' : 'system';
+                    const message = moduleMatch ? log.message.replace(moduleMatch[0], '').trim() : log.message;
+
+                    return {
+                        id: lastLogId.current + index + 1,
+                        timestamp: log.timestamp || new Date().toLocaleTimeString("en-US", { hour12: false }),
+                        level: (log.level?.toUpperCase() || 'INFO') as LogEntry['level'],
+                        module: module,
+                        message: message || '',
+                    };
+                });
+
+                if (parsedLogs.length > 0) {
+                    lastLogId.current = parsedLogs[parsedLogs.length - 1].id;
+                    setLogs(parsedLogs);
+                    setConnectionStatus("connected");
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch logs:', error);
+            setConnectionStatus("disconnected");
+        }
+    }, []);
+
+    // Initial fetch and polling
+    useEffect(() => {
+        fetchLogs();
+
+        const interval = setInterval(() => {
+            if (!isPaused) {
+                fetchLogs();
+            }
+        }, 3000); // Poll every 3 seconds
+
+        return () => clearInterval(interval);
+    }, [fetchLogs, isPaused]);
 
     const handleConsoleCommand = (e: React.FormEvent) => {
         e.preventDefault();
@@ -118,14 +163,14 @@ export default function DeveloperConsole() {
         };
         setLogs(prev => [...prev.slice(-200), newLog]);
 
-        // Simulate response
+        // TODO: Send command to backend
         setTimeout(() => {
             setLogs(prev => [...prev.slice(-200), {
                 id: Date.now(),
                 timestamp: new Date().toLocaleTimeString("en-US", { hour12: false }),
                 level: "DEBUG",
                 module: "system",
-                message: `Command executed: ${cmd}`,
+                message: `Command sent: ${cmd}`,
             }]);
         }, 200);
     };
@@ -136,34 +181,6 @@ export default function DeveloperConsole() {
             logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
         }
     }, [logs, autoScroll]);
-
-    // Simulate new logs coming in
-    useEffect(() => {
-        if (connectionStatus !== "connected" || isPaused) return;
-
-        const interval = setInterval(() => {
-            const newLog: LogEntry = {
-                id: Date.now(),
-                timestamp: new Date().toLocaleTimeString("en-US", { hour12: false }),
-                level: ["DEBUG", "INFO", "INFO", "INFO", "WARNING"][Math.floor(Math.random() * 5)] as "DEBUG" | "INFO" | "WARNING" | "ERROR",
-                module: ["voice", "play", "queue", "cache", "api"][Math.floor(Math.random() * 5)],
-                message: [
-                    "Processing request...",
-                    "Cache hit for track",
-                    "Voice connection stable",
-                    "Queue updated",
-                    "API response received",
-                    "Heartbeat acknowledged",
-                    "Voice state updated",
-                ][Math.floor(Math.random() * 7)],
-            };
-
-            setLogs(prev => [...prev.slice(-200), newLog]);
-        }, 2000);
-
-        return () => clearInterval(interval);
-    }, [connectionStatus, isPaused]);
-
     const filteredLogs = logs.filter(log => {
         const matchesText = log.message.toLowerCase().includes(filter.toLowerCase()) ||
             log.module.toLowerCase().includes(filter.toLowerCase());
