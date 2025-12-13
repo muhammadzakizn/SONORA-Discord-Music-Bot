@@ -45,14 +45,38 @@ class MusicBot(commands.Bot):
         self.error_handler = BotErrorHandler()
         self.db_manager = get_db_manager()
         
-        # Maintenance mode
-        self.maintenance_mode = False
-        self.maintenance_reason = "Server maintenance in progress. Please try again later."
+        # Maintenance mode - load from persistent file
+        self._load_maintenance_state()
         
         # Setup event handlers
         self.setup_events()
         
         logger.info("MusicBot initialized")
+    
+    def _load_maintenance_state(self) -> None:
+        """Load maintenance state from persistent file"""
+        try:
+            from pathlib import Path
+            import json
+            
+            maintenance_file = Path(__file__).parent.parent / 'config' / 'maintenance_state.json'
+            
+            if maintenance_file.exists():
+                with open(maintenance_file, 'r') as f:
+                    state = json.load(f)
+                    self.maintenance_mode = state.get("enabled", False)
+                    self.maintenance_reason = state.get("reason", "Server maintenance in progress. Please try again later.")
+                    
+                    if self.maintenance_mode:
+                        logger.info(f"🔧 Maintenance mode ACTIVE from previous session: {self.maintenance_reason}")
+            else:
+                self.maintenance_mode = False
+                self.maintenance_reason = "Server maintenance in progress. Please try again later."
+                
+        except Exception as e:
+            logger.error(f"Failed to load maintenance state: {e}")
+            self.maintenance_mode = False
+            self.maintenance_reason = "Server maintenance in progress. Please try again later."
     
     def setup_events(self) -> None:
         """Setup event handlers"""
