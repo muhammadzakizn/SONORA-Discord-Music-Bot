@@ -1000,7 +1000,7 @@ function AboutButton({ isDark }: { isDark: boolean }) {
             </button>
 
             <Link
-                href="/explore/changelog"
+                href="/changelog"
                 className={cn(
                     "w-full p-3 rounded-xl flex items-center gap-3 transition-all",
                     isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"

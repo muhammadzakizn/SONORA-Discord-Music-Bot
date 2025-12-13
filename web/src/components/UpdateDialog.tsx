@@ -154,7 +154,7 @@ export function UpdateDialog({ isOpen, onClose }: UpdateDialogProps) {
 
                     <div className="flex flex-col gap-3">
                         <Link
-                            href="/explore/changelog"
+                            href="/changelog"
                             className="flex items-center justify-center gap-2 text-purple-400 hover:text-purple-300 transition-colors"
                         >
                             <ExternalLink className="w-4 h-4" />
@@ -256,7 +256,7 @@ export function UpdateDialog({ isOpen, onClose }: UpdateDialogProps) {
                         {/* Actions */}
                         <div className="flex flex-col gap-3">
                             <Link
-                                href="/explore/changelog"
+                                href="/changelog"
                                 className="flex items-center justify-center gap-2 text-zinc-400 hover:text-white transition-colors text-sm"
                             >
                                 <ExternalLink className="w-4 h-4" />
