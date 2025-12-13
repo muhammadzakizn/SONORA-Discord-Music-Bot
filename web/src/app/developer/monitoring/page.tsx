@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
+import { ComponentStatusDialog, componentDescriptions } from "@/components/developer/ComponentStatusDialog";
+import { CacheManagementDialog } from "@/components/developer/CacheManagementDialog";
 
 interface SystemMetrics {
     cpu: number;
@@ -75,6 +77,21 @@ export default function MonitoringPage() {
 
     const [lastUpdate, setLastUpdate] = useState(new Date());
     const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // Dialog state
+    const [selectedComponent, setSelectedComponent] = useState<ComponentStatus | null>(null);
+    const [showComponentDialog, setShowComponentDialog] = useState(false);
+    const [showCacheDialog, setShowCacheDialog] = useState(false);
+
+    // Handle component card click
+    const handleComponentClick = (component: ComponentStatus) => {
+        if (component.name === "Cache System") {
+            setShowCacheDialog(true);
+        } else {
+            setSelectedComponent(component);
+            setShowComponentDialog(true);
+        }
+    };
 
     // Simulate real-time updates
     useEffect(() => {
@@ -401,9 +418,11 @@ export default function MonitoringPage() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: 0.1 * index }}
+                            onClick={() => handleComponentClick(component)}
                             className={cn(
-                                "p-4 rounded-xl border-2 transition-all",
-                                getStatusColor(component.status)
+                                "p-4 rounded-xl border-2 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]",
+                                getStatusColor(component.status),
+                                isDark ? "hover:bg-white/5" : "hover:bg-gray-50"
                             )}
                         >
                             <div className="flex items-start justify-between mb-2">
@@ -507,6 +526,22 @@ export default function MonitoringPage() {
                     </p>
                 </motion.div>
             </div>
+
+            {/* Component Status Dialog */}
+            <ComponentStatusDialog
+                isOpen={showComponentDialog}
+                onClose={() => {
+                    setShowComponentDialog(false);
+                    setSelectedComponent(null);
+                }}
+                component={selectedComponent}
+            />
+
+            {/* Cache Management Dialog */}
+            <CacheManagementDialog
+                isOpen={showCacheDialog}
+                onClose={() => setShowCacheDialog(false)}
+            />
         </div>
     );
 }

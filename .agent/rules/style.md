@@ -2,7 +2,7 @@
 trigger: always_on
 ---
 
-1. Pastikan semuanya berjalan bagus, cek, dan recheck, test, cek, fix kalau ada error, dan cek ulangi-ulangi, sampai benar-benar berjalan baik dan tidak ada bug atau error sama sekali.
+1. Pastikan semuanya berjalan bagus, cek, dan recheck, test, cek, fix kalau ada error, dan cek ulangi-ulangi, sampai benar-benar berjalan baik dan tidak ada bug atau error sama sekali serta berjalan baik di server Pterodacyl Linux, macOS.
 
 2. Pastikan selalu mengupdate changelog di :
 
@@ -14,3 +14,4 @@ trigger: always_on
 - Dan kamu rangkum semua pembaruan atau perubahan terakhir di page web /changelog juga di bagian navLiquidGlass bagian settings bagian about, nomor versinya dinaikkan/diupdate.
 
 3. Jika semuanya telah selesai maka, selalu git push ke github. tapi selain dari folder .agent/rules ya. dan jangan hilangkan folder .agent / rules di local/laptopku ini.
+

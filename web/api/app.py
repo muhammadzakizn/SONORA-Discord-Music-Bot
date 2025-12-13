@@ -1355,6 +1355,407 @@ def api_admin_cache_clear():
         return jsonify({"error": str(e)}), 500
 
 
+# ==================== COMPREHENSIVE CACHE MANAGEMENT ENDPOINTS ====================
+
+CACHE_SETTINGS_FILE = Path(__file__).parent.parent.parent / 'config' / 'cache_settings.json'
+
+def load_cache_settings() -> dict:
+    """Load cache settings from file"""
+    default_settings = {
+        "max_size_gb": 2.0,
+        "max_age_days": 3,
+        "warning_threshold_gb": 1.5,
+        "autoclean_enabled": True
+    }
+    try:
+        if CACHE_SETTINGS_FILE.exists():
+            import json
+            with open(CACHE_SETTINGS_FILE, 'r') as f:
+                settings = json.load(f)
+                return {**default_settings, **settings}
+    except Exception as e:
+        logger.error(f"Failed to load cache settings: {e}")
+    return default_settings
+
+
+def save_cache_settings(settings: dict) -> bool:
+    """Save cache settings to file"""
+    try:
+        import json
+        CACHE_SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(CACHE_SETTINGS_FILE, 'w') as f:
+            json.dump(settings, f, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save cache settings: {e}")
+        return False
+
+
+def format_bytes(size_bytes: int) -> str:
+    """Format bytes to human readable string"""
+    if size_bytes == 0:
+        return "0 B"
+    size_names = ["B", "KB", "MB", "GB"]
+    i = 0
+    while size_bytes >= 1024 and i < len(size_names) - 1:
+        size_bytes /= 1024
+        i += 1
+    return f"{size_bytes:.1f} {size_names[i]}"
+
+
+def get_dir_size(path: Path) -> tuple:
+    """Get directory size and file count"""
+    total_size = 0
+    file_count = 0
+    try:
+        if path.exists():
+            for item in path.rglob("*"):
+                if item.is_file():
+                    total_size += item.stat().st_size
+                    file_count += 1
+    except Exception as e:
+        logger.error(f"Error getting dir size for {path}: {e}")
+    return total_size, file_count
+
+
+@app.route('/api/admin/cache/stats')
+def api_admin_cache_stats():
+    """Get detailed cache statistics for all cache types"""
+    try:
+        from config.settings import Settings
+        
+        caches = {}
+        
+        # 1. Audio cache (downloads folder)
+        downloads_dir = Settings.DOWNLOADS_DIR
+        audio_size, audio_count = get_dir_size(downloads_dir)
+        caches['audio'] = {
+            'size_bytes': audio_size,
+            'size_formatted': format_bytes(audio_size),
+            'file_count': audio_count,
+            'path': str(downloads_dir)
+        }
+        
+        # 2. Artwork cache
+        artwork_dir = Settings.CACHE_DIR / 'artwork'
+        artwork_size, artwork_count = get_dir_size(artwork_dir)
+        caches['artwork'] = {
+            'size_bytes': artwork_size,
+            'size_formatted': format_bytes(artwork_size),
+            'file_count': artwork_count,
+            'path': str(artwork_dir)
+        }
+        
+        # 3. Python cache (__pycache__ directories)
+        pycache_size = 0
+        pycache_count = 0
+        base_dir = Settings.BASE_DIR
+        try:
+            for pycache_dir in base_dir.rglob('__pycache__'):
+                if pycache_dir.is_dir():
+                    size, count = get_dir_size(pycache_dir)
+                    pycache_size += size
+                    pycache_count += count
+        except Exception as e:
+            logger.error(f"Error scanning pycache: {e}")
+        
+        caches['pycache'] = {
+            'size_bytes': pycache_size,
+            'size_formatted': format_bytes(pycache_size),
+            'file_count': pycache_count,
+            'path': str(base_dir / '__pycache__')
+        }
+        
+        # 4. Next.js cache
+        nextjs_cache_dir = Settings.BASE_DIR / 'web' / '.next' / 'cache'
+        nextjs_size, nextjs_count = get_dir_size(nextjs_cache_dir)
+        caches['nextjs'] = {
+            'size_bytes': nextjs_size,
+            'size_formatted': format_bytes(nextjs_size),
+            'file_count': nextjs_count,
+            'path': str(nextjs_cache_dir)
+        }
+        
+        # 5. In-memory cache (estimate from cache manager)
+        memory_entries = 0
+        try:
+            from utils.cache import cache_manager
+            stats = cache_manager.get_stats()
+            memory_entries = sum(s.get('size', 0) for s in stats.values())
+        except:
+            pass
+        
+        caches['memory'] = {
+            'size_bytes': 0,
+            'size_formatted': 'In RAM',
+            'file_count': memory_entries,
+            'path': 'In-memory'
+        }
+        
+        # Total size
+        total_size = sum(c['size_bytes'] for c in caches.values())
+        
+        # Get settings
+        settings = load_cache_settings()
+        
+        return jsonify({
+            'caches': caches,
+            'total_size_bytes': total_size,
+            'total_size_formatted': format_bytes(total_size),
+            'settings': settings
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get cache stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/cache/clear/<cache_type>', methods=['POST'])
+def api_admin_cache_clear_type(cache_type: str):
+    """Clear specific cache type or all caches"""
+    try:
+        from config.settings import Settings
+        import shutil
+        
+        cleared_count = 0
+        cleared_size = 0
+        
+        valid_types = ['audio', 'artwork', 'pycache', 'nextjs', 'memory', 'all']
+        if cache_type not in valid_types:
+            return jsonify({"error": f"Invalid cache type. Valid types: {valid_types}"}), 400
+        
+        def clear_dir(path: Path, extensions: list = None) -> tuple:
+            """Clear files from directory, return count and size"""
+            count = 0
+            size = 0
+            if path.exists():
+                for item in path.rglob("*"):
+                    if item.is_file():
+                        if extensions is None or item.suffix.lower() in extensions:
+                            try:
+                                size += item.stat().st_size
+                                item.unlink()
+                                count += 1
+                            except Exception as e:
+                                logger.error(f"Failed to delete {item}: {e}")
+            return count, size
+        
+        # Clear audio cache
+        if cache_type in ['audio', 'all']:
+            downloads_dir = Settings.DOWNLOADS_DIR
+            c, s = clear_dir(downloads_dir, ['.opus', '.m4a', '.mp3', '.ogg', '.webm'])
+            cleared_count += c
+            cleared_size += s
+            logger.info(f"Cleared audio cache: {c} files, {format_bytes(s)}")
+        
+        # Clear artwork cache
+        if cache_type in ['artwork', 'all']:
+            artwork_dir = Settings.CACHE_DIR / 'artwork'
+            c, s = clear_dir(artwork_dir)
+            cleared_count += c
+            cleared_size += s
+            logger.info(f"Cleared artwork cache: {c} files, {format_bytes(s)}")
+        
+        # Clear Python cache
+        if cache_type in ['pycache', 'all']:
+            base_dir = Settings.BASE_DIR
+            for pycache_dir in base_dir.rglob('__pycache__'):
+                if pycache_dir.is_dir():
+                    try:
+                        size = sum(f.stat().st_size for f in pycache_dir.rglob("*") if f.is_file())
+                        count = len(list(pycache_dir.rglob("*")))
+                        shutil.rmtree(pycache_dir)
+                        cleared_count += count
+                        cleared_size += size
+                    except Exception as e:
+                        logger.error(f"Failed to clear pycache dir {pycache_dir}: {e}")
+            logger.info(f"Cleared pycache: {cleared_count} files")
+        
+        # Clear Next.js cache
+        if cache_type in ['nextjs', 'all']:
+            nextjs_cache_dir = Settings.BASE_DIR / 'web' / '.next' / 'cache'
+            if nextjs_cache_dir.exists():
+                try:
+                    size = sum(f.stat().st_size for f in nextjs_cache_dir.rglob("*") if f.is_file())
+                    count = len(list(nextjs_cache_dir.rglob("*")))
+                    shutil.rmtree(nextjs_cache_dir)
+                    cleared_count += count
+                    cleared_size += size
+                    logger.info(f"Cleared Next.js cache: {count} files, {format_bytes(size)}")
+                except Exception as e:
+                    logger.error(f"Failed to clear Next.js cache: {e}")
+        
+        # Clear in-memory cache
+        if cache_type in ['memory', 'all']:
+            try:
+                from utils.cache import cache_manager
+                cache_manager.clear()
+                cleared_count += 1
+                logger.info("Cleared in-memory cache")
+            except Exception as e:
+                logger.error(f"Failed to clear memory cache: {e}")
+        
+        return jsonify({
+            "status": "success",
+            "cleared": cleared_count,
+            "cleared_size": cleared_size,
+            "cleared_size_formatted": format_bytes(cleared_size)
+        })
+        
+    except Exception as e:
+        logger.error(f"Cache clear ({cache_type}) failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/cache/settings', methods=['GET', 'POST'])
+def api_admin_cache_settings():
+    """Get or update cache auto-cleanup settings"""
+    try:
+        if request.method == 'GET':
+            settings = load_cache_settings()
+            return jsonify(settings)
+        
+        else:  # POST
+            data = request.json or {}
+            
+            # Load existing settings and update with new values
+            settings = load_cache_settings()
+            
+            if 'max_size_gb' in data:
+                settings['max_size_gb'] = float(data['max_size_gb'])
+            if 'max_age_days' in data:
+                settings['max_age_days'] = int(data['max_age_days'])
+            if 'warning_threshold_gb' in data:
+                settings['warning_threshold_gb'] = float(data['warning_threshold_gb'])
+            if 'autoclean_enabled' in data:
+                settings['autoclean_enabled'] = bool(data['autoclean_enabled'])
+            
+            # Save settings
+            if save_cache_settings(settings):
+                # Try to update the audio cache manager with new settings
+                try:
+                    from services.audio.cache import _cache_manager
+                    if _cache_manager:
+                        _cache_manager.max_size_bytes = int(settings['max_size_gb'] * 1024 * 1024 * 1024)
+                        _cache_manager.max_age_seconds = settings['max_age_days'] * 24 * 60 * 60
+                        logger.info(f"Updated cache manager settings: {settings}")
+                except Exception as e:
+                    logger.warning(f"Could not update live cache manager: {e}")
+                
+                return jsonify({"status": "success", "settings": settings})
+            else:
+                return jsonify({"error": "Failed to save settings"}), 500
+                
+    except Exception as e:
+        logger.error(f"Cache settings error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/developer/component/<component_name>')
+def api_developer_component_details(component_name: str):
+    """Get detailed information about a specific component"""
+    bot = get_bot()
+    
+    component_info = {
+        "name": component_name,
+        "status": "online",
+        "description": "",
+        "details": [],
+        "issues": [],
+        "metrics": {}
+    }
+    
+    try:
+        if component_name == "Discord Bot":
+            if bot and bot.is_ready():
+                component_info["status"] = "online"
+                component_info["metrics"] = {
+                    "latency_ms": round(bot.latency * 1000, 2),
+                    "guilds": len(bot.guilds),
+                    "users": sum(g.member_count for g in bot.guilds)
+                }
+            else:
+                component_info["status"] = "offline"
+                component_info["issues"] = ["Bot is not connected to Discord"]
+                
+        elif component_name == "Database (SQLite)":
+            try:
+                db = get_db_manager()
+                if db:
+                    component_info["status"] = "online"
+                else:
+                    component_info["status"] = "offline"
+                    component_info["issues"] = ["Database connection failed"]
+            except:
+                component_info["status"] = "offline"
+                component_info["issues"] = ["Database not available"]
+                
+        elif component_name == "Web API":
+            component_info["status"] = "online"
+            component_info["metrics"] = {"port": 5000}
+            
+        elif component_name == "Voice Engine":
+            if bot:
+                voice_stats = bot.voice_manager.get_stats() if hasattr(bot, 'voice_manager') else {}
+                component_info["status"] = "online" if voice_stats.get('connected', 0) >= 0 else "warning"
+                component_info["metrics"] = voice_stats
+            else:
+                component_info["status"] = "offline"
+                component_info["issues"] = ["Bot not connected"]
+                
+        elif component_name == "Cache System":
+            from config.settings import Settings
+            downloads_dir = Settings.DOWNLOADS_DIR
+            cache_files = list(downloads_dir.glob("*.opus"))
+            cache_size = sum(f.stat().st_size for f in cache_files) / (1024 * 1024 * 1024)
+            
+            settings = load_cache_settings()
+            if cache_size > settings['warning_threshold_gb']:
+                component_info["status"] = "warning"
+                component_info["issues"] = [f"Cache size ({cache_size:.2f}GB) approaching limit ({settings['max_size_gb']}GB)"]
+            else:
+                component_info["status"] = "online"
+            component_info["metrics"] = {
+                "file_count": len(cache_files),
+                "size_gb": round(cache_size, 2),
+                "max_size_gb": settings['max_size_gb']
+            }
+            
+        elif component_name == "Spotify API":
+            # Check if Spotify credentials are configured
+            import os
+            if os.environ.get('SPOTIFY_CLIENT_ID') and os.environ.get('SPOTIFY_CLIENT_SECRET'):
+                component_info["status"] = "online"
+            else:
+                component_info["status"] = "warning"
+                component_info["issues"] = ["Spotify credentials not configured"]
+                
+        elif component_name == "YouTube API":
+            component_info["status"] = "online"
+            # Check if yt-dlp is available
+            try:
+                import yt_dlp
+                component_info["metrics"] = {"yt_dlp_version": yt_dlp.version.__version__}
+            except:
+                component_info["status"] = "warning"
+                component_info["issues"] = ["yt-dlp not installed or outdated"]
+                
+        elif component_name == "Apple Music":
+            from config.settings import Settings
+            cookies_file = Settings.BASE_DIR / 'cookies' / 'apple_music.txt'
+            if cookies_file.exists():
+                component_info["status"] = "online"
+            else:
+                component_info["status"] = "warning"
+                component_info["issues"] = ["Apple Music cookies not configured"]
+        
+        return jsonify(component_info)
+        
+    except Exception as e:
+        logger.error(f"Failed to get component details for {component_name}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ==================== BOT CONTROL ENDPOINTS ====================
 
 @app.route('/api/admin/bot/restart', methods=['POST'])
