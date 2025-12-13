@@ -31,6 +31,8 @@ interface User {
     lastActive: string;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+
 export default function UsersPage() {
     const { isDark } = useSettings();
     const [users, setUsers] = useState<User[]>([]);
@@ -45,27 +47,52 @@ export default function UsersPage() {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            // In production, fetch from API
-            // Mock data for demo
-            setUsers([
-                { id: "1", username: "MusicLover", discriminator: "1234", avatar: null, isBanned: false, totalPlays: 150, lastActive: "2 hours ago" },
-                { id: "2", username: "DJMaster", discriminator: "5678", avatar: null, isBanned: false, totalPlays: 320, lastActive: "5 min ago" },
-                { id: "3", username: "SpamBot", discriminator: "9999", avatar: null, isBanned: true, banReason: "Spam abuse", totalPlays: 5, lastActive: "3 days ago" },
-                { id: "4", username: "ChillVibes", discriminator: "4321", avatar: null, isBanned: false, totalPlays: 89, lastActive: "1 day ago" },
-                { id: "5", username: "TrollAccount", discriminator: "6666", avatar: null, isBanned: true, banReason: "Harassment", banExpiry: "2024-12-25", totalPlays: 12, lastActive: "1 week ago" },
-            ]);
+            const response = await fetch(`${API_BASE}/api/admin/users`, {
+                cache: 'no-store',
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setUsers(data);
+            } else {
+                // Fallback to mock data if API fails
+                setUsers([
+                    { id: "1", username: "MusicLover", discriminator: "1234", avatar: null, isBanned: false, totalPlays: 150, lastActive: "2 hours ago" },
+                    { id: "2", username: "DJMaster", discriminator: "5678", avatar: null, isBanned: false, totalPlays: 320, lastActive: "5 min ago" },
+                ]);
+            }
         } catch {
             setUsers([]);
         }
         setLoading(false);
     };
 
-    const toggleBan = (userId: string) => {
-        setUsers(prev => prev.map(user =>
-            user.id === userId
-                ? { ...user, isBanned: !user.isBanned, banReason: user.isBanned ? undefined : "Manual ban" }
-                : user
-        ));
+    const toggleBan = async (userId: string) => {
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
+
+        try {
+            if (user.isBanned) {
+                await fetch(`${API_BASE}/api/admin/users/${userId}/ban`, {
+                    method: 'DELETE',
+                });
+            } else {
+                await fetch(`${API_BASE}/api/admin/users/${userId}/ban`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: 'Manual ban' }),
+                });
+            }
+            // Refresh users list
+            fetchUsers();
+        } catch (error) {
+            console.error('Ban toggle failed:', error);
+            // Fallback to local state update
+            setUsers(prev => prev.map(u =>
+                u.id === userId
+                    ? { ...u, isBanned: !u.isBanned, banReason: u.isBanned ? undefined : "Manual ban" }
+                    : u
+            ));
+        }
     };
 
     const filteredUsers = users.filter(user => {

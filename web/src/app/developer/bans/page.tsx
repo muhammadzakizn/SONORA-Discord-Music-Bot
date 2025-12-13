@@ -33,41 +33,12 @@ interface BanRecord {
     isActive: boolean;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+
 export default function BansPage() {
     const { isDark } = useSettings();
-    const [bans, setBans] = useState<BanRecord[]>([
-        {
-            id: "1",
-            type: "user",
-            targetId: "123456789",
-            targetName: "SpamUser#1234",
-            reason: "Repeated spam and abuse",
-            bannedAt: "2024-12-10T10:00:00Z",
-            bannedBy: "Admin",
-            isActive: true,
-        },
-        {
-            id: "2",
-            type: "server",
-            targetId: "987654321",
-            targetName: "Spam Server",
-            reason: "Bot abuse and ToS violation",
-            bannedAt: "2024-12-08T14:00:00Z",
-            bannedBy: "Admin",
-            isActive: true,
-        },
-        {
-            id: "3",
-            type: "user",
-            targetId: "111222333",
-            targetName: "OldBannedUser#5678",
-            reason: "Previous violation",
-            bannedAt: "2024-11-01T08:00:00Z",
-            expiresAt: "2024-12-01T08:00:00Z",
-            bannedBy: "Admin",
-            isActive: false,
-        },
-    ]);
+    const [bans, setBans] = useState<BanRecord[]>([]);
+    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<"all" | "user" | "server" | "active" | "expired">("all");
     const [search, setSearch] = useState("");
     const [showAddBan, setShowAddBan] = useState(false);
@@ -79,6 +50,29 @@ export default function BansPage() {
         duration: "permanent" as string,
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Fetch bans on mount
+    useEffect(() => {
+        fetchBans();
+    }, []);
+
+    const fetchBans = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/bans`, {
+                cache: 'no-store',
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setBans(data);
+            } else {
+                setBans([]);
+            }
+        } catch {
+            setBans([]);
+        }
+        setLoading(false);
+    };
 
     const filteredBans = bans.filter(ban => {
         const matchesSearch =
@@ -99,38 +93,69 @@ export default function BansPage() {
         if (!newBan.targetId || !newBan.reason) return;
 
         setIsSubmitting(true);
-        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const newRecord: BanRecord = {
-            id: Date.now().toString(),
-            type: newBan.type,
-            targetId: newBan.targetId,
-            targetName: newBan.targetName || newBan.targetId,
-            reason: newBan.reason,
-            bannedAt: new Date().toISOString(),
-            expiresAt: newBan.duration !== "permanent"
-                ? new Date(Date.now() + parseInt(newBan.duration) * 24 * 60 * 60 * 1000).toISOString()
-                : undefined,
-            bannedBy: "Admin",
-            isActive: true,
-        };
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/bans`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: newBan.type,
+                    targetId: newBan.targetId,
+                    targetName: newBan.targetName || newBan.targetId,
+                    reason: newBan.reason,
+                    duration: newBan.duration,
+                }),
+            });
 
-        setBans(prev => [newRecord, ...prev]);
-        setShowAddBan(false);
-        setNewBan({ type: "user", targetId: "", targetName: "", reason: "", duration: "permanent" });
+            if (response.ok) {
+                fetchBans();
+                setShowAddBan(false);
+                setNewBan({ type: "user", targetId: "", targetName: "", reason: "", duration: "permanent" });
+            }
+        } catch (error) {
+            console.error('Add ban failed:', error);
+        }
+
         setIsSubmitting(false);
     };
 
-    const handleUnban = (id: string) => {
-        setBans(prev => prev.map(ban =>
-            ban.id === id ? { ...ban, isActive: false } : ban
-        ));
+    const handleUnban = async (id: string) => {
+        try {
+            await fetch(`${API_BASE}/api/admin/bans/${id}`, {
+                method: 'DELETE',
+            });
+            fetchBans();
+        } catch (error) {
+            console.error('Unban failed:', error);
+            setBans(prev => prev.map(ban =>
+                ban.id === id ? { ...ban, isActive: false } : ban
+            ));
+        }
     };
 
-    const handleReban = (id: string) => {
-        setBans(prev => prev.map(ban =>
-            ban.id === id ? { ...ban, isActive: true, bannedAt: new Date().toISOString() } : ban
-        ));
+    const handleReban = async (id: string) => {
+        // For reban, we need to re-create the ban
+        const ban = bans.find(b => b.id === id);
+        if (!ban) return;
+
+        try {
+            await fetch(`${API_BASE}/api/admin/bans`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: ban.type,
+                    targetId: ban.targetId,
+                    targetName: ban.targetName,
+                    reason: ban.reason,
+                }),
+            });
+            fetchBans();
+        } catch (error) {
+            console.error('Reban failed:', error);
+            setBans(prev => prev.map(b =>
+                b.id === id ? { ...b, isActive: true, bannedAt: new Date().toISOString() } : b
+            ));
+        }
     };
 
     const activeBans = bans.filter(b => b.isActive);

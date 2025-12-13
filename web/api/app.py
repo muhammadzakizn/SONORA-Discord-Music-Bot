@@ -1500,6 +1500,211 @@ def api_admin_maintenance():
         return jsonify({"error": str(e)}), 500
 
 
+# ==================== USER MANAGEMENT ENDPOINTS ====================
+
+# In-memory storage for bans (in production, use database)
+_banned_users = {}  # {user_id: {reason, banned_at, expires_at, banned_by}}
+_banned_servers = {}  # {server_id: {reason, banned_at, expires_at, banned_by}}
+
+
+@app.route('/api/admin/users', methods=['GET'])
+def api_admin_users():
+    """Get list of users who have interacted with the bot"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        users = []
+        
+        # Collect unique users from guilds (limit to avoid performance issues)
+        seen_users = set()
+        max_users = 100
+        
+        for guild in bot.guilds:
+            for member in guild.members:
+                if member.bot:
+                    continue
+                if member.id in seen_users:
+                    continue
+                if len(seen_users) >= max_users:
+                    break
+                    
+                seen_users.add(member.id)
+                
+                # Check if banned
+                is_banned = str(member.id) in _banned_users
+                ban_info = _banned_users.get(str(member.id), {})
+                
+                users.append({
+                    "id": str(member.id),
+                    "username": member.name,
+                    "discriminator": member.discriminator or "0",
+                    "avatar": str(member.avatar.url) if member.avatar else None,
+                    "isBanned": is_banned,
+                    "banReason": ban_info.get("reason") if is_banned else None,
+                    "banExpiry": ban_info.get("expires_at") if is_banned else None,
+                    "totalPlays": 0,  # Would need activity tracking
+                    "lastActive": member.joined_at.isoformat() if member.joined_at else "Unknown"
+                })
+        
+        return jsonify(users)
+        
+    except Exception as e:
+        logger.error(f"Failed to get users: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/users/<user_id>/ban', methods=['POST', 'DELETE'])
+def api_admin_user_ban(user_id):
+    """Ban or unban a user"""
+    global _banned_users
+    
+    try:
+        if request.method == 'POST':
+            data = request.json or {}
+            reason = data.get('reason', 'Banned by admin')
+            duration = data.get('duration')  # days or None for permanent
+            
+            expires_at = None
+            if duration and duration != 'permanent':
+                from datetime import datetime, timedelta
+                expires_at = (datetime.now() + timedelta(days=int(duration))).isoformat()
+            
+            _banned_users[user_id] = {
+                "reason": reason,
+                "banned_at": datetime.now().isoformat(),
+                "expires_at": expires_at,
+                "banned_by": "Admin"
+            }
+            
+            logger.info(f"User {user_id} banned: {reason}")
+            return jsonify({"status": "banned", "user_id": user_id})
+            
+        elif request.method == 'DELETE':
+            if user_id in _banned_users:
+                del _banned_users[user_id]
+                logger.info(f"User {user_id} unbanned")
+            return jsonify({"status": "unbanned", "user_id": user_id})
+            
+    except Exception as e:
+        logger.error(f"Ban operation failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================== BAN MANAGEMENT ENDPOINTS ====================
+
+@app.route('/api/admin/bans', methods=['GET', 'POST'])
+def api_admin_bans():
+    """Get all bans or add new ban"""
+    global _banned_users, _banned_servers
+    
+    if request.method == 'GET':
+        try:
+            bans = []
+            
+            # User bans
+            for user_id, ban_info in _banned_users.items():
+                bans.append({
+                    "id": f"user-{user_id}",
+                    "type": "user",
+                    "targetId": user_id,
+                    "targetName": ban_info.get("target_name", f"User {user_id}"),
+                    "reason": ban_info.get("reason", "No reason provided"),
+                    "bannedAt": ban_info.get("banned_at"),
+                    "expiresAt": ban_info.get("expires_at"),
+                    "bannedBy": ban_info.get("banned_by", "Admin"),
+                    "isActive": True
+                })
+            
+            # Server bans
+            for server_id, ban_info in _banned_servers.items():
+                bans.append({
+                    "id": f"server-{server_id}",
+                    "type": "server",
+                    "targetId": server_id,
+                    "targetName": ban_info.get("target_name", f"Server {server_id}"),
+                    "reason": ban_info.get("reason", "No reason provided"),
+                    "bannedAt": ban_info.get("banned_at"),
+                    "expiresAt": ban_info.get("expires_at"),
+                    "bannedBy": ban_info.get("banned_by", "Admin"),
+                    "isActive": True
+                })
+            
+            return jsonify(bans)
+            
+        except Exception as e:
+            logger.error(f"Failed to get bans: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            data = request.json or {}
+            ban_type = data.get('type', 'user')
+            target_id = data.get('targetId')
+            target_name = data.get('targetName', '')
+            reason = data.get('reason', 'Banned by admin')
+            duration = data.get('duration')
+            
+            if not target_id:
+                return jsonify({"error": "Target ID is required"}), 400
+            
+            expires_at = None
+            if duration and duration != 'permanent':
+                from datetime import datetime, timedelta
+                expires_at = (datetime.now() + timedelta(days=int(duration))).isoformat()
+            
+            ban_info = {
+                "target_name": target_name or target_id,
+                "reason": reason,
+                "banned_at": datetime.now().isoformat(),
+                "expires_at": expires_at,
+                "banned_by": "Admin"
+            }
+            
+            if ban_type == 'user':
+                _banned_users[target_id] = ban_info
+            else:
+                _banned_servers[target_id] = ban_info
+            
+            logger.info(f"{ban_type.capitalize()} {target_id} banned: {reason}")
+            
+            return jsonify({
+                "status": "success",
+                "id": f"{ban_type}-{target_id}",
+                "type": ban_type,
+                "targetId": target_id
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to add ban: {e}")
+            return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/bans/<ban_id>', methods=['DELETE'])
+def api_admin_ban_remove(ban_id):
+    """Remove a ban"""
+    global _banned_users, _banned_servers
+    
+    try:
+        if ban_id.startswith('user-'):
+            user_id = ban_id[5:]
+            if user_id in _banned_users:
+                del _banned_users[user_id]
+                logger.info(f"User {user_id} unbanned")
+        elif ban_id.startswith('server-'):
+            server_id = ban_id[7:]
+            if server_id in _banned_servers:
+                del _banned_servers[server_id]
+                logger.info(f"Server {server_id} unbanned")
+        
+        return jsonify({"status": "removed", "id": ban_id})
+        
+    except Exception as e:
+        logger.error(f"Failed to remove ban: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ==================== WEBSOCKET EVENTS (DISABLED) ====================
 # SocketIO is disabled for server deployment
 # WebSocket features are handled by Next.js frontend polling instead
