@@ -276,15 +276,13 @@ export default function NavLiquidGlass() {
 
                             {/* Profile */}
                             <NavButton
-                                icon={(isLoggedIn && user) || isDevLoggedIn ? undefined : User}
+                                icon={(isLoggedIn && user) || (isDevLoggedIn && devSession?.avatar) ? undefined : User}
                                 avatarUrl={
                                     isLoggedIn && user
                                         ? getAvatarUrl(user)
                                         : isDevLoggedIn && devSession?.avatar
                                             ? devSession.avatar
-                                            : isDevLoggedIn
-                                                ? '/default-dev-avatar.png'
-                                                : undefined
+                                            : undefined
                                 }
                                 label={t("nav.profile") || "Profile"}
                                 isActive={activePopup === "profile"}
@@ -292,6 +290,7 @@ export default function NavLiquidGlass() {
                                 isDark={isDark}
                                 data-nav-button
                                 showBadge={isDevLoggedIn}
+                                devInitial={isDevLoggedIn && !devSession?.avatar ? (devSession?.displayName || devSession?.username || 'D').charAt(0).toUpperCase() : undefined}
                             />
                         </motion.nav>
                     ) : null}
@@ -339,6 +338,7 @@ function NavButton({
     onClick,
     href,
     isDark,
+    devInitial,
     ...props
 }: {
     icon?: React.ElementType;
@@ -348,6 +348,7 @@ function NavButton({
     onClick?: () => void;
     href?: string;
     isDark: boolean;
+    devInitial?: string;
     [key: string]: unknown;
 }) {
     const content = (
@@ -370,6 +371,10 @@ function NavButton({
                         height={28}
                         className="nav-btn-icon rounded-full"
                     />
+                ) : devInitial ? (
+                    <div className="nav-btn-icon w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-sm">
+                        {devInitial}
+                    </div>
                 ) : Icon ? (
                     <Icon className="nav-btn-icon" />
                 ) : null}

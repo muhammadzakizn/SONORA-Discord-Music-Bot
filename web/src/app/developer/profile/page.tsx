@@ -1,23 +1,82 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { User, Save, Camera, Check, ArrowLeft } from "lucide-react";
+import { User, Save, Camera, Check, ArrowLeft, Upload, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useSession, DeveloperSession } from "@/contexts/SessionContext";
+import { useSession } from "@/contexts/SessionContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const TARGET_SIZE = 500 * 1024; // Compress to ~500KB for storage
+
+// Compress image to target size
+async function compressImage(file: File, maxSize: number = TARGET_SIZE): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Scale down if too large
+                const maxDimension = 512;
+                if (width > maxDimension || height > maxDimension) {
+                    if (width > height) {
+                        height = (height / width) * maxDimension;
+                        width = maxDimension;
+                    } else {
+                        width = (width / height) * maxDimension;
+                        height = maxDimension;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    reject(new Error('Failed to get canvas context'));
+                    return;
+                }
+
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Try different quality levels to get under target size
+                let quality = 0.9;
+                let result = canvas.toDataURL('image/jpeg', quality);
+
+                while (result.length > maxSize && quality > 0.1) {
+                    quality -= 0.1;
+                    result = canvas.toDataURL('image/jpeg', quality);
+                }
+
+                resolve(result);
+            };
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = e.target?.result as string;
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+    });
+}
 
 export default function DeveloperProfilePage() {
     const { isDark } = useSettings();
     const { devSession, isDevLoggedIn, updateDevProfile } = useSession();
     const router = useRouter();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [displayName, setDisplayName] = useState("");
     const [avatar, setAvatar] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [uploadError, setUploadError] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
 
     // Redirect if not logged in
     useEffect(() => {
@@ -34,6 +93,44 @@ export default function DeveloperProfilePage() {
         }
     }, [devSession]);
 
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadError("");
+
+        // Validate file type
+        const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+        if (!validTypes.includes(file.type)) {
+            setUploadError("Please select a PNG or JPEG image");
+            return;
+        }
+
+        // Validate file size
+        if (file.size > MAX_FILE_SIZE) {
+            setUploadError(`File too large. Maximum size is 20MB`);
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            const compressed = await compressImage(file);
+            setAvatar(compressed);
+        } catch (err) {
+            setUploadError("Failed to process image. Please try another.");
+            console.error(err);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleRemoveAvatar = () => {
+        setAvatar("");
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+
     const handleSave = async () => {
         setIsSaving(true);
         setSaveSuccess(false);
@@ -41,7 +138,7 @@ export default function DeveloperProfilePage() {
         // Update the session with new profile data
         updateDevProfile({
             displayName: displayName.trim() || undefined,
-            avatar: avatar.trim() || undefined,
+            avatar: avatar || undefined,
         });
 
         // Simulate save delay
@@ -141,47 +238,74 @@ export default function DeveloperProfilePage() {
                 </h2>
 
                 <div className="grid gap-6">
-                    {/* Avatar Preview */}
-                    <div className="flex items-center gap-6">
-                        <div className="relative">
-                            {avatar ? (
-                                <img
-                                    src={avatar}
-                                    alt="Profile"
-                                    className="w-24 h-24 rounded-2xl object-cover"
-                                    onError={(e) => {
-                                        // Fallback to initial if image fails to load
-                                        e.currentTarget.style.display = 'none';
-                                    }}
-                                />
-                            ) : (
-                                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-3xl">
-                                    {(displayName || devSession.username || 'D').charAt(0).toUpperCase()}
-                                </div>
-                            )}
-                            <div className="absolute -bottom-2 -right-2 p-1.5 rounded-lg bg-purple-500 text-white">
-                                <Camera className="w-4 h-4" />
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                            <p className={cn(
-                                "text-sm mb-1",
-                                isDark ? "text-white/50" : "text-gray-500"
-                            )}>
-                                Avatar URL
-                            </p>
-                            <input
-                                type="url"
-                                value={avatar}
-                                onChange={(e) => setAvatar(e.target.value)}
-                                placeholder="https://example.com/avatar.png"
-                                className={cn(
-                                    "w-full px-4 py-2.5 rounded-xl text-sm",
-                                    isDark
-                                        ? "bg-white/5 border border-white/10 text-white placeholder:text-white/30"
-                                        : "bg-gray-50 border border-gray-200 text-gray-900 placeholder:text-gray-400"
+                    {/* Avatar Upload */}
+                    <div>
+                        <label className={cn(
+                            "block text-sm font-medium mb-3",
+                            isDark ? "text-white/70" : "text-gray-700"
+                        )}>
+                            Profile Photo
+                        </label>
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                {avatar ? (
+                                    <>
+                                        <img
+                                            src={avatar}
+                                            alt="Profile"
+                                            className="w-24 h-24 rounded-2xl object-cover"
+                                        />
+                                        <button
+                                            onClick={handleRemoveAvatar}
+                                            className="absolute -top-2 -right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-3xl">
+                                        {(displayName || devSession.username || 'D').charAt(0).toUpperCase()}
+                                    </div>
                                 )}
-                            />
+                            </div>
+                            <div className="flex-1">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".png,.jpg,.jpeg"
+                                    onChange={handleFileSelect}
+                                    className="hidden"
+                                    id="avatar-upload"
+                                />
+                                <label
+                                    htmlFor="avatar-upload"
+                                    className={cn(
+                                        "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-colors",
+                                        isDark
+                                            ? "bg-white/10 hover:bg-white/20 text-white"
+                                            : "bg-gray-100 hover:bg-gray-200 text-gray-900"
+                                    )}
+                                >
+                                    {isUploading ? (
+                                        <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <Upload className="w-5 h-5" />
+                                    )}
+                                    <span>{isUploading ? "Processing..." : "Upload Photo"}</span>
+                                </label>
+                                <p className={cn(
+                                    "mt-2 text-xs",
+                                    isDark ? "text-white/30" : "text-gray-400"
+                                )}>
+                                    PNG, JPG, JPEG up to 20MB
+                                </p>
+                                {uploadError && (
+                                    <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" />
+                                        {uploadError}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
 
