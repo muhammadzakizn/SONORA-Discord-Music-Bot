@@ -100,6 +100,11 @@ interface GuildDetails {
         isBanned: boolean;
         banReason?: string;
     }[];
+    sendableChannels: {
+        id: string;
+        name: string;
+        position: number;
+    }[];
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
@@ -130,6 +135,12 @@ export default function ServersPage() {
     const [banTarget, setBanTarget] = useState<{ id: string; username: string } | null>(null);
     const [banReason, setBanReason] = useState("");
     const [banDuration, setBanDuration] = useState("permanent");
+
+    // Leave Server modal
+    const [showLeaveModal, setShowLeaveModal] = useState(false);
+    const [leaveReason, setLeaveReason] = useState("");
+    const [leaveTargetChannel, setLeaveTargetChannel] = useState<string>("all");
+    const [leaveBanServer, setLeaveBanServer] = useState(false);
 
     useEffect(() => {
         fetchGuilds();
@@ -254,25 +265,47 @@ export default function ServersPage() {
         setActionLoading(null);
     };
 
-    const handleKickBot = async (guildId: string) => {
-        setActionLoading("kick");
+    // Open leave server modal
+    const handleLeaveServer = () => {
         setDropdownOpen(null);
+        setLeaveReason("");
+        setLeaveTargetChannel("all");
+        setLeaveBanServer(false);
+        setShowLeaveModal(true);
+    };
+
+    // Confirm and execute leave server
+    const confirmLeaveServer = async () => {
+        if (!selectedGuild) return;
+
+        setActionLoading("leave");
         try {
-            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/kick`, {
+            const response = await fetch(`${API_BASE}/api/admin/guild/${selectedGuild.id}/leave`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    reason: leaveReason || "Bot removed by administrator",
+                    target_channel: leaveTargetChannel,
+                    ban_server: leaveBanServer
+                }),
             });
             if (response.ok) {
-                showToast("Bot disconnected from voice", "success");
-                if (selectedGuild) {
-                    await fetchGuildDetails(guildId);
-                }
+                const data = await response.json();
+                showToast(
+                    leaveBanServer
+                        ? `Left and banned server: ${data.guild_name}`
+                        : `Left server: ${data.guild_name}`,
+                    "success"
+                );
+                setShowLeaveModal(false);
+                closeModal();
                 fetchGuilds();
             } else {
                 const data = await response.json();
-                showToast(data.error || "Failed to disconnect bot", "error");
+                showToast(data.error || "Failed to leave server", "error");
             }
         } catch {
-            showToast("Failed to disconnect bot", "error");
+            showToast("Failed to leave server", "error");
         }
         setActionLoading(null);
     };
@@ -655,17 +688,20 @@ export default function ServersPage() {
                                                     Clear Queue
                                                 </button>
                                                 <button
-                                                    onClick={() => handleKickBot(guild.id)}
-                                                    disabled={actionLoading === "kick"}
+                                                    onClick={() => {
+                                                        setSelectedGuild(guild);
+                                                        handleLeaveServer();
+                                                    }}
+                                                    disabled={actionLoading === "leave"}
                                                     className={cn(
                                                         "w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors",
                                                         isDark
-                                                            ? "hover:bg-purple-500/10 text-purple-400"
-                                                            : "hover:bg-purple-50 text-purple-500"
+                                                            ? "hover:bg-red-500/10 text-red-400"
+                                                            : "hover:bg-red-50 text-red-500"
                                                     )}
                                                 >
                                                     <LogOut className="w-4 h-4" />
-                                                    Kick Bot
+                                                    Leave Server
                                                 </button>
                                             </motion.div>
                                         )}
@@ -1087,19 +1123,19 @@ export default function ServersPage() {
                                                             Clear Queue
                                                         </button>
                                                         <button
-                                                            onClick={() => handleKickBot(selectedGuild.id)}
-                                                            disabled={actionLoading === "kick"}
+                                                            onClick={handleLeaveServer}
+                                                            disabled={actionLoading === "leave"}
                                                             className={cn(
                                                                 "flex items-center justify-center gap-2 p-4 rounded-xl font-medium transition-colors",
-                                                                "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+                                                                "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                                                             )}
                                                         >
-                                                            {actionLoading === "kick" ? (
+                                                            {actionLoading === "leave" ? (
                                                                 <RefreshCw className="w-5 h-5 animate-spin" />
                                                             ) : (
                                                                 <LogOut className="w-5 h-5" />
                                                             )}
-                                                            Kick Bot
+                                                            Leave Server
                                                         </button>
                                                     </div>
                                                 </div>
@@ -1326,6 +1362,185 @@ export default function ServersPage() {
                                         <Ban className="w-5 h-5" />
                                     )}
                                     Ban User
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Leave Server Modal */}
+            <AnimatePresence>
+                {showLeaveModal && selectedGuild && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowLeaveModal(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className={cn(
+                                "w-full max-w-md p-6 rounded-2xl",
+                                isDark ? "bg-zinc-900 border border-white/10" : "bg-white border border-gray-200"
+                            )}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2 rounded-xl bg-red-500/20">
+                                    <LogOut className="w-5 h-5 text-red-400" />
+                                </div>
+                                <div>
+                                    <h3 className={cn(
+                                        "font-bold",
+                                        isDark ? "text-white" : "text-gray-900"
+                                    )}>
+                                        Leave Server
+                                    </h3>
+                                    <p className={isDark ? "text-white/50 text-sm" : "text-gray-500 text-sm"}>
+                                        {selectedGuild.name}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className={cn(
+                                        "block text-sm font-medium mb-2",
+                                        isDark ? "text-white/70" : "text-gray-700"
+                                    )}>
+                                        Reason
+                                    </label>
+                                    <textarea
+                                        value={leaveReason}
+                                        onChange={(e) => setLeaveReason(e.target.value)}
+                                        placeholder="Reason for leaving this server..."
+                                        rows={3}
+                                        className={cn(
+                                            "w-full px-4 py-3 rounded-xl outline-none transition-colors resize-none",
+                                            isDark
+                                                ? "bg-zinc-800 border border-zinc-700 text-white"
+                                                : "bg-gray-100 border border-gray-200 text-gray-900"
+                                        )}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className={cn(
+                                        "block text-sm font-medium mb-2",
+                                        isDark ? "text-white/70" : "text-gray-700"
+                                    )}>
+                                        Send Goodbye Message To
+                                    </label>
+                                    <select
+                                        value={leaveTargetChannel}
+                                        onChange={(e) => setLeaveTargetChannel(e.target.value)}
+                                        className={cn(
+                                            "w-full px-4 py-3 rounded-xl outline-none transition-colors",
+                                            isDark
+                                                ? "bg-zinc-800 border border-zinc-700 text-white"
+                                                : "bg-gray-100 border border-gray-200 text-gray-900"
+                                        )}
+                                    >
+                                        <option value="all">All Sendable Channels</option>
+                                        {guildDetails?.sendableChannels?.map(channel => (
+                                            <option key={channel.id} value={channel.id}>
+                                                #{channel.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className={cn(
+                                    "flex items-center gap-3 p-4 rounded-xl border cursor-pointer",
+                                    leaveBanServer
+                                        ? isDark ? "border-red-500/50 bg-red-500/10" : "border-red-500/50 bg-red-50"
+                                        : isDark ? "border-zinc-700 bg-zinc-800" : "border-gray-200 bg-gray-50"
+                                )}
+                                    onClick={() => setLeaveBanServer(!leaveBanServer)}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={leaveBanServer}
+                                        onChange={(e) => setLeaveBanServer(e.target.checked)}
+                                        className="w-5 h-5 rounded border text-red-500 focus:ring-red-500"
+                                    />
+                                    <div>
+                                        <p className={cn(
+                                            "font-medium",
+                                            isDark ? "text-white" : "text-gray-900"
+                                        )}>
+                                            Ban this server
+                                        </p>
+                                        <p className={cn(
+                                            "text-xs",
+                                            isDark ? "text-white/50" : "text-gray-500"
+                                        )}>
+                                            If re-invited, bot will auto-leave and notify owner
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {leaveBanServer && (
+                                <div className={cn(
+                                    "flex items-start gap-2 mt-4 p-3 rounded-xl",
+                                    isDark ? "bg-red-500/10" : "bg-red-50"
+                                )}>
+                                    <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                                    <p className={cn(
+                                        "text-xs",
+                                        isDark ? "text-white/60" : "text-gray-600"
+                                    )}>
+                                        Server will be banned permanently. Re-inviting the bot will result in automatic removal and a DM to the server owner with the ban reason.
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className={cn(
+                                "flex items-start gap-2 mt-4 p-3 rounded-xl",
+                                isDark ? "bg-blue-500/10" : "bg-blue-50"
+                            )}>
+                                <HelpCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                <p className={cn(
+                                    "text-xs",
+                                    isDark ? "text-white/60" : "text-gray-600"
+                                )}>
+                                    A goodbye message with reason and support link will be sent to the selected channel(s) before leaving.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setShowLeaveModal(false)}
+                                    className={cn(
+                                        "flex-1 py-3 rounded-xl font-medium",
+                                        isDark
+                                            ? "bg-zinc-800 text-white hover:bg-zinc-700"
+                                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                    )}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmLeaveServer}
+                                    disabled={actionLoading === "leave"}
+                                    className={cn(
+                                        "flex-1 py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2",
+                                        leaveBanServer
+                                            ? "bg-red-500 text-white hover:bg-red-600"
+                                            : "bg-orange-500 text-white hover:bg-orange-600"
+                                    )}
+                                >
+                                    {actionLoading === "leave" ? (
+                                        <RefreshCw className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <LogOut className="w-5 h-5" />
+                                    )}
+                                    {leaveBanServer ? "Leave & Ban" : "Leave Server"}
                                 </button>
                             </div>
                         </motion.div>

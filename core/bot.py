@@ -318,8 +318,56 @@ class MusicBot(commands.Bot):
         
         @self.event
         async def on_guild_join(guild: discord.Guild):
-            """Called when bot joins a guild - sends enhanced welcome message with permission check"""
+            """Called when bot joins a guild - checks ban status and sends welcome message"""
             logger.info(f"Joined guild: {guild.name} (ID: {guild.id})")
+            
+            # Check if server is banned
+            try:
+                from web.api.app import _banned_servers
+                guild_id = str(guild.id)
+                if guild_id in _banned_servers:
+                    ban_info = _banned_servers[guild_id]
+                    ban_reason = ban_info.get('reason', 'This server has been banned')
+                    
+                    logger.warning(f"Banned server {guild.name} ({guild.id}) tried to invite bot - auto-leaving")
+                    
+                    # Try to DM the owner
+                    try:
+                        owner = guild.owner
+                        if owner:
+                            embed = discord.Embed(
+                                title="🚫 SONORA Cannot Join This Server",
+                                description=(
+                                    f"Your server **{guild.name}** has been banned from using SONORA.\n\n"
+                                    f"**Reason:** {ban_reason}\n\n"
+                                    f"If you believe this is an error, please contact support."
+                                ),
+                                color=0xE53935
+                            )
+                            embed.set_footer(text="SONORA Support: https://s.id/SONORAbotSUPPORT")
+                            
+                            view = discord.ui.View()
+                            view.add_item(discord.ui.Button(
+                                label="Contact Support",
+                                url="https://s.id/SONORAbotSUPPORT",
+                                style=discord.ButtonStyle.link,
+                                emoji="💬"
+                            ))
+                            
+                            await owner.send(embed=embed, view=view)
+                            logger.info(f"Sent ban notification to owner: {owner.name}")
+                    except Exception as e:
+                        logger.error(f"Failed to DM owner about ban: {e}")
+                    
+                    # Leave the server
+                    await guild.leave()
+                    logger.info(f"Auto-left banned server: {guild.name} ({guild.id})")
+                    return  # Don't proceed with welcome
+                    
+            except ImportError:
+                pass  # Flask API not loaded yet
+            except Exception as e:
+                logger.error(f"Error checking banned servers: {e}")
             
             # Initialize pending_welcomes if needed
             if not hasattr(self, 'pending_welcomes'):

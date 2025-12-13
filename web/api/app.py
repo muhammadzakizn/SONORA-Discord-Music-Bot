@@ -1845,6 +1845,17 @@ def api_admin_guild_details(guild_id):
                 "banReason": ban_info.get("reason") if ban_info else None
             })
         
+        # Get sendable text channels (for goodbye message selection)
+        sendable_channels = []
+        for channel in guild.text_channels:
+            permissions = channel.permissions_for(guild.me)
+            if permissions.send_messages and permissions.embed_links:
+                sendable_channels.append({
+                    "id": str(channel.id),
+                    "name": channel.name,
+                    "position": channel.position
+                })
+        
         return jsonify({
             "id": str(guild.id),
             "name": guild.name,
@@ -1856,6 +1867,7 @@ def api_admin_guild_details(guild_id):
             "queueLength": queue_length,
             "queueItems": queue_items,
             "channels": sorted(all_channels, key=lambda x: (0 if x['type'] == 'text' else 1, x['position'])),
+            "sendableChannels": sorted(sendable_channels, key=lambda x: x['position']),
             "members": member_list
         })
         
@@ -1952,21 +1964,33 @@ def api_admin_guild_clear_queue(guild_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/admin/guild/<guild_id>/kick', methods=['POST'])
-def api_admin_guild_kick(guild_id):
-    """Kick bot from server (disconnect from voice)"""
+@app.route('/api/admin/guild/<guild_id>/leave', methods=['POST'])
+def api_admin_guild_leave(guild_id):
+    """Leave server with goodbye message and optional ban"""
     bot = get_bot()
     if not bot:
         return jsonify({"error": "Bot not connected"}), 503
     
     try:
-        connection = bot.voice_manager.get_connection(int(guild_id))
-        if not connection or not connection.is_connected():
-            return jsonify({"error": "Not connected to voice in this server"}), 400
+        data = request.get_json() or {}
+        reason = data.get('reason', 'No reason provided')
+        target_channel_id = data.get('target_channel')  # None = all sendable, "all" = all, or specific channel ID
+        ban_server = data.get('ban_server', False)
         
-        # Stop playback first
-        if connection.connection:
-            connection.connection.stop()
+        guild = bot.get_guild(int(guild_id))
+        if not guild:
+            return jsonify({"error": "Guild not found"}), 404
+        
+        guild_name = guild.name
+        guild_icon = str(guild.icon.url) if guild.icon else None
+        owner_id = guild.owner_id
+        
+        # First cleanup any voice connections
+        connection = bot.voice_manager.get_connection(int(guild_id))
+        if connection and connection.is_connected():
+            if connection.connection:
+                connection.connection.stop()
+            asyncio.run_coroutine_threadsafe(connection.disconnect(), bot.loop)
         
         # Clear queue
         queue_cog = bot.get_cog('QueueCommands')
@@ -1980,15 +2004,91 @@ def api_admin_guild_kick(guild_id):
                 asyncio.run_coroutine_threadsafe(player.cleanup(), bot.loop)
             del bot.players[int(guild_id)]
         
-        # Disconnect from voice
-        asyncio.run_coroutine_threadsafe(connection.disconnect(), bot.loop)
+        # Add to banned servers if requested
+        if ban_server:
+            _banned_servers[guild_id] = {
+                "target_id": guild_id,
+                "target_name": guild_name,
+                "target_type": "server",
+                "reason": reason,
+                "banned_at": datetime.now().isoformat(),
+                "banned_by": "Dashboard Admin",
+                "expires_at": None,  # Permanent
+                "is_active": True
+            }
+            logger.info(f"Server {guild_name} ({guild_id}) added to banned list")
         
-        logger.info(f"Kicked bot from guild {guild_id} via dashboard")
+        async def send_goodbye_and_leave():
+            import discord
+            try:
+                # Create goodbye embed
+                embed = discord.Embed(
+                    title="👋 SONORA Leaving Server",
+                    description=(
+                        f"**Reason:** {reason}\n\n"
+                        f"If you have any questions or need assistance, please contact support."
+                    ),
+                    color=0xE53935
+                )
+                if ban_server:
+                    embed.add_field(
+                        name="⚠️ Server Banned",
+                        value="This server has been banned. Re-inviting the bot will result in automatic removal.",
+                        inline=False
+                    )
+                embed.set_footer(text="SONORA Support: https://s.id/SONORAbotSUPPORT")
+                
+                # Create view with support button
+                view = discord.ui.View()
+                view.add_item(discord.ui.Button(
+                    label="Contact Support",
+                    url="https://s.id/SONORAbotSUPPORT",
+                    style=discord.ButtonStyle.link,
+                    emoji="💬"
+                ))
+                
+                # Send to channels
+                channels_to_send = []
+                if target_channel_id == "all" or target_channel_id is None:
+                    # Send to all sendable channels
+                    for channel in guild.text_channels:
+                        permissions = channel.permissions_for(guild.me)
+                        if permissions.send_messages and permissions.embed_links:
+                            channels_to_send.append(channel)
+                else:
+                    # Send to specific channel
+                    channel = guild.get_channel(int(target_channel_id))
+                    if channel:
+                        channels_to_send.append(channel)
+                
+                # Send goodbye messages
+                for channel in channels_to_send[:5]:  # Limit to 5 channels max
+                    try:
+                        await channel.send(embed=embed, view=view)
+                    except Exception as e:
+                        logger.error(f"Failed to send goodbye to #{channel.name}: {e}")
+                
+                # Wait a moment for messages to send
+                await asyncio.sleep(1)
+                
+                # Leave the guild
+                await guild.leave()
+                logger.info(f"Bot left server: {guild_name} ({guild_id})")
+                
+            except Exception as e:
+                logger.error(f"Error in leave process: {e}")
         
-        return jsonify({"status": "kicked", "guild_id": guild_id})
+        asyncio.run_coroutine_threadsafe(send_goodbye_and_leave(), bot.loop)
+        
+        return jsonify({
+            "status": "leaving",
+            "guild_id": guild_id,
+            "guild_name": guild_name,
+            "banned": ban_server
+        })
         
     except Exception as e:
-        logger.error(f"Failed to kick bot: {e}")
+        logger.error(f"Failed to leave server: {e}")
         return jsonify({"error": str(e)}), 500
 
 
