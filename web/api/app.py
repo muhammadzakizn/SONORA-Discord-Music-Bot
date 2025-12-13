@@ -1013,17 +1013,45 @@ def api_admin_broadcast():
         from datetime import datetime
         import discord
         
-        data = request.json
-        message = data.get('message', '').strip()
-        guild_ids = data.get('guild_ids', [])  # List of guild IDs (as strings)
-        channel_ids = data.get('channel_ids', [])  # List of channel IDs (as strings)
-        mention_type = data.get('mention_type', 'none')  # 'none', 'everyone', 'here'
-        all_channels = data.get('all_channels', False)
+        # Handle both JSON and FormData
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            # FormData from new frontend
+            message = request.form.get('message', '').strip()
+            guild_ids_str = request.form.get('guild_ids', '[]')
+            channel_ids_str = request.form.get('channel_ids', '[]')
+            mention_type = request.form.get('mention_type', 'none')
+            all_channels = request.form.get('all_channels', 'false').lower() == 'true'
+            image_file = request.files.get('image')
+            
+            # Parse JSON arrays
+            import json
+            guild_ids = json.loads(guild_ids_str) if guild_ids_str else []
+            channel_ids = json.loads(channel_ids_str) if channel_ids_str else []
+        else:
+            # JSON from old frontend
+            data = request.json or {}
+            message = data.get('message', '').strip()
+            guild_ids = data.get('guild_ids', [])
+            channel_ids = data.get('channel_ids', [])
+            mention_type = data.get('mention_type', 'none')
+            all_channels = data.get('all_channels', False)
+            image_file = None
         
         if not message:
             return jsonify({"error": "Message is required"}), 400
         
-        logger.info(f"Broadcast request: message={message[:50]}, all_channels={all_channels}, guilds={len(guild_ids)}, channels={len(channel_ids)}")
+        # Save image temporarily if provided
+        image_path = None
+        if image_file and image_file.filename:
+            import os
+            import uuid
+            ext = image_file.filename.rsplit('.', 1)[-1].lower() if '.' in image_file.filename else 'png'
+            filename = f"broadcast_{uuid.uuid4().hex[:8]}.{ext}"
+            image_path = os.path.join('/tmp', filename)
+            image_file.save(image_path)
+            logger.info(f"Saved broadcast image: {image_path}")
+        
+        logger.info(f"Broadcast request: message={message[:50]}, all_channels={all_channels}, guilds={len(guild_ids)}, channels={len(channel_ids)}, has_image={image_path is not None}")
         
         results = []
         sent_count = 0
@@ -1075,13 +1103,21 @@ def api_admin_broadcast():
                             )
                             embed.set_footer(text="Admin Broadcast")
                             
+                            # Prepare file if image exists
+                            file_to_send = None
+                            if image_path:
+                                import os
+                                if os.path.exists(image_path):
+                                    file_to_send = discord.File(image_path, filename="image.png")
+                                    embed.set_image(url="attachment://image.png")
+                            
                             # Send with or without mention
                             if mention_type == 'everyone':
-                                await channel.send(content="@everyone", embed=embed)
+                                await channel.send(content="@everyone", embed=embed, file=file_to_send)
                             elif mention_type == 'here':
-                                await channel.send(content="@here", embed=embed)
+                                await channel.send(content="@here", embed=embed, file=file_to_send)
                             else:
-                                await channel.send(embed=embed)
+                                await channel.send(embed=embed, file=file_to_send)
                             
                             results.append({
                                 "guild": guild.name,
@@ -1144,12 +1180,20 @@ def api_admin_broadcast():
                             )
                             embed.set_footer(text="Admin Broadcast")
                             
+                            # Prepare file if image exists
+                            file_to_send = None
+                            if image_path:
+                                import os
+                                if os.path.exists(image_path):
+                                    file_to_send = discord.File(image_path, filename="image.png")
+                                    embed.set_image(url="attachment://image.png")
+                            
                             if mention_type == 'everyone':
-                                await target_channel.send(content="@everyone", embed=embed)
+                                await target_channel.send(content="@everyone", embed=embed, file=file_to_send)
                             elif mention_type == 'here':
-                                await target_channel.send(content="@here", embed=embed)
+                                await target_channel.send(content="@here", embed=embed, file=file_to_send)
                             else:
-                                await target_channel.send(embed=embed)
+                                await target_channel.send(embed=embed, file=file_to_send)
                             
                             results.append({
                                 "guild": guild.name,
@@ -1218,12 +1262,20 @@ def api_admin_broadcast():
                             )
                             embed.set_footer(text="Admin Broadcast")
                             
+                            # Prepare file if image exists
+                            file_to_send = None
+                            if image_path:
+                                import os
+                                if os.path.exists(image_path):
+                                    file_to_send = discord.File(image_path, filename="image.png")
+                                    embed.set_image(url="attachment://image.png")
+                            
                             if mention_type == 'everyone':
-                                await channel.send(content="@everyone", embed=embed)
+                                await channel.send(content="@everyone", embed=embed, file=file_to_send)
                             elif mention_type == 'here':
-                                await channel.send(content="@here", embed=embed)
+                                await channel.send(content="@here", embed=embed, file=file_to_send)
                             else:
-                                await channel.send(embed=embed)
+                                await channel.send(embed=embed, file=file_to_send)
                             
                             results.append({
                                 "guild": guild.name,
@@ -1278,10 +1330,21 @@ def api_admin_dm_users():
         from datetime import datetime
         import discord
         
-        data = request.json
-        message = data.get('message', '').strip()
-        title = data.get('title', '')
-        user_ids = data.get('user_ids', [])  # List of user IDs
+        # Handle both JSON and FormData
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            # FormData from new frontend
+            message = request.form.get('message', '').strip()
+            user_ids_str = request.form.get('user_ids', '[]')
+            image_file = request.files.get('image')
+            
+            import json
+            user_ids = json.loads(user_ids_str) if user_ids_str else []
+        else:
+            # JSON from old frontend
+            data = request.json or {}
+            message = data.get('message', '').strip()
+            user_ids = data.get('user_ids', [])
+            image_file = None
         
         if not message:
             return jsonify({"error": "Message is required"}), 400
@@ -1289,7 +1352,18 @@ def api_admin_dm_users():
         if not user_ids:
             return jsonify({"error": "No users selected"}), 400
         
-        logger.info(f"DM request: sending to {len(user_ids)} users")
+        # Save image temporarily if provided
+        image_path = None
+        if image_file and image_file.filename:
+            import os
+            import uuid
+            ext = image_file.filename.rsplit('.', 1)[-1].lower() if '.' in image_file.filename else 'png'
+            filename = f"dm_{uuid.uuid4().hex[:8]}.{ext}"
+            image_path = os.path.join('/tmp', filename)
+            image_file.save(image_path)
+            logger.info(f"Saved DM image: {image_path}")
+        
+        logger.info(f"DM request: sending to {len(user_ids)} users, has_image={image_path is not None}")
         
         results = []
         sent_count = 0
@@ -1320,16 +1394,24 @@ def api_admin_dm_users():
                     
                     # Create embed
                     embed = discord.Embed(
-                        title=title if title else "📬 Direct Message from SONORA",
+                        title="📬 Direct Message from SONORA",
                         description=message,
                         color=0x7B1E3C,
                         timestamp=datetime.now()
                     )
                     embed.set_footer(text="SONORA Bot")
                     
+                    # Prepare file if image exists
+                    file_to_send = None
+                    if image_path:
+                        import os
+                        if os.path.exists(image_path):
+                            file_to_send = discord.File(image_path, filename="image.png")
+                            embed.set_image(url="attachment://image.png")
+                    
                     # Send DM
                     try:
-                        await user.send(embed=embed)
+                        await user.send(embed=embed, file=file_to_send)
                         results.append({
                             "user_id": user_id_str,
                             "username": user.name,
