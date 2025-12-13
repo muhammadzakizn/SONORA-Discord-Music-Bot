@@ -50,7 +50,7 @@ const navItems: NavItem[] = [
   { label: "Controls", href: "/developer/controls", icon: Power },
   { label: "Maintenance", href: "/developer/maintenance", icon: Wrench },
   { label: "Messaging", href: "/developer/messaging", icon: MessageSquare },
-  { label: "Users", href: "/developer/users", icon: Users },
+  { label: "Users & Servers", href: "/developer/users-servers", icon: Users },
   { label: "Bans", href: "/developer/bans", icon: Ban },
   { label: "Access", href: "/developer/access", icon: Shield },
 ];
