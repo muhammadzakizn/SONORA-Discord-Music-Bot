@@ -39,10 +39,13 @@ export default function ControlsPage() {
         }
     };
 
+    const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+
     const handleAction = async (action: string, endpoint: string, method: string = 'POST') => {
         setActionState(action, { loading: true });
         try {
-            const response = await fetch(endpoint, { method });
+            const fullEndpoint = endpoint.startsWith('/') ? `${API_BASE}${endpoint}` : endpoint;
+            const response = await fetch(fullEndpoint, { method });
             const data = await response.json();
 
             if (response.ok) {

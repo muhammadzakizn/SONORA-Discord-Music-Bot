@@ -384,6 +384,19 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
                 )}
 
                 <Link
+                  href="/admin/settings/profile"
+                  onClick={() => setShowProfile(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2.5 transition-colors text-sm",
+                    isDark
+                      ? "text-white/70 hover:text-white hover:bg-white/[0.08]"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-black/[0.05]"
+                  )}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Profile Settings</span>
+                </Link>
+                <Link
                   href="/"
                   onClick={() => setShowProfile(false)}
                   className={cn(

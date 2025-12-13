@@ -41,27 +41,51 @@ export default function MessagingPage() {
         setResult(null);
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
 
-            const newResult: BroadcastResult = {
-                success: true,
-                serversReached: target === "all" ? 45 : 1,
-                failed: 0,
-                timestamp: new Date().toLocaleString(),
-            };
+            const response = await fetch(`${API_BASE}/api/admin/broadcast`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: title ? `**${title}**\n\n${message}` : message,
+                    all_channels: target === "all",
+                    channel_ids: target === "specific" && channelId ? [channelId] : [],
+                    mention_type: 'none',
+                }),
+            });
 
-            setResult(newResult);
-            setHistory(prev => [newResult, ...prev].slice(0, 10));
+            const data = await response.json();
 
-            // Clear form after success
-            setTimeout(() => {
-                setTitle("");
-                setMessage("");
-                setImage("");
-                setResult(null);
-            }, 3000);
-        } catch {
+            if (response.ok && data.success) {
+                const newResult: BroadcastResult = {
+                    success: true,
+                    serversReached: data.sent || 0,
+                    failed: data.failed || 0,
+                    timestamp: new Date().toLocaleString(),
+                };
+
+                setResult(newResult);
+                setHistory(prev => [newResult, ...prev].slice(0, 10));
+
+                // Clear form after success
+                setTimeout(() => {
+                    setTitle("");
+                    setMessage("");
+                    setImage("");
+                    setResult(null);
+                }, 3000);
+            } else {
+                setResult({
+                    success: false,
+                    serversReached: 0,
+                    failed: data.failed || 1,
+                    timestamp: new Date().toLocaleString(),
+                });
+            }
+        } catch (error) {
+            console.error('Broadcast error:', error);
             setResult({
                 success: false,
                 serversReached: 0,
