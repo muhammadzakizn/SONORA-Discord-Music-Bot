@@ -241,10 +241,14 @@ function LoginPageContent() {
 
   // MFA state
   const [selectedMfaMethod, setSelectedMfaMethod] = useState<MFAMethod | null>(null);
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   // Detect ?verify=true from OAuth callback
   // Handle session from query param (workaround for SameSite cookie issues)
   useEffect(() => {
+    // Prevent multiple redirects
+    if (hasRedirected) return;
+
     const isVerifyFlow = searchParams.get('verify') === 'true';
     const sessionFromUrl = searchParams.get('session');
 
@@ -256,6 +260,7 @@ function LoginPageContent() {
     // If session is passed via URL, store it in cookie manually
     if (sessionFromUrl) {
       console.log('[Login] Storing session from URL to cookie...');
+      setHasRedirected(true); // Mark as redirecting to prevent loop
 
       // Decode to make sure it's valid, then store
       try {
@@ -266,45 +271,38 @@ function LoginPageContent() {
         // Store in cookie (client-side)
         document.cookie = `sonora-admin-session=${decodeURIComponent(sessionFromUrl)}; path=/; max-age=${60 * 60 * 24 * 7}`;
 
-        // Clean URL (remove session param for security)
-        window.history.replaceState({}, '', '/login?verify=true');
+        console.log('[Login] Cookie stored, navigating to /admin...');
 
-        // Refresh session context to read the new cookie
-        refreshSession();
-
-        // Redirect to admin after a short delay to allow session to load
-        setTimeout(() => {
-          console.log('[Login] Redirecting to /admin...');
-          router.push('/admin');
-        }, 500);
+        // Use window.location for clean navigation (avoids React re-render issues)
+        window.location.href = '/admin';
         return;
       } catch (e) {
         console.error('[Login] Failed to parse session from URL:', e);
+        setHasRedirected(false);
       }
     }
 
-    // Check existing cookie
+    // Check existing cookie (fallback if came back without session param)
     const cookies = document.cookie;
     const hasSessionCookie = cookies.includes('sonora-admin-session');
 
     console.log('[Login] Has session cookie:', hasSessionCookie);
-    console.log('[Login] sessionLoading:', sessionLoading);
     console.log('[Login] isLoggedIn:', isLoggedIn);
 
-    // If cookie exists but session not loaded, try refresh
+    // If already logged in, redirect to admin
+    if (hasSessionCookie && isLoggedIn && user) {
+      console.log('[Login] Already logged in, redirecting to /admin...');
+      setHasRedirected(true);
+      window.location.href = '/admin';
+      return;
+    }
+
+    // If cookie exists but session not loaded yet, wait
     if (hasSessionCookie && !isLoggedIn && !sessionLoading) {
       console.log('[Login] Cookie exists but not logged in, refreshing session...');
       refreshSession();
-      return;
     }
-
-    // If session is loaded and user is logged in, redirect to admin
-    if (!sessionLoading && isLoggedIn && user) {
-      console.log('[Login] Session loaded, redirecting to /admin...');
-      router.push('/admin');
-      return;
-    }
-  }, [searchParams, isLoggedIn, user, sessionLoading, router, refreshSession]);
+  }, [searchParams, isLoggedIn, user, sessionLoading, hasRedirected, refreshSession]);
 
   // Countdown timer for resend
   useEffect(() => {
