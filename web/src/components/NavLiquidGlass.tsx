@@ -524,9 +524,17 @@ function ProfileMenu({
                         isDark ? "bg-white/5" : "bg-gray-100"
                     )}
                 >
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
-                        {(devSession.displayName || devSession.username || 'D').charAt(0).toUpperCase()}
-                    </div>
+                    {devSession.avatar ? (
+                        <img
+                            src={devSession.avatar}
+                            alt="Profile"
+                            className="w-12 h-12 rounded-xl object-cover"
+                        />
+                    ) : (
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
+                            {(devSession.displayName || devSession.username || 'D').charAt(0).toUpperCase()}
+                        </div>
+                    )}
                     <div className="flex-1 min-w-0">
                         <p className={cn("font-semibold truncate", isDark ? "text-white" : "text-gray-900")}>
                             {devSession.displayName || devSession.username}
