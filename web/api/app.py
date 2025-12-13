@@ -927,21 +927,63 @@ def api_admin_guilds_channels():
         
         for guild in bot.guilds:
             channels_data = []
+            sendable_count = 0
             
             # Get text channels
             for channel in guild.text_channels:
-                # Check permissions
                 permissions = channel.permissions_for(guild.me)
+                can_send = permissions.send_messages and permissions.view_channel
+                if can_send:
+                    sendable_count += 1
                 
                 channels_data.append({
                     "id": str(channel.id),
                     "name": channel.name,
                     "type": "text",
                     "position": channel.position,
+                    "category": channel.category.name if channel.category else None,
+                    "can_send": can_send,
                     "permissions": {
                         "send_messages": permissions.send_messages,
+                        "view_channel": permissions.view_channel,
                         "embed_links": permissions.embed_links,
                         "mention_everyone": permissions.mention_everyone
+                    }
+                })
+            
+            # Get voice channels (for info display only, can't send message)
+            for channel in guild.voice_channels:
+                permissions = channel.permissions_for(guild.me)
+                
+                channels_data.append({
+                    "id": str(channel.id),
+                    "name": channel.name,
+                    "type": "voice",
+                    "position": channel.position,
+                    "category": channel.category.name if channel.category else None,
+                    "can_send": False,
+                    "members_count": len(channel.members),
+                    "permissions": {
+                        "connect": permissions.connect,
+                        "speak": permissions.speak,
+                        "view_channel": permissions.view_channel
+                    }
+                })
+            
+            # Get stage channels
+            for channel in guild.stage_channels:
+                permissions = channel.permissions_for(guild.me)
+                
+                channels_data.append({
+                    "id": str(channel.id),
+                    "name": channel.name,
+                    "type": "stage",
+                    "position": channel.position,
+                    "category": channel.category.name if channel.category else None,
+                    "can_send": False,
+                    "permissions": {
+                        "connect": permissions.connect,
+                        "view_channel": permissions.view_channel
                     }
                 })
             
@@ -949,7 +991,9 @@ def api_admin_guilds_channels():
                 "id": str(guild.id),
                 "name": guild.name,
                 "icon": str(guild.icon.url) if guild.icon else None,
-                "channels": sorted(channels_data, key=lambda x: x['position'])
+                "member_count": guild.member_count,
+                "sendable_channels": sendable_count,
+                "channels": sorted(channels_data, key=lambda x: (x.get('category') or '', x['position']))
             })
         
         return jsonify(guilds_data)
@@ -1220,6 +1264,120 @@ def api_admin_broadcast():
         
     except Exception as e:
         logger.error(f"Broadcast failed: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/dm-users', methods=['POST'])
+def api_admin_dm_users():
+    """Send DM to selected users"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        from datetime import datetime
+        import discord
+        
+        data = request.json
+        message = data.get('message', '').strip()
+        title = data.get('title', '')
+        user_ids = data.get('user_ids', [])  # List of user IDs
+        
+        if not message:
+            return jsonify({"error": "Message is required"}), 400
+        
+        if not user_ids:
+            return jsonify({"error": "No users selected"}), 400
+        
+        logger.info(f"DM request: sending to {len(user_ids)} users")
+        
+        results = []
+        sent_count = 0
+        failed_count = 0
+        
+        loop = bot.loop
+        
+        async def send_dms():
+            nonlocal sent_count, failed_count
+            
+            for user_id_str in user_ids:
+                try:
+                    user_id = int(user_id_str)
+                    user = bot.get_user(user_id)
+                    
+                    if not user:
+                        # Try to fetch user
+                        try:
+                            user = await bot.fetch_user(user_id)
+                        except:
+                            results.append({
+                                "user_id": user_id_str,
+                                "status": "failed",
+                                "reason": "User not found"
+                            })
+                            failed_count += 1
+                            continue
+                    
+                    # Create embed
+                    embed = discord.Embed(
+                        title=title if title else "📬 Direct Message from SONORA",
+                        description=message,
+                        color=0x7B1E3C,
+                        timestamp=datetime.now()
+                    )
+                    embed.set_footer(text="SONORA Bot")
+                    
+                    # Send DM
+                    try:
+                        await user.send(embed=embed)
+                        results.append({
+                            "user_id": user_id_str,
+                            "username": user.name,
+                            "status": "success"
+                        })
+                        sent_count += 1
+                    except discord.Forbidden:
+                        results.append({
+                            "user_id": user_id_str,
+                            "username": user.name,
+                            "status": "failed",
+                            "reason": "DMs disabled"
+                        })
+                        failed_count += 1
+                    except Exception as e:
+                        results.append({
+                            "user_id": user_id_str,
+                            "status": "failed",
+                            "reason": str(e)[:50]
+                        })
+                        failed_count += 1
+                    
+                    # Rate limit
+                    await asyncio.sleep(0.5)
+                    
+                except Exception as e:
+                    results.append({
+                        "user_id": user_id_str,
+                        "status": "failed",
+                        "reason": str(e)[:50]
+                    })
+                    failed_count += 1
+        
+        # Execute
+        future = asyncio.run_coroutine_threadsafe(send_dms(), loop)
+        future.result(timeout=120)
+        
+        logger.info(f"DM complete: sent={sent_count}, failed={failed_count}")
+        
+        return jsonify({
+            "success": True,
+            "sent": sent_count,
+            "failed": failed_count,
+            "results": results[:50]
+        })
+        
+    except Exception as e:
+        logger.error(f"DM users failed: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
