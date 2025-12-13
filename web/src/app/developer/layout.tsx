@@ -482,7 +482,10 @@ function DeveloperLayoutContent({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isLoggedIn) {
+  // Check if user has access (either Discord login or developer localStorage auth)
+  const hasDevAuth = typeof window !== 'undefined' && localStorage.getItem('sonora-dev-auth');
+
+  if (!isLoggedIn && !hasDevAuth) {
     return null;
   }
 
