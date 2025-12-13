@@ -163,8 +163,10 @@ export async function GET(request: NextRequest) {
             }
         } catch (authError) {
             console.warn('Auth database check failed (bot may be offline):', authError);
-            // Continue without auth database - fallback to session-only auth
-            authState = 'trusted'; // Skip MFA if bot is offline
+            // Continue without auth database - treat as new user to show MFA setup
+            // This ensures MFA is set up even if bot API is offline
+            authState = 'new';
+            authUserId = Date.now(); // Use timestamp as temporary ID
         }
 
         // Create session data
