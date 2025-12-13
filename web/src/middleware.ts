@@ -83,7 +83,7 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.cdnfonts.com",
     "font-src 'self' https://fonts.gstatic.com https://fonts.cdnfonts.com data:",
     "img-src 'self' data: blob: https: http:",
-    "connect-src 'self' ws://localhost:* wss://localhost:* http://localhost:* https://cdn.discordapp.com https://*.scdn.co https://*.mzstatic.com https://i.ytimg.com https://fonts.cdnfonts.com",
+    "connect-src 'self' ws: wss: http://localhost:* https://localhost:* http://*.caliphdev.com:* https://*.caliphdev.com:* http://*:5000 https://*:5000 https://cdn.discordapp.com https://*.scdn.co https://*.mzstatic.com https://i.ytimg.com https://fonts.cdnfonts.com",
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
