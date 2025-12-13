@@ -98,13 +98,13 @@ class MusicBot(commands.Bot):
                                 ),
                                 color=0xE53935
                             )
-                            embed.set_footer(text="SONORA Support: https://sonora.muhamza.my.id/support")
+                            embed.set_footer(text="SONORA Support: https://s.id/SONORAbotSUPPORT")
                             
                             # Add support button
                             view = discord.ui.View()
                             view.add_item(discord.ui.Button(
                                 label="Contact Support",
-                                url="https://sonora.muhamza.my.id/support",
+                                url="https://s.id/SONORAbotSUPPORT",
                                 style=discord.ButtonStyle.link,
                                 emoji="💬"
                             ))
@@ -137,13 +137,13 @@ class MusicBot(commands.Bot):
                                     ),
                                     color=0xE53935
                                 )
-                                embed.set_footer(text="SONORA Support: https://sonora.muhamza.my.id/support")
+                                embed.set_footer(text="SONORA Support: https://s.id/SONORAbotSUPPORT")
                                 
                                 # Add support button
                                 view = discord.ui.View()
                                 view.add_item(discord.ui.Button(
                                     label="Contact Support",
-                                    url="https://sonora.muhamza.my.id/support",
+                                    url="https://s.id/SONORAbotSUPPORT",
                                     style=discord.ButtonStyle.link,
                                     emoji="💬"
                                 ))
