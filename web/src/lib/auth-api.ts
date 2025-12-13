@@ -344,3 +344,66 @@ export async function getLoginHistory(userId: number, limit: number = 20): Promi
     return [];
   }
 }
+
+// ==================== DISCORD DM MFA ====================
+
+/**
+ * Send Discord DM verification code
+ * Requires bot to be online to send DM
+ */
+export async function sendDiscordDMCode(
+  userId: number | string,
+  discordId: string
+): Promise<{ success: boolean; message?: string; expires_in?: number; dev_code?: string; error?: string }> {
+  try {
+    const response = await fetch(`${BOT_API_URL}/api/auth/mfa/discord/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, discord_id: discordId }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Send Discord DM code error:', error);
+    return { success: false, error: 'Failed to send Discord DM. Bot may be offline.' };
+  }
+}
+
+/**
+ * Verify Discord DM code
+ */
+export async function verifyDiscordDMCode(
+  userId: number | string,
+  code: string
+): Promise<MFAVerifyResponse> {
+  try {
+    const response = await fetch(`${BOT_API_URL}/api/auth/mfa/discord/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, code }),
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+    return { success: false, error: 'Invalid code' };
+  } catch (error) {
+    console.error('Verify Discord DM code error:', error);
+    return { success: false, error: 'Failed to verify code' };
+  }
+}
+
+/**
+ * Setup Discord DM as MFA method
+ */
+export async function setupDiscordMFA(userId: number | string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${BOT_API_URL}/api/auth/mfa/discord/setup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Setup Discord MFA error:', error);
+    return { success: false, error: 'Failed to setup Discord MFA' };
+  }
+}

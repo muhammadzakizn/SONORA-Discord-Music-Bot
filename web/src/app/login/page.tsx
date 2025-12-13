@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useSession, getAvatarUrl } from "@/contexts/SessionContext";
 import { cn } from "@/lib/utils";
-import { checkAuthUser, registerAuthUser, setupTOTP, verifyTOTPSetup, verifyTOTP, verifyBackupCode, checkTrustedDevice, addTrustedDevice, type AuthUser } from "@/lib/auth-api";
+import { checkAuthUser, registerAuthUser, setupTOTP, verifyTOTPSetup, verifyTOTP, verifyBackupCode, checkTrustedDevice, addTrustedDevice, sendDiscordDMCode, verifyDiscordDMCode, type AuthUser } from "@/lib/auth-api";
 
 const backgroundImages = [
   {
@@ -483,6 +483,26 @@ function LoginPageContent() {
     setVerifyError("");
 
     try {
+      // If in MFA mode, use MFA-specific API
+      if (loginMode === 'mfa-select' || loginMode === 'mfa-verify') {
+        const userId = authUser?.id || user.id;
+        const result = await sendDiscordDMCode(userId, user.id);
+
+        if (result.success) {
+          setVerifyStatus("sent");
+          setVerifyCountdown(result.expires_in || 300); // 5 minutes default
+          // If dev_code is returned (for testing), show it
+          if (result.dev_code) {
+            console.log('[MFA] Dev code for testing:', result.dev_code);
+          }
+        } else {
+          setVerifyStatus("error");
+          setVerifyError(result.error || "Failed to send code. Bot may be offline.");
+        }
+        return;
+      }
+
+      // Regular email verification
       const response = await fetch("/api/verify/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -515,6 +535,31 @@ function LoginPageContent() {
     setVerifyError("");
 
     try {
+      // If in MFA verify mode with Discord selected, use MFA API
+      if (loginMode === 'mfa-verify' && selectedMfaMethod === 'discord') {
+        const userId = authUser?.id || user.id;
+        const result = await verifyDiscordDMCode(userId, fullCode);
+
+        if (result.success) {
+          setVerifyStatus("success");
+          // Start zoom animation after brief success message
+          setTimeout(() => {
+            setIsZooming(true);
+          }, 1000);
+          // Redirect after zoom animation fills screen completely
+          setTimeout(() => {
+            router.push("/admin");
+          }, 2500);
+        } else {
+          setVerifyStatus("error");
+          setVerifyError(result.error || "Invalid code");
+          setVerifyCode(["", "", "", "", "", ""]);
+          verifyInputRefs.current[0]?.focus();
+        }
+        return;
+      }
+
+      // Regular email verification
       const response = await fetch("/api/verify/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -543,7 +588,7 @@ function LoginPageContent() {
       setVerifyStatus("error");
       setVerifyError("Network error. Please try again.");
     }
-  }, [user, verifyCode, router]);
+  }, [user, verifyCode, router, loginMode, selectedMfaMethod, authUser]);
 
   // Handle verification code input change
   const handleVerifyInputChange = (index: number, value: string) => {
