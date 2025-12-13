@@ -384,10 +384,10 @@ export default function MessagingPage() {
                         <AnimatePresence>
                             {targetType === "specific_channel" && (
                                 <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="mb-4 overflow-hidden space-y-3"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="mb-4 space-y-3 overflow-visible"
                                 >
                                     {/* Server Dropdown */}
                                     <div>
@@ -612,10 +612,10 @@ export default function MessagingPage() {
                         <AnimatePresence>
                             {targetType === "users" && (
                                 <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="mb-4 overflow-hidden"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="mb-4 overflow-visible"
                                 >
                                     <label className={cn(
                                         "block text-sm font-medium mb-2",
