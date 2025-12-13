@@ -78,10 +78,14 @@ export default function MonitoringPage() {
 
     // Simulate real-time updates
     useEffect(() => {
+        const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+
         const fetchMetrics = async () => {
             // In production, fetch from API
             try {
-                const response = await fetch('/api/developer/stats');
+                const response = await fetch(`${API_BASE}/api/developer/stats`, {
+                    cache: 'no-store',
+                });
                 if (response.ok) {
                     const data = await response.json();
                     if (data.system) {
