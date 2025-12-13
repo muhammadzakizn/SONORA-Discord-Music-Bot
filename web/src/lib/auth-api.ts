@@ -159,7 +159,7 @@ export async function verifyTOTPSetup(
     const response = await fetch('/api/mfa/totp/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: String(userId), code }),
+      body: JSON.stringify({ userId: String(userId), code, secret }), // Include secret for stateless verification
     });
     if (response.ok) {
       const data = await response.json();
