@@ -139,7 +139,10 @@ export default function NavLiquidGlass() {
     }, [activePopup]);
 
     const scrollToTop = () => {
+        // Try multiple methods to ensure scrolling to absolute top
         window.scrollTo({ top: 0, behavior: "smooth" });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0; // For Safari
     };
 
     const togglePopup = (popup: PopupType) => {
