@@ -36,7 +36,16 @@ app = Flask(__name__,
            template_folder='templates',
            static_folder='static')
 app.config['SECRET_KEY'] = 'your-secret-key-change-this'
-CORS(app)
+
+# CORS configuration - allow all origins for API access
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "supports_credentials": False  # Set to False when using "*" origins
+    }
+})
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Global bot reference (will be set by main.py)
