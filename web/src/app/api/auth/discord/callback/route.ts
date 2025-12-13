@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const BOT_API_URL = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
@@ -92,6 +94,79 @@ export async function GET(request: NextRequest) {
         const guildsData = guildsResponse.ok ? await guildsResponse.json() : [];
         console.log('Guilds count:', guildsData.length);
 
+        // Check if user exists in auth database (via Bot API)
+        let authState: 'new' | 'existing' | 'mfa_required' | 'trusted' = 'new';
+        let authUserId: number | null = null;
+        let mfaMethods: string[] = [];
+
+        try {
+            console.log('Checking auth database for user:', userData.id);
+            const authCheckResponse = await fetch(`${BOT_API_URL}/api/auth/user/check`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ discord_id: userData.id }),
+            });
+
+            if (authCheckResponse.ok) {
+                const authData = await authCheckResponse.json();
+                console.log('Auth check result:', authData);
+
+                if (authData.exists && authData.user) {
+                    authUserId = authData.user.id;
+                    mfaMethods = authData.mfa_methods || [];
+
+                    if (authData.user.mfa_enabled && mfaMethods.length > 0) {
+                        // Check if current device is trusted
+                        const deviceCheckResponse = await fetch(`${BOT_API_URL}/api/auth/trusted-devices/check`, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'User-Agent': request.headers.get('user-agent') || 'Unknown',
+                                'X-Forwarded-For': request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '',
+                            },
+                            body: JSON.stringify({ user_id: authUserId }),
+                        });
+
+                        if (deviceCheckResponse.ok) {
+                            const deviceData = await deviceCheckResponse.json();
+                            authState = deviceData.is_trusted ? 'trusted' : 'mfa_required';
+                        } else {
+                            authState = 'mfa_required';
+                        }
+                    } else {
+                        // User exists but no MFA - treat as trusted
+                        authState = 'trusted';
+                    }
+                } else {
+                    // New user - register them
+                    console.log('Registering new user...');
+                    const registerResponse = await fetch(`${BOT_API_URL}/api/auth/user/register`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            discord_id: userData.id,
+                            username: userData.username,
+                            email: userData.email,
+                            avatar_url: userData.avatar 
+                                ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+                                : null,
+                        }),
+                    });
+
+                    if (registerResponse.ok) {
+                        const registerData = await registerResponse.json();
+                        authUserId = registerData.user_id;
+                        authState = 'new';
+                        console.log('User registered with ID:', authUserId);
+                    }
+                }
+            }
+        } catch (authError) {
+            console.warn('Auth database check failed (bot may be offline):', authError);
+            // Continue without auth database - fallback to session-only auth
+            authState = 'trusted'; // Skip MFA if bot is offline
+        }
+
         // Create session data
         const sessionData = {
             user: {
@@ -107,29 +182,32 @@ export async function GET(request: NextRequest) {
             ),
             accessToken: accessToken,
             timestamp: Date.now(),
+            // Auth state for login page
+            authState: authState,
+            authUserId: authUserId,
+            mfaMethods: mfaMethods,
         };
 
-        // Create response - redirect based on environment
-        // For server deployment: use verification flow with DM code (stay on login page, switch to verify mode)
-        // For Vercel (cloud): skip verification (no access to local bot)
-        const isVercelDeployment = process.env.VERCEL === '1';
-        
-        // Set session cookie (readable by client-side for session context)
+        // Create response - redirect based on auth state
+        const isSecure = appUrl.startsWith('https://');
         const encodedSession = Buffer.from(JSON.stringify(sessionData)).toString('base64');
         
-        // Note: secure: false for HTTP deployment (non-HTTPS)
-        // Set to true only when using HTTPS
-        const isSecure = appUrl.startsWith('https://');
-        
-        // Due to SameSite cookie issues with OAuth redirects,
-        // we pass the session via query param and let the client store it
-        const redirectPath = isVercelDeployment 
-            ? '/admin' 
-            : `/login?verify=true&session=${encodeURIComponent(encodedSession)}`;
+        // Determine redirect path based on auth state
+        let redirectPath: string;
+        if (authState === 'trusted') {
+            // Trusted device or no MFA - go directly to admin
+            redirectPath = '/admin';
+        } else if (authState === 'new') {
+            // New user - go to login for MFA setup
+            redirectPath = `/login?verify=true&session=${encodeURIComponent(encodedSession)}&flow=setup`;
+        } else {
+            // Existing user with MFA - go to login for verification
+            redirectPath = `/login?verify=true&session=${encodeURIComponent(encodedSession)}&flow=verify`;
+        }
         
         const response = NextResponse.redirect(new URL(redirectPath, appUrl));
         
-        // Still try to set cookie (may work in some browsers)
+        // Set session cookie
         response.cookies.set('sonora-admin-session', encodedSession, {
             httpOnly: false, // Allow client-side access for session display
             secure: isSecure,
@@ -138,7 +216,7 @@ export async function GET(request: NextRequest) {
             path: '/',
         });
 
-        // Also set admin auth in localStorage-compatible cookie for auth.ts
+        // Also set admin auth cookie
         const adminAuthData = {
             role: 'admin',
             timestamp: Date.now(),
@@ -146,7 +224,9 @@ export async function GET(request: NextRequest) {
                 id: userData.id,
                 username: userData.username,
                 avatar: userData.avatar,
-            }
+            },
+            authState: authState,
+            authUserId: authUserId,
         };
         response.cookies.set('sonora-admin-auth', Buffer.from(JSON.stringify(adminAuthData)).toString('base64'), {
             httpOnly: false,
@@ -156,7 +236,7 @@ export async function GET(request: NextRequest) {
             path: '/',
         });
 
-        console.log(`Session created, redirecting to ${redirectPath.substring(0, 50)}...`);
+        console.log(`Auth state: ${authState}, redirecting to ${redirectPath.substring(0, 50)}...`);
         return response;
 
     } catch (err) {
@@ -164,3 +244,4 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL('/login?error=server_error', request.url));
     }
 }
+

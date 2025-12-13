@@ -259,31 +259,87 @@ function LoginPageContent() {
 
     const isVerifyFlow = searchParams.get('verify') === 'true';
     const sessionFromUrl = searchParams.get('session');
+    const flowType = searchParams.get('flow'); // 'setup' | 'verify' | null
 
     if (!isVerifyFlow) return;
 
-    console.log('[Login] Verify flow detected');
+    console.log('[Login] Verify flow detected, flow type:', flowType);
     console.log('[Login] Session from URL:', sessionFromUrl ? 'present' : 'missing');
 
     // If session is passed via URL, store it in cookie manually
     if (sessionFromUrl) {
       console.log('[Login] Storing session from URL to cookie...');
-      setHasRedirected(true); // Mark as redirecting to prevent loop
 
       // Decode to make sure it's valid, then store
       try {
         const decoded = atob(decodeURIComponent(sessionFromUrl));
         const sessionData = JSON.parse(decoded);
         console.log('[Login] Session user:', sessionData.user?.username);
+        console.log('[Login] Auth state:', sessionData.authState);
+        console.log('[Login] Auth user ID:', sessionData.authUserId);
 
         // Store in cookie (client-side)
         document.cookie = `sonora-admin-session=${decodeURIComponent(sessionFromUrl)}; path=/; max-age=${60 * 60 * 24 * 7}`;
 
-        console.log('[Login] Cookie stored, navigating to /admin...');
+        // Handle different flow types
+        if (flowType === 'setup' && sessionData.authUserId) {
+          // New user - need to setup MFA
+          console.log('[Login] New user flow - going to MFA setup');
+          setAuthUser({
+            id: sessionData.authUserId,
+            discord_id: sessionData.user.id,
+            username: sessionData.user.username,
+            email: sessionData.user.email,
+            avatar_url: sessionData.user.avatar
+              ? `https://cdn.discordapp.com/avatars/${sessionData.user.id}/${sessionData.user.avatar}.png`
+              : undefined,
+            status: 'pending',
+            mfa_enabled: false,
+            role: 'user',
+            created_at: new Date().toISOString(),
+          });
 
-        // Use window.location for clean navigation (avoids React re-render issues)
-        window.location.href = '/admin';
-        return;
+          // Request TOTP setup from API
+          setupTOTP(sessionData.authUserId).then((result) => {
+            if (result.success && result.qr_code && result.secret) {
+              setTotpSetup({ qrCode: result.qr_code, secret: result.secret });
+              setLoginMode('mfa-setup');
+            } else {
+              console.error('[Login] TOTP setup failed:', result.error);
+              // Fallback - skip MFA for now
+              setHasRedirected(true);
+              window.location.href = '/admin';
+            }
+          });
+          return;
+        } else if (flowType === 'verify' && sessionData.authUserId) {
+          // Existing user with MFA - need to verify
+          console.log('[Login] Existing user flow - going to MFA verify');
+          setAuthUser({
+            id: sessionData.authUserId,
+            discord_id: sessionData.user.id,
+            username: sessionData.user.username,
+            email: sessionData.user.email,
+            status: 'active',
+            mfa_enabled: true,
+            role: 'admin',
+            created_at: new Date().toISOString(),
+          });
+
+          // Set available MFA methods from session
+          if (sessionData.mfaMethods && sessionData.mfaMethods.length > 0) {
+            setSelectedMfaMethod(sessionData.mfaMethods[0] as MFAMethod);
+          }
+
+          setLoginMode('mfa-select');
+          return;
+        } else {
+          // No flow specified or trusted device - go directly to admin
+          console.log('[Login] Cookie stored, navigating to /admin...');
+          setHasRedirected(true);
+          window.location.href = '/admin';
+          return;
+        }
       } catch (e) {
         console.error('[Login] Failed to parse session from URL:', e);
         setHasRedirected(false);

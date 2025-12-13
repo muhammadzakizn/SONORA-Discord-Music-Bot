@@ -689,7 +689,178 @@ def get_mfa_methods():
         return jsonify({'error': 'Server error'}), 500
 
 
-# ==================== INITIALIZATION ====================
+# ==================== DISCORD DM VERIFICATION ====================
+
+# Global reference to bot instance (set by main.py)
+_bot_instance = None
+
+def set_auth_bot_instance(bot):
+    """Set bot instance for Discord DM verification"""
+    global _bot_instance
+    _bot_instance = bot
+    logger.info("✓ Auth API connected to Discord bot for DM verification")
+
+
+@auth_bp.route('/mfa/discord/send', methods=['POST'])
+def send_discord_dm_code():
+    """
+    Send verification code via Discord DM
+    Uses the bot to send a DM to the user
+    """
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        discord_id = data.get('discord_id')
+        
+        if not user_id or not discord_id:
+            return jsonify({'error': 'User ID and Discord ID required'}), 400
+        
+        db = get_auth_db_manager()
+        
+        # Create verification code (database generates and hashes internally)
+        code = run_async(db.create_verification_code(
+            code_type='discord_dm',
+            user_id=user_id,
+            discord_id=discord_id,
+            expires_minutes=5
+        ))
+        
+        # Send DM via bot
+        if _bot_instance:
+            try:
+                # Use asyncio to send DM
+                async def send_dm():
+                    user = await _bot_instance.fetch_user(int(discord_id))
+                    if user:
+                        embed_data = {
+                            'title': '🔐 SONORA Login Verification',
+                            'description': f'Your verification code is:\n\n# `{code}`\n\nThis code expires in 5 minutes.',
+                            'color': 0x9B59B6,  # Purple
+                            'footer': {'text': 'If you did not request this code, please ignore this message.'}
+                        }
+                        
+                        import discord
+                        embed = discord.Embed(
+                            title=embed_data['title'],
+                            description=embed_data['description'],
+                            color=embed_data['color']
+                        )
+                        embed.set_footer(text=embed_data['footer']['text'])
+                        
+                        await user.send(embed=embed)
+                        return True
+                    return False
+                
+                success = run_async(send_dm())
+                
+                if success:
+                    logger.info(f"Sent verification code to Discord user {discord_id}")
+                    return jsonify({
+                        'success': True,
+                        'message': 'Verification code sent to your Discord DM',
+                        'expires_in': 300  # 5 minutes
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Could not send DM. Make sure you can receive DMs from the bot.'
+                    }), 400
+                    
+            except Exception as dm_error:
+                logger.error(f"Failed to send Discord DM: {dm_error}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to send DM. Check your Discord privacy settings.'
+                }), 400
+        else:
+            # Bot not available - return code in response (for testing only)
+            logger.warning("Bot not available for DM verification - returning code directly (DEV ONLY)")
+            return jsonify({
+                'success': True,
+                'message': 'Code generated (bot offline - shown for testing)',
+                'dev_code': code,  # Remove in production!
+                'expires_in': 300
+            })
+    
+    except Exception as e:
+        logger.error(f"Send Discord DM code error: {e}", exc_info=True)
+        return jsonify({'error': 'Server error'}), 500
+
+
+@auth_bp.route('/mfa/discord/verify', methods=['POST'])
+def verify_discord_dm_code():
+    """
+    Verify Discord DM code
+    """
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        code = data.get('code')
+        
+        if not all([user_id, code]):
+            return jsonify({'error': 'User ID and code required'}), 400
+        
+        db = get_auth_db_manager()
+        
+        # Verify code (database method: code, code_type, user_id)
+        if run_async(db.verify_code(code, 'discord_dm', user_id=user_id)):
+            # Update MFA last used
+            run_async(db.update_mfa_last_used(user_id, 'discord'))
+            
+            # Log successful verification
+            client_info = get_client_info(request)
+            run_async(db._log_security_event(
+                user_id=user_id,
+                event_type='mfa_verified',
+                success=True,
+                ip_address=client_info['ip_address'],
+                user_agent=client_info['user_agent'],
+                metadata={'method': 'discord_dm'}
+            ))
+            
+            return jsonify({
+                'success': True,
+                'message': 'Discord verification successful'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid or expired code'
+            }), 400
+    
+    except Exception as e:
+        logger.error(f"Verify Discord DM code error: {e}", exc_info=True)
+        return jsonify({'error': 'Server error'}), 500
+
+
+@auth_bp.route('/mfa/discord/setup', methods=['POST'])
+def setup_discord_mfa():
+    """
+    Enable Discord DM as MFA method
+    """
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID required'}), 400
+        
+        db = get_auth_db_manager()
+        
+        # Add Discord as MFA method (no secret needed - uses Discord ID)
+        run_async(db.add_mfa_method(user_id, 'discord', is_primary=True))
+        
+        return jsonify({
+            'success': True,
+            'message': 'Discord DM verification enabled'
+        })
+    
+    except Exception as e:
+        logger.error(f"Setup Discord MFA error: {e}", exc_info=True)
+        return jsonify({'error': 'Server error'}), 500
+
+
+
 
 def init_auth_api(app):
     """Initialize auth API and database"""

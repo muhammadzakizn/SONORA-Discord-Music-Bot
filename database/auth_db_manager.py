@@ -642,6 +642,53 @@ class AuthDatabaseManager:
         """, (user_id, method_type))
         await self.db.commit()
     
+    async def add_mfa_method(
+        self,
+        user_id: int,
+        method_type: str,
+        method_data: Optional[str] = None,
+        is_primary: bool = False
+    ) -> int:
+        """
+        Add MFA method for user
+        
+        Args:
+            user_id: User ID
+            method_type: Type of MFA (passkey, totp, email, discord)
+            method_data: Optional data (encrypted if sensitive)
+            is_primary: Whether this is the primary method
+            
+        Returns:
+            MFA method ID
+        """
+        # Encrypt method data if provided
+        encrypted_data = self.crypto.encrypt(json.dumps({
+            'type': method_type,
+            'data': method_data
+        })) if method_data else self.crypto.encrypt(json.dumps({'type': method_type}))
+        
+        cursor = await self.db.execute("""
+            INSERT OR REPLACE INTO mfa_methods (user_id, method_type, method_data, is_primary, is_active)
+            VALUES (?, ?, ?, ?, 1)
+        """, (user_id, method_type, encrypted_data, is_primary))
+        
+        # Enable MFA for user
+        await self.db.execute(
+            "UPDATE auth_users SET mfa_enabled = 1 WHERE id = ?",
+            (user_id,)
+        )
+        
+        await self.db.commit()
+        
+        await self._log_security_event(
+            user_id=user_id,
+            event_type=f'mfa_{method_type}_setup',
+            success=True
+        )
+        
+        return cursor.lastrowid
+    
+    
     # ==================== BACKUP CODES ====================
     
     async def generate_backup_codes(self, user_id: int, count: int = 10) -> List[str]:
