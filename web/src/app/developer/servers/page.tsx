@@ -1,21 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import Image from "next/image";
+import { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     Server,
     Users,
     Music,
     VolumeX,
     Volume2,
-    Pause,
-    Play,
-    Power,
     Search,
     RefreshCw,
     ExternalLink,
     MoreVertical,
+    Square,
+    Trash2,
+    LogOut,
+    Hash,
+    Mic,
+    X,
+    Ban,
+    ToggleLeft,
+    ToggleRight,
+    AlertTriangle,
+    CheckCircle,
+    Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -24,11 +32,66 @@ interface Guild {
     id: string;
     name: string;
     icon: string | null;
-    members: number;
-    isPlaying: boolean;
-    currentTrack?: string;
-    voiceChannel?: string;
+    member_count: number;
+    is_playing: boolean;
+    current_track?: {
+        title: string;
+        artist: string;
+        duration: number;
+        current_time: number;
+    };
 }
+
+interface GuildDetails {
+    id: string;
+    name: string;
+    icon: string | null;
+    memberCount: number;
+    voiceChannel: {
+        id: string;
+        name: string;
+        members: number;
+    } | null;
+    isPlaying: boolean;
+    currentTrack: {
+        title: string;
+        artist: string;
+        duration: number;
+        current_time: number;
+        artwork_url?: string;
+    } | null;
+    queueLength: number;
+    textChannels: {
+        id: string;
+        name: string;
+        position: number;
+        isDisabled: boolean;
+        disableInfo?: {
+            disabled_at: string;
+            disabled_by: string;
+            reason: string;
+        };
+        permissions: {
+            sendMessages: boolean;
+            embedLinks: boolean;
+        };
+    }[];
+    voiceChannels: {
+        id: string;
+        name: string;
+        position: number;
+        members: number;
+    }[];
+    members: {
+        id: string;
+        username: string;
+        displayName: string;
+        avatar: string | null;
+        isBanned: boolean;
+    }[];
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
 
 export default function ServersPage() {
     const { isDark } = useSettings();
@@ -37,6 +100,22 @@ export default function ServersPage() {
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<"all" | "playing" | "idle">("all");
 
+    // Modal state
+    const [selectedGuild, setSelectedGuild] = useState<Guild | null>(null);
+    const [guildDetails, setGuildDetails] = useState<GuildDetails | null>(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
+    const [activeTab, setActiveTab] = useState<"overview" | "channels" | "members" | "controls">("overview");
+
+    // Action states
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+    // Ban modal
+    const [showBanModal, setShowBanModal] = useState(false);
+    const [banTarget, setBanTarget] = useState<{ id: string; username: string } | null>(null);
+    const [banReason, setBanReason] = useState("");
+    const [banDuration, setBanDuration] = useState("permanent");
+
     useEffect(() => {
         fetchGuilds();
     }, []);
@@ -44,39 +123,203 @@ export default function ServersPage() {
     const fetchGuilds = async () => {
         setLoading(true);
         try {
-            const response = await fetch('/api/guilds');
+            const response = await fetch(`${API_BASE}/api/guilds`, {
+                cache: 'no-store',
+            });
             if (response.ok) {
                 const data = await response.json();
                 setGuilds(data);
             } else {
-                // Mock data for demo
-                setGuilds([
-                    { id: "1", name: "SONORA Test Server", icon: null, members: 150, isPlaying: true, currentTrack: "Bohemian Rhapsody", voiceChannel: "Music" },
-                    { id: "2", name: "Gaming Hub", icon: null, members: 500, isPlaying: false },
-                    { id: "3", name: "Chill Lounge", icon: null, members: 230, isPlaying: true, currentTrack: "Lofi Beats", voiceChannel: "Lofi" },
-                    { id: "4", name: "Developer Zone", icon: null, members: 85, isPlaying: false },
-                ]);
+                setGuilds([]);
             }
         } catch {
-            // Mock data
-            setGuilds([
-                { id: "1", name: "SONORA Test Server", icon: null, members: 150, isPlaying: true, currentTrack: "Bohemian Rhapsody", voiceChannel: "Music" },
-                { id: "2", name: "Gaming Hub", icon: null, members: 500, isPlaying: false },
-            ]);
+            setGuilds([]);
         }
         setLoading(false);
+    };
+
+    const fetchGuildDetails = useCallback(async (guildId: string) => {
+        setLoadingDetails(true);
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/details`, {
+                cache: 'no-store',
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setGuildDetails(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch guild details:', error);
+        }
+        setLoadingDetails(false);
+    }, []);
+
+    const openGuildModal = async (guild: Guild) => {
+        setSelectedGuild(guild);
+        setActiveTab("overview");
+        await fetchGuildDetails(guild.id);
+    };
+
+    const closeModal = () => {
+        setSelectedGuild(null);
+        setGuildDetails(null);
+    };
+
+    const showToast = (message: string, type: "success" | "error") => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+
+    // Server control actions
+    const handleStopAudio = async (guildId: string) => {
+        setActionLoading("stop");
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/stop-audio`, {
+                method: 'POST',
+            });
+            if (response.ok) {
+                showToast("Audio stopped successfully", "success");
+                await fetchGuildDetails(guildId);
+                fetchGuilds();
+            } else {
+                const data = await response.json();
+                showToast(data.error || "Failed to stop audio", "error");
+            }
+        } catch {
+            showToast("Failed to stop audio", "error");
+        }
+        setActionLoading(null);
+    };
+
+    const handleClearQueue = async (guildId: string) => {
+        setActionLoading("clear");
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/clear-queue`, {
+                method: 'POST',
+            });
+            if (response.ok) {
+                const data = await response.json();
+                showToast(`Cleared ${data.cleared_count} tracks from queue`, "success");
+                await fetchGuildDetails(guildId);
+            } else {
+                const data = await response.json();
+                showToast(data.error || "Failed to clear queue", "error");
+            }
+        } catch {
+            showToast("Failed to clear queue", "error");
+        }
+        setActionLoading(null);
+    };
+
+    const handleKickBot = async (guildId: string) => {
+        setActionLoading("kick");
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/kick`, {
+                method: 'POST',
+            });
+            if (response.ok) {
+                showToast("Bot disconnected from voice", "success");
+                closeModal();
+                fetchGuilds();
+            } else {
+                const data = await response.json();
+                showToast(data.error || "Failed to disconnect bot", "error");
+            }
+        } catch {
+            showToast("Failed to disconnect bot", "error");
+        }
+        setActionLoading(null);
+    };
+
+    // Channel disable/enable
+    const handleToggleChannel = async (guildId: string, channelId: string, isDisabled: boolean) => {
+        setActionLoading(`channel-${channelId}`);
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/channels/${channelId}/disable`, {
+                method: isDisabled ? 'DELETE' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: isDisabled ? undefined : JSON.stringify({ reason: 'Disabled from server management' }),
+            });
+            if (response.ok) {
+                showToast(isDisabled ? "Channel enabled" : "Channel disabled", "success");
+                await fetchGuildDetails(guildId);
+            } else {
+                showToast("Failed to toggle channel", "error");
+            }
+        } catch {
+            showToast("Failed to toggle channel", "error");
+        }
+        setActionLoading(null);
+    };
+
+    // Ban user
+    const openBanModal = (user: { id: string; username: string }) => {
+        setBanTarget(user);
+        setBanReason("");
+        setBanDuration("permanent");
+        setShowBanModal(true);
+    };
+
+    const handleBanUser = async () => {
+        if (!banTarget || !selectedGuild) return;
+
+        setActionLoading("ban");
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/guild/${selectedGuild.id}/ban-user/${banTarget.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    reason: banReason || 'Banned from server management',
+                    duration: banDuration,
+                }),
+            });
+            if (response.ok) {
+                showToast(`${banTarget.username} has been banned`, "success");
+                setShowBanModal(false);
+                await fetchGuildDetails(selectedGuild.id);
+            } else {
+                showToast("Failed to ban user", "error");
+            }
+        } catch {
+            showToast("Failed to ban user", "error");
+        }
+        setActionLoading(null);
     };
 
     const filteredGuilds = guilds.filter(guild => {
         const matchesSearch = guild.name.toLowerCase().includes(search.toLowerCase());
         const matchesFilter = filter === "all" ||
-            (filter === "playing" && guild.isPlaying) ||
-            (filter === "idle" && !guild.isPlaying);
+            (filter === "playing" && guild.is_playing) ||
+            (filter === "idle" && !guild.is_playing);
         return matchesSearch && matchesFilter;
     });
 
     return (
         <div className="space-y-6">
+            {/* Toast */}
+            <AnimatePresence>
+                {toast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className={cn(
+                            "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl flex items-center gap-2 shadow-lg",
+                            toast.type === "success"
+                                ? "bg-green-500 text-white"
+                                : "bg-red-500 text-white"
+                        )}
+                    >
+                        {toast.type === "success" ? (
+                            <CheckCircle className="w-5 h-5" />
+                        ) : (
+                            <AlertTriangle className="w-5 h-5" />
+                        )}
+                        {toast.message}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -183,6 +426,27 @@ export default function ServersPage() {
                         </div>
                     ))}
                 </div>
+            ) : guilds.length === 0 ? (
+                <div className={cn(
+                    "text-center py-12 rounded-xl border",
+                    isDark
+                        ? "bg-zinc-900/50 border-white/10"
+                        : "bg-white border-gray-200"
+                )}>
+                    <Server className={cn(
+                        "w-12 h-12 mx-auto mb-4",
+                        isDark ? "text-zinc-600" : "text-gray-400"
+                    )} />
+                    <h3 className={cn(
+                        "font-medium mb-2",
+                        isDark ? "text-white" : "text-gray-900"
+                    )}>
+                        No servers connected
+                    </h3>
+                    <p className={isDark ? "text-white/50" : "text-gray-500"}>
+                        The bot is not connected to any servers or the API is unreachable
+                    </p>
+                </div>
             ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredGuilds.map((guild, index) => (
@@ -193,7 +457,7 @@ export default function ServersPage() {
                             transition={{ delay: index * 0.05 }}
                             className={cn(
                                 "p-4 rounded-xl border transition-all",
-                                guild.isPlaying
+                                guild.is_playing
                                     ? "border-green-500/30 bg-green-500/5"
                                     : isDark
                                         ? "bg-zinc-900/50 border-white/10"
@@ -205,7 +469,15 @@ export default function ServersPage() {
                                     "w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold",
                                     "bg-gradient-to-br from-purple-500 to-pink-500 text-white"
                                 )}>
-                                    {guild.name.charAt(0)}
+                                    {guild.icon ? (
+                                        <img
+                                            src={guild.icon}
+                                            alt={guild.name}
+                                            className="w-full h-full rounded-xl object-cover"
+                                        />
+                                    ) : (
+                                        guild.name.charAt(0)
+                                    )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h3 className={cn(
@@ -217,19 +489,19 @@ export default function ServersPage() {
                                     <div className="flex items-center gap-2 text-sm">
                                         <Users className="w-3 h-3" />
                                         <span className={isDark ? "text-white/50" : "text-gray-500"}>
-                                            {guild.members} members
+                                            {guild.member_count} members
                                         </span>
                                     </div>
                                 </div>
                                 <div className={cn(
                                     "p-2 rounded-lg",
-                                    guild.isPlaying
+                                    guild.is_playing
                                         ? "bg-green-500/20 text-green-400"
                                         : isDark
                                             ? "bg-zinc-800 text-zinc-500"
                                             : "bg-gray-100 text-gray-400"
                                 )}>
-                                    {guild.isPlaying ? (
+                                    {guild.is_playing ? (
                                         <Volume2 className="w-4 h-4" />
                                     ) : (
                                         <VolumeX className="w-4 h-4" />
@@ -237,7 +509,7 @@ export default function ServersPage() {
                                 </div>
                             </div>
 
-                            {guild.isPlaying && (
+                            {guild.is_playing && guild.current_track && (
                                 <div className={cn(
                                     "p-3 rounded-lg mb-3",
                                     isDark ? "bg-white/5" : "bg-gray-50"
@@ -248,36 +520,39 @@ export default function ServersPage() {
                                             "text-sm truncate",
                                             isDark ? "text-white/80" : "text-gray-700"
                                         )}>
-                                            {guild.currentTrack}
+                                            {guild.current_track.title}
                                         </span>
                                     </div>
-                                    {guild.voiceChannel && (
-                                        <p className={cn(
-                                            "text-xs mt-1",
-                                            isDark ? "text-white/40" : "text-gray-500"
-                                        )}>
-                                            in #{guild.voiceChannel}
-                                        </p>
-                                    )}
+                                    <p className={cn(
+                                        "text-xs mt-1",
+                                        isDark ? "text-white/40" : "text-gray-500"
+                                    )}>
+                                        by {guild.current_track.artist}
+                                    </p>
                                 </div>
                             )}
 
                             <div className="flex gap-2">
-                                <button className={cn(
-                                    "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2",
-                                    isDark
-                                        ? "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                )}>
+                                <button
+                                    onClick={() => openGuildModal(guild)}
+                                    className={cn(
+                                        "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2",
+                                        isDark
+                                            ? "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    )}
+                                >
                                     <ExternalLink className="w-4 h-4" />
                                     View
                                 </button>
-                                <button className={cn(
-                                    "p-2 rounded-lg transition-colors",
-                                    isDark
-                                        ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                )}>
+                                <button
+                                    className={cn(
+                                        "p-2 rounded-lg transition-colors",
+                                        isDark
+                                            ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                    )}
+                                >
                                     <MoreVertical className="w-4 h-4" />
                                 </button>
                             </div>
@@ -287,7 +562,7 @@ export default function ServersPage() {
             )}
 
             {/* Empty State */}
-            {!loading && filteredGuilds.length === 0 && (
+            {!loading && filteredGuilds.length === 0 && guilds.length > 0 && (
                 <div className={cn(
                     "text-center py-12 rounded-xl border",
                     isDark
@@ -309,6 +584,522 @@ export default function ServersPage() {
                     </p>
                 </div>
             )}
+
+            {/* Server Detail Modal */}
+            <AnimatePresence>
+                {selectedGuild && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={closeModal}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className={cn(
+                                "w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl flex flex-col",
+                                isDark ? "bg-zinc-900 border border-white/10" : "bg-white border border-gray-200"
+                            )}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Modal Header */}
+                            <div className={cn(
+                                "flex items-center justify-between p-4 border-b",
+                                isDark ? "border-white/10" : "border-gray-200"
+                            )}>
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                        "w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold",
+                                        "bg-gradient-to-br from-purple-500 to-pink-500 text-white"
+                                    )}>
+                                        {guildDetails?.icon ? (
+                                            <img
+                                                src={guildDetails.icon}
+                                                alt={guildDetails.name}
+                                                className="w-full h-full rounded-xl object-cover"
+                                            />
+                                        ) : (
+                                            selectedGuild.name.charAt(0)
+                                        )}
+                                    </div>
+                                    <div>
+                                        <h2 className={cn(
+                                            "font-bold",
+                                            isDark ? "text-white" : "text-gray-900"
+                                        )}>
+                                            {selectedGuild.name}
+                                        </h2>
+                                        <p className={cn(
+                                            "text-sm",
+                                            isDark ? "text-white/50" : "text-gray-500"
+                                        )}>
+                                            {guildDetails?.memberCount || selectedGuild.member_count} members
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={closeModal}
+                                    className={cn(
+                                        "p-2 rounded-lg transition-colors",
+                                        isDark ? "hover:bg-white/10" : "hover:bg-gray-100"
+                                    )}
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Tabs */}
+                            <div className={cn(
+                                "flex border-b px-4",
+                                isDark ? "border-white/10" : "border-gray-200"
+                            )}>
+                                {[
+                                    { id: "overview", label: "Overview", icon: Info },
+                                    { id: "channels", label: "Channels", icon: Hash },
+                                    { id: "members", label: "Members", icon: Users },
+                                    { id: "controls", label: "Controls", icon: Square },
+                                ].map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                                        className={cn(
+                                            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px",
+                                            activeTab === tab.id
+                                                ? "border-purple-500 text-purple-400"
+                                                : isDark
+                                                    ? "border-transparent text-white/50 hover:text-white/80"
+                                                    : "border-transparent text-gray-500 hover:text-gray-700"
+                                        )}
+                                    >
+                                        <tab.icon className="w-4 h-4" />
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Modal Content */}
+                            <div className="flex-1 overflow-y-auto p-4">
+                                {loadingDetails ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <RefreshCw className="w-8 h-8 animate-spin text-purple-400" />
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Overview Tab */}
+                                        {activeTab === "overview" && guildDetails && (
+                                            <div className="space-y-4">
+                                                {/* Now Playing */}
+                                                {guildDetails.isPlaying && guildDetails.currentTrack ? (
+                                                    <div className={cn(
+                                                        "p-4 rounded-xl border",
+                                                        "border-green-500/30 bg-green-500/5"
+                                                    )}>
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Volume2 className="w-5 h-5 text-green-400" />
+                                                            <span className="text-green-400 font-medium">Now Playing</span>
+                                                        </div>
+                                                        <h3 className={cn(
+                                                            "font-semibold text-lg",
+                                                            isDark ? "text-white" : "text-gray-900"
+                                                        )}>
+                                                            {guildDetails.currentTrack.title}
+                                                        </h3>
+                                                        <p className={isDark ? "text-white/60" : "text-gray-600"}>
+                                                            {guildDetails.currentTrack.artist}
+                                                        </p>
+                                                        {guildDetails.voiceChannel && (
+                                                            <p className={cn(
+                                                                "text-sm mt-2",
+                                                                isDark ? "text-white/40" : "text-gray-500"
+                                                            )}>
+                                                                <Mic className="w-3 h-3 inline mr-1" />
+                                                                in #{guildDetails.voiceChannel.name} ({guildDetails.voiceChannel.members} listeners)
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className={cn(
+                                                        "p-4 rounded-xl border",
+                                                        isDark ? "border-white/10 bg-zinc-800/50" : "border-gray-200 bg-gray-50"
+                                                    )}>
+                                                        <div className="flex items-center gap-2">
+                                                            <VolumeX className="w-5 h-5 text-zinc-500" />
+                                                            <span className={isDark ? "text-white/60" : "text-gray-500"}>
+                                                                Not playing anything
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Stats */}
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    <div className={cn(
+                                                        "p-4 rounded-xl border text-center",
+                                                        isDark ? "border-white/10 bg-zinc-800/50" : "border-gray-200 bg-gray-50"
+                                                    )}>
+                                                        <p className="text-2xl font-bold text-purple-400">{guildDetails.textChannels.length}</p>
+                                                        <p className={isDark ? "text-white/50 text-sm" : "text-gray-500 text-sm"}>Text Channels</p>
+                                                    </div>
+                                                    <div className={cn(
+                                                        "p-4 rounded-xl border text-center",
+                                                        isDark ? "border-white/10 bg-zinc-800/50" : "border-gray-200 bg-gray-50"
+                                                    )}>
+                                                        <p className="text-2xl font-bold text-blue-400">{guildDetails.voiceChannels.length}</p>
+                                                        <p className={isDark ? "text-white/50 text-sm" : "text-gray-500 text-sm"}>Voice Channels</p>
+                                                    </div>
+                                                    <div className={cn(
+                                                        "p-4 rounded-xl border text-center",
+                                                        isDark ? "border-white/10 bg-zinc-800/50" : "border-gray-200 bg-gray-50"
+                                                    )}>
+                                                        <p className="text-2xl font-bold text-orange-400">{guildDetails.queueLength}</p>
+                                                        <p className={isDark ? "text-white/50 text-sm" : "text-gray-500 text-sm"}>Queue Length</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Channels Tab */}
+                                        {activeTab === "channels" && guildDetails && (
+                                            <div className="space-y-2">
+                                                <p className={cn(
+                                                    "text-sm mb-4",
+                                                    isDark ? "text-white/50" : "text-gray-500"
+                                                )}>
+                                                    Disabled channels will show a warning when users try to use bot commands.
+                                                </p>
+                                                {guildDetails.textChannels.map(channel => (
+                                                    <div
+                                                        key={channel.id}
+                                                        className={cn(
+                                                            "flex items-center justify-between p-3 rounded-lg",
+                                                            channel.isDisabled
+                                                                ? "bg-red-500/10 border border-red-500/20"
+                                                                : isDark
+                                                                    ? "bg-zinc-800/50"
+                                                                    : "bg-gray-50"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <Hash className={cn(
+                                                                "w-4 h-4",
+                                                                channel.isDisabled ? "text-red-400" : isDark ? "text-white/50" : "text-gray-500"
+                                                            )} />
+                                                            <span className={cn(
+                                                                channel.isDisabled ? "text-red-400" : isDark ? "text-white" : "text-gray-900"
+                                                            )}>
+                                                                {channel.name}
+                                                            </span>
+                                                            {channel.isDisabled && (
+                                                                <span className="text-xs text-red-400 bg-red-500/20 px-2 py-0.5 rounded">
+                                                                    Disabled
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleToggleChannel(selectedGuild.id, channel.id, channel.isDisabled)}
+                                                            disabled={actionLoading === `channel-${channel.id}`}
+                                                            className={cn(
+                                                                "p-2 rounded-lg transition-colors",
+                                                                channel.isDisabled
+                                                                    ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                                                                    : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                                            )}
+                                                        >
+                                                            {actionLoading === `channel-${channel.id}` ? (
+                                                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                                            ) : channel.isDisabled ? (
+                                                                <ToggleRight className="w-4 h-4" />
+                                                            ) : (
+                                                                <ToggleLeft className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Members Tab */}
+                                        {activeTab === "members" && guildDetails && (
+                                            <div className="space-y-2">
+                                                <p className={cn(
+                                                    "text-sm mb-4",
+                                                    isDark ? "text-white/50" : "text-gray-500"
+                                                )}>
+                                                    Banned users will be added to the global ban list and cannot use the bot.
+                                                </p>
+                                                {guildDetails.members.map(member => (
+                                                    <div
+                                                        key={member.id}
+                                                        className={cn(
+                                                            "flex items-center justify-between p-3 rounded-lg",
+                                                            member.isBanned
+                                                                ? "bg-red-500/10 border border-red-500/20"
+                                                                : isDark
+                                                                    ? "bg-zinc-800/50"
+                                                                    : "bg-gray-50"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn(
+                                                                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                                                                "bg-gradient-to-br from-purple-500 to-pink-500 text-white"
+                                                            )}>
+                                                                {member.avatar ? (
+                                                                    <img
+                                                                        src={member.avatar}
+                                                                        alt={member.username}
+                                                                        className="w-full h-full rounded-full object-cover"
+                                                                    />
+                                                                ) : (
+                                                                    member.username.charAt(0).toUpperCase()
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <p className={cn(
+                                                                    "font-medium",
+                                                                    member.isBanned ? "text-red-400" : isDark ? "text-white" : "text-gray-900"
+                                                                )}>
+                                                                    {member.displayName}
+                                                                </p>
+                                                                <p className={cn(
+                                                                    "text-xs",
+                                                                    isDark ? "text-white/40" : "text-gray-500"
+                                                                )}>
+                                                                    @{member.username}
+                                                                </p>
+                                                            </div>
+                                                            {member.isBanned && (
+                                                                <span className="text-xs text-red-400 bg-red-500/20 px-2 py-0.5 rounded">
+                                                                    Banned
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {!member.isBanned && (
+                                                            <button
+                                                                onClick={() => openBanModal(member)}
+                                                                className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                                                            >
+                                                                <Ban className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Controls Tab */}
+                                        {activeTab === "controls" && guildDetails && (
+                                            <div className="space-y-4">
+                                                <div className={cn(
+                                                    "p-4 rounded-xl border",
+                                                    isDark ? "border-white/10 bg-zinc-800/50" : "border-gray-200 bg-gray-50"
+                                                )}>
+                                                    <h3 className={cn(
+                                                        "font-semibold mb-4",
+                                                        isDark ? "text-white" : "text-gray-900"
+                                                    )}>
+                                                        Playback Controls
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                        <button
+                                                            onClick={() => handleStopAudio(selectedGuild.id)}
+                                                            disabled={actionLoading === "stop"}
+                                                            className={cn(
+                                                                "flex items-center justify-center gap-2 p-4 rounded-xl font-medium transition-colors",
+                                                                "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                                            )}
+                                                        >
+                                                            {actionLoading === "stop" ? (
+                                                                <RefreshCw className="w-5 h-5 animate-spin" />
+                                                            ) : (
+                                                                <Square className="w-5 h-5" />
+                                                            )}
+                                                            Stop Audio
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleClearQueue(selectedGuild.id)}
+                                                            disabled={actionLoading === "clear"}
+                                                            className={cn(
+                                                                "flex items-center justify-center gap-2 p-4 rounded-xl font-medium transition-colors",
+                                                                "bg-orange-500/20 text-orange-400 hover:bg-orange-500/30"
+                                                            )}
+                                                        >
+                                                            {actionLoading === "clear" ? (
+                                                                <RefreshCw className="w-5 h-5 animate-spin" />
+                                                            ) : (
+                                                                <Trash2 className="w-5 h-5" />
+                                                            )}
+                                                            Clear Queue
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleKickBot(selectedGuild.id)}
+                                                            disabled={actionLoading === "kick"}
+                                                            className={cn(
+                                                                "flex items-center justify-center gap-2 p-4 rounded-xl font-medium transition-colors",
+                                                                "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+                                                            )}
+                                                        >
+                                                            {actionLoading === "kick" ? (
+                                                                <RefreshCw className="w-5 h-5 animate-spin" />
+                                                            ) : (
+                                                                <LogOut className="w-5 h-5" />
+                                                            )}
+                                                            Kick Bot
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className={cn(
+                                                    "p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5"
+                                                )}>
+                                                    <div className="flex items-start gap-3">
+                                                        <AlertTriangle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                                                        <div>
+                                                            <h4 className="font-medium text-yellow-400">Warning</h4>
+                                                            <p className={cn(
+                                                                "text-sm mt-1",
+                                                                isDark ? "text-white/60" : "text-gray-600"
+                                                            )}>
+                                                                These actions will immediately affect all users in the server.
+                                                                A notification will be sent to Discord.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Ban User Modal */}
+            <AnimatePresence>
+                {showBanModal && banTarget && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowBanModal(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className={cn(
+                                "w-full max-w-md p-6 rounded-2xl",
+                                isDark ? "bg-zinc-900 border border-white/10" : "bg-white border border-gray-200"
+                            )}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2 rounded-xl bg-red-500/20">
+                                    <Ban className="w-5 h-5 text-red-400" />
+                                </div>
+                                <div>
+                                    <h3 className={cn(
+                                        "font-bold",
+                                        isDark ? "text-white" : "text-gray-900"
+                                    )}>
+                                        Ban User
+                                    </h3>
+                                    <p className={isDark ? "text-white/50 text-sm" : "text-gray-500 text-sm"}>
+                                        {banTarget.username}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className={cn(
+                                        "block text-sm font-medium mb-2",
+                                        isDark ? "text-white/70" : "text-gray-700"
+                                    )}>
+                                        Reason
+                                    </label>
+                                    <textarea
+                                        value={banReason}
+                                        onChange={(e) => setBanReason(e.target.value)}
+                                        placeholder="Reason for the ban..."
+                                        rows={3}
+                                        className={cn(
+                                            "w-full px-4 py-3 rounded-xl outline-none transition-colors resize-none",
+                                            isDark
+                                                ? "bg-zinc-800 border border-zinc-700 text-white"
+                                                : "bg-gray-100 border border-gray-200 text-gray-900"
+                                        )}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className={cn(
+                                        "block text-sm font-medium mb-2",
+                                        isDark ? "text-white/70" : "text-gray-700"
+                                    )}>
+                                        Duration
+                                    </label>
+                                    <select
+                                        value={banDuration}
+                                        onChange={(e) => setBanDuration(e.target.value)}
+                                        className={cn(
+                                            "w-full px-4 py-3 rounded-xl outline-none transition-colors",
+                                            isDark
+                                                ? "bg-zinc-800 border border-zinc-700 text-white"
+                                                : "bg-gray-100 border border-gray-200 text-gray-900"
+                                        )}
+                                    >
+                                        <option value="permanent">Permanent</option>
+                                        <option value="1">1 Day</option>
+                                        <option value="7">7 Days</option>
+                                        <option value="30">30 Days</option>
+                                        <option value="90">90 Days</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <p className={cn(
+                                "text-xs mt-4",
+                                isDark ? "text-white/40" : "text-gray-500"
+                            )}>
+                                User will be added to the global ban list and notified with support link.
+                            </p>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setShowBanModal(false)}
+                                    className={cn(
+                                        "flex-1 py-3 rounded-xl font-medium",
+                                        isDark
+                                            ? "bg-zinc-800 text-white hover:bg-zinc-700"
+                                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                    )}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleBanUser}
+                                    disabled={actionLoading === "ban"}
+                                    className="flex-1 py-3 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    {actionLoading === "ban" ? (
+                                        <RefreshCw className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <Ban className="w-5 h-5" />
+                                    )}
+                                    Ban User
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

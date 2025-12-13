@@ -12,7 +12,7 @@ from config.logging_config import get_logger
 from database.db_manager import get_db_manager
 # ==================== v3.3.0 NEW IMPORTS ====================
 try:
-    from datetime import datetime
+    from datetime import datetime, timedelta
     from web.auth import auth_manager, login_required, admin_required, public_or_authenticated
     from utils.analytics import analytics
     from services.translation import translator
@@ -1505,6 +1505,7 @@ def api_admin_maintenance():
 # In-memory storage for bans (in production, use database)
 _banned_users = {}  # {user_id: {reason, banned_at, expires_at, banned_by}}
 _banned_servers = {}  # {server_id: {reason, banned_at, expires_at, banned_by}}
+_disabled_channels = {}  # {guild_id: {channel_id: {disabled_at, disabled_by, reason}}}
 
 
 @app.route('/api/admin/users', methods=['GET'])
@@ -1703,6 +1704,379 @@ def api_admin_ban_remove(ban_id):
     except Exception as e:
         logger.error(f"Failed to remove ban: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+# ==================== SERVER MANAGEMENT ENDPOINTS ====================
+
+@app.route('/api/admin/guild/<guild_id>/details')
+def api_admin_guild_details(guild_id):
+    """Get detailed guild information with channels, members count, voice info"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        guild = bot.get_guild(int(guild_id))
+        if not guild:
+            return jsonify({"error": "Guild not found"}), 404
+        
+        # Get voice connection info
+        connection = bot.voice_manager.get_connection(int(guild_id))
+        voice_channel = None
+        is_playing = False
+        current_track = None
+        
+        if connection and connection.is_connected():
+            voice_channel = {
+                "id": str(connection.channel.id),
+                "name": connection.channel.name,
+                "members": len([m for m in connection.channel.members if not m.bot])
+            }
+            is_playing = connection.connection.is_playing() if connection.connection else False
+            
+            # Get current track
+            if hasattr(bot, 'players') and int(guild_id) in bot.players:
+                player = bot.players[int(guild_id)]
+                if player.metadata:
+                    current_track = {
+                        "title": player.metadata.title,
+                        "artist": player.metadata.artist,
+                        "duration": player.metadata.duration,
+                        "current_time": player.get_current_time(),
+                        "artwork_url": player.metadata.artwork_url
+                    }
+        
+        # Get queue info
+        queue_length = 0
+        queue_cog = bot.get_cog('QueueCommands')
+        if queue_cog and int(guild_id) in queue_cog.queues:
+            queue_length = len(queue_cog.queues[int(guild_id)])
+        
+        # Get text channels
+        text_channels = []
+        for channel in guild.text_channels:
+            permissions = channel.permissions_for(guild.me)
+            is_disabled = str(channel.id) in _disabled_channels.get(guild_id, {})
+            text_channels.append({
+                "id": str(channel.id),
+                "name": channel.name,
+                "position": channel.position,
+                "isDisabled": is_disabled,
+                "disableInfo": _disabled_channels.get(guild_id, {}).get(str(channel.id)),
+                "permissions": {
+                    "sendMessages": permissions.send_messages,
+                    "embedLinks": permissions.embed_links
+                }
+            })
+        
+        # Get voice channels
+        voice_channels = []
+        for channel in guild.voice_channels:
+            voice_channels.append({
+                "id": str(channel.id),
+                "name": channel.name,
+                "position": channel.position,
+                "members": len(channel.members)
+            })
+        
+        # Get member count (limit to prevent performance issues)
+        member_list = []
+        for member in list(guild.members)[:50]:
+            if member.bot:
+                continue
+            is_banned = str(member.id) in _banned_users
+            member_list.append({
+                "id": str(member.id),
+                "username": member.name,
+                "displayName": member.display_name,
+                "avatar": str(member.avatar.url) if member.avatar else None,
+                "isBanned": is_banned
+            })
+        
+        return jsonify({
+            "id": str(guild.id),
+            "name": guild.name,
+            "icon": str(guild.icon.url) if guild.icon else None,
+            "memberCount": guild.member_count,
+            "voiceChannel": voice_channel,
+            "isPlaying": is_playing,
+            "currentTrack": current_track,
+            "queueLength": queue_length,
+            "textChannels": sorted(text_channels, key=lambda x: x['position']),
+            "voiceChannels": sorted(voice_channels, key=lambda x: x['position']),
+            "members": member_list
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get guild details: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/guild/<guild_id>/stop-audio', methods=['POST'])
+def api_admin_guild_stop_audio(guild_id):
+    """Stop audio and clear queue in server"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        connection = bot.voice_manager.get_connection(int(guild_id))
+        if not connection or not connection.is_connected():
+            return jsonify({"error": "Not connected to voice in this server"}), 400
+        
+        # Stop playback
+        if connection.connection:
+            connection.connection.stop()
+        
+        # Clear queue
+        queue_cog = bot.get_cog('QueueCommands')
+        if queue_cog and int(guild_id) in queue_cog.queues:
+            queue_cog.queues[int(guild_id)].clear()
+        
+        # Cleanup player
+        if hasattr(bot, 'players') and int(guild_id) in bot.players:
+            player = bot.players[int(guild_id)]
+            if hasattr(player, 'cleanup'):
+                asyncio.run_coroutine_threadsafe(player.cleanup(), bot.loop)
+            del bot.players[int(guild_id)]
+        
+        logger.info(f"Stopped audio in guild {guild_id} via dashboard")
+        
+        # Send Discord notification
+        async def send_notification():
+            try:
+                import discord
+                guild = bot.get_guild(int(guild_id))
+                if not guild:
+                    return
+                
+                # Find a suitable channel to notify
+                for channel in guild.text_channels:
+                    permissions = channel.permissions_for(guild.me)
+                    if permissions.send_messages:
+                        embed = discord.Embed(
+                            description="⏹️ **Audio stopped** via Developer Dashboard",
+                            color=0x7B1E3C
+                        )
+                        await channel.send(embed=embed, delete_after=30)
+                        break
+            except Exception as e:
+                logger.error(f"Notification failed: {e}")
+        
+        asyncio.run_coroutine_threadsafe(send_notification(), bot.loop)
+        
+        return jsonify({"status": "stopped", "guild_id": guild_id})
+        
+    except Exception as e:
+        logger.error(f"Failed to stop audio: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/guild/<guild_id>/clear-queue', methods=['POST'])
+def api_admin_guild_clear_queue(guild_id):
+    """Clear queue without stopping current track"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        queue_cog = bot.get_cog('QueueCommands')
+        if not queue_cog or int(guild_id) not in queue_cog.queues:
+            return jsonify({"error": "No queue found for this server"}), 400
+        
+        queue_length = len(queue_cog.queues[int(guild_id)])
+        queue_cog.queues[int(guild_id)].clear()
+        
+        logger.info(f"Cleared queue ({queue_length} tracks) in guild {guild_id} via dashboard")
+        
+        return jsonify({
+            "status": "cleared",
+            "guild_id": guild_id,
+            "cleared_count": queue_length
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to clear queue: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/guild/<guild_id>/kick', methods=['POST'])
+def api_admin_guild_kick(guild_id):
+    """Kick bot from server (disconnect from voice)"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        connection = bot.voice_manager.get_connection(int(guild_id))
+        if not connection or not connection.is_connected():
+            return jsonify({"error": "Not connected to voice in this server"}), 400
+        
+        # Stop playback first
+        if connection.connection:
+            connection.connection.stop()
+        
+        # Clear queue
+        queue_cog = bot.get_cog('QueueCommands')
+        if queue_cog and int(guild_id) in queue_cog.queues:
+            queue_cog.queues[int(guild_id)].clear()
+        
+        # Cleanup player
+        if hasattr(bot, 'players') and int(guild_id) in bot.players:
+            player = bot.players[int(guild_id)]
+            if hasattr(player, 'cleanup'):
+                asyncio.run_coroutine_threadsafe(player.cleanup(), bot.loop)
+            del bot.players[int(guild_id)]
+        
+        # Disconnect from voice
+        asyncio.run_coroutine_threadsafe(connection.disconnect(), bot.loop)
+        
+        logger.info(f"Kicked bot from guild {guild_id} via dashboard")
+        
+        return jsonify({"status": "kicked", "guild_id": guild_id})
+        
+    except Exception as e:
+        logger.error(f"Failed to kick bot: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================== DISABLED CHANNELS MANAGEMENT ====================
+
+@app.route('/api/admin/disabled-channels', methods=['GET'])
+def api_admin_disabled_channels():
+    """Get all disabled channels across all guilds"""
+    try:
+        result = []
+        for guild_id, channels in _disabled_channels.items():
+            for channel_id, info in channels.items():
+                result.append({
+                    "guildId": guild_id,
+                    "channelId": channel_id,
+                    "channelName": info.get("channel_name", "Unknown"),
+                    "guildName": info.get("guild_name", "Unknown"),
+                    "disabledAt": info.get("disabled_at"),
+                    "disabledBy": info.get("disabled_by", "Admin"),
+                    "reason": info.get("reason", "No reason provided")
+                })
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Failed to get disabled channels: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/guild/<guild_id>/channels/<channel_id>/disable', methods=['POST', 'DELETE'])
+def api_admin_channel_disable(guild_id, channel_id):
+    """Enable or disable a channel"""
+    global _disabled_channels
+    bot = get_bot()
+    
+    try:
+        if request.method == 'POST':
+            # Disable channel
+            data = request.json or {}
+            reason = data.get('reason', 'Disabled by admin')
+            
+            # Get channel and guild names for display
+            channel_name = "Unknown"
+            guild_name = "Unknown"
+            if bot:
+                guild = bot.get_guild(int(guild_id))
+                if guild:
+                    guild_name = guild.name
+                    channel = guild.get_channel(int(channel_id))
+                    if channel:
+                        channel_name = channel.name
+            
+            if guild_id not in _disabled_channels:
+                _disabled_channels[guild_id] = {}
+            
+            _disabled_channels[guild_id][channel_id] = {
+                "channel_name": channel_name,
+                "guild_name": guild_name,
+                "disabled_at": datetime.now().isoformat(),
+                "disabled_by": "Admin",
+                "reason": reason
+            }
+            
+            logger.info(f"Channel {channel_id} in guild {guild_id} disabled: {reason}")
+            
+            return jsonify({
+                "status": "disabled",
+                "guild_id": guild_id,
+                "channel_id": channel_id
+            })
+            
+        elif request.method == 'DELETE':
+            # Enable channel
+            if guild_id in _disabled_channels and channel_id in _disabled_channels[guild_id]:
+                del _disabled_channels[guild_id][channel_id]
+                if not _disabled_channels[guild_id]:
+                    del _disabled_channels[guild_id]
+                logger.info(f"Channel {channel_id} in guild {guild_id} enabled")
+            
+            return jsonify({
+                "status": "enabled",
+                "guild_id": guild_id,
+                "channel_id": channel_id
+            })
+            
+    except Exception as e:
+        logger.error(f"Failed to toggle channel: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/guild/<guild_id>/ban-user/<user_id>', methods=['POST'])
+def api_admin_guild_ban_user(guild_id, user_id):
+    """Ban a user from server context (adds to global ban list)"""
+    global _banned_users
+    bot = get_bot()
+    
+    try:
+        data = request.json or {}
+        reason = data.get('reason', 'Banned by admin from server management')
+        duration = data.get('duration')
+        
+        # Get user info for display
+        user_name = f"User {user_id}"
+        if bot:
+            guild = bot.get_guild(int(guild_id))
+            if guild:
+                member = guild.get_member(int(user_id))
+                if member:
+                    user_name = member.name
+        
+        expires_at = None
+        if duration and duration != 'permanent':
+            expires_at = (datetime.now() + timedelta(days=int(duration))).isoformat()
+        
+        _banned_users[user_id] = {
+            "target_name": user_name,
+            "reason": reason,
+            "banned_at": datetime.now().isoformat(),
+            "expires_at": expires_at,
+            "banned_by": "Admin",
+            "from_guild": guild_id
+        }
+        
+        logger.info(f"User {user_id} ({user_name}) banned from guild {guild_id}: {reason}")
+        
+        return jsonify({
+            "status": "banned",
+            "user_id": user_id,
+            "user_name": user_name,
+            "guild_id": guild_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to ban user: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# Export disabled channels for bot to check
+def is_channel_disabled(guild_id: str, channel_id: str) -> dict:
+    """Check if a channel is disabled and return info if so"""
+    guild_channels = _disabled_channels.get(str(guild_id), {})
+    return guild_channels.get(str(channel_id))
 
 
 # ==================== WEBSOCKET EVENTS (DISABLED) ====================
