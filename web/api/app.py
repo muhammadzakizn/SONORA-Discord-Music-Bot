@@ -1355,6 +1355,150 @@ def api_admin_cache_clear():
         return jsonify({"error": str(e)}), 500
 
 
+# ==================== BOT CONTROL ENDPOINTS ====================
+
+@app.route('/api/admin/bot/restart', methods=['POST'])
+def api_admin_restart():
+    """Restart the bot gracefully"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        import sys
+        import os
+        
+        logger.warning("Restart requested via web dashboard")
+        
+        def delayed_restart():
+            time.sleep(1)
+            # Restart by re-executing the script
+            os.execv(sys.executable, ['python'] + sys.argv)
+        
+        restart_thread = threading.Thread(target=delayed_restart)
+        restart_thread.start()
+        
+        return jsonify({
+            "status": "restart_initiated",
+            "message": "Bot is restarting..."
+        })
+        
+    except Exception as e:
+        logger.error(f"Restart failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/bot/pause', methods=['POST'])
+def api_admin_pause():
+    """Pause all music playback across all voice connections"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        paused_count = 0
+        
+        for vc in bot.voice_clients:
+            if vc.is_playing():
+                vc.pause()
+                paused_count += 1
+        
+        logger.info(f"Paused playback in {paused_count} servers")
+        
+        return jsonify({
+            "status": "success",
+            "paused": paused_count,
+            "message": f"Paused playback in {paused_count} servers"
+        })
+        
+    except Exception as e:
+        logger.error(f"Pause failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/bot/resume', methods=['POST'])
+def api_admin_resume():
+    """Resume all paused music playback"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        resumed_count = 0
+        
+        for vc in bot.voice_clients:
+            if vc.is_paused():
+                vc.resume()
+                resumed_count += 1
+        
+        logger.info(f"Resumed playback in {resumed_count} servers")
+        
+        return jsonify({
+            "status": "success",
+            "resumed": resumed_count,
+            "message": f"Resumed playback in {resumed_count} servers"
+        })
+        
+    except Exception as e:
+        logger.error(f"Resume failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# Global maintenance mode state
+_maintenance_mode = {
+    "enabled": False,
+    "reason": "",
+    "started_at": None
+}
+
+
+@app.route('/api/admin/maintenance', methods=['GET', 'POST'])
+def api_admin_maintenance():
+    """Get or set maintenance mode"""
+    global _maintenance_mode
+    
+    if request.method == 'GET':
+        return jsonify({
+            "enabled": _maintenance_mode["enabled"],
+            "reason": _maintenance_mode["reason"],
+            "started_at": _maintenance_mode["started_at"]
+        })
+    
+    # POST - toggle maintenance mode
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        data = request.json or {}
+        enable = data.get('enable', not _maintenance_mode["enabled"])
+        reason = data.get('reason', 'Scheduled maintenance')
+        
+        if enable:
+            _maintenance_mode = {
+                "enabled": True,
+                "reason": reason,
+                "started_at": time.time()
+            }
+            logger.warning(f"Maintenance mode ENABLED: {reason}")
+        else:
+            _maintenance_mode = {
+                "enabled": False,
+                "reason": "",
+                "started_at": None
+            }
+            logger.info("Maintenance mode DISABLED")
+        
+        return jsonify({
+            "status": "success",
+            "maintenance_mode": _maintenance_mode["enabled"],
+            "message": f"Maintenance mode {'enabled' if enable else 'disabled'}"
+        })
+        
+    except Exception as e:
+        logger.error(f"Maintenance mode toggle failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 # ==================== WEBSOCKET EVENTS (DISABLED) ====================
 # SocketIO is disabled for server deployment

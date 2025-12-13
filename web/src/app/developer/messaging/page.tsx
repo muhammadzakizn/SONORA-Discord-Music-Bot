@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     MessageSquare,
     Send,
     Server,
-    Users,
+    Hash,
     CheckCircle,
     XCircle,
     RefreshCw,
+    ChevronDown,
     Image as ImageIcon,
     X,
 } from "lucide-react";
@@ -23,16 +24,61 @@ interface BroadcastResult {
     timestamp: string;
 }
 
+interface Channel {
+    id: string;
+    name: string;
+    type: string;
+    permissions: {
+        send_messages: boolean;
+        embed_links: boolean;
+    };
+}
+
+interface Guild {
+    id: string;
+    name: string;
+    icon: string | null;
+    channels: Channel[];
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+
 export default function MessagingPage() {
     const { isDark } = useSettings();
     const [target, setTarget] = useState<"all" | "specific">("all");
-    const [channelId, setChannelId] = useState("");
+    const [guilds, setGuilds] = useState<Guild[]>([]);
+    const [selectedGuild, setSelectedGuild] = useState<Guild | null>(null);
+    const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+    const [showGuildDropdown, setShowGuildDropdown] = useState(false);
+    const [showChannelDropdown, setShowChannelDropdown] = useState(false);
     const [title, setTitle] = useState("");
     const [message, setMessage] = useState("");
     const [image, setImage] = useState("");
     const [sending, setSending] = useState(false);
     const [result, setResult] = useState<BroadcastResult | null>(null);
     const [history, setHistory] = useState<BroadcastResult[]>([]);
+    const [loadingGuilds, setLoadingGuilds] = useState(false);
+
+    // Fetch guilds and channels on mount
+    useEffect(() => {
+        const fetchGuilds = async () => {
+            setLoadingGuilds(true);
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/guilds/channels`, {
+                    cache: 'no-store',
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setGuilds(data);
+                }
+            } catch (error) {
+                console.error('Failed to fetch guilds:', error);
+            }
+            setLoadingGuilds(false);
+        };
+
+        fetchGuilds();
+    }, []);
 
     const handleSend = async () => {
         if (!message.trim()) return;
@@ -41,8 +87,6 @@ export default function MessagingPage() {
         setResult(null);
 
         try {
-            const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
-
             const response = await fetch(`${API_BASE}/api/admin/broadcast`, {
                 method: 'POST',
                 headers: {
@@ -51,7 +95,8 @@ export default function MessagingPage() {
                 body: JSON.stringify({
                     message: title ? `**${title}**\n\n${message}` : message,
                     all_channels: target === "all",
-                    channel_ids: target === "specific" && channelId ? [channelId] : [],
+                    channel_ids: target === "specific" && selectedChannel ? [selectedChannel.id] : [],
+                    guild_ids: target === "specific" && selectedGuild && !selectedChannel ? [selectedGuild.id] : [],
                     mention_type: 'none',
                 }),
             });
@@ -97,6 +142,10 @@ export default function MessagingPage() {
         setSending(false);
     };
 
+    const availableChannels = selectedGuild?.channels.filter(ch =>
+        ch.type === 'text' && ch.permissions.send_messages
+    ) || [];
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -115,7 +164,7 @@ export default function MessagingPage() {
                         Broadcast Messaging
                     </h1>
                     <p className={isDark ? "text-white/50" : "text-gray-500"}>
-                        Send announcements to Discord servers
+                        Send announcements to Discord servers ({guilds.length} servers connected)
                     </p>
                 </div>
             </div>
@@ -150,7 +199,11 @@ export default function MessagingPage() {
                             </label>
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => setTarget("all")}
+                                    onClick={() => {
+                                        setTarget("all");
+                                        setSelectedGuild(null);
+                                        setSelectedChannel(null);
+                                    }}
                                     className={cn(
                                         "flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 border-2",
                                         target === "all"
@@ -161,7 +214,7 @@ export default function MessagingPage() {
                                     )}
                                 >
                                     <Server className="w-4 h-4" />
-                                    All Servers
+                                    All Servers ({guilds.length})
                                 </button>
                                 <button
                                     onClick={() => setTarget("specific")}
@@ -174,39 +227,211 @@ export default function MessagingPage() {
                                                 : "bg-gray-100 border-gray-200 text-gray-600 hover:border-gray-300"
                                     )}
                                 >
-                                    <Users className="w-4 h-4" />
+                                    <Hash className="w-4 h-4" />
                                     Specific Channel
                                 </button>
                             </div>
                         </div>
 
-                        {/* Channel ID (for specific) */}
+                        {/* Server & Channel Selection */}
                         <AnimatePresence>
                             {target === "specific" && (
                                 <motion.div
                                     initial={{ height: 0, opacity: 0 }}
                                     animate={{ height: "auto", opacity: 1 }}
                                     exit={{ height: 0, opacity: 0 }}
-                                    className="mb-4 overflow-hidden"
+                                    className="mb-4 overflow-hidden space-y-3"
                                 >
-                                    <label className={cn(
-                                        "block text-sm font-medium mb-2",
-                                        isDark ? "text-white/70" : "text-gray-700"
-                                    )}>
-                                        Channel ID
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={channelId}
-                                        onChange={(e) => setChannelId(e.target.value)}
-                                        placeholder="123456789012345678"
-                                        className={cn(
-                                            "w-full px-4 py-3 rounded-xl outline-none transition-colors font-mono text-sm",
-                                            isDark
-                                                ? "bg-zinc-800 border border-zinc-700 text-white focus:border-blue-500"
-                                                : "bg-gray-100 border border-gray-200 text-gray-900 focus:border-blue-500"
-                                        )}
-                                    />
+                                    {/* Server Dropdown */}
+                                    <div>
+                                        <label className={cn(
+                                            "block text-sm font-medium mb-2",
+                                            isDark ? "text-white/70" : "text-gray-700"
+                                        )}>
+                                            Select Server
+                                        </label>
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setShowGuildDropdown(!showGuildDropdown)}
+                                                className={cn(
+                                                    "w-full px-4 py-3 rounded-xl flex items-center justify-between border",
+                                                    isDark
+                                                        ? "bg-zinc-800 border-zinc-700 text-white"
+                                                        : "bg-gray-100 border-gray-200 text-gray-900"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    {selectedGuild ? (
+                                                        <>
+                                                            {selectedGuild.icon ? (
+                                                                <img
+                                                                    src={selectedGuild.icon}
+                                                                    alt=""
+                                                                    className="w-6 h-6 rounded-full"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                                                                    {selectedGuild.name.charAt(0)}
+                                                                </div>
+                                                            )}
+                                                            <span>{selectedGuild.name}</span>
+                                                        </>
+                                                    ) : (
+                                                        <span className={isDark ? "text-zinc-500" : "text-gray-500"}>
+                                                            {loadingGuilds ? "Loading servers..." : "Select a server"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <ChevronDown className={cn(
+                                                    "w-5 h-5 transition-transform",
+                                                    showGuildDropdown && "rotate-180"
+                                                )} />
+                                            </button>
+
+                                            {showGuildDropdown && (
+                                                <div className={cn(
+                                                    "absolute z-50 w-full mt-2 rounded-xl border shadow-lg max-h-60 overflow-y-auto",
+                                                    isDark
+                                                        ? "bg-zinc-800 border-zinc-700"
+                                                        : "bg-white border-gray-200"
+                                                )}>
+                                                    {guilds.map(guild => (
+                                                        <button
+                                                            key={guild.id}
+                                                            onClick={() => {
+                                                                setSelectedGuild(guild);
+                                                                setSelectedChannel(null);
+                                                                setShowGuildDropdown(false);
+                                                            }}
+                                                            className={cn(
+                                                                "w-full px-4 py-3 flex items-center gap-3 transition-colors",
+                                                                isDark
+                                                                    ? "hover:bg-zinc-700"
+                                                                    : "hover:bg-gray-100",
+                                                                selectedGuild?.id === guild.id && (isDark ? "bg-zinc-700" : "bg-gray-100")
+                                                            )}
+                                                        >
+                                                            {guild.icon ? (
+                                                                <img
+                                                                    src={guild.icon}
+                                                                    alt=""
+                                                                    className="w-8 h-8 rounded-full"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold">
+                                                                    {guild.name.charAt(0)}
+                                                                </div>
+                                                            )}
+                                                            <div className="text-left">
+                                                                <p className={cn(
+                                                                    "font-medium",
+                                                                    isDark ? "text-white" : "text-gray-900"
+                                                                )}>
+                                                                    {guild.name}
+                                                                </p>
+                                                                <p className={cn(
+                                                                    "text-xs",
+                                                                    isDark ? "text-zinc-500" : "text-gray-500"
+                                                                )}>
+                                                                    {guild.channels.filter(c => c.type === 'text').length} text channels
+                                                                </p>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Channel Dropdown */}
+                                    {selectedGuild && (
+                                        <div>
+                                            <label className={cn(
+                                                "block text-sm font-medium mb-2",
+                                                isDark ? "text-white/70" : "text-gray-700"
+                                            )}>
+                                                Select Channel
+                                            </label>
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setShowChannelDropdown(!showChannelDropdown)}
+                                                    className={cn(
+                                                        "w-full px-4 py-3 rounded-xl flex items-center justify-between border",
+                                                        isDark
+                                                            ? "bg-zinc-800 border-zinc-700 text-white"
+                                                            : "bg-gray-100 border-gray-200 text-gray-900"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Hash className="w-4 h-4 text-zinc-500" />
+                                                        <span>
+                                                            {selectedChannel?.name || "Select a channel (optional)"}
+                                                        </span>
+                                                    </div>
+                                                    <ChevronDown className={cn(
+                                                        "w-5 h-5 transition-transform",
+                                                        showChannelDropdown && "rotate-180"
+                                                    )} />
+                                                </button>
+
+                                                {showChannelDropdown && (
+                                                    <div className={cn(
+                                                        "absolute z-50 w-full mt-2 rounded-xl border shadow-lg max-h-60 overflow-y-auto",
+                                                        isDark
+                                                            ? "bg-zinc-800 border-zinc-700"
+                                                            : "bg-white border-gray-200"
+                                                    )}>
+                                                        {/* Option to send to all channels in guild */}
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedChannel(null);
+                                                                setShowChannelDropdown(false);
+                                                            }}
+                                                            className={cn(
+                                                                "w-full px-4 py-3 flex items-center gap-2 transition-colors border-b",
+                                                                isDark
+                                                                    ? "hover:bg-zinc-700 border-zinc-700"
+                                                                    : "hover:bg-gray-100 border-gray-200",
+                                                                !selectedChannel && (isDark ? "bg-zinc-700" : "bg-gray-100")
+                                                            )}
+                                                        >
+                                                            <Server className="w-4 h-4" />
+                                                            <span className="font-medium">All available channels in this server</span>
+                                                        </button>
+
+                                                        {availableChannels.map(channel => (
+                                                            <button
+                                                                key={channel.id}
+                                                                onClick={() => {
+                                                                    setSelectedChannel(channel);
+                                                                    setShowChannelDropdown(false);
+                                                                }}
+                                                                className={cn(
+                                                                    "w-full px-4 py-3 flex items-center gap-2 transition-colors",
+                                                                    isDark
+                                                                        ? "hover:bg-zinc-700"
+                                                                        : "hover:bg-gray-100",
+                                                                    selectedChannel?.id === channel.id && (isDark ? "bg-zinc-700" : "bg-gray-100")
+                                                                )}
+                                                            >
+                                                                <Hash className="w-4 h-4 text-zinc-500" />
+                                                                <span>{channel.name}</span>
+                                                            </button>
+                                                        ))}
+
+                                                        {availableChannels.length === 0 && (
+                                                            <p className={cn(
+                                                                "px-4 py-3 text-sm",
+                                                                isDark ? "text-zinc-500" : "text-gray-500"
+                                                            )}>
+                                                                No available channels with send permission
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -313,7 +538,7 @@ export default function MessagingPage() {
                             ) : result?.success ? (
                                 <>
                                     <CheckCircle className="w-5 h-5" />
-                                    Sent to {result.serversReached} servers!
+                                    Sent to {result.serversReached} channels!
                                 </>
                             ) : result?.success === false ? (
                                 <>
@@ -383,6 +608,15 @@ export default function MessagingPage() {
                                 </div>
                             )}
                         </div>
+                        {target === "specific" && selectedGuild && (
+                            <div className={cn(
+                                "mt-3 text-xs",
+                                isDark ? "text-white/40" : "text-gray-500"
+                            )}>
+                                Sending to: {selectedGuild.name}
+                                {selectedChannel && ` > #${selectedChannel.name}`}
+                            </div>
+                        )}
                     </motion.div>
 
                     {/* History */}
@@ -423,7 +657,7 @@ export default function MessagingPage() {
                                                 "text-sm",
                                                 isDark ? "text-white/70" : "text-gray-600"
                                             )}>
-                                                {item.serversReached} servers
+                                                {item.serversReached} channels
                                             </span>
                                         </div>
                                         <span className={cn(
