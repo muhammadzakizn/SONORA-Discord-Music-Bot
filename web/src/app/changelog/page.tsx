@@ -15,7 +15,7 @@ export default function ChangelogPage() {
                 <div className="max-w-4xl mx-auto px-4 py-4">
                     <div className="flex items-center justify-between">
                         <Link
-                            href="/explore"
+                            href="/"
                             className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
                         >
                             <ArrowLeft className="w-5 h-5" />
