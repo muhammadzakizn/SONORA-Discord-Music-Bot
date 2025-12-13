@@ -107,7 +107,8 @@ interface GuildDetails {
     }[];
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+// Use internal Next.js API proxy to Flask backend
+const API_BASE = '/api/bot';
 
 export default function ServersPage() {
     const { isDark } = useSettings();
@@ -160,7 +161,7 @@ export default function ServersPage() {
     const fetchGuilds = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/api/guilds`, {
+            const response = await fetch(`${API_BASE}/guilds`, {
                 cache: 'no-store',
             });
             if (response.ok) {
@@ -180,7 +181,7 @@ export default function ServersPage() {
         setGuildDetails(null); // Reset previous data
         try {
             console.log(`Fetching guild details for: ${guildId}`);
-            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/details`, {
+            const response = await fetch(`${API_BASE}/admin/guild/${guildId}/details`, {
                 cache: 'no-store',
             });
             console.log(`Response status: ${response.status}`);
@@ -227,7 +228,7 @@ export default function ServersPage() {
         setActionLoading("stop");
         setDropdownOpen(null);
         try {
-            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/stop-audio`, {
+            const response = await fetch(`${API_BASE}/admin/guild/${guildId}/stop-audio`, {
                 method: 'POST',
             });
             if (response.ok) {
@@ -248,7 +249,7 @@ export default function ServersPage() {
         setActionLoading("clear");
         setDropdownOpen(null);
         try {
-            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/clear-queue`, {
+            const response = await fetch(`${API_BASE}/admin/guild/${guildId}/clear-queue`, {
                 method: 'POST',
             });
             if (response.ok) {
@@ -280,7 +281,7 @@ export default function ServersPage() {
 
         setActionLoading("leave");
         try {
-            const response = await fetch(`${API_BASE}/api/admin/guild/${selectedGuild.id}/leave`, {
+            const response = await fetch(`${API_BASE}/admin/guild/${selectedGuild.id}/leave`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -314,7 +315,7 @@ export default function ServersPage() {
     const handleToggleChannel = async (guildId: string, channelId: string, isDisabled: boolean) => {
         setActionLoading(`channel-${channelId}`);
         try {
-            const response = await fetch(`${API_BASE}/api/admin/guild/${guildId}/channels/${channelId}/disable`, {
+            const response = await fetch(`${API_BASE}/admin/guild/${guildId}/channels/${channelId}/disable`, {
                 method: isDisabled ? 'DELETE' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: isDisabled ? undefined : JSON.stringify({ reason: 'Disabled from server management' }),
@@ -344,7 +345,7 @@ export default function ServersPage() {
 
         setActionLoading("ban");
         try {
-            const response = await fetch(`${API_BASE}/api/admin/guild/${selectedGuild.id}/ban-user/${banTarget.id}`, {
+            const response = await fetch(`${API_BASE}/admin/guild/${selectedGuild.id}/ban-user/${banTarget.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

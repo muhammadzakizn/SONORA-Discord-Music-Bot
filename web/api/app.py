@@ -2297,27 +2297,31 @@ def api_admin_users():
     try:
         users = []
         
-        # Collect unique users from guilds (limit to avoid performance issues)
-        seen_users = set()
-        max_users = 100
+        # Collect unique users from guilds (increased limit)
+        seen_users = {}  # {user_id: user_data}
+        max_users = 500  # Increased from 100
         
         for guild in bot.guilds:
             for member in guild.members:
                 if member.bot:
                     continue
-                if member.id in seen_users:
-                    continue
                 if len(seen_users) >= max_users:
                     break
                     
-                seen_users.add(member.id)
+                user_id_str = str(member.id)
+                
+                if user_id_str in seen_users:
+                    # Add this server to the user's server list
+                    if guild.name not in seen_users[user_id_str].get("servers", []):
+                        seen_users[user_id_str]["servers"].append(guild.name)
+                    continue
                 
                 # Check if banned
-                is_banned = str(member.id) in _banned_users
-                ban_info = _banned_users.get(str(member.id), {})
+                is_banned = user_id_str in _banned_users
+                ban_info = _banned_users.get(user_id_str, {})
                 
-                users.append({
-                    "id": str(member.id),
+                seen_users[user_id_str] = {
+                    "id": user_id_str,
                     "username": member.name,
                     "discriminator": member.discriminator or "0",
                     "avatar": str(member.avatar.url) if member.avatar else None,
@@ -2325,8 +2329,13 @@ def api_admin_users():
                     "banReason": ban_info.get("reason") if is_banned else None,
                     "banExpiry": ban_info.get("expires_at") if is_banned else None,
                     "totalPlays": 0,  # Would need activity tracking
-                    "lastActive": member.joined_at.isoformat() if member.joined_at else "Unknown"
-                })
+                    "lastActive": member.joined_at.isoformat() if member.joined_at else "Unknown",
+                    "serverName": guild.name,  # Primary server
+                    "servers": [guild.name]  # List of all servers
+                }
+        
+        # Convert dict to list
+        users = list(seen_users.values())
         
         return jsonify(users)
         

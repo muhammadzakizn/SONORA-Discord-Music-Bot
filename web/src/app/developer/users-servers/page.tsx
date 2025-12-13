@@ -46,7 +46,8 @@ interface ServerRecord {
     banReason?: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+// Use internal Next.js API proxy to Flask backend
+const API_BASE = '/api/bot';
 
 export default function UsersServersPage() {
     const { isDark } = useSettings();
@@ -78,12 +79,12 @@ export default function UsersServersPage() {
         setLoadingServers(true);
         try {
             // Fetch current servers from guilds API
-            const guildsResponse = await fetch(`${API_BASE}/api/guilds`, {
+            const guildsResponse = await fetch(`${API_BASE}/guilds`, {
                 cache: 'no-store',
             });
 
             // Fetch banned servers from bans API
-            const bansResponse = await fetch(`${API_BASE}/api/admin/bans`, {
+            const bansResponse = await fetch(`${API_BASE}/admin/bans`, {
                 cache: 'no-store',
             });
 
@@ -154,7 +155,7 @@ export default function UsersServersPage() {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/api/admin/users`, {
+            const response = await fetch(`${API_BASE}/admin/users`, {
                 cache: 'no-store',
             });
             if (response.ok) {
@@ -179,11 +180,11 @@ export default function UsersServersPage() {
 
         try {
             if (user.isBanned) {
-                await fetch(`${API_BASE}/api/admin/users/${userId}/ban`, {
+                await fetch(`${API_BASE}/admin/users/${userId}/ban`, {
                     method: 'DELETE',
                 });
             } else {
-                await fetch(`${API_BASE}/api/admin/users/${userId}/ban`, {
+                await fetch(`${API_BASE}/admin/users/${userId}/ban`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ reason: 'Manual ban' }),
