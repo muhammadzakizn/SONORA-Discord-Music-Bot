@@ -79,11 +79,12 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   // Basic CSP - allow self and required external resources
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.cdnfonts.com",
     "font-src 'self' https://fonts.gstatic.com https://fonts.cdnfonts.com data:",
     "img-src 'self' data: blob: https: http:",
-    "connect-src 'self' ws: wss: http://localhost:* https://localhost:* http://*.caliphdev.com:* https://*.caliphdev.com:* http://*:5000 https://*:5000 https://cdn.discordapp.com https://*.scdn.co https://*.mzstatic.com https://i.ytimg.com https://fonts.cdnfonts.com",
+    "connect-src 'self' ws: wss: http://localhost:* https://localhost:* http://*.caliphdev.com:* https://*.caliphdev.com:* http://*:5000 https://*:5000 https://cdn.discordapp.com https://*.scdn.co https://*.mzstatic.com https://i.ytimg.com https://fonts.cdnfonts.com https://challenges.cloudflare.com",
+    "frame-src 'self' https://challenges.cloudflare.com",
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
