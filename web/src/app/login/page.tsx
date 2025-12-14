@@ -1491,14 +1491,51 @@ function LoginPageContent() {
                         </>
                       ) : discordApprovalStatus === 'approved' ? (
                         <>
-                          <h2 className="text-2xl font-bold text-green-400 mb-2">Verified!</h2>
-                          <p className="text-white/60 text-sm text-center">
-                            Now setting up your authenticator app...
+                          <h2 className="text-2xl font-bold text-green-400 mb-2">Approved!</h2>
+                          <p className="text-white/60 text-sm text-center mb-4">
+                            Enter the 6-digit code from your Discord DM to continue.
                           </p>
-                          <div className="mt-4 flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin" />
-                            <span className="text-green-300 text-sm">Loading TOTP setup...</span>
+
+                          {/* Code Input */}
+                          <div className="flex gap-2 justify-center">
+                            {verifyCode.map((digit, index) => (
+                              <input
+                                key={index}
+                                ref={(el) => { verifyInputRefs.current[index] = el; }}
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={1}
+                                value={digit}
+                                onChange={(e) => handleVerifyInputChange(index, e.target.value)}
+                                onKeyDown={(e) => handleVerifyKeyDown(index, e)}
+                                className="w-12 h-14 text-center text-2xl font-bold bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all"
+                                disabled={verifyStatus === "verifying" || verifyStatus === "success"}
+                              />
+                            ))}
                           </div>
+
+                          {/* Error Message */}
+                          {verifyError && (
+                            <p className="text-red-400 text-sm mt-3">{verifyError}</p>
+                          )}
+
+                          {/* Verify Button */}
+                          <button
+                            onClick={handleVerifyCode}
+                            disabled={verifyCode.join("").length !== 6 || verifyStatus === "verifying"}
+                            className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          >
+                            {verifyStatus === "verifying" ? (
+                              <span className="flex items-center justify-center gap-2">
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                Verifying...
+                              </span>
+                            ) : verifyStatus === "success" ? (
+                              "Success! Loading..."
+                            ) : (
+                              "Verify Code"
+                            )}
+                          </button>
                         </>
                       ) : discordApprovalStatus === 'denied' ? (
                         <>
