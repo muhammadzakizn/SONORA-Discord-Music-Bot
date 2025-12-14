@@ -185,13 +185,15 @@ function randomChars(len: number): string {
 
 /**
  * Verify TOTP code during login
+ * Uses Next.js API proxy to reach Bot API (browser can't access BOT_API_URL directly)
  */
 export async function verifyTOTP(userId: number, code: string): Promise<MFAVerifyResponse> {
   try {
-    const response = await fetch(`${BOT_API_URL}/api/auth/mfa/totp/verify`, {
+    // Use Next.js proxy route - browser can't reach BOT_API_URL (localhost:5000) directly
+    const response = await fetch('/api/mfa/totp/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, code }),
+      body: JSON.stringify({ userId, code, isSetup: false }),
     });
     return await response.json();
   } catch (error) {
