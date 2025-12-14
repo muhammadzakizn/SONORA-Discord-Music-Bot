@@ -624,7 +624,7 @@ function LoginPageContent() {
       setVerifyStatus("error");
       setVerifyError("Network error. Please try again.");
     }
-  }, [user]);
+  }, [user, loginMode, authUser, totpSetup]);
 
   // Verify the entered code
   const handleVerifyCode = useCallback(async () => {
