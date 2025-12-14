@@ -1450,11 +1450,17 @@ function LoginPageContent() {
                             // For passkey, check if user has one registered
                             if (method.id === "passkey") {
                               console.log('[Passkey] Button clicked, supportsPasskey:', supportsPasskey);
+                              console.log('[Passkey] isSecureContext:', window.isSecureContext);
                               console.log('[Passkey] authUser:', authUser);
 
+                              // WebAuthn requires HTTPS or localhost
+                              if (!window.isSecureContext) {
+                                alert("Passkey requires HTTPS connection.\n\nYour current connection is not secure (HTTP).\nPlease access this site via HTTPS to use Passkey.");
+                                return;
+                              }
+
                               if (!supportsPasskey) {
-                                setVerifyError("Passkey not supported on this device");
-                                setLoginMode("mfa-select");
+                                alert("Passkey is not supported on this browser.\n\nPlease use a modern browser (Chrome, Safari, Edge) with biometric support.");
                                 return;
                               }
 
