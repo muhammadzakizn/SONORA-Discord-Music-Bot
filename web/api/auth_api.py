@@ -737,21 +737,26 @@ def send_discord_dm_code():
         data = request.json
         user_id = data.get('user_id')
         discord_id = data.get('discord_id')
-        device_info = data.get('device_info', 'Unknown device')
+        device_info_raw = data.get('device_info', 'Unknown device')
         
-        # Ensure device_info is a string (might be dict from proxy)
-        if isinstance(device_info, dict):
-            import json
-            device_info = json.dumps(device_info)
+        # Extract info from device_info dict if coming from Next.js proxy
+        if isinstance(device_info_raw, dict):
+            ip_address = device_info_raw.get('ip_address', 'Unknown')
+            user_agent = device_info_raw.get('user_agent', 'Unknown')
+            # Clean up IP address (take first if multiple)
+            if ip_address and ',' in ip_address:
+                ip_address = ip_address.split(',')[0].strip()
+            device_info = f"{user_agent}"
+        else:
+            device_info = device_info_raw
+            # Fallback to Flask request headers
+            ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+            if ip_address and ',' in ip_address:
+                ip_address = ip_address.split(',')[0].strip()
+            user_agent = request.headers.get('User-Agent', 'Unknown')
         
         if not user_id or not discord_id:
             return jsonify({'error': 'User ID and Discord ID required'}), 400
-        
-        # Get client info
-        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if ip_address:
-            ip_address = ip_address.split(',')[0].strip()
-        user_agent = request.headers.get('User-Agent', 'Unknown')
         
         db = ensure_db_connected()
         
