@@ -409,13 +409,15 @@ export async function checkMFAApprovalStatus(requestId: string): Promise<Approva
 
 /**
  * Verify Discord DM code
+ * Uses Next.js API proxy to reach bot API
  */
 export async function verifyDiscordDMCode(
   userId: number | string,
   code: string
 ): Promise<MFAVerifyResponse> {
   try {
-    const response = await fetch(`${BOT_API_URL}/api/auth/mfa/discord/verify`, {
+    // Use relative URL to go through Next.js proxy
+    const response = await fetch('/api/mfa/discord/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, code }),
