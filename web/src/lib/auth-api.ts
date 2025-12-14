@@ -364,6 +364,7 @@ interface ApprovalStatusResponse {
 /**
  * Send Discord DM approval request with buttons
  * Returns request_id for polling status (does NOT send code directly)
+ * Uses Next.js API proxy to reach bot API
  */
 export async function sendDiscordDMCode(
   userId: number | string,
@@ -371,7 +372,8 @@ export async function sendDiscordDMCode(
   deviceInfo?: string
 ): Promise<DiscordSendResponse> {
   try {
-    const response = await fetch(`${BOT_API_URL}/api/auth/mfa/discord/send`, {
+    // Use relative URL to go through Next.js proxy (server-side can reach localhost:5000)
+    const response = await fetch('/api/mfa/discord/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -390,10 +392,12 @@ export async function sendDiscordDMCode(
 /**
  * Check MFA approval status
  * Poll this every 1-2 seconds after sendDiscordDMCode
+ * Uses Next.js API proxy to reach bot API
  */
 export async function checkMFAApprovalStatus(requestId: string): Promise<ApprovalStatusResponse> {
   try {
-    const response = await fetch(`${BOT_API_URL}/api/auth/mfa/discord/status?request_id=${requestId}`);
+    // Use relative URL to go through Next.js proxy
+    const response = await fetch(`/api/mfa/discord/status?request_id=${requestId}`);
     return await response.json();
   } catch (error) {
     console.error('Check MFA approval status error:', error);
