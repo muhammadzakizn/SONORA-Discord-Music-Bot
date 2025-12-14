@@ -721,6 +721,11 @@ def send_discord_dm_code():
         discord_id = data.get('discord_id')
         device_info = data.get('device_info', 'Unknown device')
         
+        # Ensure device_info is a string (might be dict from proxy)
+        if isinstance(device_info, dict):
+            import json
+            device_info = json.dumps(device_info)
+        
         if not user_id or not discord_id:
             return jsonify({'error': 'User ID and Discord ID required'}), 400
         
