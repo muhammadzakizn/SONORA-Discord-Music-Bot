@@ -81,7 +81,7 @@ const DiscordIcon = () => (
   </svg>
 );
 
-type LoginMode = "select" | "admin" | "terms" | "developer" | "mfa-select" | "mfa-verify" | "mfa-setup" | "mfa-discord-first" | "backup-codes";
+type LoginMode = "select" | "admin" | "terms" | "developer" | "mfa-select" | "mfa-verify" | "mfa-setup" | "mfa-discord-first" | "backup-codes" | "passkey-setup";
 type MFAMethod = "discord" | "totp" | "passkey" | "email";
 
 const MFA_METHODS = [
@@ -278,6 +278,8 @@ function LoginPageContent() {
   const [mfaSetupStep, setMfaSetupStep] = useState<'choice' | 'passkey' | 'totp'>('choice');
   // Track which MFA methods are complete
   const [totpSetupComplete, setTotpSetupComplete] = useState(false);
+  // Track if user already has passkey (for existing user flow)
+  const [hasPasskey, setHasPasskey] = useState(false);
 
   // Detect ?verify=true from OAuth callback
   // Handle session from query param (workaround for SameSite cookie issues)
@@ -1442,8 +1444,47 @@ function LoginPageContent() {
                           key={method.id}
                           whileHover={{ scale: 1.02, y: -1 }}
                           whileTap={{ scale: 0.98 }}
-                          onClick={() => {
+                          onClick={async () => {
                             setSelectedMfaMethod(method.id);
+
+                            // For passkey, check if user has one registered
+                            if (method.id === "passkey") {
+                              if (!supportsPasskey) {
+                                setVerifyError("Passkey not supported on this device");
+                                return;
+                              }
+
+                              // Check if user has passkey registered
+                              const userId = authUser?.id;
+                              if (userId) {
+                                try {
+                                  const response = await fetch("/api/mfa/passkey/authenticate", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ user_id: userId }),
+                                  });
+
+                                  if (response.ok) {
+                                    // User has passkey, go to verify (which will trigger handlePasskeyVerify)
+                                    setHasPasskey(true);
+                                    setLoginMode("mfa-verify");
+                                    // Trigger passkey verification immediately
+                                    setTimeout(() => handlePasskeyVerify(), 500);
+                                  } else {
+                                    // No passkey registered, go to setup
+                                    setHasPasskey(false);
+                                    setLoginMode("passkey-setup");
+                                  }
+                                } catch (error) {
+                                  console.error("[Passkey] Check failed:", error);
+                                  setLoginMode("passkey-setup");
+                                }
+                              } else {
+                                setLoginMode("passkey-setup");
+                              }
+                              return;
+                            }
+
                             if (method.id === "discord") {
                               sendVerificationCode();
                             }
@@ -1952,6 +1993,181 @@ function LoginPageContent() {
                             {verifyStatus === "verifying" ? "Verifying..." : "Verify & Activate"}
                           </motion.button>
                         </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* Passkey Setup for Existing Users */}
+                {loginMode === "passkey-setup" && user && (
+                  <motion.div
+                    key="passkey-setup"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative z-10"
+                  >
+                    {/* Header */}
+                    <div className="flex flex-col items-center mb-6">
+                      <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                        <Fingerprint className="w-8 h-8 text-white" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-2">Setup Passkey</h2>
+                      <p className="text-white/60 text-sm text-center">
+                        You don&apos;t have a passkey yet. Set one up to use fingerprint or Face ID for login.
+                      </p>
+                    </div>
+
+                    {/* User Info */}
+                    <div className="flex items-center gap-4 p-4 mb-6 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
+                      <Image
+                        src={getAvatarUrl(user)}
+                        alt={user.username}
+                        width={48}
+                        height={48}
+                        className="rounded-full"
+                      />
+                      <div>
+                        <p className="font-medium text-white">{user.username}</p>
+                        <p className="text-sm text-white/50">Setting up passkey</p>
+                      </div>
+                    </div>
+
+                    {/* Error Message */}
+                    {passkeySetupError && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-2 justify-center text-rose-400 text-sm mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        <span>{passkeySetupError}</span>
+                      </motion.div>
+                    )}
+
+                    {/* Setup Success */}
+                    {passkeySetupComplete ? (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-center py-8"
+                      >
+                        <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-400" />
+                        <h3 className="text-xl font-bold text-green-400 mb-2">Passkey Created!</h3>
+                        <p className="text-white/60 mb-4">Redirecting to dashboard...</p>
+                      </motion.div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Benefits */}
+                        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                          <p className="text-sm text-blue-300">
+                            <strong>Benefits:</strong><br />
+                            - Fast login with fingerprint/Face ID<br />
+                            - More secure than passwords<br />
+                            - Works offline
+                          </p>
+                        </div>
+
+                        {/* Setup Button */}
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={async () => {
+                            setIsSettingUpPasskey(true);
+                            setPasskeySetupError("");
+
+                            try {
+                              const userId = authUser?.id;
+                              if (!userId) throw new Error("User not found");
+
+                              // Get registration options
+                              const optionsResponse = await fetch("/api/mfa/passkey/register", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  user_id: userId,
+                                  username: user.username
+                                }),
+                              });
+
+                              if (!optionsResponse.ok) {
+                                const error = await optionsResponse.json();
+                                throw new Error(error.error || "Failed to get options");
+                              }
+
+                              const options = await optionsResponse.json();
+
+                              // Start registration
+                              const credential = await startRegistration({ optionsJSON: options });
+
+                              // Verify with server
+                              const verifyResponse = await fetch("/api/mfa/passkey/register/complete", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  user_id: userId,
+                                  credential: credential,
+                                  device_name: navigator.userAgent.includes('Mac') ? 'Mac' :
+                                    navigator.userAgent.includes('Windows') ? 'Windows' :
+                                      navigator.userAgent.includes('iPhone') ? 'iPhone' :
+                                        navigator.userAgent.includes('Android') ? 'Android' : 'Device'
+                                }),
+                              });
+
+                              if (!verifyResponse.ok) {
+                                const error = await verifyResponse.json();
+                                throw new Error(error.error || "Failed to register");
+                              }
+
+                              setPasskeySetupComplete(true);
+                              setIsSettingUpPasskey(false);
+
+                              // Set MFA verified cookie
+                              setMfaVerifiedCookie();
+
+                              // Go to admin
+                              setTimeout(() => {
+                                setIsZooming(true);
+                              }, 1000);
+                              setTimeout(() => {
+                                router.push("/admin");
+                              }, 2500);
+
+                            } catch (error: any) {
+                              console.error("[Passkey] Setup error:", error);
+                              setPasskeySetupError(error.message || "Failed to setup passkey");
+                              setIsSettingUpPasskey(false);
+                            }
+                          }}
+                          disabled={isSettingUpPasskey}
+                          className={cn(
+                            "w-full py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-3",
+                            isSettingUpPasskey
+                              ? "bg-white/[0.08] text-white/40 cursor-not-allowed"
+                              : "bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:opacity-90 shadow-[0_4px_24px_rgba(59,130,246,0.4)]"
+                          )}
+                        >
+                          {isSettingUpPasskey ? (
+                            <>
+                              <RefreshCw className="w-5 h-5 animate-spin" />
+                              Setting up...
+                            </>
+                          ) : (
+                            <>
+                              <Fingerprint className="w-5 h-5" />
+                              Setup Passkey
+                            </>
+                          )}
+                        </motion.button>
+
+                        {/* Back button */}
+                        <button
+                          onClick={() => setLoginMode("mfa-select")}
+                          className="w-full py-3 rounded-xl font-semibold text-white/60 hover:text-white transition-colors"
+                        >
+                          ← Choose Different Method
+                        </button>
                       </div>
                     )}
                   </motion.div>
