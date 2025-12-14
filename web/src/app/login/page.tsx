@@ -257,7 +257,7 @@ function LoginPageContent() {
   const [approvalCountdown, setApprovalCountdown] = useState(15);
   const approvalPollingRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
+  const hasSentApprovalRequest = useRef(false);
 
   // Detect ?verify=true from OAuth callback
   // Handle session from query param (workaround for SameSite cookie issues)
@@ -540,37 +540,11 @@ function LoginPageContent() {
               if (approvalPollingRef.current) clearInterval(approvalPollingRef.current);
               setDiscordApprovalStatus('approved');
 
-              // Different behavior for discord-first vs mfa-verify
-              if (loginMode === 'mfa-discord-first') {
-                // New user - proceed to TOTP setup
-                console.log('[MFA] Discord approved, proceeding to TOTP setup');
-                setTimeout(() => {
-                  if (totpSetup) {
-                    setLoginMode('mfa-setup');
-                  } else {
-                    // TOTP not ready yet, wait and retry
-                    console.log('[MFA] Waiting for TOTP setup...');
-                    const checkTotp = setInterval(() => {
-                      if (totpSetup) {
-                        clearInterval(checkTotp);
-                        setLoginMode('mfa-setup');
-                      }
-                    }, 500);
-                    // Timeout after 10s
-                    setTimeout(() => {
-                      clearInterval(checkTotp);
-                      if (!totpSetup) {
-                        console.error('[MFA] TOTP setup failed to load');
-                        setVerifyError('Failed to load authenticator setup. Please try again.');
-                      }
-                    }, 10000);
-                  }
-                }, 1500);
-              } else {
-                // Existing user - ready for code input
-                setVerifyStatus("idle");
-                setTimeout(() => verifyInputRefs.current[0]?.focus(), 100);
-              }
+              // After approval, user needs to enter the verification code from DM
+              // This applies to both new users (mfa-discord-first) and existing users (mfa-verify)
+              console.log('[MFA] Discord approved, showing code input');
+              setVerifyStatus("idle");
+              setTimeout(() => verifyInputRefs.current[0]?.focus(), 100);
             } else if (status.status === 'denied') {
               // Denied! Go back to login
               if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
@@ -626,8 +600,9 @@ function LoginPageContent() {
 
   // Auto-trigger Discord DM send when entering mfa-discord-first mode
   useEffect(() => {
-    if (loginMode === 'mfa-discord-first' && user && discordApprovalStatus === 'idle') {
+    if (loginMode === 'mfa-discord-first' && user && discordApprovalStatus === 'idle' && !hasSentApprovalRequest.current) {
       console.log('[MFA] Mode is mfa-discord-first, triggering sendVerificationCode');
+      hasSentApprovalRequest.current = true;
       sendVerificationCode();
     }
   }, [loginMode, user, discordApprovalStatus, sendVerificationCode]);
@@ -644,20 +619,49 @@ function LoginPageContent() {
 
     try {
       // If in MFA verify mode with Discord selected, use MFA API
-      if (loginMode === 'mfa-verify' && selectedMfaMethod === 'discord') {
+      if ((loginMode === 'mfa-verify' || loginMode === 'mfa-discord-first') && selectedMfaMethod === 'discord') {
         const userId = authUser?.id || user.id;
         const result = await verifyDiscordDMCode(userId, fullCode);
 
         if (result.success) {
           setVerifyStatus("success");
-          // Start zoom animation after brief success message
-          setTimeout(() => {
-            setIsZooming(true);
-          }, 1000);
-          // Redirect after zoom animation fills screen completely
-          setTimeout(() => {
-            router.push("/admin");
-          }, 2500);
+
+          if (loginMode === 'mfa-discord-first') {
+            // New user - proceed to TOTP setup after code verified
+            console.log('[MFA] Discord code verified, proceeding to TOTP setup');
+            setTimeout(() => {
+              if (totpSetup) {
+                setLoginMode('mfa-setup');
+              } else {
+                // Wait for TOTP setup to load
+                console.log('[MFA] Waiting for TOTP setup...');
+                const checkTotp = setInterval(() => {
+                  if (totpSetup) {
+                    clearInterval(checkTotp);
+                    setLoginMode('mfa-setup');
+                  }
+                }, 500);
+                // Timeout after 10s
+                setTimeout(() => {
+                  clearInterval(checkTotp);
+                  if (!totpSetup) {
+                    console.error('[MFA] TOTP setup failed to load');
+                    setVerifyError('Failed to load authenticator setup. Please try again.');
+                  }
+                }, 10000);
+              }
+            }, 1500);
+          } else {
+            // Existing user - go to admin
+            // Start zoom animation after brief success message
+            setTimeout(() => {
+              setIsZooming(true);
+            }, 1000);
+            // Redirect after zoom animation fills screen completely
+            setTimeout(() => {
+              router.push("/admin");
+            }, 2500);
+          }
         } else {
           setVerifyStatus("error");
           setVerifyError(result.error || "Invalid code");
