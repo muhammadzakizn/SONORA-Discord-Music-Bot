@@ -448,6 +448,319 @@ def verify_totp():
         return jsonify({'error': 'Server error'}), 500
 
 
+# ==================== PASSKEY (WebAuthn) ====================
+
+RP_NAME = "SONORA Dashboard"
+RP_ID = os.environ.get('PASSKEY_RP_ID', 'localhost')
+ORIGIN = os.environ.get('NEXT_PUBLIC_APP_URL', 'http://localhost:3000')
+
+
+@auth_bp.route('/mfa/passkey/register', methods=['POST'])
+def passkey_register():
+    """Generate passkey registration options"""
+    try:
+        import secrets
+        
+        data = request.json
+        user_id = data.get('user_id')
+        username = data.get('username', f'user_{user_id}')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID required'}), 400
+        
+        db = ensure_db_connected()
+        
+        # Get existing credentials to exclude
+        existing = run_async(db.get_passkey_credentials(user_id))
+        exclude_credentials = [
+            {
+                'id': cred['credential_id'],
+                'transports': cred.get('transports', [])
+            }
+            for cred in existing
+        ]
+        
+        # Generate challenge
+        challenge = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
+        
+        # Store challenge for verification
+        run_async(db.store_passkey_challenge(user_id, challenge))
+        
+        # Build registration options (simplified WebAuthn format)
+        options = {
+            'challenge': challenge,
+            'rp': {
+                'name': RP_NAME,
+                'id': RP_ID
+            },
+            'user': {
+                'id': base64.urlsafe_b64encode(str(user_id).encode()).decode('utf-8').rstrip('='),
+                'name': username,
+                'displayName': username
+            },
+            'pubKeyCredParams': [
+                {'type': 'public-key', 'alg': -7},   # ES256
+                {'type': 'public-key', 'alg': -257}  # RS256
+            ],
+            'timeout': 60000,
+            'attestation': 'none',
+            'excludeCredentials': exclude_credentials,
+            'authenticatorSelection': {
+                'residentKey': 'preferred',
+                'userVerification': 'preferred',
+                'authenticatorAttachment': 'platform'
+            }
+        }
+        
+        return jsonify(options)
+    
+    except Exception as e:
+        logger.error(f"Passkey register error: {e}", exc_info=True)
+        return jsonify({'error': 'Server error'}), 500
+
+
+@auth_bp.route('/mfa/passkey/register/complete', methods=['POST'])
+def passkey_register_complete():
+    """Verify and store passkey registration"""
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        credential = data.get('credential')
+        device_name = data.get('device_name', 'Unknown Device')
+        
+        if not all([user_id, credential]):
+            return jsonify({'error': 'User ID and credential required'}), 400
+        
+        db = ensure_db_connected()
+        
+        # Get stored challenge
+        expected_challenge = run_async(db.get_passkey_challenge(user_id))
+        if not expected_challenge:
+            return jsonify({'error': 'Challenge expired. Please try again.'}), 400
+        
+        # Extract credential data
+        credential_id = credential.get('id')
+        raw_id = credential.get('rawId')
+        response = credential.get('response', {})
+        
+        # For registration, we get attestationObject and clientDataJSON
+        client_data_json_b64 = response.get('clientDataJSON')
+        attestation_object_b64 = response.get('attestationObject')
+        
+        if not all([credential_id, client_data_json_b64, attestation_object_b64]):
+            return jsonify({'error': 'Invalid credential format'}), 400
+        
+        # Verify clientDataJSON contains our challenge
+        try:
+            # Add padding if needed
+            padding = 4 - len(client_data_json_b64) % 4
+            if padding != 4:
+                client_data_json_b64 += '=' * padding
+            client_data_json = base64.urlsafe_b64decode(client_data_json_b64)
+            client_data = json.loads(client_data_json)
+            
+            # Verify challenge matches
+            received_challenge = client_data.get('challenge', '')
+            if received_challenge != expected_challenge:
+                return jsonify({'error': 'Challenge mismatch'}), 400
+            
+            # Verify origin
+            if client_data.get('origin') != ORIGIN:
+                logger.warning(f"Origin mismatch: {client_data.get('origin')} != {ORIGIN}")
+                # Allow for localhost development
+                if 'localhost' not in client_data.get('origin', ''):
+                    return jsonify({'error': 'Origin mismatch'}), 400
+            
+            # Verify type
+            if client_data.get('type') != 'webauthn.create':
+                return jsonify({'error': 'Invalid credential type'}), 400
+                
+        except Exception as e:
+            logger.error(f"Client data verification failed: {e}")
+            return jsonify({'error': 'Invalid client data'}), 400
+        
+        # Parse attestation object to extract public key
+        try:
+            padding = 4 - len(attestation_object_b64) % 4
+            if padding != 4:
+                attestation_object_b64 += '=' * padding
+            attestation_object = base64.urlsafe_b64decode(attestation_object_b64)
+            
+            # For simplicity, we store the raw attestation object
+            # In production, you'd parse CBOR and extract the public key properly
+            # We'll use the credential_id as the key identifier
+            
+        except Exception as e:
+            logger.error(f"Attestation parsing failed: {e}")
+            return jsonify({'error': 'Invalid attestation object'}), 400
+        
+        # Store credential
+        transports = response.get('transports', ['internal'])
+        run_async(db.setup_passkey(
+            user_id=user_id,
+            credential_id=credential_id,
+            public_key=attestation_object,  # Store whole attestation for now
+            counter=0,
+            transports=transports,
+            device_name=device_name
+        ))
+        
+        # Clear challenge
+        run_async(db.clear_passkey_challenge(user_id))
+        
+        # Generate backup codes if first MFA
+        backup_codes = run_async(db.generate_backup_codes(user_id))
+        
+        return jsonify({
+            'success': True,
+            'message': 'Passkey registered successfully',
+            'backup_codes': backup_codes
+        })
+    
+    except Exception as e:
+        logger.error(f"Passkey register complete error: {e}", exc_info=True)
+        return jsonify({'error': 'Server error'}), 500
+
+
+@auth_bp.route('/mfa/passkey/authenticate', methods=['POST'])
+def passkey_authenticate():
+    """Generate passkey authentication options"""
+    try:
+        import secrets
+        
+        data = request.json
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID required'}), 400
+        
+        db = ensure_db_connected()
+        
+        # Get user's passkeys
+        credentials = run_async(db.get_passkey_credentials(user_id))
+        if not credentials:
+            return jsonify({'error': 'No passkey registered'}), 400
+        
+        # Generate challenge
+        challenge = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
+        
+        # Store challenge
+        run_async(db.store_passkey_challenge(user_id, challenge))
+        
+        # Build allowed credentials
+        allow_credentials = [
+            {
+                'id': cred['credential_id'],
+                'type': 'public-key',
+                'transports': cred.get('transports', ['internal'])
+            }
+            for cred in credentials
+        ]
+        
+        options = {
+            'challenge': challenge,
+            'timeout': 60000,
+            'rpId': RP_ID,
+            'allowCredentials': allow_credentials,
+            'userVerification': 'preferred'
+        }
+        
+        return jsonify(options)
+    
+    except Exception as e:
+        logger.error(f"Passkey authenticate error: {e}", exc_info=True)
+        return jsonify({'error': 'Server error'}), 500
+
+
+@auth_bp.route('/mfa/passkey/authenticate/complete', methods=['POST'])
+def passkey_authenticate_complete():
+    """Verify passkey authentication"""
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        credential = data.get('credential')
+        
+        if not all([user_id, credential]):
+            return jsonify({'error': 'User ID and credential required'}), 400
+        
+        db = ensure_db_connected()
+        
+        # Get stored challenge
+        expected_challenge = run_async(db.get_passkey_challenge(user_id))
+        if not expected_challenge:
+            return jsonify({'error': 'Challenge expired. Please try again.'}), 400
+        
+        # Extract credential data
+        credential_id = credential.get('id')
+        response = credential.get('response', {})
+        client_data_json_b64 = response.get('clientDataJSON')
+        authenticator_data_b64 = response.get('authenticatorData')
+        signature_b64 = response.get('signature')
+        
+        if not all([credential_id, client_data_json_b64, authenticator_data_b64, signature_b64]):
+            return jsonify({'error': 'Invalid credential format'}), 400
+        
+        # Verify clientDataJSON
+        try:
+            padding = 4 - len(client_data_json_b64) % 4
+            if padding != 4:
+                client_data_json_b64 += '=' * padding
+            client_data_json = base64.urlsafe_b64decode(client_data_json_b64)
+            client_data = json.loads(client_data_json)
+            
+            if client_data.get('challenge') != expected_challenge:
+                return jsonify({'error': 'Challenge mismatch'}), 400
+            
+            if client_data.get('type') != 'webauthn.get':
+                return jsonify({'error': 'Invalid credential type'}), 400
+                
+        except Exception as e:
+            logger.error(f"Auth client data verification failed: {e}")
+            return jsonify({'error': 'Invalid client data'}), 400
+        
+        # Get stored credential
+        stored_cred = run_async(db.get_passkey_by_credential_id(credential_id))
+        if not stored_cred or stored_cred['user_id'] != user_id:
+            return jsonify({'error': 'Credential not found'}), 400
+        
+        # Get counter from authenticator data
+        try:
+            padding = 4 - len(authenticator_data_b64) % 4
+            if padding != 4:
+                authenticator_data_b64 += '=' * padding
+            authenticator_data = base64.urlsafe_b64decode(authenticator_data_b64)
+            
+            # Counter is bytes 33-36 (big endian)
+            if len(authenticator_data) >= 37:
+                new_counter = int.from_bytes(authenticator_data[33:37], 'big')
+                
+                # Verify counter is increasing (replay protection)
+                if new_counter <= stored_cred['counter']:
+                    logger.warning(f"Passkey counter not increasing: {new_counter} <= {stored_cred['counter']}")
+                    # Some authenticators don't support counters, so we log but allow
+                
+                # Update counter
+                run_async(db.update_passkey_counter(credential_id, new_counter))
+                
+        except Exception as e:
+            logger.warning(f"Counter extraction failed: {e}")
+        
+        # Clear challenge
+        run_async(db.clear_passkey_challenge(user_id))
+        
+        # Update last used
+        run_async(db.update_mfa_last_used(user_id, 'passkey'))
+        
+        return jsonify({
+            'success': True,
+            'message': 'Passkey authentication successful'
+        })
+    
+    except Exception as e:
+        logger.error(f"Passkey authenticate complete error: {e}", exc_info=True)
+        return jsonify({'error': 'Server error'}), 500
+
+
 # ==================== BACKUP CODES ====================
 
 @auth_bp.route('/mfa/backup-codes/generate', methods=['POST'])

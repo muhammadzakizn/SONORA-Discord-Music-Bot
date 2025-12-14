@@ -710,6 +710,184 @@ class AuthDatabaseManager:
         return cursor.lastrowid
     
     
+    # ==================== PASSKEY (WebAuthn) ====================
+    
+    async def store_passkey_challenge(self, user_id: int, challenge: str) -> None:
+        """Store passkey challenge for verification"""
+        # Store in verification_codes table with short TTL
+        code_hash = self.crypto.hash_code(challenge[:32])  # Hash part of challenge
+        await self.db.execute("""
+            DELETE FROM verification_codes WHERE user_id = ? AND code_type = 'passkey_challenge'
+        """, (user_id,))
+        await self.db.execute("""
+            INSERT INTO verification_codes (user_id, code_hash, code_type, expires_at)
+            VALUES (?, ?, 'passkey_challenge', datetime('now', '+5 minutes'))
+        """, (user_id, self.crypto.encrypt(challenge)))
+        await self.db.commit()
+    
+    async def get_passkey_challenge(self, user_id: int) -> Optional[str]:
+        """Get stored passkey challenge"""
+        async with self.db.execute("""
+            SELECT code_hash FROM verification_codes 
+            WHERE user_id = ? AND code_type = 'passkey_challenge' 
+            AND expires_at > datetime('now')
+        """, (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                try:
+                    return self.crypto.decrypt(row[0])
+                except:
+                    return None
+            return None
+    
+    async def clear_passkey_challenge(self, user_id: int) -> None:
+        """Clear passkey challenge after use"""
+        await self.db.execute("""
+            DELETE FROM verification_codes WHERE user_id = ? AND code_type = 'passkey_challenge'
+        """, (user_id,))
+        await self.db.commit()
+    
+    async def setup_passkey(
+        self,
+        user_id: int,
+        credential_id: str,
+        public_key: bytes,
+        counter: int,
+        transports: Optional[List[str]] = None,
+        device_name: Optional[str] = None
+    ) -> int:
+        """
+        Store passkey credential for user
+        
+        Args:
+            user_id: User ID
+            credential_id: WebAuthn credential ID (base64url)
+            public_key: Public key bytes
+            counter: Authenticator counter
+            transports: Transport hints
+            device_name: Optional device name
+            
+        Returns:
+            Passkey ID
+        """
+        import base64
+        
+        # Encrypt public key for storage
+        encrypted_data = self.crypto.encrypt(json.dumps({
+            'public_key': base64.b64encode(public_key).decode('utf-8'),
+            'transports': transports or []
+        }))
+        
+        cursor = await self.db.execute("""
+            INSERT INTO passkey_credentials (user_id, credential_id, public_key, counter, device_name)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, credential_id, encrypted_data, counter, device_name or 'Unknown Device'))
+        
+        # Add to mfa_methods table
+        await self.add_mfa_method(user_id, 'passkey', credential_id, is_primary=False)
+        
+        await self.db.commit()
+        
+        await self._log_security_event(
+            user_id=user_id,
+            event_type='passkey_registered',
+            success=True,
+            metadata={'device_name': device_name}
+        )
+        
+        return cursor.lastrowid
+    
+    async def get_passkey_credentials(self, user_id: int) -> List[Dict]:
+        """Get all passkey credentials for user"""
+        import base64
+        
+        async with self.db.execute("""
+            SELECT id, credential_id, public_key, counter, device_name, created_at, last_used
+            FROM passkey_credentials WHERE user_id = ?
+        """, (user_id,)) as cursor:
+            rows = await cursor.fetchall()
+            
+            result = []
+            for row in rows:
+                try:
+                    decrypted = json.loads(self.crypto.decrypt(row[2]))
+                    result.append({
+                        'id': row[0],
+                        'credential_id': row[1],
+                        'public_key': base64.b64decode(decrypted['public_key']),
+                        'transports': decrypted.get('transports', []),
+                        'counter': row[3],
+                        'device_name': row[4],
+                        'created_at': row[5],
+                        'last_used': row[6]
+                    })
+                except:
+                    continue
+            return result
+    
+    async def get_passkey_by_credential_id(self, credential_id: str) -> Optional[Dict]:
+        """Get passkey by credential ID"""
+        import base64
+        
+        async with self.db.execute("""
+            SELECT id, user_id, credential_id, public_key, counter, device_name
+            FROM passkey_credentials WHERE credential_id = ?
+        """, (credential_id,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                try:
+                    decrypted = json.loads(self.crypto.decrypt(row[3]))
+                    return {
+                        'id': row[0],
+                        'user_id': row[1],
+                        'credential_id': row[2],
+                        'public_key': base64.b64decode(decrypted['public_key']),
+                        'transports': decrypted.get('transports', []),
+                        'counter': row[4],
+                        'device_name': row[5]
+                    }
+                except:
+                    return None
+            return None
+    
+    async def update_passkey_counter(self, credential_id: str, new_counter: int) -> None:
+        """Update passkey counter after successful authentication"""
+        await self.db.execute("""
+            UPDATE passkey_credentials 
+            SET counter = ?, last_used = CURRENT_TIMESTAMP
+            WHERE credential_id = ?
+        """, (new_counter, credential_id))
+        await self.db.commit()
+    
+    async def delete_passkey(self, user_id: int, credential_id: str) -> bool:
+        """Delete a passkey credential"""
+        cursor = await self.db.execute("""
+            DELETE FROM passkey_credentials 
+            WHERE user_id = ? AND credential_id = ?
+        """, (user_id, credential_id))
+        
+        if cursor.rowcount > 0:
+            # Also remove from mfa_methods if this was the last passkey
+            async with self.db.execute("""
+                SELECT COUNT(*) FROM passkey_credentials WHERE user_id = ?
+            """, (user_id,)) as count_cursor:
+                count = (await count_cursor.fetchone())[0]
+                if count == 0:
+                    await self.db.execute("""
+                        DELETE FROM mfa_methods WHERE user_id = ? AND method_type = 'passkey'
+                    """, (user_id,))
+            
+            await self.db.commit()
+            
+            await self._log_security_event(
+                user_id=user_id,
+                event_type='passkey_removed',
+                success=True
+            )
+            return True
+        return False
+    
+    
     # ==================== BACKUP CODES ====================
     
     async def generate_backup_codes(self, user_id: int, count: int = 10) -> List[str]:

@@ -10,6 +10,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useSession, getAvatarUrl } from "@/contexts/SessionContext";
 import { cn } from "@/lib/utils";
 import { checkAuthUser, registerAuthUser, setupTOTP, verifyTOTPSetup, verifyTOTP, verifyBackupCode, checkTrustedDevice, addTrustedDevice, sendDiscordDMCode, verifyDiscordDMCode, checkMFAApprovalStatus, type AuthUser } from "@/lib/auth-api";
+import { startRegistration, startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser";
 
 const backgroundImages = [
   {
@@ -268,6 +269,16 @@ function LoginPageContent() {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasSentApprovalRequest = useRef(false);
 
+  // Passkey state
+  const [supportsPasskey, setSupportsPasskey] = useState(false);
+  const [passkeySetupComplete, setPasskeySetupComplete] = useState(false);
+  const [passkeySetupError, setPasskeySetupError] = useState("");
+  const [isSettingUpPasskey, setIsSettingUpPasskey] = useState(false);
+  // MFA setup step: 'choice' | 'passkey' | 'totp' for new user flow
+  const [mfaSetupStep, setMfaSetupStep] = useState<'choice' | 'passkey' | 'totp'>('choice');
+  // Track which MFA methods are complete
+  const [totpSetupComplete, setTotpSetupComplete] = useState(false);
+
   // Detect ?verify=true from OAuth callback
   // Handle session from query param (workaround for SameSite cookie issues)
   useEffect(() => {
@@ -492,6 +503,154 @@ function LoginPageContent() {
       setIsLoading(false);
     }
   }, [username, password, t]);
+
+  // Check passkey support on mount
+  useEffect(() => {
+    setSupportsPasskey(browserSupportsWebAuthn());
+  }, []);
+
+  // Handle passkey setup for new users
+  const handlePasskeySetup = useCallback(async () => {
+    if (!user || !authUser) return;
+
+    setIsSettingUpPasskey(true);
+    setPasskeySetupError("");
+
+    try {
+      const userId = authUser.id;
+
+      // Step 1: Get registration options from server
+      const optionsResponse = await fetch("/api/mfa/passkey/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          username: user.username
+        }),
+      });
+
+      if (!optionsResponse.ok) {
+        const error = await optionsResponse.json();
+        throw new Error(error.error || "Failed to get registration options");
+      }
+
+      const options = await optionsResponse.json();
+      console.log('[Passkey] Registration options:', options);
+
+      // Step 2: Start WebAuthn registration
+      const credential = await startRegistration({ optionsJSON: options });
+      console.log('[Passkey] Credential created:', credential.id);
+
+      // Step 3: Verify with server
+      const verifyResponse = await fetch("/api/mfa/passkey/register/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          credential: credential,
+          device_name: navigator.userAgent.includes('Mac') ? 'Mac' :
+            navigator.userAgent.includes('Windows') ? 'Windows' :
+              navigator.userAgent.includes('iPhone') ? 'iPhone' :
+                navigator.userAgent.includes('Android') ? 'Android' : 'Device'
+        }),
+      });
+
+      if (!verifyResponse.ok) {
+        const error = await verifyResponse.json();
+        throw new Error(error.error || "Failed to verify passkey");
+      }
+
+      const result = await verifyResponse.json();
+      console.log('[Passkey] Registration complete:', result);
+
+      setPasskeySetupComplete(true);
+      setIsSettingUpPasskey(false);
+
+      // Store backup codes if returned
+      if (result.backup_codes) {
+        setBackupCodes(result.backup_codes);
+      }
+
+      // Check if both MFA methods are complete
+      if (totpSetupComplete) {
+        // Both complete - go to backup codes then admin
+        setLoginMode('backup-codes');
+      } else {
+        // Need to setup TOTP next
+        setMfaSetupStep('totp');
+      }
+
+    } catch (error: any) {
+      console.error('[Passkey] Setup error:', error);
+      setPasskeySetupError(error.message || "Failed to setup passkey");
+      setIsSettingUpPasskey(false);
+    }
+  }, [user, authUser, totpSetupComplete]);
+
+  // Handle passkey verification for returning users
+  const handlePasskeyVerify = useCallback(async () => {
+    if (!user || !authUser) return;
+
+    setVerifyStatus("verifying");
+    setVerifyError("");
+
+    try {
+      const userId = authUser.id;
+
+      // Step 1: Get authentication options
+      const optionsResponse = await fetch("/api/mfa/passkey/authenticate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      if (!optionsResponse.ok) {
+        const error = await optionsResponse.json();
+        throw new Error(error.error || "Failed to get authentication options");
+      }
+
+      const options = await optionsResponse.json();
+      console.log('[Passkey] Auth options:', options);
+
+      // Step 2: Start WebAuthn authentication
+      const credential = await startAuthentication({ optionsJSON: options });
+      console.log('[Passkey] Authentication credential:', credential.id);
+
+      // Step 3: Verify with server
+      const verifyResponse = await fetch("/api/mfa/passkey/authenticate/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          credential: credential,
+        }),
+      });
+
+      if (!verifyResponse.ok) {
+        const error = await verifyResponse.json();
+        throw new Error(error.error || "Authentication failed");
+      }
+
+      setVerifyStatus("success");
+      console.log('[Passkey] Authentication successful');
+
+      // Set MFA verified cookie
+      setMfaVerifiedCookie();
+
+      // Go to admin
+      setTimeout(() => {
+        setIsZooming(true);
+      }, 1000);
+      setTimeout(() => {
+        router.push("/admin");
+      }, 2500);
+
+    } catch (error: any) {
+      console.error('[Passkey] Verify error:', error);
+      setVerifyStatus("error");
+      setVerifyError(error.message || "Passkey verification failed");
+    }
+  }, [user, authUser, router]);
 
   // Send verification code via Discord DM
   const sendVerificationCode = useCallback(async () => {
