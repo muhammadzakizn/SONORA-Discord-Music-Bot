@@ -951,20 +951,50 @@ def check_mfa_approval_status():
 @auth_bp.route('/mfa/discord/verify', methods=['POST'])
 def verify_discord_dm_code():
     """
-    Verify Discord DM code
+    Verify Discord DM code from MFA approval request
     """
     try:
         data = request.json
         user_id = data.get('user_id')
         code = data.get('code')
         
-        if not all([user_id, code]):
+        if not all([user_id, code]):\
             return jsonify({'error': 'User ID and code required'}), 400
         
         db = ensure_db_connected()
         
-        # Verify code (database method: code, code_type, user_id)
-        if run_async(db.verify_code(code, 'discord_dm', user_id=user_id)):
+        # Find approved MFA request for this user
+        approved_request = run_async(db.db.execute("""
+            SELECT request_id, code_hash, discord_id 
+            FROM mfa_approval_requests 
+            WHERE (user_id = ? OR discord_id IN (SELECT discord_id FROM auth_users WHERE id = ?))
+            AND status = 'approved'
+            AND code_hash IS NOT NULL
+            AND responded_at > datetime('now', '-5 minutes')
+            ORDER BY responded_at DESC
+            LIMIT 1
+        """, (user_id, user_id)))
+        
+        row = run_async(approved_request.fetchone())
+        
+        if not row:
+            return jsonify({
+                'success': False,
+                'error': 'No approved request found or code expired'
+            }), 400
+        
+        request_id, code_hash, discord_id = row[0], row[1], row[2]
+        
+        # Verify code hash
+        if db.crypto.verify_code(code, code_hash):
+            # Mark request as used by setting code_hash to null
+            run_async(db.db.execute("""
+                UPDATE mfa_approval_requests 
+                SET code_hash = NULL 
+                WHERE request_id = ?
+            """, (request_id,)))
+            run_async(db.db.commit())
+            
             # Update MFA last used
             run_async(db.update_mfa_last_used(user_id, 'discord'))
             
@@ -976,7 +1006,7 @@ def verify_discord_dm_code():
                 success=True,
                 ip_address=client_info['ip_address'],
                 user_agent=client_info['user_agent'],
-                metadata={'method': 'discord_dm'}
+                metadata={'method': 'discord_dm', 'request_id': request_id}
             ))
             
             return jsonify({
@@ -986,7 +1016,7 @@ def verify_discord_dm_code():
         else:
             return jsonify({
                 'success': False,
-                'error': 'Invalid or expired code'
+                'error': 'Invalid code'
             }), 400
     
     except Exception as e:
