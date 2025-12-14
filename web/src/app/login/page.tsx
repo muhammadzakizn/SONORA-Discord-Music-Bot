@@ -327,10 +327,7 @@ function LoginPageContent() {
           setSelectedMfaMethod('discord');
           setLoginMode('mfa-discord-first');
 
-          // Auto-trigger Discord DM send
-          setTimeout(() => {
-            sendVerificationCode();
-          }, 500);
+          // Note: sendVerificationCode is triggered by useEffect on loginMode change
           return;
         } else if (effectiveFlow === 'verify') {
           // Existing user with MFA - need to verify
@@ -387,6 +384,7 @@ function LoginPageContent() {
       refreshSession();
     }
   }, [searchParams, isLoggedIn, user, sessionLoading, hasRedirected, refreshSession]);
+
 
   // Countdown timer for resend
   useEffect(() => {
@@ -625,6 +623,14 @@ function LoginPageContent() {
       setVerifyError("Network error. Please try again.");
     }
   }, [user, loginMode, authUser, totpSetup]);
+
+  // Auto-trigger Discord DM send when entering mfa-discord-first mode
+  useEffect(() => {
+    if (loginMode === 'mfa-discord-first' && user && discordApprovalStatus === 'idle') {
+      console.log('[MFA] Mode is mfa-discord-first, triggering sendVerificationCode');
+      sendVerificationCode();
+    }
+  }, [loginMode, user, discordApprovalStatus, sendVerificationCode]);
 
   // Verify the entered code
   const handleVerifyCode = useCallback(async () => {
