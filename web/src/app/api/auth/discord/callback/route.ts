@@ -134,8 +134,10 @@ export async function GET(request: NextRequest) {
                             authState = 'mfa_required';
                         }
                     } else {
-                        // User exists but no MFA - treat as trusted
-                        authState = 'trusted';
+                        // User exists but no MFA enabled - need to setup MFA
+                        authState = 'new';
+                        authUserId = authData.user.id;
+                        console.log('User exists but no MFA - requiring MFA setup');
                     }
                 } else {
                     // New user - register them
