@@ -1449,20 +1449,47 @@ function LoginPageContent() {
 
                             // For passkey, check if user has one registered
                             if (method.id === "passkey") {
+                              console.log('[Passkey] Button clicked, supportsPasskey:', supportsPasskey);
+                              console.log('[Passkey] authUser:', authUser);
+
                               if (!supportsPasskey) {
                                 setVerifyError("Passkey not supported on this device");
+                                setLoginMode("mfa-select");
                                 return;
                               }
 
-                              // Check if user has passkey registered
-                              const userId = authUser?.id;
+                              // Get userId from authUser or try to get from session
+                              let userId = authUser?.id;
+
+                              // Fallback: try to get from session cookie
+                              if (!userId) {
+                                try {
+                                  const sessionCookie = document.cookie
+                                    .split('; ')
+                                    .find(row => row.startsWith('sonora-admin-session='));
+                                  if (sessionCookie) {
+                                    const sessionValue = sessionCookie.split('=')[1];
+                                    const decoded = JSON.parse(atob(decodeURIComponent(sessionValue)));
+                                    userId = decoded.authUserId;
+                                    console.log('[Passkey] Got userId from session cookie:', userId);
+                                  }
+                                } catch (e) {
+                                  console.error('[Passkey] Failed to get userId from session:', e);
+                                }
+                              }
+
+                              console.log('[Passkey] Using userId:', userId);
+
                               if (userId) {
                                 try {
+                                  setVerifyStatus("verifying");
                                   const response = await fetch("/api/mfa/passkey/authenticate", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({ user_id: userId }),
                                   });
+
+                                  console.log('[Passkey] Auth response status:', response.status);
 
                                   if (response.ok) {
                                     // User has passkey, go to verify (which will trigger handlePasskeyVerify)
@@ -1472,14 +1499,18 @@ function LoginPageContent() {
                                     setTimeout(() => handlePasskeyVerify(), 500);
                                   } else {
                                     // No passkey registered, go to setup
+                                    console.log('[Passkey] No passkey found, going to setup');
                                     setHasPasskey(false);
+                                    setVerifyStatus("idle");
                                     setLoginMode("passkey-setup");
                                   }
                                 } catch (error) {
                                   console.error("[Passkey] Check failed:", error);
+                                  setVerifyStatus("idle");
                                   setLoginMode("passkey-setup");
                                 }
                               } else {
+                                console.log('[Passkey] No userId available, going to setup');
                                 setLoginMode("passkey-setup");
                               }
                               return;
