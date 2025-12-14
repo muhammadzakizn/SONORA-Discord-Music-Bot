@@ -1308,6 +1308,7 @@ class AuthDatabaseManager:
 
 # Singleton instance
 _auth_db_manager: Optional[AuthDatabaseManager] = None
+_db_initialized: bool = False
 
 
 def get_auth_db_manager() -> AuthDatabaseManager:
@@ -1320,6 +1321,25 @@ def get_auth_db_manager() -> AuthDatabaseManager:
 
 async def init_auth_database() -> AuthDatabaseManager:
     """Initialize and return auth database manager"""
+    global _db_initialized
     manager = get_auth_db_manager()
-    await manager.connect()
+    if not _db_initialized:
+        await manager.connect()
+        _db_initialized = True
+    return manager
+
+
+def ensure_db_connected() -> AuthDatabaseManager:
+    """Ensure database is connected (sync wrapper for Flask routes)"""
+    global _db_initialized
+    manager = get_auth_db_manager()
+    if not _db_initialized or manager.db is None:
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        loop.run_until_complete(manager.connect())
+        _db_initialized = True
     return manager

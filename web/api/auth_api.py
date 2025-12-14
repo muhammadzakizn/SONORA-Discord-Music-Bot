@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database.auth_db_manager import (
     get_auth_db_manager, 
     init_auth_database,
+    ensure_db_connected,
     SecureCrypto,
     AuthDatabaseManager
 )
@@ -106,7 +107,7 @@ def require_auth(f):
             return jsonify({'error': 'Authentication required'}), 401
         
         # Validate session
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         # ... validate session logic
         
         return f(*args, **kwargs)
@@ -128,7 +129,7 @@ def check_user():
         if not discord_id:
             return jsonify({'error': 'Discord ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         user = run_async(db.get_user_by_discord_id(discord_id))
         
         if user:
@@ -168,7 +169,7 @@ def register_user():
         if not discord_id or not username:
             return jsonify({'error': 'Discord ID and username required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         
         # Check if already exists
         existing = run_async(db.get_user_by_discord_id(discord_id))
@@ -215,7 +216,7 @@ def get_all_users():
         status = request.args.get('status')
         role = request.args.get('role')
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         users = run_async(db.get_all_users(limit=limit, offset=offset, status=status, role=role))
         total = run_async(db.get_user_count(status=status))
         
@@ -235,7 +236,7 @@ def get_all_users():
 def get_user(user_id: int):
     """Get single user details"""
     try:
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         user = run_async(db.get_user_by_id(user_id))
         
         if not user:
@@ -276,7 +277,7 @@ def update_user_status(user_id: int):
         if status not in ['pending', 'active', 'suspended', 'banned']:
             return jsonify({'error': 'Invalid status'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         run_async(db.update_user_status(user_id, status))
         
         return jsonify({
@@ -304,7 +305,7 @@ def setup_totp():
         if not user_id:
             return jsonify({'error': 'User ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         user = run_async(db.get_user_by_id(user_id))
         
         if not user:
@@ -371,7 +372,7 @@ def verify_totp_setup():
             }), 400
         
         # Save to database (encrypted)
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         run_async(db.setup_totp(user_id, secret))
         
         # Generate backup codes
@@ -401,7 +402,7 @@ def verify_totp():
         if not all([user_id, code]):
             return jsonify({'error': 'User ID and code required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         
         # Get TOTP secret
         secret = run_async(db.get_totp_secret(user_id))
@@ -441,7 +442,7 @@ def generate_backup_codes():
         if not user_id:
             return jsonify({'error': 'User ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         codes = run_async(db.generate_backup_codes(user_id))
         
         return jsonify({
@@ -466,7 +467,7 @@ def verify_backup_code():
         if not all([user_id, code]):
             return jsonify({'error': 'User ID and code required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         
         # Verify and consume code
         if run_async(db.verify_backup_code(user_id, code)):
@@ -498,7 +499,7 @@ def get_backup_codes_count():
         if not user_id:
             return jsonify({'error': 'User ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         codes_info = run_async(db.get_backup_codes_count(user_id))
         
         return jsonify(codes_info)
@@ -519,7 +520,7 @@ def get_trusted_devices():
         if not user_id:
             return jsonify({'error': 'User ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         devices = run_async(db.get_trusted_devices(user_id))
         
         return jsonify({
@@ -543,7 +544,7 @@ def add_trusted_device():
             return jsonify({'error': 'User ID required'}), 400
         
         client_info = get_client_info(request)
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         
         device_id = run_async(db.add_trusted_device(
             user_id=user_id,
@@ -574,7 +575,7 @@ def remove_trusted_device(device_id: int):
         if not user_id:
             return jsonify({'error': 'User ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         
         if run_async(db.remove_trusted_device(user_id, device_id)):
             return jsonify({
@@ -600,7 +601,7 @@ def check_trusted_device():
             return jsonify({'error': 'User ID required'}), 400
         
         client_info = get_client_info(request)
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         
         is_trusted = run_async(db.is_trusted_device(user_id, client_info['device_fingerprint']))
         
@@ -625,7 +626,7 @@ def get_security_log():
         limit = request.args.get('limit', 100, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         logs = run_async(db.get_security_log(
             user_id=user_id,
             event_type=event_type,
@@ -654,7 +655,7 @@ def get_login_history():
         if not user_id:
             return jsonify({'error': 'User ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         history = run_async(db.get_login_history(user_id, limit))
         
         return jsonify({
@@ -677,7 +678,7 @@ def get_mfa_methods():
         if not user_id:
             return jsonify({'error': 'User ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         methods = run_async(db.get_user_mfa_methods(user_id))
         
         return jsonify({
@@ -729,7 +730,7 @@ def send_discord_dm_code():
             ip_address = ip_address.split(',')[0].strip()
         user_agent = request.headers.get('User-Agent', 'Unknown')
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         
         # Create approval request (15 second timeout)
         request_id = run_async(db.create_mfa_approval_request(
@@ -907,7 +908,7 @@ def check_mfa_approval_status():
         if not request_id:
             return jsonify({'error': 'Request ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         result = run_async(db.check_mfa_approval_status(request_id))
         
         return jsonify(result)
@@ -932,7 +933,7 @@ def verify_discord_dm_code():
         if not all([user_id, code]):
             return jsonify({'error': 'User ID and code required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         
         # Verify code (database method: code, code_type, user_id)
         if run_async(db.verify_code(code, 'discord_dm', user_id=user_id)):
@@ -977,7 +978,7 @@ def setup_discord_mfa():
         if not user_id:
             return jsonify({'error': 'User ID required'}), 400
         
-        db = get_auth_db_manager()
+        db = ensure_db_connected()
         
         # Add Discord as MFA method (no secret needed - uses Discord ID)
         run_async(db.add_mfa_method(user_id, 'discord', is_primary=True))
