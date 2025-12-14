@@ -11,6 +11,7 @@ import { useSession, getAvatarUrl } from "@/contexts/SessionContext";
 import { cn } from "@/lib/utils";
 import { checkAuthUser, registerAuthUser, setupTOTP, verifyTOTPSetup, verifyTOTP, verifyBackupCode, checkTrustedDevice, addTrustedDevice, sendDiscordDMCode, verifyDiscordDMCode, checkMFAApprovalStatus, type AuthUser } from "@/lib/auth-api";
 import { startRegistration, startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser";
+import Turnstile from "@/components/Turnstile";
 
 const backgroundImages = [
   {
@@ -249,6 +250,10 @@ function LoginPageContent() {
   const [termsTimer, setTermsTimer] = useState(10);
   const [termsCanContinue, setTermsCanContinue] = useState(false);
   const termsRef = useRef<HTMLDivElement>(null);
+
+  // CAPTCHA state
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaVerified, setCaptchaVerified] = useState(false);
 
   // MFA state
   const [selectedMfaMethod, setSelectedMfaMethod] = useState<MFAMethod | null>(null);
@@ -1258,21 +1263,71 @@ function LoginPageContent() {
                       )}
                     </div>
 
+                    {/* CAPTCHA - only show after terms read */}
+                    {termsCanContinue && (
+                      <div className="mb-4">
+                        <p className="text-sm text-white/60 mb-3 text-center">
+                          Complete verification to continue
+                        </p>
+                        <Turnstile
+                          siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAAACGmEeX0Hq8vNnC3"}
+                          onVerify={async (token) => {
+                            console.log("[CAPTCHA] Token received");
+                            setCaptchaToken(token);
+                            // Verify on server
+                            try {
+                              const res = await fetch("/api/verify-captcha", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ token }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                console.log("[CAPTCHA] Verified successfully");
+                                setCaptchaVerified(true);
+                              } else {
+                                console.error("[CAPTCHA] Verification failed:", data);
+                              }
+                            } catch (e) {
+                              console.error("[CAPTCHA] Server verify error:", e);
+                            }
+                          }}
+                          onError={() => {
+                            console.error("[CAPTCHA] Widget error");
+                            setCaptchaVerified(false);
+                          }}
+                          onExpire={() => {
+                            console.log("[CAPTCHA] Token expired");
+                            setCaptchaVerified(false);
+                            setCaptchaToken(null);
+                          }}
+                          theme="dark"
+                        />
+                        {captchaVerified && (
+                          <p className="text-green-400 text-sm text-center mt-2 flex items-center justify-center gap-1">
+                            <CheckCircle className="w-4 h-4" /> Verified
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Continue Button */}
                     <motion.button
-                      whileHover={termsCanContinue ? { scale: 1.02 } : {}}
-                      whileTap={termsCanContinue ? { scale: 0.98 } : {}}
-                      onClick={termsCanContinue ? handleDiscordLogin : undefined}
-                      disabled={!termsCanContinue}
+                      whileHover={termsCanContinue && captchaVerified ? { scale: 1.02 } : {}}
+                      whileTap={termsCanContinue && captchaVerified ? { scale: 0.98 } : {}}
+                      onClick={termsCanContinue && captchaVerified ? handleDiscordLogin : undefined}
+                      disabled={!termsCanContinue || !captchaVerified}
                       className={cn(
                         "w-full flex items-center justify-center gap-3 p-4 rounded-2xl font-semibold transition-all",
-                        termsCanContinue
+                        termsCanContinue && captchaVerified
                           ? "bg-[#5865F2] hover:bg-[#4752C4] text-white shadow-[0_4px_24px_rgba(88,101,242,0.5)] cursor-pointer"
                           : "bg-white/10 text-white/40 cursor-not-allowed"
                       )}
                     >
                       <DiscordIcon />
-                      {termsCanContinue ? "Continue to Discord" : "Please read the terms"}
+                      {!termsCanContinue ? "Please read the terms" :
+                        !captchaVerified ? "Complete verification" :
+                          "Continue to Discord"}
                     </motion.button>
 
                     <p className="mt-4 text-xs text-white/40 text-center">
