@@ -671,6 +671,33 @@ function LoginPageContent() {
         return;
       }
 
+      // TOTP verification for returning users (verify against stored secret in DB)
+      if (loginMode === 'mfa-verify' && selectedMfaMethod === 'totp') {
+        const userId = authUser?.id || user.id;
+        console.log('[MFA] Verifying TOTP for user:', userId);
+
+        const result = await verifyTOTP(Number(userId), fullCode);
+
+        if (result.success) {
+          setVerifyStatus("success");
+          console.log('[MFA] TOTP verified successfully');
+
+          // Go to admin
+          setTimeout(() => {
+            setIsZooming(true);
+          }, 1000);
+          setTimeout(() => {
+            router.push("/admin");
+          }, 2500);
+        } else {
+          setVerifyStatus("error");
+          setVerifyError(result.error || "Invalid code. Please try again.");
+          setVerifyCode(["", "", "", "", "", ""]);
+          verifyInputRefs.current[0]?.focus();
+        }
+        return;
+      }
+
       // Regular email verification
       const response = await fetch("/api/verify/check", {
         method: "POST",
@@ -700,7 +727,7 @@ function LoginPageContent() {
       setVerifyStatus("error");
       setVerifyError("Network error. Please try again.");
     }
-  }, [user, verifyCode, router, loginMode, selectedMfaMethod, authUser]);
+  }, [user, verifyCode, router, loginMode, selectedMfaMethod, authUser, totpSetup]);
 
   // Handle verification code input change
   const handleVerifyInputChange = (index: number, value: string) => {
