@@ -57,6 +57,24 @@ def run_async(coro):
     return loop.run_until_complete(coro)
 
 
+def run_in_bot_loop(coro, timeout=30):
+    """
+    Run async coroutine in bot's event loop.
+    Required for Discord API calls since HTTP session is bound to bot's loop.
+    """
+    if _bot_instance and _bot_instance.loop:
+        import concurrent.futures
+        future = asyncio.run_coroutine_threadsafe(coro, _bot_instance.loop)
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            logger.error("Bot loop coroutine timed out")
+            return None
+    else:
+        # Fallback if bot not available
+        return run_async(coro)
+
+
 def get_client_info(req) -> Dict[str, str]:
     """Extract client information from request"""
     user_agent = req.headers.get('User-Agent', 'Unknown')
@@ -858,7 +876,7 @@ def send_discord_dm_code():
                     
                     return True, msg.id
                 
-                success, message_id = run_async(send_approval_dm())
+                success, message_id = run_in_bot_loop(send_approval_dm())
                 
                 if success:
                     logger.info(f"Sent MFA approval request to Discord user {discord_id}")
