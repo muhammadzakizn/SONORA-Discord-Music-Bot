@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import {
     User,
     Camera,
     AtSign,
-    Mail,
     Calendar,
     Shield,
     Crown,
@@ -15,19 +14,44 @@ import {
     Check,
     X,
     Edit3,
+    Upload,
+    Trash2,
+    Crop,
 } from "lucide-react";
 import { useSession, getAvatarUrl, getServerIconUrl } from "@/contexts/SessionContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { cn } from "@/lib/utils";
 
+// Maximum file size (25MB) 
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+// Target compressed size for localStorage (500KB)
+const TARGET_SIZE = 500 * 1024;
+
+interface CropArea {
+    x: number;
+    y: number;
+    size: number;
+}
+
 export default function ProfilePage() {
-    const { user, displayName: contextDisplayName, setDisplayName: setContextDisplayName, managedGuilds } = useSession();
+    const { user, displayName: contextDisplayName, setDisplayName: setContextDisplayName, customAvatar, setCustomAvatar, managedGuilds } = useSession();
     const { isDark, t } = useSettings();
     const [localDisplayName, setLocalDisplayName] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Image cropping states
+    const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+    const [showCropModal, setShowCropModal] = useState(false);
+    const [cropArea, setCropArea] = useState<CropArea>({ x: 0, y: 0, size: 200 });
+    const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+    const cropCanvasRef = useRef<HTMLCanvasElement>(null);
+    const cropImageRef = useRef<HTMLImageElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
     // Initialize local display name from context
     useEffect(() => {
@@ -60,6 +84,169 @@ export default function ProfilePage() {
         setIsEditing(false);
     };
 
+    // Handle file upload
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+            setSaveMessage({ type: 'error', text: 'Only PNG, JPG, JPEG files are supported' });
+            setTimeout(() => setSaveMessage(null), 3000);
+            return;
+        }
+
+        // Validate file size
+        if (file.size > MAX_FILE_SIZE) {
+            setSaveMessage({ type: 'error', text: 'File size must be less than 25MB' });
+            setTimeout(() => setSaveMessage(null), 3000);
+            return;
+        }
+
+        // Read and display image
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setUploadedImage(event.target?.result as string);
+            setShowCropModal(true);
+        };
+        reader.readAsDataURL(file);
+
+        // Reset input
+        e.target.value = '';
+    };
+
+    // Compress image to target size
+    const compressImage = useCallback(async (dataUrl: string, targetWidth: number = 256): Promise<string> => {
+        return new Promise((resolve) => {
+            const img = document.createElement('img');
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = targetWidth;
+                canvas.height = targetWidth;
+                const ctx = canvas.getContext('2d')!;
+                ctx.drawImage(img, 0, 0, targetWidth, targetWidth);
+
+                // Start with high quality
+                let quality = 0.9;
+                let result = canvas.toDataURL('image/jpeg', quality);
+
+                // Reduce quality until size is acceptable
+                while (result.length > TARGET_SIZE && quality > 0.1) {
+                    quality -= 0.1;
+                    result = canvas.toDataURL('image/jpeg', quality);
+                }
+
+                resolve(result);
+            };
+            img.src = dataUrl;
+        });
+    }, []);
+
+    // Handle crop and save
+    const handleCropSave = useCallback(async () => {
+        if (!uploadedImage || !cropImageRef.current) return;
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+
+        // Get actual image dimensions
+        const img = cropImageRef.current;
+        const displayedWidth = img.clientWidth;
+        const displayedHeight = img.clientHeight;
+        const scaleX = img.naturalWidth / displayedWidth;
+        const scaleY = img.naturalHeight / displayedHeight;
+
+        // Calculate crop dimensions
+        const cropX = cropArea.x * scaleX;
+        const cropY = cropArea.y * scaleY;
+        const cropSize = cropArea.size * Math.min(scaleX, scaleY);
+
+        canvas.width = 256;
+        canvas.height = 256;
+
+        ctx.drawImage(
+            img,
+            cropX, cropY, cropSize, cropSize,
+            0, 0, 256, 256
+        );
+
+        // Compress and save
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        const compressed = await compressImage(croppedDataUrl);
+
+        setCustomAvatar(compressed);
+        setShowCropModal(false);
+        setUploadedImage(null);
+        setSaveMessage({ type: 'success', text: t('profile.saved') });
+        setTimeout(() => setSaveMessage(null), 3000);
+    }, [uploadedImage, cropArea, compressImage, setCustomAvatar, t]);
+
+    // Handle removing custom avatar
+    const handleRemoveAvatar = () => {
+        setCustomAvatar(null);
+        setSaveMessage({ type: 'success', text: t('profile.saved') });
+        setTimeout(() => setSaveMessage(null), 3000);
+    };
+
+    // Mouse events for crop dragging
+    const handleMouseDown = (e: React.MouseEvent) => {
+        setIsDragging(true);
+        setDragStart({ x: e.clientX - cropArea.x, y: e.clientY - cropArea.y });
+    };
+
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (!isDragging || !cropImageRef.current) return;
+
+        const imgRect = cropImageRef.current.getBoundingClientRect();
+        const newX = Math.max(0, Math.min(e.clientX - dragStart.x, imgRect.width - cropArea.size));
+        const newY = Math.max(0, Math.min(e.clientY - dragStart.y, imgRect.height - cropArea.size));
+
+        setCropArea(prev => ({ ...prev, x: newX, y: newY }));
+    }, [isDragging, dragStart, cropArea.size]);
+
+    const handleMouseUp = useCallback(() => {
+        setIsDragging(false);
+    }, []);
+
+    useEffect(() => {
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            return () => {
+                window.removeEventListener('mousemove', handleMouseMove);
+                window.removeEventListener('mouseup', handleMouseUp);
+            };
+        }
+    }, [isDragging, handleMouseMove, handleMouseUp]);
+
+    // Initialize crop area when image loads
+    const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        const img = e.currentTarget;
+        setImageSize({ width: img.clientWidth, height: img.clientHeight });
+        const minDim = Math.min(img.clientWidth, img.clientHeight);
+        const size = Math.min(200, minDim * 0.8);
+        setCropArea({
+            x: (img.clientWidth - size) / 2,
+            y: (img.clientHeight - size) / 2,
+            size
+        });
+    };
+
+    // Handle resize slider
+    const handleSizeChange = (newSize: number) => {
+        if (!cropImageRef.current) return;
+        const maxSize = Math.min(imageSize.width, imageSize.height);
+        const size = Math.min(maxSize, Math.max(50, newSize));
+
+        // Keep centered when resizing
+        const centerX = cropArea.x + cropArea.size / 2;
+        const centerY = cropArea.y + cropArea.size / 2;
+        const newX = Math.max(0, Math.min(centerX - size / 2, imageSize.width - size));
+        const newY = Math.max(0, Math.min(centerY - size / 2, imageSize.height - size));
+
+        setCropArea({ x: newX, y: newY, size });
+    };
+
     if (!user) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
@@ -68,7 +255,8 @@ export default function ProfilePage() {
         );
     }
 
-    const avatarUrl = getAvatarUrl(user);
+    // Use custom avatar if set, otherwise Discord avatar
+    const avatarUrl = customAvatar || getAvatarUrl(user);
 
     return (
         <div className="max-w-4xl mx-auto space-y-8">
@@ -98,14 +286,40 @@ export default function ProfilePage() {
                             alt={user.username}
                             width={120}
                             height={120}
-                            className="rounded-2xl"
+                            className="rounded-2xl object-cover"
+                            unoptimized={!!customAvatar} // Skip optimization for data URLs
                         />
-                        <div className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Camera className="w-8 h-8 text-white" />
+                        <div className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+                                title="Upload new avatar"
+                            >
+                                <Upload className="w-5 h-5 text-white" />
+                            </button>
+                            {customAvatar && (
+                                <button
+                                    onClick={handleRemoveAvatar}
+                                    className="p-2 bg-rose-500/50 rounded-lg hover:bg-rose-500/70 transition-colors"
+                                    title="Remove custom avatar"
+                                >
+                                    <Trash2 className="w-5 h-5 text-white" />
+                                </button>
+                            )}
                         </div>
-                        <button className="absolute -bottom-2 -right-2 p-2 bg-[#7B1E3C] rounded-full hover:bg-[#9B2E4C] transition-colors">
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="absolute -bottom-2 -right-2 p-2 bg-[#7B1E3C] rounded-full hover:bg-[#9B2E4C] transition-colors"
+                        >
                             <Camera className="w-4 h-4 text-white" />
                         </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".png,.jpg,.jpeg"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                        />
                     </div>
 
                     <div className="flex-1">
@@ -197,15 +411,6 @@ export default function ProfilePage() {
                                     {t('profile.discord')}: <span className={isDark ? "text-white" : "text-gray-900"}>@{user.username}</span>
                                 </span>
                             </div>
-                            {user.email && (
-                                <div className={cn(
-                                    "flex items-center gap-2",
-                                    isDark ? "text-zinc-400" : "text-gray-500"
-                                )}>
-                                    <Mail className="w-4 h-4" />
-                                    <span className="text-sm">{user.email}</span>
-                                </div>
-                            )}
                             <div className={cn(
                                 "flex items-center gap-2",
                                 isDark ? "text-zinc-400" : "text-gray-500"
@@ -360,6 +565,7 @@ export default function ProfilePage() {
                 <button
                     onClick={() => {
                         document.cookie = 'sonora-admin-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                        document.cookie = 'sonora-mfa-verified=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
                         window.location.href = '/login';
                     }}
                     className="px-4 py-2 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg hover:bg-rose-500/30 transition-colors"
@@ -367,6 +573,125 @@ export default function ProfilePage() {
                     {t('profile.logout')}
                 </button>
             </motion.div>
+
+            {/* Image Crop Modal */}
+            <AnimatePresence>
+                {showCropModal && uploadedImage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+                        onClick={() => setShowCropModal(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                                "w-full max-w-lg p-6 rounded-2xl",
+                                isDark ? "bg-zinc-900" : "bg-white"
+                            )}
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className={cn(
+                                    "text-lg font-semibold flex items-center gap-2",
+                                    isDark ? "text-white" : "text-gray-900"
+                                )}>
+                                    <Crop className="w-5 h-5" />
+                                    Crop Image
+                                </h3>
+                                <button
+                                    onClick={() => setShowCropModal(false)}
+                                    className={cn(
+                                        "p-2 rounded-lg",
+                                        isDark ? "hover:bg-zinc-800" : "hover:bg-gray-100"
+                                    )}
+                                >
+                                    <X className={cn("w-5 h-5", isDark ? "text-white" : "text-gray-900")} />
+                                </button>
+                            </div>
+
+                            {/* Image with crop overlay */}
+                            <div className="relative mb-4 flex justify-center">
+                                <div className="relative inline-block">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        ref={cropImageRef}
+                                        src={uploadedImage}
+                                        alt="Crop preview"
+                                        className="max-w-full max-h-[300px] rounded-lg"
+                                        onLoad={handleImageLoad}
+                                    />
+                                    {/* Dark overlay */}
+                                    <div className="absolute inset-0 bg-black/50 rounded-lg pointer-events-none" />
+                                    {/* Crop area (clear) */}
+                                    <div
+                                        className="absolute border-2 border-white cursor-move"
+                                        style={{
+                                            left: cropArea.x,
+                                            top: cropArea.y,
+                                            width: cropArea.size,
+                                            height: cropArea.size,
+                                            boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
+                                            background: 'transparent',
+                                        }}
+                                        onMouseDown={handleMouseDown}
+                                    >
+                                        {/* Corner handles */}
+                                        <div className="absolute -top-1 -left-1 w-3 h-3 bg-white rounded-full" />
+                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full" />
+                                        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-white rounded-full" />
+                                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-white rounded-full" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Size slider */}
+                            <div className="mb-6">
+                                <label className={cn(
+                                    "text-sm mb-2 block",
+                                    isDark ? "text-zinc-400" : "text-gray-500"
+                                )}>
+                                    Crop Size: {Math.round(cropArea.size)}px
+                                </label>
+                                <input
+                                    type="range"
+                                    min={50}
+                                    max={Math.min(imageSize.width, imageSize.height) || 300}
+                                    value={cropArea.size}
+                                    onChange={(e) => handleSizeChange(Number(e.target.value))}
+                                    className="w-full accent-[#7B1E3C]"
+                                />
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowCropModal(false)}
+                                    className={cn(
+                                        "flex-1 py-2.5 rounded-lg font-medium transition-colors",
+                                        isDark
+                                            ? "bg-zinc-800 text-white hover:bg-zinc-700"
+                                            : "bg-gray-100 text-gray-900 hover:bg-gray-200"
+                                    )}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleCropSave}
+                                    className="flex-1 py-2.5 rounded-lg font-medium bg-[#7B1E3C] text-white hover:bg-[#9B2E4C] transition-colors"
+                                >
+                                    Save Cropped Image
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <canvas ref={cropCanvasRef} className="hidden" />
         </div>
     );
 }

@@ -40,6 +40,7 @@ interface SessionContextType {
     session: UserSession | null;
     user: DiscordUser | null;
     displayName: string;
+    customAvatar: string | null;  // Custom avatar data URL
     guilds: UserGuild[];
     managedGuilds: UserGuild[];
     isLoggedIn: boolean;
@@ -54,6 +55,7 @@ interface SessionContextType {
     logout: () => void;
     refreshSession: () => void;
     setDisplayName: (name: string) => void;
+    setCustomAvatar: (avatar: string | null) => void;
     setMfaVerified: (verified: boolean) => void;
 }
 
@@ -131,6 +133,30 @@ function storeDisplayName(userId: string, name: string): void {
     }
 }
 
+// Helper to get stored custom avatar
+function getStoredCustomAvatar(userId: string): string | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        return localStorage.getItem(`sonora-custom-avatar-${userId}`);
+    } catch {
+        return null;
+    }
+}
+
+// Helper to store custom avatar
+function storeCustomAvatar(userId: string, avatar: string | null): void {
+    if (typeof window === 'undefined') return;
+    try {
+        if (avatar) {
+            localStorage.setItem(`sonora-custom-avatar-${userId}`, avatar);
+        } else {
+            localStorage.removeItem(`sonora-custom-avatar-${userId}`);
+        }
+    } catch {
+        // Ignore errors
+    }
+}
+
 // Generate Discord avatar URL
 export function getAvatarUrl(user: DiscordUser): string {
     if (user.avatar) {
@@ -154,6 +180,7 @@ export function getServerIconUrl(guild: UserGuild): string | null {
 export function SessionProvider({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<UserSession | null>(null);
     const [displayName, setDisplayNameState] = useState<string>('');
+    const [customAvatar, setCustomAvatarState] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isMfaVerified, setIsMfaVerifiedState] = useState(false);
     const [devSession, setDevSession] = useState<DeveloperSession | null>(null);
@@ -189,6 +216,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             const storedName = getStoredDisplayName(userSession.user.id);
             setDisplayNameState(storedName || userSession.user.username);
 
+            // Load custom avatar
+            const storedAvatar = getStoredCustomAvatar(userSession.user.id);
+            setCustomAvatarState(storedAvatar);
+
             // Load MFA status
             const mfaStatus = getMfaStatus(userSession.user.id);
             setIsMfaVerifiedState(mfaStatus);
@@ -209,6 +240,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         document.cookie = 'sonora-admin-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         setSession(null);
         setDisplayNameState('');
+        setCustomAvatarState(null);
         setIsMfaVerifiedState(false);
         window.location.href = '/login';
     }, []);
@@ -231,6 +263,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
             storeDisplayName(session.user.id, name);
             setDisplayNameState(name);
+        }
+    }, [session?.user]);
+
+    const setCustomAvatar = useCallback((avatar: string | null) => {
+        if (session?.user) {
+            storeCustomAvatar(session.user.id, avatar);
+            setCustomAvatarState(avatar);
         }
     }, [session?.user]);
 
@@ -257,6 +296,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 session,
                 user: session?.user || null,
                 displayName: displayName || devSession?.displayName || devSession?.username || '',
+                customAvatar,
                 guilds: session?.guilds || [],
                 managedGuilds,
                 isLoggedIn: !!session,
@@ -270,6 +310,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 logout,
                 refreshSession,
                 setDisplayName,
+                setCustomAvatar,
                 setMfaVerified,
             }}
         >
