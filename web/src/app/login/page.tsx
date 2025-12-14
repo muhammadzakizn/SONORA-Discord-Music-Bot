@@ -212,6 +212,15 @@ export default function LoginPage() {
   );
 }
 
+// Helper to set MFA verified cookie
+function setMfaVerifiedCookie() {
+  const isSecure = window.location.protocol === 'https:';
+  const expires = new Date();
+  expires.setTime(expires.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days
+  document.cookie = `sonora-mfa-verified=true; path=/; expires=${expires.toUTCString()}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
+  console.log('[MFA] Set mfaVerified cookie');
+}
+
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -653,6 +662,8 @@ function LoginPageContent() {
             }, 1500);
           } else {
             // Existing user - go to admin
+            // Set MFA verified cookie before redirecting
+            setMfaVerifiedCookie();
             // Start zoom animation after brief success message
             setTimeout(() => {
               setIsZooming(true);
@@ -681,6 +692,9 @@ function LoginPageContent() {
         if (result.success) {
           setVerifyStatus("success");
           console.log('[MFA] TOTP verified successfully');
+
+          // Set MFA verified cookie before redirecting
+          setMfaVerifiedCookie();
 
           // Go to admin
           setTimeout(() => {
@@ -1889,6 +1903,9 @@ function LoginPageContent() {
                         if (trustDevice && authUser) {
                           await addTrustedDevice(authUser.id, navigator.userAgent.split(" ")[0]);
                         }
+
+                        // Set MFA verified cookie before redirect
+                        setMfaVerifiedCookie();
 
                         // Redirect to admin
                         setVerifyStatus("success");

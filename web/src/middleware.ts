@@ -122,13 +122,47 @@ export function middleware(request: NextRequest) {
 
   // Check for admin session cookie
   const adminSession = request.cookies.get('sonora-admin-session')?.value;
+  const mfaVerified = request.cookies.get('sonora-mfa-verified')?.value;
   const devAuth = request.cookies.get('sonora-dev-auth')?.value;
 
-  // Protect /admin routes - require admin session
+  // Protect /admin routes - require admin session AND MFA verification
   if (pathname.startsWith('/admin')) {
     if (!adminSession) {
       // No session, redirect to login
       const response = NextResponse.redirect(new URL('/login', request.url));
+      return addSecurityHeaders(response);
+    }
+    
+    // Check if MFA verification is required
+    // Parse session to see if user has MFA enabled
+    try {
+      const sessionData = JSON.parse(Buffer.from(adminSession, 'base64').toString('utf-8'));
+      const hasMfa = sessionData.mfaMethods && sessionData.mfaMethods.length > 0;
+      const authState = sessionData.authState;
+      
+      // If user has MFA enabled or is in mfa_required state, check mfaVerified cookie
+      if ((hasMfa || authState === 'mfa_required') && mfaVerified !== 'true') {
+        console.log('[Middleware] MFA required but not verified, redirecting to login');
+        const response = NextResponse.redirect(
+          new URL('/login?flow=verify&mfa_required=true', request.url)
+        );
+        return addSecurityHeaders(response);
+      }
+      
+      // If new user (needs MFA setup), check mfaVerified
+      if (authState === 'new' && mfaVerified !== 'true') {
+        console.log('[Middleware] New user MFA setup required, redirecting to login');
+        const response = NextResponse.redirect(
+          new URL('/login?flow=setup&mfa_required=true', request.url)
+        );
+        return addSecurityHeaders(response);
+      }
+    } catch (e) {
+      console.error('[Middleware] Failed to parse session:', e);
+      // If session is corrupted, clear and redirect
+      const response = NextResponse.redirect(new URL('/login', request.url));
+      response.cookies.delete('sonora-admin-session');
+      response.cookies.delete('sonora-mfa-verified');
       return addSecurityHeaders(response);
     }
   }
