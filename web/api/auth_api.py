@@ -986,7 +986,7 @@ def verify_discord_dm_code():
         request_id, code_hash, discord_id = row[0], row[1], row[2]
         
         # Verify code hash
-        if db.crypto.verify_code(code, code_hash):
+        if db.crypto.verify_code_hash(code, code_hash):
             # Mark request as used by setting code_hash to null
             run_async(db.db.execute("""
                 UPDATE mfa_approval_requests 
