@@ -9,6 +9,7 @@ class AudioSource(str, Enum):
     YOUTUBE_MUSIC = "YouTube Music"
     APPLE_MUSIC = "Apple Music"
     DIRECT = "Direct URL"
+    STREAMING = "Streaming"
     UNKNOWN = "Unknown"
 
 

@@ -141,15 +141,29 @@ class MetadataProcessor:
         if artwork_result:
             artwork_url, artwork_source = artwork_result
         
+        # Handle streaming mode where audio_result may be None
+        # Use track_info values as fallback
+        if audio_result:
+            duration = audio_result.duration
+            audio_path = audio_result.file_path
+            audio_source = audio_result.source
+            bitrate = audio_result.bitrate
+        else:
+            # Streaming mode - no downloaded file
+            duration = track_info.duration or 0
+            audio_path = None
+            audio_source = AudioSource.STREAMING
+            bitrate = None
+        
         # Create metadata
         metadata = MetadataInfo(
             title=track_info.title,
             artist=track_info.artist,
             album=track_info.album,
-            duration=audio_result.duration,
-            audio_path=audio_result.file_path,
-            audio_source=audio_result.source,
-            bitrate=audio_result.bitrate,
+            duration=duration,
+            audio_path=audio_path,
+            audio_source=audio_source,
+            bitrate=bitrate,
             artwork_url=artwork_url,
             artwork_source=artwork_source,
             lyrics=lyrics_result,
