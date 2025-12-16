@@ -36,11 +36,12 @@ class MusicDLHandler:
     
     # Clients to use for searching
     # Ordered by priority: HiFi sources first
+    # NOTE: TIDALMusicClient requires separate auth via browser, not included in default
     DEFAULT_CLIENTS = [
-        'TIDALMusicClient',       # HiFi lossless
-        'YouTubeMusicClient',     # Already have yt-dlp, but can be fallback
         'NeteaseMusicClient',     # Large Chinese library
         'KugouMusicClient',       # Another large source
+        'KuwoMusicClient',        # Kuwo music
+        'QianqianMusicClient',    # Qianqian music
     ]
     
     # Additional clients for specific platforms
