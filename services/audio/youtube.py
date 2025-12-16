@@ -277,9 +277,34 @@ class YouTubeDownloader(BaseDownloader):
             logger.error(f"Failed to get stream URL: {e}")
             return None
     
+    async def _upload_to_ftp_cache(self, file_path: Path, artist: str, title: str) -> None:
+        """
+        Upload downloaded file to FTP cache (fire-and-forget).
+        
+        This is called after a successful download to cache the file
+        for future use. Runs in background, doesn't block playback.
+        
+        Args:
+            file_path: Local file path
+            artist: Artist name  
+            title: Track title
+        """
+        try:
+            from services.storage.ftp_storage import get_ftp_cache
+            ftp_cache = get_ftp_cache()
+            
+            if ftp_cache.is_enabled:
+                # Upload in background (don't block playback)
+                asyncio.create_task(
+                    ftp_cache.upload(file_path, artist, title)
+                )
+                logger.debug(f"FTP upload scheduled: {title}")
+        except Exception as e:
+            logger.warning(f"FTP upload scheduling failed: {e}")
+    
     async def download(self, track_info: TrackInfo) -> AudioResult:
         """
-        Download audio - MusicDL first, then YouTube Music fallback
+        Download audio - FTP cache first, then MusicDL, then YouTube Music fallback
         
         Args:
             track_info: Track information
@@ -294,6 +319,37 @@ class YouTubeDownloader(BaseDownloader):
         
         # Get output path
         output_path = self._get_output_path(track_info, 'opus')
+        
+        # ========================================
+        # PRIORITY 0: Check FTP Cache first
+        # ========================================
+        try:
+            from services.storage.ftp_storage import get_ftp_cache
+            ftp_cache = get_ftp_cache()
+            
+            if ftp_cache.is_enabled:
+                # Check if exists in FTP cache
+                if await ftp_cache.exists(track_info.artist, track_info.title):
+                    logger.info(f"☁️ Found in FTP cache: {track_info.title}")
+                    
+                    # Download from FTP
+                    if await ftp_cache.download(track_info.artist, track_info.title, output_path):
+                        logger.info(f"☁️ Downloaded from FTP cache: {output_path.name}")
+                        
+                        return AudioResult(
+                            file_path=output_path,
+                            title=track_info.title,
+                            artist=track_info.artist,
+                            duration=track_info.duration,
+                            source=AudioSource.YOUTUBE_MUSIC,
+                            bitrate=Settings.AUDIO_BITRATE,
+                            format='opus',
+                            sample_rate=Settings.AUDIO_SAMPLE_RATE
+                        )
+                else:
+                    logger.debug(f"Not in FTP cache: {track_info.title}")
+        except Exception as e:
+            logger.warning(f"FTP cache check failed: {e}")
         
         # ========================================
         # PRIORITY 1: Try MusicDL (primary source)
@@ -332,6 +388,10 @@ class YouTubeDownloader(BaseDownloader):
                         sample_rate=Settings.AUDIO_SAMPLE_RATE
                     )
                     result.delete_after_play = delete_after_play
+                    
+                    # Upload to FTP cache (background, non-blocking)
+                    await self._upload_to_ftp_cache(downloaded_file, track_info.artist, track_info.title)
+                    
                     return result
                 else:
                     logger.info("MusicDL: No result, falling back to yt-dlp...")
@@ -491,6 +551,9 @@ class YouTubeDownloader(BaseDownloader):
                 self._check_file_size(output_path)
                 
                 logger.info(f"✓ Downloaded (web client): {output_path.name}")
+                
+                # Upload to FTP cache (background, non-blocking)
+                await self._upload_to_ftp_cache(output_path, track_info.artist, track_info.title)
                 
                 return AudioResult(
                     file_path=output_path,

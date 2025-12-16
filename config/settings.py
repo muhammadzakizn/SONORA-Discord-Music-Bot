@@ -96,6 +96,12 @@ class Settings:
     PROGRESS_BAR_LENGTH: int = 20
     LYRICS_DISPLAY_LINES: int = 3
     
+    # FTP Audio Cache (Hostinger)
+    FTP_HOST: str = os.getenv('FTP_HOST', '')
+    FTP_USER: str = os.getenv('FTP_USER', '')
+    FTP_PASSWORD: str = os.getenv('FTP_PASSWORD', '')
+    FTP_DIRECTORY: str = os.getenv('FTP_DIRECTORY', '/audio-cache')
+    
     @classmethod
     def validate(cls) -> bool:
         """Validate that all required settings are present"""
