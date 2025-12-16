@@ -101,6 +101,54 @@ class MusicDLHandler:
         """Check if MusicDL is available and initialized"""
         return MUSICDL_AVAILABLE and self._initialized
     
+    def _score_result(self, song: Dict, query: str) -> int:
+        """
+        Score a search result for relevance
+        
+        Higher score = better match
+        Negative scores for remixes/covers unless specifically requested
+        """
+        score = 0
+        song_name = song.get('song_name', '').lower()
+        artist = song.get('singers', '').lower()
+        query_lower = query.lower()
+        
+        # Parse query for artist and title
+        if ' - ' in query:
+            expected_artist, expected_title = query.split(' - ', 1)
+            expected_artist = expected_artist.lower().strip()
+            expected_title = expected_title.lower().strip()
+        else:
+            expected_artist = ''
+            expected_title = query_lower.strip()
+        
+        # Exact title match bonus
+        if expected_title in song_name:
+            score += 50
+        
+        # Exact artist match bonus
+        if expected_artist and expected_artist in artist:
+            score += 30
+        
+        # PENALIZE remixes/covers unless specifically requested
+        remix_keywords = ['remix', 'cover', 'dj ', 'mashup', 'bootleg', 'edit', 
+                         'extended', 'club mix', 'radio edit', 'instrumental',
+                         'karaoke', 'acapella', 'acoustic version', 'live']
+        
+        is_remix_requested = any(kw in query_lower for kw in remix_keywords)
+        
+        if not is_remix_requested:
+            for kw in remix_keywords:
+                if kw in song_name:
+                    score -= 100  # Heavy penalty for unwanted remixes
+                    break
+        
+        # Penalize very long titles (likely have extra info)
+        if len(song_name) > len(expected_title) * 2:
+            score -= 20
+        
+        return score
+    
     async def search(self, query: str) -> Optional[Dict[str, Any]]:
         """
         Search for a track using MusicDL
@@ -126,25 +174,46 @@ class MusicDLHandler:
                 logger.debug(f"No MusicDL results for: {query}")
                 return None
             
-            # Get best result (first available with valid download URL)
+            # Collect all valid results with scores
+            scored_results = []
             for source, songs in results.items():
                 for song in songs:
                     if song.get('download_url') or song.get('with_valid_download_url'):
-                        logger.info(f"Found on MusicDL ({source}): {song.get('song_name')}")
-                        return {
+                        score = self._score_result(song, query)
+                        scored_results.append({
+                            'score': score,
                             'source': source,
-                            'title': song.get('song_name', 'Unknown'),
-                            'artist': song.get('singers', 'Unknown'),
-                            'album': song.get('album', ''),
-                            'duration': song.get('duration', ''),
-                            'file_size': song.get('file_size', ''),
-                            'ext': song.get('ext', 'mp3'),
-                            'download_url': song.get('download_url'),
-                            'raw_data': song,
-                        }
+                            'song': song
+                        })
             
-            logger.debug(f"No valid download URLs in MusicDL results for: {query}")
-            return None
+            if not scored_results:
+                logger.debug(f"No valid download URLs in MusicDL results for: {query}")
+                return None
+            
+            # Sort by score (highest first)
+            scored_results.sort(key=lambda x: x['score'], reverse=True)
+            
+            # Get best result
+            best = scored_results[0]
+            song = best['song']
+            source = best['source']
+            
+            # Log if we filtered out remixes
+            if best['score'] < 0:
+                logger.warning(f"Best result has negative score ({best['score']}), may not be accurate match")
+            
+            logger.info(f"Found on MusicDL ({source}): {song.get('song_name')} [score: {best['score']}]")
+            return {
+                'source': source,
+                'title': song.get('song_name', 'Unknown'),
+                'artist': song.get('singers', 'Unknown'),
+                'album': song.get('album', ''),
+                'duration': song.get('duration', ''),
+                'file_size': song.get('file_size', ''),
+                'ext': song.get('ext', 'mp3'),
+                'download_url': song.get('download_url'),
+                'raw_data': song,
+            }
             
         except Exception as e:
             logger.error(f"MusicDL search error: {e}")
