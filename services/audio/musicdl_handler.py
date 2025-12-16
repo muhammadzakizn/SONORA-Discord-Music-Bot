@@ -258,14 +258,21 @@ class MusicDLHandler:
             if not results:
                 return None
             
-            # Collect all results, PREFER FLAC
+            # Collect all results with quality + title matching
             scored_results = []
+            
+            # Extract expected title from query
+            query_lower = query.lower()
+            remix_keywords = ['remix', 'mix', 'bootleg', 'edit', 'version', 'cover', 'mashup']
+            is_remix_requested = any(kw in query_lower for kw in remix_keywords)
+            
             for source, songs in results.items():
                 for song in songs:
                     if song.get('download_url') or song.get('with_valid_download_url'):
                         file_ext = song.get('ext', '').lower()
+                        song_name = song.get('song_name', '').lower()
                         
-                        # Quality scoring - FLAC preferred
+                        # Base quality scoring - FLAC preferred
                         if file_ext == 'flac':
                             score = 200  # FLAC highest priority
                         elif file_ext == 'm4a':
@@ -274,6 +281,17 @@ class MusicDLHandler:
                             score = 50  # MP3 fallback
                         else:
                             score = 0
+                        
+                        # PENALTY: Unwanted remixes
+                        if not is_remix_requested:
+                            for kw in remix_keywords:
+                                if kw in song_name:
+                                    score -= 300  # Heavy penalty for remixes
+                                    break
+                        
+                        # BONUS: Exact title match
+                        if query_lower.split(' - ')[-1].strip() in song_name:
+                            score += 50
                         
                         scored_results.append({
                             'score': score,
