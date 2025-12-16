@@ -721,56 +721,61 @@ class PlayCommand(commands.Cog):
         errors = []
         
         # ========================================
-        # TIER 1: MusicDL via YouTubeDownloader (PRIMARY)
-        # YouTubeDownloader internally uses MusicDL first, then yt-dlp
+        # TIER 1: FTP Cache (REMOTE CACHE) 
+        # Check FTP first for previously downloaded tracks
+        # ========================================
+        try:
+            from services.storage.ftp_storage import get_ftp_cache
+            ftp_cache = get_ftp_cache()
+            
+            if ftp_cache.is_enabled:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_loading(
+                        "Checking Cloud Cache",
+                        f"☁️ Checking FTP cache...\n**{track_info.title}**"
+                    )
+                )
+                
+                if await ftp_cache.exists(track_info.artist, track_info.title):
+                    logger.info(f"☁️ Found in FTP cache: {track_info.title}")
+                    
+                    # Download from FTP
+                    cache_path = await ftp_cache.download(track_info.artist, track_info.title)
+                    
+                    if cache_path and cache_path.exists():
+                        result = AudioResult(
+                            file_path=cache_path,
+                            title=track_info.title,
+                            artist=track_info.artist,
+                            duration=track_info.duration,
+                            source="FTP Cache",
+                            bitrate=256,
+                            format='opus',
+                            sample_rate=48000,
+                            delete_after_play=True  # Clean up after playback
+                        )
+                        logger.info(f"☁️ Loaded from FTP cache: {cache_path.name}")
+                        return result
+        except Exception as e:
+            logger.warning(f"FTP cache check failed: {e}")
+        
+        # ========================================
+        # TIER 2: yt-dlp Direct Download (PRIMARY)
+        # Download via yt-dlp, then upload to FTP
         # ========================================
         try:
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
                     "Downloading",
-                    f"Source: Music Library\n⏳ Mengunduh audio..."
+                    f"📥 Downloading via yt-dlp...\n**{track_info.title}**"
                 )
             )
             
-            result = await self.youtube_downloader.download(track_info)
-            result.source = "MusicDL"
+            # Force yt-dlp (skip MusicDL internally)
+            result = await self.youtube_downloader._download_from_ytdlp(track_info)
             
-            # Verify downloaded file
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Verifying",
-                    f"✅ Memverifikasi audio...\n**{track_info.title}**"
-                )
-            )
-            from utils.track_verifier import TrackVerifier
-            verification = await TrackVerifier.verify_track(result.file_path, track_info)
-            
-            if not verification.success:
-                logger.warning(f"MusicDL verification failed: {verification.message}")
-                raise Exception(f"Verification failed: {verification.message}")
-            
-            logger.info(f"✓ Downloaded & verified from MusicDL: {result.title} (confidence: {verification.confidence:.2f})")
-            return result
-        
-        except Exception as e:
-            errors.append({"source": "MusicDL", "error": str(e)})
-            logger.warning(f"MusicDL/YouTube download failed: {e}")
-        
-        # ========================================
-        # TIER 2: Spotify via spotdl (FALLBACK)
-        # Only for tracks with Spotify URL
-        # ========================================
-        if track_info.url and 'spotify.com' in str(track_info.url):
-            try:
-                await self._safe_loader_update(loader, 
-                    embed=EmbedBuilder.create_loading(
-                        "Downloading",
-                        f"Source: Spotify (fallback)\n⏳ Mengunduh audio..."
-                    )
-                )
-                
-                result = await self.spotify_downloader.download(track_info)
-                result.source = "Spotify"
+            if result and result.file_path and result.file_path.exists():
+                result.source = "YouTube Music"
                 
                 # Verify downloaded file
                 await self._safe_loader_update(loader, 
@@ -782,18 +787,92 @@ class PlayCommand(commands.Cog):
                 from utils.track_verifier import TrackVerifier
                 verification = await TrackVerifier.verify_track(result.file_path, track_info)
                 
-                if not verification.success:
-                    logger.warning(f"Spotify verification failed: {verification.message}")
+                if verification.success:
+                    logger.info(f"✓ Downloaded & verified via yt-dlp: {result.title} (confidence: {verification.confidence:.2f})")
+                    
+                    # Upload to FTP cache in background
+                    try:
+                        from services.storage.ftp_storage import get_ftp_cache
+                        ftp_cache = get_ftp_cache()
+                        if ftp_cache.is_enabled:
+                            asyncio.create_task(
+                                ftp_cache.upload(result.file_path, track_info.artist, track_info.title)
+                            )
+                            logger.info(f"☁️ Uploading to FTP cache: {track_info.title}")
+                    except Exception as e:
+                        logger.warning(f"FTP upload failed: {e}")
+                    
+                    return result
+                else:
+                    logger.warning(f"yt-dlp verification failed: {verification.message}")
                     raise Exception(f"Verification failed: {verification.message}")
-                
-                logger.info(f"✓ Downloaded & verified from Spotify: {result.title} (confidence: {verification.confidence:.2f})")
-                return result
+        
+        except Exception as e:
+            errors.append({"source": "yt-dlp", "error": str(e)})
+            logger.warning(f"yt-dlp download failed: {e}")
+        
+        # ========================================
+        # TIER 3: MusicDL (LAST RESORT)
+        # Only if yt-dlp fails, try MusicDL
+        # ========================================
+        try:
+            await self._safe_loader_update(loader, 
+                embed=EmbedBuilder.create_loading(
+                    "Trying Alternative",
+                    f"🎵 Trying MusicDL...\n**{track_info.title}**"
+                )
+            )
             
-            except Exception as e:
-                errors.append({"source": "Spotify", "error": str(e)})
-                logger.warning(f"Spotify download failed: {e}")
-        else:
-            logger.debug("No Spotify URL, skipping Spotify fallback")
+            from services.audio.musicdl_handler import get_musicdl_handler
+            musicdl = get_musicdl_handler()
+            
+            if musicdl.is_available:
+                query = f"{track_info.artist} - {track_info.title}"
+                song_info = await musicdl.search_best_quality(query)
+                
+                if song_info:
+                    # Download
+                    downloaded_file = await musicdl.download(song_info, self.youtube_downloader.download_dir)
+                    
+                    if downloaded_file and downloaded_file.exists():
+                        result = AudioResult(
+                            file_path=downloaded_file,
+                            title=track_info.title,
+                            artist=track_info.artist,
+                            duration=track_info.duration,
+                            source="MusicDL",
+                            bitrate=256,
+                            format=song_info.get('ext', 'unknown'),
+                            sample_rate=48000
+                        )
+                        
+                        # Verify
+                        from utils.track_verifier import TrackVerifier
+                        verification = await TrackVerifier.verify_track(result.file_path, track_info)
+                        
+                        if verification.success:
+                            logger.info(f"✓ Downloaded & verified via MusicDL: {result.title}")
+                            
+                            # Upload to FTP
+                            try:
+                                from services.storage.ftp_storage import get_ftp_cache
+                                ftp_cache = get_ftp_cache()
+                                if ftp_cache.is_enabled:
+                                    asyncio.create_task(
+                                        ftp_cache.upload(result.file_path, track_info.artist, track_info.title)
+                                    )
+                            except:
+                                pass
+                            
+                            return result
+                        else:
+                            logger.warning(f"MusicDL verification failed: {verification.message}")
+            
+            raise Exception("MusicDL not available or no results")
+        
+        except Exception as e:
+            errors.append({"source": "MusicDL", "error": str(e)})
+            logger.warning(f"MusicDL download failed: {e}")
         
         # All failed
         raise DownloadError("All sources failed", details=errors)

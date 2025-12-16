@@ -545,8 +545,25 @@ class YouTubeDownloader(BaseDownloader):
         except Exception as e:
             logger.warning(f"MusicDL failed: {e}, falling back to yt-dlp...")
         
+        # Use yt-dlp fallback
+        return await self._download_from_ytdlp(track_info)
+    
+    async def _download_from_ytdlp(self, track_info: TrackInfo) -> AudioResult:
+        """
+        Download audio using yt-dlp directly (skip MusicDL).
+        
+        This method is used when:
+        - MusicDL fails or is unavailable
+        - Direct yt-dlp download is requested (e.g., after 403 stream failure)
+        
+        Args:
+            track_info: Track information
+            
+        Returns:
+            AudioResult with download result
+        """
         # ========================================
-        # PRIORITY 2: YouTube Music via yt-dlp (fallback)
+        # YouTube Music via yt-dlp 
         # ========================================
         logger.info(f"Downloading from YouTube Music (fallback): {track_info}")
         
