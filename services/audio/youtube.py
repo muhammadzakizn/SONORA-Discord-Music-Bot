@@ -251,10 +251,11 @@ class YouTubeDownloader(BaseDownloader):
             ]
             
             # Add cookies
-            if Settings.YOUTUBE_COOKIES.exists():
+            yt_cookies = Settings.get_youtube_cookies()
+            if yt_cookies:
                 try:
-                    if Settings.YOUTUBE_COOKIES.stat().st_size > 0:
-                        command.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
+                    if yt_cookies.stat().st_size > 0:
+                        command.extend(['--cookies', str(yt_cookies)])
                         logger.debug("Using YouTube Music cookies for stream")
                 except:
                     pass
@@ -591,11 +592,12 @@ class YouTubeDownloader(BaseDownloader):
         # ALWAYS use YouTube Music cookies for authenticated downloads
         # This ensures we get music.youtube.com audio (no video intro)
         cookies_added = False
-        if Settings.YOUTUBE_COOKIES.exists():
+        yt_cookies = Settings.get_youtube_cookies()
+        if yt_cookies:
             try:
-                cookie_size = Settings.YOUTUBE_COOKIES.stat().st_size
+                cookie_size = yt_cookies.stat().st_size
                 if cookie_size > 0:
-                    command.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
+                    command.extend(['--cookies', str(yt_cookies)])
                     cookies_added = True
                     logger.info(f"✓ Download: Using YouTube Music cookies ({cookie_size} bytes)")
                 else:
@@ -669,8 +671,8 @@ class YouTubeDownloader(BaseDownloader):
         ]
         
         # Always add cookies for web client
-        if cookies_added:
-            command_fallback.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
+        if cookies_added and yt_cookies:
+            command_fallback.extend(['--cookies', str(yt_cookies)])
             logger.info(f"  Fallback: Using YouTube Music cookies")
         
         stdout, stderr, returncode = await self._run_command(command_fallback, timeout=300)
