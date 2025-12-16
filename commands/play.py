@@ -928,82 +928,39 @@ class PlayCommand(commands.Cog):
         tracks_queued = 0
         
         async def on_first_track(track: TrackInfo):
-            """Called when first track is ready - Check FTP first, then stream if not cached"""
+            """Called when first track is ready - STREAM immediately (faster!)"""
             nonlocal first_track_played
             
+            # Try streaming first for instant playback
             stream_url = None
             use_streaming = False
-            audio_result = None
-            ftp_cached = False
             
-            # ========================================
-            # STEP 1: Check FTP cache FIRST
-            # ========================================
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
-                    "☁️ Checking FTP Cache",
+                    "🌐 Streaming First Track",
                     f"**{track.title}** - *{track.artist}*"
                 )
             )
             
             try:
-                from services.storage.ftp_storage import get_ftp_cache
-                ftp_cache = get_ftp_cache()
-                
-                if ftp_cache.is_enabled:
-                    if await ftp_cache.exists(track.artist, track.title):
-                        logger.info(f"☁️ Found in FTP cache: {track.title}")
-                        
-                        # Download from FTP
-                        from config.settings import Settings
-                        cache_path = Settings.DOWNLOADS_DIR / f"ftp_{track.artist}_{track.title}.opus"
-                        
-                        if await ftp_cache.download(track.artist, track.title, cache_path):
-                            from config.constants import AudioSource
-                            audio_result = AudioResult(
-                                file_path=cache_path,
-                                title=track.title,
-                                artist=track.artist,
-                                duration=track.duration,
-                                source=AudioSource.YOUTUBE_MUSIC,
-                                bitrate=256,
-                                format='opus',
-                                sample_rate=48000
-                            )
-                            ftp_cached = True
-                            logger.info(f"☁️ Loaded from FTP: {cache_path.name}")
-            except Exception as e:
-                logger.warning(f"FTP cache check failed: {e}")
-            
-            # ========================================
-            # STEP 2: If not in FTP, STREAM via yt-dlp
-            # ========================================
-            if not ftp_cached:
-                await self._safe_loader_update(loader, 
-                    embed=EmbedBuilder.create_loading(
-                        "🌐 Streaming First Track",
-                        f"**{track.title}** - *{track.artist}*"
-                    )
-                )
-                
-                try:
-                    stream_url = await self.youtube_downloader.get_stream_url(track)
-                    if stream_url:
-                        use_streaming = True
-                        logger.info(f"✓ Got stream URL for playlist first track")
-                        
-                        # Start background download to FTP cache (FLAC via MusicDL)
-                        asyncio.create_task(
-                            self.youtube_downloader.background_download_for_cache(
-                                track.artist, track.title
-                            )
+                stream_url = await self.youtube_downloader.get_stream_url(track)
+                if stream_url:
+                    use_streaming = True
+                    logger.info(f"✓ Got stream URL for playlist first track")
+                    
+                    # Start background download to FTP cache (FLAC via MusicDL)
+                    asyncio.create_task(
+                        self.youtube_downloader.background_download_for_cache(
+                            track.artist, track.title
                         )
-                        logger.info(f"📥 Background download started: {track.title} → FTP")
-                except Exception as e:
-                    logger.warning(f"Stream failed: {e}, falling back to download")
+                    )
+                    logger.info(f"📥 Background download started: {track.title} → FTP")
+            except Exception as e:
+                logger.warning(f"Stream failed: {e}, falling back to download")
             
-            # Fallback to download if streaming fails AND not from FTP
-            if not use_streaming and not ftp_cached:
+            # Fallback to download if streaming fails
+            audio_result = None
+            if not use_streaming:
                 await self._safe_loader_update(loader, 
                     embed=EmbedBuilder.create_loading(
                         "Downloading First Track",
@@ -1217,81 +1174,45 @@ class PlayCommand(commands.Cog):
         tracks_queued = 0
         
         async def on_first_track(track: TrackInfo):
-            """Called when first track is ready - Check FTP first, then stream"""
+            """Called when first track is ready - STREAM immediately (faster!)"""
             nonlocal first_track_played
             
             if is_already_playing:
+                # Bot already playing, queue this track too
                 track.voice_channel_id = voice_channel.id
                 queue_cog.queues[guild_id].append(track)
                 return
             
+            # Try streaming first for instant playback
             stream_url = None
             use_streaming = False
-            audio_result = None
-            ftp_cached = False
             
-            # STEP 1: Check FTP cache first
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
-                    "☁️ Checking FTP Cache",
+                    "🌐 Streaming First Track",
                     f"**{track.title}** - *{track.artist}*"
                 )
             )
             
             try:
-                from services.storage.ftp_storage import get_ftp_cache
-                ftp_cache = get_ftp_cache()
-                
-                if ftp_cache.is_enabled:
-                    if await ftp_cache.exists(track.artist, track.title):
-                        logger.info(f"☁️ Found in FTP cache: {track.title}")
-                        
-                        from config.settings import Settings
-                        cache_path = Settings.DOWNLOADS_DIR / f"ftp_{track.artist}_{track.title}.opus"
-                        
-                        if await ftp_cache.download(track.artist, track.title, cache_path):
-                            from config.constants import AudioSource
-                            audio_result = AudioResult(
-                                file_path=cache_path,
-                                title=track.title,
-                                artist=track.artist,
-                                duration=track.duration,
-                                source=AudioSource.YOUTUBE_MUSIC,
-                                bitrate=256,
-                                format='opus',
-                                sample_rate=48000
-                            )
-                            ftp_cached = True
-                            logger.info(f"☁️ Loaded from FTP: {cache_path.name}")
-            except Exception as e:
-                logger.warning(f"FTP cache check failed: {e}")
-            
-            # STEP 2: If not in FTP, stream via yt-dlp
-            if not ftp_cached:
-                await self._safe_loader_update(loader, 
-                    embed=EmbedBuilder.create_loading(
-                        "🌐 Streaming First Track",
-                        f"**{track.title}** - *{track.artist}*"
-                    )
-                )
-                
-                try:
-                    stream_url = await self.youtube_downloader.get_stream_url(track)
-                    if stream_url:
-                        use_streaming = True
-                        logger.info(f"✓ Got stream URL for YouTube playlist first track")
-                        
-                        asyncio.create_task(
-                            self.youtube_downloader.background_download_for_cache(
-                                track.artist, track.title
-                            )
+                stream_url = await self.youtube_downloader.get_stream_url(track)
+                if stream_url:
+                    use_streaming = True
+                    logger.info(f"✓ Got stream URL for YouTube playlist first track")
+                    
+                    # Start background download to FTP cache
+                    asyncio.create_task(
+                        self.youtube_downloader.background_download_for_cache(
+                            track.artist, track.title
                         )
-                        logger.info(f"📥 Background download started: {track.title} → FTP")
-                except Exception as e:
-                    logger.warning(f"Stream failed: {e}, falling back to download")
+                    )
+                    logger.info(f"📥 Background download started: {track.title} → FTP")
+            except Exception as e:
+                logger.warning(f"Stream failed: {e}, falling back to download")
             
-            # Fallback to download if streaming fails AND not from FTP
-            if not use_streaming and not ftp_cached:
+            # Fallback to download if streaming fails
+            audio_result = None
+            if not use_streaming:
                 await self._safe_loader_update(loader, 
                     embed=EmbedBuilder.create_loading(
                         "Downloading First Track",

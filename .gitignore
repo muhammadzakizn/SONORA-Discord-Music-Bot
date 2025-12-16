@@ -109,3 +109,4 @@ web/.git
 *.flac
 *.pkl
 *.opus
+downloads/playlist_cache/
