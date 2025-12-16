@@ -843,10 +843,9 @@ class SynchronizedMediaPlayer:
                 self.prefetched_metadata = None  # Clear cache
             
             elif isinstance(next_item, TrackInfo):
-                # Need to download and process this track (pre-fetch didn't complete or failed)
+                # Need to download and process this track
                 logger.info(f"Processing next track: {next_item.title}")
                 
-                # Get Play command to use download methods
                 play_cog = self.bot.get_cog('PlayCommand')
                 if not play_cog:
                     logger.error("PlayCommand not available for download")
@@ -858,17 +857,39 @@ class SynchronizedMediaPlayer:
                     use_streaming = False
                     
                     # ========================================
-                    # STEP 1: Check FTP cache first
+                    # STEP 1: Check if already prepared in cache
                     # ========================================
+                    queue_items = queue_cog.queues.get(self.guild_id, [])
+                    current_queue_idx = 0  # Assume this is first in queue
+                    
                     try:
-                        from services.storage.ftp_storage import get_ftp_cache
-                        ftp_cache = get_ftp_cache()
+                        from services.audio.playlist_cache import get_playlist_cache
+                        playlist_cache = get_playlist_cache()
                         
-                        if ftp_cache.is_enabled:
-                            if await ftp_cache.exists(next_item.artist, next_item.title):
+                        # Get cached track if available
+                        cached_track = playlist_cache.get_cached_track(current_queue_idx)
+                        
+                        if cached_track and cached_track.audio_path:
+                            logger.info(f"✓ Using CACHED track: {next_item.title}")
+                            from config.constants import AudioSource
+                            from database.models import AudioResult as AR
+                            audio_result = AR(
+                                file_path=cached_track.audio_path,
+                                title=next_item.title,
+                                artist=next_item.artist,
+                                duration=next_item.duration,
+                                source=AudioSource.YOUTUBE_MUSIC,
+                                bitrate=256,
+                                format='opus',
+                                sample_rate=48000
+                            )
+                        else:
+                            # Check FTP directly
+                            from services.storage.ftp_storage import get_ftp_cache
+                            ftp_cache = get_ftp_cache()
+                            
+                            if ftp_cache.is_enabled and await ftp_cache.exists(next_item.artist, next_item.title):
                                 logger.info(f"☁️ Found in FTP: {next_item.title}")
-                                
-                                # Download from FTP to local cache
                                 from config.settings import Settings
                                 cache_path = Settings.DOWNLOADS_DIR / f"ftp_{next_item.artist}_{next_item.title}.opus"
                                 
@@ -887,10 +908,10 @@ class SynchronizedMediaPlayer:
                                     )
                                     logger.info(f"☁️ Loaded from FTP: {cache_path.name}")
                     except Exception as e:
-                        logger.warning(f"FTP cache check failed: {e}")
+                        logger.warning(f"Cache check failed: {e}")
                     
                     # ========================================
-                    # STEP 2: If not cached, try streaming
+                    # STEP 2: If not cached, stream with 6s buffer
                     # ========================================
                     if not audio_result:
                         logger.info(f"🌐 Streaming: {next_item.title}")
@@ -900,8 +921,6 @@ class SynchronizedMediaPlayer:
                             if stream_url:
                                 use_streaming = True
                                 logger.info(f"✓ Got stream URL, buffering 6s...")
-                                
-                                # Wait for buffer
                                 await asyncio.sleep(6)
                                 
                                 # Background: download to FTP cache
@@ -924,40 +943,34 @@ class SynchronizedMediaPlayer:
                         logger.error(f"Failed all methods: {next_item.title}")
                         return await self._play_next_from_queue()
                     
-                    # Process metadata (artwork + lyrics)
+                    # Process metadata
                     voice_ch_id = getattr(next_item, 'voice_channel_id', None)
                     orig_requested_by = getattr(next_item, 'requested_by', None)
                     orig_requested_by_id = getattr(next_item, 'requested_by_id', 0)
                     
                     next_metadata = await play_cog.metadata_processor.process(
                         next_item,
-                        audio_result,  # Can be None for streaming
+                        audio_result,
                         requested_by=orig_requested_by or "Queue",
                         requested_by_id=orig_requested_by_id or 0,
                         prefer_apple_artwork=True,
                         voice_channel_id=voice_ch_id
                     )
                     
-                    # Store stream_url if streaming
                     if use_streaming and stream_url:
                         next_metadata.stream_url = stream_url
                     
                     # ========================================
-                    # STEP 4: Prepare next 3 tracks in background
+                    # STEP 4: Trigger on_track_started to prepare next
                     # ========================================
                     try:
-                        queue_items = queue_cog.queues.get(self.guild_id, [])
-                        if len(queue_items) > 0:
-                            from services.audio.playlist_cache import get_playlist_cache
-                            playlist_cache = get_playlist_cache()
-                            
-                            # Prepare next 3 tracks (background)
-                            asyncio.create_task(
-                                playlist_cache.prepare_next_tracks(0, queue_items)
-                            )
-                            logger.debug(f"Started preparing next 3 tracks")
+                        from services.audio.playlist_cache import get_playlist_cache
+                        playlist_cache = get_playlist_cache()
+                        asyncio.create_task(
+                            playlist_cache.on_track_started(current_queue_idx, queue_items)
+                        )
                     except Exception as e:
-                        logger.warning(f"Buffer preparation failed: {e}")
+                        logger.debug(f"on_track_started failed: {e}")
                     
                 except Exception as e:
                     logger.error(f"Failed to process next track: {e}")
