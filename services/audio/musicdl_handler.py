@@ -149,6 +149,14 @@ class MusicDLHandler:
         if len(song_name) > len(expected_title) * 2:
             score -= 20
         
+        # SKIP FLAC files - too large and slow to download
+        # Prefer MP3 (small, fast download)
+        file_ext = song.get('ext', '').lower()
+        if file_ext == 'flac':
+            score -= 200  # Heavy penalty - skip FLAC entirely
+        elif file_ext in ['mp3', 'm4a', 'aac']:
+            score += 10  # Bonus for preferred formats
+        
         return score
     
     async def search(self, query: str) -> Optional[Dict[str, Any]]:
