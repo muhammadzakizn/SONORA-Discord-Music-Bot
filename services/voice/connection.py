@@ -287,6 +287,91 @@ class RobustVoiceConnection:
             and self.connection.is_paused()
         )
     
+    async def ensure_connected(self, channel: VoiceChannel = None) -> bool:
+        """
+        Verify voice connection is alive and restore if lost.
+        
+        Use this before any playback operation to ensure connection is stable.
+        
+        Args:
+            channel: Target channel (optional, uses current if not specified)
+            
+        Returns:
+            True if connected (or reconnected), False if failed
+        """
+        try:
+            # Quick check - already connected and healthy
+            if self.connection and self.connection.is_connected():
+                # Verify with ping check
+                if self.connection.latency > 0:
+                    logger.debug(f"Connection healthy (latency: {self.connection.latency:.0f}ms)")
+                    return True
+                else:
+                    # Latency 0 might indicate stale connection
+                    logger.warning("Zero latency detected, checking connection state...")
+            
+            # Not connected or stale - need to reconnect
+            if not channel:
+                channel = self.channel
+            
+            if not channel:
+                logger.error("No channel to reconnect to")
+                return False
+            
+            logger.info(f"Connection lost, attempting reconnect to {channel.name}...")
+            
+            # Cleanup old connection
+            await self.cleanup()
+            
+            # Reconnect
+            await self.connect(channel)
+            
+            if self.is_connected():
+                logger.info("✓ Reconnected successfully")
+                return True
+            else:
+                logger.error("Reconnection failed")
+                return False
+                
+        except Exception as e:
+            logger.error(f"ensure_connected failed: {e}")
+            return False
+    
+    def sync_state(self, guild: 'discord.Guild') -> bool:
+        """
+        Synchronize connection state with Discord's actual state.
+        
+        Use this when bot might have lost track of voice state.
+        
+        Args:
+            guild: Discord guild to sync with
+            
+        Returns:
+            True if connection is valid after sync
+        """
+        try:
+            actual_voice_client = guild.voice_client
+            
+            if actual_voice_client and actual_voice_client.is_connected():
+                # Discord says we're connected
+                if self.connection != actual_voice_client:
+                    logger.warning("Connection state mismatch, syncing...")
+                    self.connection = actual_voice_client
+                    self.guild_id = guild.id
+                    logger.info("✓ State synchronized")
+                return True
+            else:
+                # Discord says we're not connected
+                if self.connection:
+                    logger.warning("Internal state says connected but Discord says no")
+                    self.connection = None
+                    self.guild_id = None
+                return False
+                
+        except Exception as e:
+            logger.error(f"sync_state failed: {e}")
+            return False
+    
     async def move_to(self, channel: VoiceChannel) -> None:
         """
         Move to a different voice channel

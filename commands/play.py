@@ -409,6 +409,79 @@ class PlayCommand(commands.Cog):
         if loader:
             await loader.update(*args, **kwargs)
     
+    async def _process_track_with_retry(
+        self,
+        track_info: TrackInfo,
+        loader: Optional[SafeLoadingManager] = None,
+        max_retries: int = 3
+    ) -> tuple:
+        """
+        Process track with verification and retry logic.
+        
+        Flow:
+        1. Check cache with verification
+        2. Download with fallback chain (MusicDL → yt-dlp)
+        3. Verify audio matches expected track
+        4. Retry up to max_retries on failure
+        5. Return (None, skip_reason) to skip track after all retries fail
+        
+        Args:
+            track_info: Track to process
+            loader: Optional loading manager for UI updates
+            max_retries: Maximum number of retry attempts (default: 3)
+            
+        Returns:
+            Tuple of (AudioResult, skip_reason)
+            - If success: (AudioResult, None)
+            - If skip: (None, "reason for skip")
+        """
+        last_error = None
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Update UI
+                await self._safe_loader_update(loader,
+                    embed=EmbedBuilder.create_loading(
+                        f"Processing ({attempt}/{max_retries})",
+                        f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                        f"🔄 {'Mengunduh' if attempt == 1 else 'Mencoba ulang'}..."
+                    )
+                )
+                
+                # Try download with verification
+                audio_result = await self._download_with_fallback(track_info, loader)
+                
+                if audio_result and audio_result.is_success:
+                    logger.info(f"✓ Track ready (attempt {attempt}): {track_info.title}")
+                    return (audio_result, None)  # Success!
+                else:
+                    last_error = "Download returned empty result"
+                    logger.warning(f"Attempt {attempt} failed: {last_error}")
+                    
+            except Exception as e:
+                last_error = str(e)
+                logger.warning(f"Attempt {attempt} error: {e}")
+                
+                # Don't retry on certain errors
+                if "File terlalu besar" in str(e):
+                    return (None, f"File terlalu besar (> 100MB)")
+                
+                if attempt < max_retries:
+                    await self._safe_loader_update(loader,
+                        embed=EmbedBuilder.create_loading(
+                            f"Retry ({attempt}/{max_retries})",
+                            f"⚠️ Percobaan {attempt} gagal\n"
+                            f"🔄 Mencoba ulang dalam 2 detik..."
+                        )
+                    )
+                    await asyncio.sleep(2)
+        
+        # All retries failed - skip this track
+        skip_reason = f"Gagal setelah {max_retries}x percobaan: {last_error[:50] if last_error else 'Unknown'}"
+        logger.warning(f"Skipping track: {track_info.title} - {skip_reason}")
+        
+        return (None, skip_reason)
+    
     async def _download_with_fallback(
         self,
         track_info: TrackInfo,

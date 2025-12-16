@@ -59,6 +59,210 @@ class PlaylistProcessor:
             track = await self.spotify.search(url)
             return [track] if track else []
     
+    async def get_all_metadata_fast(self, url: str) -> List[TrackInfo]:
+        """
+        Get metadata for all tracks WITHOUT downloading audio.
+        This is the FASTEST way to get playlist/album info.
+        
+        Use this to:
+        1. Show track count immediately
+        2. Queue tracks with metadata
+        3. Download audio on-demand when needed
+        
+        Args:
+            url: URL to process (playlist or album)
+        
+        Returns:
+            List of TrackInfo with metadata only (no audio file)
+        """
+        url_type = URLValidator.get_url_type(url)
+        logger.info(f"Getting metadata fast for {url_type}: {url[:50]}...")
+        
+        try:
+            if url_type == 'spotify':
+                return await self._get_spotify_playlist_info_only(url)
+            
+            elif url_type in ['youtube', 'youtube_music']:
+                return await self._get_youtube_playlist_metadata(url)
+            
+            elif url_type == 'apple_music':
+                return await self._get_apple_music_metadata(url)
+            
+            elif url_type == 'soundcloud':
+                return await self._get_soundcloud_metadata(url)
+            
+            elif url_type == 'tidal':
+                return await self._get_tidal_metadata(url)
+            
+            else:
+                # Single track - just return as-is
+                track = await self.spotify.search(url)
+                return [track] if track else []
+                
+        except Exception as e:
+            logger.error(f"Fast metadata fetch failed: {e}")
+            # Fallback to regular process_url
+            return await self.process_url(url)
+    
+    async def _get_youtube_playlist_metadata(self, url: str) -> List[TrackInfo]:
+        """Get YouTube playlist metadata without downloading"""
+        try:
+            command = [
+                'yt-dlp',
+                '--flat-playlist',
+                '--dump-json',
+                '--no-download',
+                url
+            ]
+            
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=120
+            )
+            
+            if process.returncode != 0:
+                logger.warning(f"yt-dlp metadata failed: {stderr.decode()[:200]}")
+                return []
+            
+            tracks = []
+            for line in stdout.decode().strip().split('\n'):
+                if not line:
+                    continue
+                try:
+                    import json
+                    data = json.loads(line)
+                    track = TrackInfo(
+                        title=data.get('title', 'Unknown'),
+                        artist=data.get('uploader', data.get('channel', 'Unknown')),
+                        duration=data.get('duration', 0),
+                        url=f"https://youtube.com/watch?v={data.get('id', '')}",
+                        track_id=data.get('id')
+                    )
+                    tracks.append(track)
+                except Exception as e:
+                    logger.debug(f"Failed to parse track: {e}")
+                    continue
+            
+            logger.info(f"Got {len(tracks)} tracks from YouTube playlist (metadata only)")
+            return tracks
+            
+        except asyncio.TimeoutError:
+            logger.error("YouTube metadata fetch timed out")
+            return []
+        except Exception as e:
+            logger.error(f"YouTube metadata fetch failed: {e}")
+            return []
+    
+    async def _get_apple_music_metadata(self, url: str) -> List[TrackInfo]:
+        """Get Apple Music playlist/album metadata"""
+        try:
+            am_handler = get_apple_music_handler()
+            
+            if '/playlist/' in url:
+                tracks_data = await am_handler.get_playlist_tracks(url)
+            elif '/album/' in url:
+                tracks_data = await am_handler.get_album_tracks(url)
+            else:
+                return []
+            
+            if not tracks_data:
+                return []
+            
+            tracks = []
+            for data in tracks_data:
+                track = TrackInfo(
+                    title=data.get('title', 'Unknown'),
+                    artist=data.get('artist', 'Unknown'),
+                    album=data.get('album', ''),
+                    url=None,
+                    track_id=None
+                )
+                tracks.append(track)
+            
+            logger.info(f"Got {len(tracks)} tracks from Apple Music (metadata only)")
+            return tracks
+            
+        except Exception as e:
+            logger.error(f"Apple Music metadata fetch failed: {e}")
+            return []
+    
+    async def _get_soundcloud_metadata(self, url: str) -> List[TrackInfo]:
+        """Get SoundCloud set/playlist metadata"""
+        if '/sets/' not in url:
+            # Single track
+            return await self._process_soundcloud_url(url)
+        
+        try:
+            command = [
+                'yt-dlp',
+                '--flat-playlist',
+                '--dump-json',
+                url
+            ]
+            
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=60
+            )
+            
+            tracks = []
+            for line in stdout.decode().strip().split('\n'):
+                if not line:
+                    continue
+                try:
+                    import json
+                    data = json.loads(line)
+                    track = TrackInfo(
+                        title=data.get('title', 'Unknown'),
+                        artist=data.get('uploader', 'Unknown'),
+                        duration=data.get('duration', 0),
+                        url=data.get('url', data.get('webpage_url')),
+                        track_id=data.get('id')
+                    )
+                    tracks.append(track)
+                except Exception:
+                    continue
+            
+            logger.info(f"Got {len(tracks)} tracks from SoundCloud (metadata only)")
+            return tracks
+            
+        except Exception as e:
+            logger.error(f"SoundCloud metadata fetch failed: {e}")
+            return []
+    
+    async def _get_tidal_metadata(self, url: str) -> List[TrackInfo]:
+        """Get TIDAL metadata - falls back to search"""
+        # TIDAL requires authentication, so we just extract info from URL
+        # and create a placeholder for YouTube Music search
+        import re
+        match = re.search(r'tidal\.com/(?:browse/)?(track|album|playlist)/(\d+|[a-f0-9-]+)', url)
+        
+        if match:
+            content_type = match.group(1)
+            content_id = match.group(2)
+            
+            track = TrackInfo(
+                title=f"TIDAL {content_type} {content_id}",
+                artist="",
+                url=None,
+                track_id=content_id
+            )
+            return [track]
+        
+        return []
+    
     async def _process_spotify_url(self, url: str) -> List[TrackInfo]:
         """
         Process Spotify URL (track, playlist, or album)

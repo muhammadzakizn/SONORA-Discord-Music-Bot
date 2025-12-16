@@ -131,13 +131,14 @@ class BaseDownloader(ABC):
         filename = self._sanitize_filename(filename)
         return self.download_dir / f"{filename}.{extension}"
     
-    def check_cache(self, track_info: TrackInfo, extension: str = 'opus') -> Optional[Path]:
+    def check_cache(self, track_info: TrackInfo, extension: str = 'opus', verify: bool = False) -> Optional[Path]:
         """
         Check if track already exists in downloads folder (cache)
         
         Args:
             track_info: Track information
             extension: File extension (default: opus)
+            verify: If True, verify audio metadata matches track (slower but safer)
         
         Returns:
             Path to cached file if exists and valid, None otherwise
@@ -147,6 +148,11 @@ class BaseDownloader(ABC):
         if expected_path.exists() and expected_path.is_file():
             # Verify file is not empty
             if expected_path.stat().st_size > 0:
+                # Optional verification
+                if verify:
+                    if not self._verify_cache_match(expected_path, track_info):
+                        return None
+                
                 logger.info(f"✓ Found in cache: {expected_path.name}")
                 # Touch file to update access time (for LRU)
                 self._touch_cache_file(expected_path)
@@ -172,6 +178,11 @@ class BaseDownloader(ABC):
             if safe_artist in file_lower and safe_title in file_lower:
                 # Verify file is not empty
                 if file.stat().st_size > 0:
+                    # Optional verification
+                    if verify:
+                        if not self._verify_cache_match(file, track_info):
+                            continue
+                    
                     logger.info(f"✓ Found in cache (fuzzy match): {file.name}")
                     # Touch file to update access time (for LRU)
                     self._touch_cache_file(file)
@@ -195,6 +206,60 @@ class BaseDownloader(ABC):
             logger.debug(f"Touched cache file: {file_path.name}")
         except Exception as e:
             logger.warning(f"Failed to touch cache file {file_path}: {e}")
+    
+    def _verify_cache_match(self, file_path: Path, track_info: 'TrackInfo') -> bool:
+        """
+        Verify that cached audio file matches expected track
+        
+        Uses TrackVerifier for fuzzy matching of title/artist.
+        Deletes mismatched files automatically.
+        
+        Args:
+            file_path: Path to cached audio file
+            track_info: Expected track information
+            
+        Returns:
+            True if file matches, False otherwise
+        """
+        try:
+            from utils.track_verifier import TrackVerifier
+            import asyncio
+            
+            # Run verification (need to handle async from sync context)
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Create new event loop for sync operation
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        asyncio.run,
+                        TrackVerifier.verify_track(file_path, track_info)
+                    )
+                    result = future.result(timeout=10)
+            else:
+                result = asyncio.run(TrackVerifier.verify_track(file_path, track_info))
+            
+            if result.success:
+                logger.debug(f"Cache verified: {file_path.name} (confidence: {result.confidence:.2f})")
+                return True
+            else:
+                logger.warning(f"Cache mismatch: {file_path.name}")
+                logger.warning(f"  Expected: {track_info.artist} - {track_info.title}")
+                logger.warning(f"  Got: {result.actual_artist} - {result.actual_title}")
+                
+                # Delete mismatched file
+                try:
+                    file_path.unlink()
+                    logger.info(f"Deleted mismatched cache: {file_path.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete mismatched cache: {e}")
+                
+                return False
+                
+        except Exception as e:
+            logger.warning(f"Cache verification failed: {e}")
+            # On error, assume file is OK (don't delete)
+            return True
     
     async def _run_command(self, command: list, timeout: int = 300, env: dict = None) -> tuple:
         """
