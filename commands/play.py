@@ -118,40 +118,96 @@ class PlayCommand(commands.Cog):
                 )
                 return
             
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Found",
-                    f"**{track_info.title}** - *{track_info.artist}*\n\nPreparing..."
-                )
-            )
-            
             # ========================================
-            # SINGLE TRACK: TRY STREAMING FIRST
+            # SINGLE TRACK: HYBRID STREAMING FLOW
+            # Priority: FTP Cache → Stream + Background Download
             # ========================================
             stream_url = None
             audio_result = None
             use_streaming = False
+            ftp_cached = False
             
-            # Try to get stream URL for instant playback
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Streaming",
-                    f"**{track_info.title}** - *{track_info.artist}*\n\n🌐 Getting stream..."
-                )
-            )
-            
+            # STEP 1: Check FTP Cache first
             try:
-                stream_url = await self.youtube_downloader.get_stream_url(track_info)
-                if stream_url:
-                    use_streaming = True
-                    logger.info(f"✓ Got stream URL, using streaming mode")
-                else:
-                    logger.info("No stream URL, falling back to download")
+                from services.storage.ftp_storage import get_ftp_cache
+                ftp_cache = get_ftp_cache()
+                
+                if ftp_cache.is_enabled:
+                    await self._safe_loader_update(loader, 
+                        embed=EmbedBuilder.create_loading(
+                            "Checking Cache",
+                            f"**{track_info.title}** - *{track_info.artist}*\n\n☁️ Checking FTP cache..."
+                        )
+                    )
+                    
+                    if await ftp_cache.exists(track_info.artist, track_info.title):
+                        logger.info(f"☁️ Found in FTP cache: {track_info.title}")
+                        ftp_cached = True
+                        
+                        # Download from FTP cache
+                        await self._safe_loader_update(loader, 
+                            embed=EmbedBuilder.create_loading(
+                                "Loading from Cache",
+                                f"**{track_info.title}** - *{track_info.artist}*\n\n📥 Downloading from cache..."
+                            )
+                        )
+                        
+                        cache_path = self.youtube_downloader.download_dir / f"{track_info.artist}_{track_info.title}_cached.opus"
+                        if await ftp_cache.download(track_info.artist, track_info.title, cache_path):
+                            from database.models import AudioResult as AR
+                            from config.constants import AudioSource
+                            audio_result = AR(
+                                file_path=cache_path,
+                                title=track_info.title,
+                                artist=track_info.artist,
+                                duration=track_info.duration,
+                                source=AudioSource.YOUTUBE_MUSIC,
+                                bitrate=256,
+                                format='opus',
+                                sample_rate=48000
+                            )
+                            logger.info(f"☁️ Loaded from FTP cache: {cache_path.name}")
             except Exception as e:
-                logger.warning(f"Stream URL failed: {e}, falling back to download")
+                logger.warning(f"FTP cache check failed: {e}")
             
-            # If streaming not available, download
-            if not use_streaming:
+            # STEP 2: If not cached, stream + background download
+            if not ftp_cached:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_loading(
+                        "Streaming",
+                        f"**{track_info.title}** - *{track_info.artist}*\n\n🌐 Preparing stream..."
+                    )
+                )
+                
+                try:
+                    stream_url = await self.youtube_downloader.get_stream_url(track_info)
+                    if stream_url:
+                        use_streaming = True
+                        logger.info(f"✓ Got stream URL, using streaming mode")
+                        
+                        # Wait for buffer (important for stable playback)
+                        await self._safe_loader_update(loader, 
+                            embed=EmbedBuilder.create_loading(
+                                "Buffering",
+                                f"**{track_info.title}** - *{track_info.artist}*\n\n⏳ Buffering stream (6s)..."
+                            )
+                        )
+                        await asyncio.sleep(6)  # 6 second buffer for stable playback
+                        
+                        # Start background download for FTP cache
+                        asyncio.create_task(
+                            self.youtube_downloader.background_download_for_cache(
+                                track_info.artist, track_info.title
+                            )
+                        )
+                        logger.info(f"📥 Background: Started caching {track_info.title}")
+                    else:
+                        logger.info("No stream URL, falling back to download")
+                except Exception as e:
+                    logger.warning(f"Stream URL failed: {e}, falling back to download")
+            
+            # If streaming not available AND not from cache, download
+            if not use_streaming and not audio_result:
                 # Stage 2: Download with Verification (3x retry)
                 MAX_DOWNLOAD_RETRIES = 3
                 last_error = None

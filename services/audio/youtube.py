@@ -302,6 +302,84 @@ class YouTubeDownloader(BaseDownloader):
         except Exception as e:
             logger.warning(f"FTP upload scheduling failed: {e}")
     
+    async def background_download_for_cache(self, artist: str, title: str) -> None:
+        """
+        Background task: Download best quality audio and cache to FTP.
+        
+        Called while streaming to prepare high-quality file for future use.
+        Uses MusicDL to find FLAC/best quality, then uploads to FTP.
+        
+        Args:
+            artist: Artist name
+            title: Track title
+        """
+        try:
+            from services.audio.musicdl_handler import get_musicdl_handler
+            from services.storage.ftp_storage import get_ftp_cache
+            
+            ftp_cache = get_ftp_cache()
+            if not ftp_cache.is_enabled:
+                logger.debug("FTP cache disabled, skipping background download")
+                return
+            
+            # Check if already cached
+            if await ftp_cache.exists(artist, title):
+                logger.debug(f"Already in FTP cache: {title}")
+                return
+            
+            logger.info(f"📥 Background: Downloading for cache: {artist} - {title}")
+            
+            musicdl = get_musicdl_handler()
+            
+            if musicdl.is_available:
+                # Search for best quality (FLAC preferred)
+                query = f"{artist} - {title}"
+                song_info = await musicdl.search_best_quality(query)
+                
+                if song_info:
+                    # Download
+                    downloaded_file = await musicdl.download(song_info, self.download_dir)
+                    
+                    if downloaded_file and downloaded_file.exists():
+                        # Upload to FTP
+                        success = await ftp_cache.upload(downloaded_file, artist, title)
+                        
+                        if success:
+                            logger.info(f"☁️ Cached to FTP: {title} ({song_info.get('ext', 'unknown')})")
+                            # Clean up local file
+                            try:
+                                downloaded_file.unlink()
+                            except:
+                                pass
+                        return
+            
+            # Fallback: Use yt-dlp if MusicDL fails
+            logger.info(f"MusicDL failed, trying yt-dlp for cache: {title}")
+            
+            # Download via yt-dlp (best audio)
+            from database.models import TrackInfo as TI
+            temp_track = TI(
+                title=title,
+                artist=artist,
+                url=None,
+                source="youtube_music"
+            )
+            
+            # Use regular download
+            result = await self.download(temp_track)
+            if result and result.file_path and result.file_path.exists():
+                success = await ftp_cache.upload(result.file_path, artist, title)
+                if success:
+                    logger.info(f"☁️ Cached to FTP via yt-dlp: {title}")
+                # Clean up
+                try:
+                    result.file_path.unlink()
+                except:
+                    pass
+                    
+        except Exception as e:
+            logger.error(f"Background cache download failed: {e}")
+    
     async def download(self, track_info: TrackInfo) -> AudioResult:
         """
         Download audio - FTP cache first, then MusicDL, then YouTube Music fallback

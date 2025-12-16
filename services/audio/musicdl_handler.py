@@ -233,6 +233,85 @@ class MusicDLHandler:
             logger.error(f"MusicDL search error: {e}")
             return None
     
+    async def search_best_quality(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Search for a track preferring HIGHEST quality (FLAC first).
+        Used for FTP cache downloads.
+        
+        Args:
+            query: Search query (artist - title)
+            
+        Returns:
+            Song info dict with FLAC/highest quality or None
+        """
+        if not self.is_available:
+            return None
+        
+        try:
+            loop = asyncio.get_event_loop()
+            results = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: self._music_client.search(keyword=query)
+                ),
+                timeout=10.0  # Longer timeout for quality search
+            )
+            
+            if not results:
+                return None
+            
+            # Collect all results, PREFER FLAC
+            scored_results = []
+            for source, songs in results.items():
+                for song in songs:
+                    if song.get('download_url') or song.get('with_valid_download_url'):
+                        file_ext = song.get('ext', '').lower()
+                        
+                        # Quality scoring - FLAC preferred
+                        if file_ext == 'flac':
+                            score = 200  # FLAC highest priority
+                        elif file_ext == 'm4a':
+                            score = 100  # AAC good quality
+                        elif file_ext == 'mp3':
+                            score = 50  # MP3 fallback
+                        else:
+                            score = 0
+                        
+                        scored_results.append({
+                            'score': score,
+                            'source': source,
+                            'song': song
+                        })
+            
+            if not scored_results:
+                return None
+            
+            # Sort by quality score
+            scored_results.sort(key=lambda x: x['score'], reverse=True)
+            
+            best = scored_results[0]
+            song = best['song']
+            
+            logger.info(f"Found best quality ({song.get('ext', 'unknown')}): {song.get('song_name')}")
+            return {
+                'source': best['source'],
+                'title': song.get('song_name', 'Unknown'),
+                'artist': song.get('singers', 'Unknown'),
+                'album': song.get('album', ''),
+                'duration': song.get('duration', ''),
+                'file_size': song.get('file_size', ''),
+                'ext': song.get('ext', 'flac'),
+                'download_url': song.get('download_url'),
+                'raw_data': song,
+            }
+            
+        except asyncio.TimeoutError:
+            logger.warning(f"MusicDL best quality search timeout: {query}")
+            return None
+        except Exception as e:
+            logger.error(f"MusicDL best quality search error: {e}")
+            return None
+    
     async def search_and_download(
         self, 
         query: str, 
