@@ -212,6 +212,71 @@ class YouTubeDownloader(BaseDownloader):
             logger.error(f"YouTube Music search failed: {e}", exc_info=True)
             return None
     
+    async def get_stream_url(self, track_info: TrackInfo) -> Optional[str]:
+        """
+        Get direct stream URL without downloading.
+        
+        This allows instant playback by streaming directly from YouTube Music.
+        Uses yt-dlp --get-url to extract the audio stream URL.
+        
+        Args:
+            track_info: Track information with URL
+        
+        Returns:
+            Direct audio stream URL or None if failed
+        """
+        logger.info(f"Getting stream URL for: {track_info}")
+        
+        try:
+            # Build URL for yt-dlp
+            url = track_info.url
+            if not url:
+                # Need to search first
+                clean_query = self._clean_search_query(track_info.artist, track_info.title)
+                url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}"
+            
+            # Build command to get stream URL only (no download)
+            command = [
+                'yt-dlp',
+                url,
+                '-I', '1',  # Only first result if search
+                '--get-url',  # Just get URL, don't download
+                '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
+                '--no-playlist',
+                '--geo-bypass',
+                '--socket-timeout', '15',
+                '--no-check-certificate',
+                '--extractor-args', 'youtube:player_client=android_music',
+            ]
+            
+            # Add cookies
+            if Settings.YOUTUBE_COOKIES.exists():
+                try:
+                    if Settings.YOUTUBE_COOKIES.stat().st_size > 0:
+                        command.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
+                        logger.debug("Using YouTube Music cookies for stream")
+                except:
+                    pass
+            
+            stdout, stderr, returncode = await self._run_command(command, timeout=15)
+            
+            if returncode != 0:
+                logger.warning(f"Failed to get stream URL: {stderr}")
+                return None
+            
+            stream_url = stdout.strip()
+            
+            if stream_url and stream_url.startswith('http'):
+                logger.info(f"✓ Got stream URL for: {track_info.title}")
+                return stream_url
+            else:
+                logger.warning(f"Invalid stream URL returned: {stream_url[:100] if stream_url else 'empty'}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to get stream URL: {e}")
+            return None
+    
     async def download(self, track_info: TrackInfo) -> AudioResult:
         """
         Download audio - MusicDL first, then YouTube Music fallback

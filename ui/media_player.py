@@ -109,6 +109,63 @@ class SynchronizedMediaPlayer:
             self.is_playing = False
             raise
     
+    async def start_from_stream(self, stream_url: str, volume: float = 1.0) -> None:
+        """
+        Start playback from stream URL (no download required).
+        
+        This enables instant playback by streaming directly from URL.
+        Used for single tracks and first track of playlists.
+        
+        Args:
+            stream_url: Direct audio stream URL
+            volume: Initial volume (0.0 to 2.0, default: 1.0)
+        """
+        try:
+            logger.info(f"Starting stream playback: {self.metadata.title}")
+            
+            # Create audio source from URL with volume control
+            # FFmpeg will handle streaming from URL
+            ffmpeg_options = {
+                'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+                'options': '-vn'  # No video
+            }
+            
+            audio_source = discord.FFmpegPCMAudio(
+                stream_url,
+                **ffmpeg_options
+            )
+            
+            # Apply volume transformer
+            audio_source = discord.PCMVolumeTransformer(audio_source, volume=volume)
+            
+            # Record start time
+            self.start_time = time.time()
+            self.is_playing = True
+            self.is_paused = False
+            self._transitioning_to_next = False
+            self._is_streaming = True  # Mark as streaming mode
+            
+            # Start playback
+            def after_callback(error):
+                self._on_end(error)
+            
+            self.voice.play(audio_source, after=after_callback)
+            
+            # Start update loop
+            self.update_task = asyncio.create_task(self._update_loop())
+            
+            # Update voice channel status
+            await self._update_voice_channel_status(
+                f"🎵 Streaming: {self.metadata.title[:30]} - {self.metadata.artist[:20]}"
+            )
+            
+            logger.info(f"🌐 Stream playback started: {self.metadata.title}")
+        
+        except Exception as e:
+            logger.error(f"Failed to start stream playback: {e}", exc_info=True)
+            self.is_playing = False
+            raise
+    
     def set_volume(self, volume: float) -> bool:
         """
         Set playback volume
