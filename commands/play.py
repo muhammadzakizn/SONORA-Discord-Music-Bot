@@ -872,32 +872,56 @@ class PlayCommand(commands.Cog):
         tracks_queued = 0
         
         async def on_first_track(track: TrackInfo):
-            """Called when first track is ready - play immediately"""
+            """Called when first track is ready - STREAM immediately (faster!)"""
             nonlocal first_track_played
+            
+            # Try streaming first for instant playback
+            stream_url = None
+            use_streaming = False
             
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
-                    "Downloading First Track",
+                    "🌐 Streaming First Track",
                     f"**{track.title}** - *{track.artist}*"
                 )
             )
             
-            # Download first track
-            audio_result = await self._download_with_fallback(track, loader)
+            try:
+                stream_url = await self.youtube_downloader.get_stream_url(track)
+                if stream_url:
+                    use_streaming = True
+                    logger.info(f"✓ Got stream URL for playlist first track")
+            except Exception as e:
+                logger.warning(f"Stream failed: {e}, falling back to download")
             
-            if not audio_result or not audio_result.is_success:
-                logger.error("Failed to download first track")
-                return
+            # Fallback to download if streaming fails
+            audio_result = None
+            if not use_streaming:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_loading(
+                        "Downloading First Track",
+                        f"**{track.title}** - *{track.artist}*"
+                    )
+                )
+                audio_result = await self._download_with_fallback(track, loader)
+                
+                if not audio_result or not audio_result.is_success:
+                    logger.error("Failed to download first track")
+                    return
             
             # Process metadata
             metadata = await self.metadata_processor.process(
                 track,
-                audio_result,
+                audio_result,  # Can be None for streaming mode
                 requested_by=interaction.user.display_name,
                 requested_by_id=interaction.user.id,
                 prefer_apple_artwork=False,  # Spotify has good artwork
                 voice_channel_id=voice_channel.id
             )
+            
+            # Store stream_url in metadata if streaming
+            if use_streaming and stream_url:
+                metadata.stream_url = stream_url
             
             # Connect to voice
             voice_connection = RobustVoiceConnection()
@@ -952,10 +976,15 @@ class PlayCommand(commands.Cog):
                 self.bot.players = {}
             self.bot.players[guild_id] = player
             
-            await player.start(volume=volume)
-            first_track_played = True
+            # Start playback - streaming or file-based
+            if use_streaming and stream_url:
+                await player.start_from_stream(stream_url, volume=volume)
+                logger.info(f"🌐 Streaming playlist first track: {track.title}")
+            else:
+                await player.start(volume=volume)
+                logger.info(f"🎵 Playing playlist first track: {track.title}")
             
-            logger.info(f"🎵 First track playing: {track.title}")
+            first_track_played = True
         
         async def on_track_ready(track: TrackInfo):
             """Called for each subsequent track - add to queue"""
@@ -1064,7 +1093,7 @@ class PlayCommand(commands.Cog):
         tracks_queued = 0
         
         async def on_first_track(track: TrackInfo):
-            """Called when first track is ready - play immediately"""
+            """Called when first track is ready - STREAM immediately (faster!)"""
             nonlocal first_track_played
             
             if is_already_playing:
@@ -1073,29 +1102,53 @@ class PlayCommand(commands.Cog):
                 queue_cog.queues[guild_id].append(track)
                 return
             
+            # Try streaming first for instant playback
+            stream_url = None
+            use_streaming = False
+            
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
-                    "Downloading First Track",
+                    "🌐 Streaming First Track",
                     f"**{track.title}** - *{track.artist}*"
                 )
             )
             
-            # Download first track
-            audio_result = await self._download_with_fallback(track, loader)
+            try:
+                stream_url = await self.youtube_downloader.get_stream_url(track)
+                if stream_url:
+                    use_streaming = True
+                    logger.info(f"✓ Got stream URL for YouTube playlist first track")
+            except Exception as e:
+                logger.warning(f"Stream failed: {e}, falling back to download")
             
-            if not audio_result or not audio_result.is_success:
-                logger.error("Failed to download first YouTube track")
-                return
+            # Fallback to download if streaming fails
+            audio_result = None
+            if not use_streaming:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_loading(
+                        "Downloading First Track",
+                        f"**{track.title}** - *{track.artist}*"
+                    )
+                )
+                audio_result = await self._download_with_fallback(track, loader)
+                
+                if not audio_result or not audio_result.is_success:
+                    logger.error("Failed to download first YouTube track")
+                    return
             
             # Process metadata
             metadata = await self.metadata_processor.process(
                 track,
-                audio_result,
+                audio_result,  # Can be None for streaming mode
                 requested_by=interaction.user.display_name,
                 requested_by_id=interaction.user.id,
                 prefer_apple_artwork=True,  # Get Apple Music artwork for YouTube
                 voice_channel_id=voice_channel.id
             )
+            
+            # Store stream_url in metadata if streaming
+            if use_streaming and stream_url:
+                metadata.stream_url = stream_url
             
             # Connect to voice
             voice_connection = RobustVoiceConnection()
@@ -1150,10 +1203,15 @@ class PlayCommand(commands.Cog):
                 self.bot.players = {}
             self.bot.players[guild_id] = player
             
-            await player.start(volume=volume)
-            first_track_played = True
+            # Start playback - streaming or file-based
+            if use_streaming and stream_url:
+                await player.start_from_stream(stream_url, volume=volume)
+                logger.info(f"🌐 Streaming YouTube playlist first track: {track.title}")
+            else:
+                await player.start(volume=volume)
+                logger.info(f"🎵 Playing YouTube playlist first track: {track.title}")
             
-            logger.info(f"🎵 First YouTube track playing: {track.title}")
+            first_track_played = True
         
         async def on_track_ready(track: TrackInfo):
             """Called for each subsequent track - add to queue"""
