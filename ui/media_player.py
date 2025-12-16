@@ -627,6 +627,19 @@ class SynchronizedMediaPlayer:
         Uses pre-fetched track if available for instant playback
         """
         try:
+            # ========================================
+            # CLEANUP: Delete finished track's audio file
+            # ========================================
+            if self.metadata and hasattr(self.metadata, 'file_path') and self.metadata.file_path:
+                try:
+                    from pathlib import Path
+                    finished_file = Path(self.metadata.file_path)
+                    if finished_file.exists() and 'playlist_cache' in str(finished_file):
+                        finished_file.unlink()
+                        logger.info(f"🗑️ Cleaned up finished track: {finished_file.name}")
+                except Exception as e:
+                    logger.debug(f"Cleanup failed: {e}")
+            
             # Check if voice is still connected
             if not self.voice or not self.voice.is_connected():
                 logger.info("Voice not connected, skipping next track")
