@@ -171,7 +171,8 @@ class PlayCommand(commands.Cog):
                 logger.warning(f"FTP cache check failed: {e}")
             
             # STEP 2: If not cached, stream + background download
-            if not ftp_cached:
+            # Skip streaming if DISABLE_STREAMING=true (server mode)
+            if not ftp_cached and not Settings.DISABLE_STREAMING:
                 await self._safe_loader_update(loader, 
                     embed=EmbedBuilder.create_loading(
                         "Streaming",
@@ -205,6 +206,8 @@ class PlayCommand(commands.Cog):
                         logger.info("No stream URL, falling back to download")
                 except Exception as e:
                     logger.warning(f"Stream URL failed: {e}, falling back to download")
+            elif Settings.DISABLE_STREAMING and not ftp_cached:
+                logger.info(f"📥 Streaming disabled (server mode), downloading first: {track_info.title}")
             
             # If streaming not available AND not from cache, download
             if not use_streaming and not audio_result:

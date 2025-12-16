@@ -102,6 +102,10 @@ class Settings:
     FTP_PASSWORD: str = os.getenv('FTP_PASSWORD', '')
     FTP_DIRECTORY: str = os.getenv('FTP_DIRECTORY', '/audio-cache')
     
+    # Server mode - disable streaming if YouTube blocks IP (403 error)
+    # Set to "true" on servers where streaming returns 403 Forbidden
+    DISABLE_STREAMING: bool = os.getenv('DISABLE_STREAMING', 'false').lower() == 'true'
+    
     @classmethod
     def validate(cls) -> bool:
         """Validate that all required settings are present"""
