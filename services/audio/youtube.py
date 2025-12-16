@@ -250,22 +250,24 @@ class YouTubeDownloader(BaseDownloader):
                 )
                 
                 if downloaded_file and downloaded_file.exists():
-                    # Check file size limit (100MB)
-                    self._check_file_size(downloaded_file)
+                    # Check file size - returns True if should delete after play
+                    delete_after_play = self._check_file_size(downloaded_file)
                     
                     actual_format = downloaded_file.suffix.lstrip('.')
                     logger.info(f"Downloaded via MusicDL: {downloaded_file.name}")
                     
-                    return AudioResult(
+                    result = AudioResult(
                         file_path=downloaded_file,
                         title=track_info.title,
                         artist=track_info.artist,
                         duration=track_info.duration,
-                        source=AudioSource.YOUTUBE_MUSIC,  # Will update source constant later
+                        source=AudioSource.YOUTUBE_MUSIC,
                         bitrate=Settings.AUDIO_BITRATE,
                         format=actual_format,
                         sample_rate=Settings.AUDIO_SAMPLE_RATE
                     )
+                    result.delete_after_play = delete_after_play
+                    return result
                 else:
                     logger.info("MusicDL: No result, falling back to yt-dlp...")
             else:

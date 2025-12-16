@@ -76,13 +76,16 @@ class MusicDLHandler:
                 logger.warning("No MusicDL clients available")
                 return
             
-            # Initialize config
+            # Initialize config with quality preferences
+            # Prefer MP3 320kbps over FLAC to save storage (~10MB vs ~190MB)
             init_cfg = {}
             for client in active_clients:
                 init_cfg[client] = {
                     'work_dir': str(self.work_dir / client.replace('MusicClient', '').lower()),
                     'search_size_per_source': 5,
                     'disable_print': True,
+                    'download_preference': ['320k', '256k', 'mp3', 'aac'],  # Prefer smaller formats
+                    'audio_quality': '320k',  # Max 320kbps
                 }
             
             self._music_client = musicdl.MusicClient(

@@ -34,35 +34,32 @@ class BaseDownloader(ABC):
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.source = AudioSource.UNKNOWN
     
-    def _check_file_size(self, file_path: Path) -> None:
+    def _check_file_size(self, file_path: Path) -> bool:
         """
-        Check if file exceeds maximum size limit
+        Check file size and mark for post-playback cleanup if too large.
+        
+        Instead of rejecting large files, we allow them but mark for deletion
+        after playback to save storage space.
         
         Args:
             file_path: Path to the file to check
             
-        Raises:
-            FileTooLargeError: If file exceeds MAX_FILE_SIZE (100MB)
+        Returns:
+            True if file should be deleted after playback (large file)
+            False if file can be kept (within size limit)
         """
         if not file_path.exists():
-            return
+            return False
         
         file_size = file_path.stat().st_size
         file_size_mb = file_size / (1024 * 1024)
         
         if file_size > self.MAX_FILE_SIZE:
-            # Delete the file to save space
-            try:
-                file_path.unlink()
-                logger.warning(f"Deleted oversized file: {file_path.name} ({file_size_mb:.1f}MB)")
-            except Exception as e:
-                logger.error(f"Failed to delete oversized file: {e}")
-            
-            raise FileTooLargeError(
-                f"File terlalu besar! ({file_size_mb:.1f}MB)\n"
-                f"Batas maksimum: 100MB\n"
-                f"Coba cari versi lagu yang lebih pendek atau format berbeda."
+            logger.warning(
+                f"Large file detected: {file_path.name} ({file_size_mb:.1f}MB) - "
+                f"will delete after playback"
             )
+            return True  # Mark for deletion after playback
         
         logger.debug(f"File size OK: {file_path.name} ({file_size_mb:.1f}MB)")
     

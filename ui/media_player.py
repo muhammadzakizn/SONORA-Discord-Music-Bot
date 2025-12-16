@@ -300,6 +300,9 @@ class SynchronizedMediaPlayer:
             logger.info("Playback finished")
             completed = True
         
+        # Cleanup large files after playback (storage optimization)
+        self._cleanup_large_audio_file()
+        
         # Save play history to database
         if self.bot and self.guild_id and self.metadata:
             try:
@@ -356,6 +359,40 @@ class SynchronizedMediaPlayer:
             # Return the time when paused
             return self._paused_at_time
         return 0.0
+    
+    def _cleanup_large_audio_file(self) -> None:
+        """
+        Delete large audio files after playback to save storage.
+        
+        Checks if file has delete_after_play flag or is over 100MB.
+        This is called in _on_end after playback finishes.
+        """
+        if not self.metadata or not self.metadata.audio_path:
+            return
+        
+        try:
+            audio_path = self.metadata.audio_path
+            
+            # Check if file exists
+            if not audio_path.exists():
+                return
+            
+            # Check for delete_after_play flag (set for large downloads)
+            should_delete = getattr(self.metadata, 'delete_after_play', False)
+            
+            # Also delete if file is over 100MB (safety net)
+            file_size = audio_path.stat().st_size
+            file_size_mb = file_size / (1024 * 1024)
+            
+            if file_size > 100 * 1024 * 1024:  # Over 100MB
+                should_delete = True
+            
+            if should_delete:
+                audio_path.unlink()
+                logger.info(f"🗑️ Deleted large file after playback: {audio_path.name} ({file_size_mb:.1f}MB)")
+            
+        except Exception as e:
+            logger.warning(f"Failed to cleanup audio file: {e}")
     
     async def _save_play_history(self, completed: bool = True) -> None:
         """
