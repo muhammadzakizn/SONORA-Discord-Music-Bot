@@ -284,6 +284,102 @@ class FTPAudioCache:
                 self._disconnect()
         
         return await asyncio.get_event_loop().run_in_executor(None, _stats)
+    
+    async def cleanup_old_files(self, max_age_days: int = 2, size_limit_gb: float = 23.0) -> dict:
+        """
+        Clean up old/unused files from FTP cache.
+        
+        Rules:
+        1. Delete files not used in max_age_days (default 2 days)
+        2. If cache > size_limit_gb (23GB), use stricter 1-day limit
+        
+        Args:
+            max_age_days: Delete files older than this (default 2)
+            size_limit_gb: If exceeded, use 1-day cleanup (default 23GB)
+        
+        Returns:
+            Dict with cleanup stats
+        """
+        if not self._enabled:
+            return {'enabled': False}
+        
+        def _cleanup():
+            if not self._connect():
+                return {'enabled': True, 'connected': False}
+            
+            try:
+                import time
+                from datetime import datetime
+                
+                files = self._ftp.nlst()
+                audio_files = [f for f in files if f.endswith(('.opus', '.mp3', '.m4a', '.flac'))]
+                
+                # Calculate total size
+                total_size = 0
+                file_info = []
+                
+                for f in audio_files:
+                    try:
+                        size = self._ftp.size(f)
+                        # Get modification time
+                        mdtm_response = self._ftp.sendcmd(f'MDTM {f}')
+                        # Response format: "213 YYYYMMDDHHmmss"
+                        mdtm_str = mdtm_response.split()[1]
+                        mtime = datetime.strptime(mdtm_str, '%Y%m%d%H%M%S')
+                        
+                        file_info.append({
+                            'name': f,
+                            'size': size or 0,
+                            'mtime': mtime
+                        })
+                        total_size += size or 0
+                    except:
+                        pass
+                
+                total_size_gb = total_size / (1024 * 1024 * 1024)
+                
+                # Determine cleanup threshold
+                if total_size_gb > size_limit_gb:
+                    # Near capacity - use stricter 1-day limit
+                    age_threshold = 1
+                    logger.warning(f"FTP cache near limit ({total_size_gb:.1f}GB), using 1-day cleanup")
+                else:
+                    age_threshold = max_age_days
+                
+                # Find old files
+                now = datetime.now()
+                deleted_count = 0
+                deleted_size = 0
+                
+                for info in file_info:
+                    age_days = (now - info['mtime']).days
+                    
+                    if age_days >= age_threshold:
+                        try:
+                            self._ftp.delete(info['name'])
+                            deleted_count += 1
+                            deleted_size += info['size']
+                            logger.info(f"🗑️ Deleted old cache: {info['name']} (age: {age_days}d)")
+                        except:
+                            pass
+                
+                return {
+                    'enabled': True,
+                    'connected': True,
+                    'total_files': len(audio_files),
+                    'total_size_gb': total_size_gb,
+                    'deleted_files': deleted_count,
+                    'deleted_size_mb': deleted_size / (1024 * 1024),
+                    'age_threshold_days': age_threshold
+                }
+                
+            except Exception as e:
+                logger.error(f"FTP cleanup error: {e}")
+                return {'enabled': True, 'connected': False, 'error': str(e)}
+            finally:
+                self._disconnect()
+        
+        return await asyncio.get_event_loop().run_in_executor(None, _cleanup)
 
 
 # Global instance
