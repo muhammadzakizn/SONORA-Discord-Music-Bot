@@ -4,7 +4,7 @@ from typing import Optional
 import asyncio
 
 from database.models import MetadataInfo, TrackInfo, AudioResult, LyricsData
-from config.constants import ArtworkSource
+from config.constants import ArtworkSource, AudioSource
 from config.logging_config import get_logger
 from .artwork import ArtworkFetcher
 from services.lyrics.genius import GeniusLyricsFetcher
