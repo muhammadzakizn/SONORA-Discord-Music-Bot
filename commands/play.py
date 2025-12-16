@@ -947,6 +947,14 @@ class PlayCommand(commands.Cog):
                 if stream_url:
                     use_streaming = True
                     logger.info(f"✓ Got stream URL for playlist first track")
+                    
+                    # Start background download to FTP cache (FLAC via MusicDL)
+                    asyncio.create_task(
+                        self.youtube_downloader.background_download_for_cache(
+                            track.artist, track.title
+                        )
+                    )
+                    logger.info(f"📥 Background download started: {track.title} → FTP")
             except Exception as e:
                 logger.warning(f"Stream failed: {e}, falling back to download")
             
@@ -1174,6 +1182,14 @@ class PlayCommand(commands.Cog):
                 if stream_url:
                     use_streaming = True
                     logger.info(f"✓ Got stream URL for YouTube playlist first track")
+                    
+                    # Start background download to FTP cache
+                    asyncio.create_task(
+                        self.youtube_downloader.background_download_for_cache(
+                            track.artist, track.title
+                        )
+                    )
+                    logger.info(f"📥 Background download started: {track.title} → FTP")
             except Exception as e:
                 logger.warning(f"Stream failed: {e}, falling back to download")
             
