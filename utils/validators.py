@@ -23,6 +23,16 @@ class URLValidator:
     APPLE_MUSIC_ALBUM_PATTERN = re.compile(r'music\.apple\.com/([a-z]{2})/album/[^/]+/(\d+)')
     APPLE_MUSIC_PLAYLIST_PATTERN = re.compile(r'music\.apple\.com/([a-z]{2})/playlist/[^/]+/pl\.([a-zA-Z0-9\-]+)')
     
+    # TIDAL URL patterns
+    TIDAL_TRACK_PATTERN = re.compile(r'tidal\.com/(?:browse/)?(track)/(\d+)')
+    TIDAL_ALBUM_PATTERN = re.compile(r'tidal\.com/(?:browse/)?(album)/(\d+)')
+    TIDAL_PLAYLIST_PATTERN = re.compile(r'tidal\.com/(?:browse/)?(playlist)/([a-f0-9-]+)')
+    TIDAL_LISTEN_PATTERN = re.compile(r'listen\.tidal\.com/(track|album|playlist)/(\d+|[a-f0-9-]+)')
+    
+    # SoundCloud URL patterns
+    SOUNDCLOUD_TRACK_PATTERN = re.compile(r'soundcloud\.com/([\w-]+)/([\w-]+)(?:\?.*)?$')
+    SOUNDCLOUD_SET_PATTERN = re.compile(r'soundcloud\.com/([\w-]+)/sets/([\w-]+)')
+    
     @staticmethod
     def is_valid_url(url: str) -> bool:
         """
@@ -59,6 +69,16 @@ class URLValidator:
     def is_youtube_music_url(url: str) -> bool:
         """Check if URL is from YouTube Music"""
         return 'music.youtube.com' in url
+    
+    @staticmethod
+    def is_tidal_url(url: str) -> bool:
+        """Check if URL is from TIDAL"""
+        return 'tidal.com' in url or 'listen.tidal.com' in url
+    
+    @staticmethod
+    def is_soundcloud_url(url: str) -> bool:
+        """Check if URL is from SoundCloud"""
+        return 'soundcloud.com' in url
     
     @staticmethod
     def extract_spotify_id(url: str) -> Optional[Tuple[str, str]]:
@@ -161,6 +181,10 @@ class URLValidator:
             return 'youtube'
         elif URLValidator.is_apple_music_url(url):
             return 'apple_music'
+        elif URLValidator.is_tidal_url(url):
+            return 'tidal'
+        elif URLValidator.is_soundcloud_url(url):
+            return 'soundcloud'
         elif URLValidator.is_valid_url(url):
             return 'direct'
         else:

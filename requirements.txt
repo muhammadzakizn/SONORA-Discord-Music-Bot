@@ -17,6 +17,10 @@ gamdl>=1.8.0
 lyricsgenius>=3.0.1
 syncedlyrics>=0.6.0
 
+# Multi-Platform Audio (MusicDL - TIDAL, SoundCloud, etc.)
+musicdl>=2.7.0
+faster-whisper>=1.0.0  # For WhisperLRC auto-lyrics (optional, set ENABLE_WHISPER_LYRICS=true)
+
 # Metadata & Media
 mutagen>=1.47.0
 Pillow>=10.0.0

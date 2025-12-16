@@ -12,6 +12,7 @@ eggs/
 lib/
 lib64/
 !web/src/lib/
+!Hostinger/portfolio/lib/
 parts/
 sdist/
 var/

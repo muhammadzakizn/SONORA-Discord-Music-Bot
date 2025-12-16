@@ -74,7 +74,7 @@ class MetadataProcessor:
         artwork_task = self.artwork_fetcher.fetch(track_info, prefer_apple=prefer_apple_artwork)
         
         # Multi-source lyrics fetch with priority
-        # Priority: LRCLIB (synced) → Syncedlyrics (synced) → Genius (plain fallback)
+        # Priority: LRCLIB (synced) → Syncedlyrics (synced) → WhisperLRC (AI) → Genius (plain)
         async def fetch_lyrics_with_fallback():
             # Priority 1: LRCLIB (best synced lyrics with timestamps)
             logger.info(f"Fetching lyrics from LRCLIB: {track_info}")
@@ -89,7 +89,27 @@ class MetadataProcessor:
                 if lyrics and lyrics.lines:
                     return lyrics
             
-            # Priority 3: Genius (plain text - not synced but better than nothing)
+            # Priority 3: WhisperLRC (AI-generated synced lyrics from audio)
+            # Only if audio file exists and ENABLE_WHISPER_LYRICS=true
+            try:
+                from services.lyrics.whisper_lyrics import get_whisper_lyrics_fetcher, ENABLE_WHISPER_LYRICS
+                if ENABLE_WHISPER_LYRICS and audio_result and audio_result.file_path:
+                    logger.info("Synced lyrics not found, trying WhisperLRC...")
+                    whisper = get_whisper_lyrics_fetcher()
+                    if whisper.is_available:
+                        # Create track info with audio path for Whisper
+                        track_with_audio = {
+                            'title': track_info.title,
+                            'artist': track_info.artist,
+                            'file_path': audio_result.file_path
+                        }
+                        lyrics = await whisper.fetch(track_with_audio)
+                        if lyrics and lyrics.lines:
+                            return lyrics
+            except Exception as e:
+                logger.warning(f"WhisperLRC failed: {e}")
+            
+            # Priority 4: Genius (plain text - not synced but better than nothing)
             logger.info("Synced lyrics not found, trying Genius (plain text)...")
             lyrics = await self.genius_fetcher.fetch(track_info)
             if lyrics and lyrics.lines:

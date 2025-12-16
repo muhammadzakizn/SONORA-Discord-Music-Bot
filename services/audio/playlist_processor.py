@@ -49,6 +49,10 @@ class PlaylistProcessor:
             return await self._process_youtube_url(url)
         elif url_type == 'apple_music':
             return await self._process_apple_music_url(url)
+        elif url_type == 'tidal':
+            return await self._process_tidal_url(url)
+        elif url_type == 'soundcloud':
+            return await self._process_soundcloud_url(url)
         else:
             # Single track from search
             logger.debug(f"Processing as search query: {url}")
@@ -924,3 +928,176 @@ class PlaylistProcessor:
             return tracks  # Return the 1 track we got
         
         return tracks
+    
+    async def _process_tidal_url(self, url: str) -> List[TrackInfo]:
+        """
+        Process TIDAL URL (track, album, or playlist)
+        Uses MusicDL TIDALMusicClient for HiFi audio
+        
+        Args:
+            url: TIDAL URL
+        
+        Returns:
+            List of TrackInfo
+        """
+        logger.info(f"Processing TIDAL URL: {url}")
+        
+        try:
+            # Try to get track info from TIDAL via MusicDL
+            from services.audio.musicdl_handler import get_musicdl_handler
+            musicdl = get_musicdl_handler()
+            
+            if not musicdl.is_available:
+                logger.warning("MusicDL not available for TIDAL")
+                # Fallback: extract title from URL and search YouTube Music
+                import re
+                match = re.search(r'tidal\.com/(?:browse/)?(track|album|playlist)/(\d+|[a-f0-9-]+)', url)
+                if match:
+                    content_type = match.group(1)
+                    content_id = match.group(2)
+                    logger.info(f"TIDAL {content_type}: {content_id} - searching on YouTube Music")
+                    # Search on YouTube Music as fallback
+                    track = await self.youtube.search(f"tidal {content_type} {content_id}")
+                    return [track] if track else []
+                return []
+            
+            # For now, search on MusicDL and convert to TrackInfo
+            # Full TIDAL integration pending (needs authentication)
+            result = await musicdl.search(url)
+            if result:
+                track = TrackInfo(
+                    title=result.get('title', 'Unknown'),
+                    artist=result.get('artist', 'Unknown'),
+                    album=result.get('album', ''),
+                    duration=0,  # Will be updated on download
+                    url=None,  # Will use MusicDL to download
+                    track_id=result.get('raw_data', {}).get('id')
+                )
+                # Store MusicDL data for later download
+                track.musicdl_data = result
+                return [track]
+            
+            # Fallback to YouTube Music search
+            logger.info("TIDAL track not found via MusicDL, trying YouTube Music")
+            track = await self.youtube.search(url)
+            return [track] if track else []
+            
+        except Exception as e:
+            logger.error(f"Failed to process TIDAL URL: {e}", exc_info=True)
+            return []
+    
+    async def _process_soundcloud_url(self, url: str) -> List[TrackInfo]:
+        """
+        Process SoundCloud URL (track or set/playlist)
+        Uses yt-dlp which supports SoundCloud natively
+        
+        Args:
+            url: SoundCloud URL
+        
+        Returns:
+            List of TrackInfo
+        """
+        logger.info(f"Processing SoundCloud URL: {url}")
+        
+        try:
+            # SoundCloud is natively supported by yt-dlp
+            # Use flat-playlist to check if it's a set/playlist
+            import re
+            is_set = '/sets/' in url
+            
+            if is_set:
+                # Playlist/set - get all tracks
+                logger.info("Processing SoundCloud set/playlist")
+                command = [
+                    'yt-dlp',
+                    '--flat-playlist',
+                    '--dump-json',
+                    url
+                ]
+                
+                stdout, stderr, returncode = await self.youtube._run_command(command, timeout=60)
+                
+                if returncode != 0:
+                    logger.error(f"Failed to get SoundCloud set: {stderr}")
+                    return []
+                
+                # Parse tracks
+                import json
+                tracks = []
+                for line in stdout.strip().split('\n'):
+                    if not line:
+                        continue
+                    try:
+                        track_data = json.loads(line)
+                        # SoundCloud titles are usually "Artist - Title" or just title
+                        title_full = track_data.get('title', 'Unknown')
+                        
+                        if ' - ' in title_full:
+                            parts = title_full.split(' - ', 1)
+                            artist = parts[0]
+                            title = parts[1]
+                        else:
+                            artist = track_data.get('uploader') or 'Unknown'
+                            title = title_full
+                        
+                        track_url = track_data.get('url') or track_data.get('webpage_url')
+                        
+                        track = TrackInfo(
+                            title=title,
+                            artist=artist,
+                            duration=track_data.get('duration', 0),
+                            url=track_url,
+                            track_id=track_data.get('id')
+                        )
+                        tracks.append(track)
+                    except json.JSONDecodeError:
+                        continue
+                
+                logger.info(f"Found {len(tracks)} tracks in SoundCloud set")
+                return tracks
+            
+            else:
+                # Single track - use direct URL
+                track = TrackInfo(
+                    title='SoundCloud Track',  # Will be updated on download
+                    artist='Unknown',
+                    duration=0,
+                    url=url,
+                    track_id=None
+                )
+                
+                # Get metadata via yt-dlp
+                command = [
+                    'yt-dlp',
+                    '--dump-json',
+                    '--no-download',
+                    url
+                ]
+                
+                stdout, stderr, returncode = await self.youtube._run_command(command, timeout=30)
+                
+                if returncode == 0 and stdout:
+                    import json
+                    try:
+                        data = json.loads(stdout)
+                        title_full = data.get('title', 'Unknown')
+                        
+                        if ' - ' in title_full:
+                            parts = title_full.split(' - ', 1)
+                            track.artist = parts[0]
+                            track.title = parts[1]
+                        else:
+                            track.artist = data.get('uploader') or data.get('creator') or 'Unknown'
+                            track.title = title_full
+                        
+                        track.duration = data.get('duration', 0)
+                        track.track_id = data.get('id')
+                    except json.JSONDecodeError:
+                        pass
+                
+                return [track]
+                
+        except Exception as e:
+            logger.error(f"Failed to process SoundCloud URL: {e}", exc_info=True)
+            return []
+
