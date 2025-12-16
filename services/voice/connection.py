@@ -68,25 +68,46 @@ class RobustVoiceConnection:
         """
         logger.info(f"Connecting to voice channel: {channel.name} (ID: {channel.id})")
         
+        # CRITICAL: Sync with Discord's actual voice state first
+        self.sync_state(channel.guild)
+        
         # Check if already connected to this channel
         existing_client = channel.guild.voice_client
-        if existing_client and existing_client.is_connected():
-            if existing_client.channel.id == channel.id:
-                logger.info("✓ Already connected to this channel, reusing connection")
-                self.connection = existing_client
-                self.guild_id = channel.guild.id
-                return self.connection
-            else:
-                logger.info(f"Moving from {existing_client.channel.name} to {channel.name}")
+        if existing_client:
+            try:
+                if existing_client.is_connected():
+                    if existing_client.channel and existing_client.channel.id == channel.id:
+                        logger.info("✓ Already connected to this channel, reusing connection")
+                        self.connection = existing_client
+                        self.guild_id = channel.guild.id
+                        return self.connection
+                    else:
+                        logger.info(f"Moving from {existing_client.channel.name if existing_client.channel else 'unknown'} to {channel.name}")
+                        try:
+                            await existing_client.move_to(channel)
+                            self.connection = existing_client
+                            self.guild_id = channel.guild.id
+                            logger.info("✓ Moved to new channel")
+                            return self.connection
+                        except Exception as e:
+                            logger.warning(f"Failed to move: {e}, will reconnect")
+                            await self.cleanup()
+                else:
+                    # Connection object exists but not connected - cleanup stale state
+                    logger.warning("Stale voice client detected, cleaning up...")
+                    try:
+                        await existing_client.disconnect(force=True)
+                    except:
+                        pass
+                    await asyncio.sleep(0.5)
+            except Exception as e:
+                logger.warning(f"Error checking existing connection: {e}")
+                # Force cleanup
                 try:
-                    await existing_client.move_to(channel)
-                    self.connection = existing_client
-                    self.guild_id = channel.guild.id
-                    logger.info("✓ Moved to new channel")
-                    return self.connection
-                except Exception as e:
-                    logger.warning(f"Failed to move: {e}, will reconnect")
-                    await self.cleanup()
+                    await existing_client.disconnect(force=True)
+                except:
+                    pass
+                await asyncio.sleep(0.5)
         
         for attempt in range(self.max_reconnects):
             try:
