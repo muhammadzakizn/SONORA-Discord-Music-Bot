@@ -76,17 +76,15 @@ class MusicDLHandler:
                 logger.warning("No MusicDL clients available")
                 return
             
-            # Initialize config with quality preferences
-            # Prefer AAC 256kbps (better quality than MP3, smaller than FLAC)
-            # AAC 256kbps ≈ 5-8MB per song (vs FLAC 150-200MB)
+            # Initialize config
+            # Note: MusicDL doesn't support quality/format preferences directly
+            # Files will be in original format from source (usually mp3)
             init_cfg = {}
             for client in active_clients:
                 init_cfg[client] = {
                     'work_dir': str(self.work_dir / client.replace('MusicClient', '').lower()),
                     'search_size_per_source': 5,
                     'disable_print': True,
-                    'download_preference': ['aac', 'm4a', '256k', '192k', 'mp3'],  # AAC first
-                    'audio_quality': '256k',  # 256kbps AAC = excellent quality
                 }
             
             self._music_client = musicdl.MusicClient(
