@@ -158,6 +158,17 @@ def main():
         except Exception as e:
             logger.warning(f"Failed to initialize cache manager: {e}")
         
+        # Initialize FTP cache at startup (not lazy load)
+        try:
+            from services.storage.ftp_storage import get_ftp_cache
+            ftp_cache = get_ftp_cache()
+            if ftp_cache.is_enabled:
+                logger.info(f"✓ FTP Cache ready: {Settings.FTP_HOST}")
+            else:
+                logger.warning("FTP Cache disabled (missing credentials)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize FTP cache: {e}")
+        
         # Start web dashboard if enabled
         if ENABLE_WEB_DASHBOARD:
             try:
