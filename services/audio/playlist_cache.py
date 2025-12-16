@@ -150,7 +150,9 @@ class PlaylistCacheManager:
     
     async def prepare_next_tracks(self, current_index: int, queue: List[TrackInfo]) -> None:
         """
-        Prepare the next BUFFER_SIZE tracks ahead.
+        Prepare the next BUFFER_SIZE tracks ahead - SEQUENTIALLY.
+        
+        Downloads one at a time to prevent MusicDL overload.
         
         Args:
             current_index: Current playing track index
@@ -165,16 +167,15 @@ class PlaylistCacheManager:
                 break  # No more tracks
             
             if next_idx in self.prepared_tracks:
+                logger.debug(f"Track {next_idx} already prepared, skipping")
                 continue  # Already prepared
             
-            if next_idx in self._prepare_tasks:
-                continue  # Already preparing
-            
-            # Start background preparation
             track = queue[next_idx]
-            task = asyncio.create_task(self.prepare_track(next_idx, track))
-            self._prepare_tasks[next_idx] = task
-            logger.debug(f"Started preparing track {next_idx}: {track.title}")
+            
+            # SEQUENTIAL: Wait for this track to complete before next
+            logger.info(f"📦 [{i}/3] Preparing: {track.title}")
+            await self.prepare_track(next_idx, track)
+            logger.info(f"✓ [{i}/3] Ready: {track.title}")
     
     async def get_playable_track(self, index: int, track_info: TrackInfo) -> CachedTrack:
         """

@@ -106,3 +106,5 @@ node_modules/
 # Web submodule (has its own git)
 web/.git
 
+*.flac
+*.pkl
