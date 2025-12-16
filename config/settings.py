@@ -47,7 +47,24 @@ class Settings:
     # Cookie files
     APPLE_MUSIC_COOKIES: Path = COOKIES_DIR / 'apple_music_cookies.txt'
     SPOTIFY_COOKIES: Path = COOKIES_DIR / 'spotify_cookies.txt'
-    YOUTUBE_COOKIES: Path = COOKIES_DIR / 'youtube_music_cookies.txt'
+    
+    # YouTube cookies - can be set via env var or default path
+    @classmethod
+    def get_youtube_cookies(cls) -> Optional[Path]:
+        """Get YouTube cookies path from env var or default location"""
+        # First check env var
+        env_path = os.getenv('YOUTUBE_COOKIES_PATH', '')
+        if env_path:
+            path = Path(env_path)
+            if path.exists():
+                return path
+        # Fallback to default
+        default_path = cls.COOKIES_DIR / 'youtube_music_cookies.txt'
+        if default_path.exists():
+            return default_path
+        return None
+    
+    YOUTUBE_COOKIES: Optional[Path] = None  # Set dynamically
     
     # Audio settings
     AUDIO_BITRATE: int = 256  # kbps

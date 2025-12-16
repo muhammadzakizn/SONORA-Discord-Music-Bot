@@ -119,11 +119,12 @@ class YouTubeDownloader(BaseDownloader):
             ]
             
             # ALWAYS add YouTube Music cookies for authenticated access
-            if Settings.YOUTUBE_COOKIES.exists():
+            yt_cookies = Settings.get_youtube_cookies()
+            if yt_cookies:
                 try:
-                    if Settings.YOUTUBE_COOKIES.stat().st_size > 0:
-                        command.extend(['--cookies', str(Settings.YOUTUBE_COOKIES)])
-                        logger.info(f"✓ Search: Using YouTube Music cookies")
+                    if yt_cookies.stat().st_size > 0:
+                        command.extend(['--cookies', str(yt_cookies)])
+                        logger.info(f"✓ Search: Using YouTube Music cookies from {yt_cookies}")
                     else:
                         logger.warning("⚠ YouTube Music cookies file is empty!")
                 except Exception as e:
@@ -268,7 +269,13 @@ class YouTubeDownloader(BaseDownloader):
             
             if stream_url and stream_url.startswith('http'):
                 logger.info(f"✓ Got stream URL for: {track_info.title}")
-                return stream_url
+                
+                # Test if URL is accessible (detect 403 early)
+                if await self.test_stream_url(stream_url):
+                    return stream_url
+                else:
+                    logger.warning(f"Stream URL test failed (403?), will need download")
+                    return None
             else:
                 logger.warning(f"Invalid stream URL returned: {stream_url[:100] if stream_url else 'empty'}")
                 return None
@@ -276,6 +283,39 @@ class YouTubeDownloader(BaseDownloader):
         except Exception as e:
             logger.error(f"Failed to get stream URL: {e}")
             return None
+    
+    async def test_stream_url(self, url: str) -> bool:
+        """
+        Test if stream URL is accessible (check for 403).
+        
+        Makes a HEAD request to the URL to verify it's accessible
+        before attempting to stream. Detects 403 Forbidden early.
+        
+        Args:
+            url: Stream URL to test
+            
+        Returns:
+            True if accessible, False if 403 or other error
+        """
+        try:
+            import aiohttp
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.head(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status == 200:
+                        logger.debug(f"✓ Stream URL accessible (200 OK)")
+                        return True
+                    elif response.status == 403:
+                        logger.warning(f"⚠ Stream URL blocked: 403 Forbidden")
+                        return False
+                    else:
+                        logger.warning(f"Stream URL returned status {response.status}")
+                        # Allow other statuses, might still work
+                        return True
+        except Exception as e:
+            logger.warning(f"Stream URL test failed: {e}")
+            # If test fails, assume URL might work
+            return True
     
     async def _upload_to_ftp_cache(self, file_path: Path, artist: str, title: str) -> None:
         """
