@@ -844,7 +844,7 @@ class SynchronizedMediaPlayer:
             
             elif isinstance(next_item, TrackInfo):
                 # Need to download and process this track (pre-fetch didn't complete or failed)
-                logger.info(f"Downloading next track: {next_item.title}")
+                logger.info(f"Processing next track: {next_item.title}")
                 
                 # Get Play command to use download methods
                 play_cog = self.bot.get_cog('PlayCommand')
@@ -853,33 +853,114 @@ class SynchronizedMediaPlayer:
                     return
                 
                 try:
-                    # Download audio (with fallback)
-                    audio_result = await play_cog._download_with_fallback(next_item, None)
+                    audio_result = None
+                    stream_url = None
+                    use_streaming = False
                     
-                    if not audio_result or not audio_result.is_success:
-                        logger.error(f"Failed to download: {next_item.title}")
-                        # Try next track in queue
+                    # ========================================
+                    # STEP 1: Check FTP cache first
+                    # ========================================
+                    try:
+                        from services.storage.ftp_storage import get_ftp_cache
+                        ftp_cache = get_ftp_cache()
+                        
+                        if ftp_cache.is_enabled:
+                            if await ftp_cache.exists(next_item.artist, next_item.title):
+                                logger.info(f"☁️ Found in FTP: {next_item.title}")
+                                
+                                # Download from FTP to local cache
+                                from config.settings import Settings
+                                cache_path = Settings.DOWNLOADS_DIR / f"ftp_{next_item.artist}_{next_item.title}.opus"
+                                
+                                if await ftp_cache.download(next_item.artist, next_item.title, cache_path):
+                                    from config.constants import AudioSource
+                                    from database.models import AudioResult as AR
+                                    audio_result = AR(
+                                        file_path=cache_path,
+                                        title=next_item.title,
+                                        artist=next_item.artist,
+                                        duration=next_item.duration,
+                                        source=AudioSource.YOUTUBE_MUSIC,
+                                        bitrate=256,
+                                        format='opus',
+                                        sample_rate=48000
+                                    )
+                                    logger.info(f"☁️ Loaded from FTP: {cache_path.name}")
+                    except Exception as e:
+                        logger.warning(f"FTP cache check failed: {e}")
+                    
+                    # ========================================
+                    # STEP 2: If not cached, try streaming
+                    # ========================================
+                    if not audio_result:
+                        logger.info(f"🌐 Streaming: {next_item.title}")
+                        
+                        try:
+                            stream_url = await play_cog.youtube_downloader.get_stream_url(next_item)
+                            if stream_url:
+                                use_streaming = True
+                                logger.info(f"✓ Got stream URL, buffering 6s...")
+                                
+                                # Wait for buffer
+                                await asyncio.sleep(6)
+                                
+                                # Background: download to FTP cache
+                                asyncio.create_task(
+                                    play_cog.youtube_downloader.background_download_for_cache(
+                                        next_item.artist, next_item.title
+                                    )
+                                )
+                        except Exception as e:
+                            logger.warning(f"Streaming failed: {e}")
+                    
+                    # ========================================
+                    # STEP 3: Fallback to download if no stream
+                    # ========================================
+                    if not audio_result and not use_streaming:
+                        logger.info(f"Downloading: {next_item.title}")
+                        audio_result = await play_cog._download_with_fallback(next_item, None)
+                    
+                    if not audio_result and not use_streaming:
+                        logger.error(f"Failed all methods: {next_item.title}")
                         return await self._play_next_from_queue()
                     
                     # Process metadata (artwork + lyrics)
-                    # Auto-play always uses Apple Music artwork (highest quality)
-                    # Preserve original requester from TrackInfo
                     voice_ch_id = getattr(next_item, 'voice_channel_id', None)
                     orig_requested_by = getattr(next_item, 'requested_by', None)
                     orig_requested_by_id = getattr(next_item, 'requested_by_id', 0)
                     
                     next_metadata = await play_cog.metadata_processor.process(
                         next_item,
-                        audio_result,
+                        audio_result,  # Can be None for streaming
                         requested_by=orig_requested_by or "Queue",
                         requested_by_id=orig_requested_by_id or 0,
-                        prefer_apple_artwork=True,  # Auto-play always uses Apple Music
-                        voice_channel_id=voice_ch_id  # Preserve original voice channel
+                        prefer_apple_artwork=True,
+                        voice_channel_id=voice_ch_id
                     )
+                    
+                    # Store stream_url if streaming
+                    if use_streaming and stream_url:
+                        next_metadata.stream_url = stream_url
+                    
+                    # ========================================
+                    # STEP 4: Prepare next 3 tracks in background
+                    # ========================================
+                    try:
+                        queue_items = queue_cog.queues.get(self.guild_id, [])
+                        if len(queue_items) > 0:
+                            from services.audio.playlist_cache import get_playlist_cache
+                            playlist_cache = get_playlist_cache()
+                            
+                            # Prepare next 3 tracks (background)
+                            asyncio.create_task(
+                                playlist_cache.prepare_next_tracks(0, queue_items)
+                            )
+                            logger.debug(f"Started preparing next 3 tracks")
+                    except Exception as e:
+                        logger.warning(f"Buffer preparation failed: {e}")
                     
                 except Exception as e:
                     logger.error(f"Failed to process next track: {e}")
-                    # Try next track in queue
                     return await self._play_next_from_queue()
                 
             elif isinstance(next_item, MetadataInfo):
@@ -942,8 +1023,13 @@ class SynchronizedMediaPlayer:
                 f"🎵 NOW PLAYING: {next_metadata.title[:30]} - {next_metadata.artist[:20]}"
             )
             
-            # Start playback
-            await self.start(volume=volume)
+            # Start playback - streaming or file-based
+            if hasattr(next_metadata, 'stream_url') and next_metadata.stream_url:
+                await self.start_from_stream(next_metadata.stream_url, volume=volume)
+                logger.info(f"🌐 Streaming from queue: {next_metadata.title}")
+            else:
+                await self.start(volume=volume)
+                logger.info(f"🎵 Playing from queue: {next_metadata.title}")
             
         except Exception as e:
             logger.error(f"Failed to play next from queue: {e}", exc_info=True)
