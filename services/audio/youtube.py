@@ -214,7 +214,7 @@ class YouTubeDownloader(BaseDownloader):
     
     async def download(self, track_info: TrackInfo) -> AudioResult:
         """
-        Download audio from YouTube Music with fallback to regular YouTube
+        Download audio - MusicDL first, then YouTube Music fallback
         
         Args:
             track_info: Track information
@@ -225,10 +225,56 @@ class YouTubeDownloader(BaseDownloader):
         Raises:
             Exception if all download attempts fail
         """
-        logger.info(f"Downloading from YouTube Music: {track_info}")
+        logger.info(f"Downloading: {track_info}")
         
         # Get output path
         output_path = self._get_output_path(track_info, 'opus')
+        
+        # ========================================
+        # PRIORITY 1: Try MusicDL (primary source)
+        # ========================================
+        try:
+            from services.audio.musicdl_handler import get_musicdl_handler
+            musicdl = get_musicdl_handler()
+            
+            if musicdl.is_available:
+                logger.info("Trying MusicDL as primary source...")
+                
+                # Search query for MusicDL
+                search_query = f"{track_info.artist} - {track_info.title}"
+                
+                # Try download via MusicDL
+                downloaded_file = await musicdl.search_and_download(
+                    search_query, 
+                    output_dir=self.download_dir
+                )
+                
+                if downloaded_file and downloaded_file.exists():
+                    actual_format = downloaded_file.suffix.lstrip('.')
+                    logger.info(f"Downloaded via MusicDL: {downloaded_file.name}")
+                    
+                    return AudioResult(
+                        file_path=downloaded_file,
+                        title=track_info.title,
+                        artist=track_info.artist,
+                        duration=track_info.duration,
+                        source=AudioSource.YOUTUBE_MUSIC,  # Will update source constant later
+                        bitrate=Settings.AUDIO_BITRATE,
+                        format=actual_format,
+                        sample_rate=Settings.AUDIO_SAMPLE_RATE
+                    )
+                else:
+                    logger.info("MusicDL: No result, falling back to yt-dlp...")
+            else:
+                logger.info("MusicDL not available, using yt-dlp...")
+                
+        except Exception as e:
+            logger.warning(f"MusicDL failed: {e}, falling back to yt-dlp...")
+        
+        # ========================================
+        # PRIORITY 2: YouTube Music via yt-dlp (fallback)
+        # ========================================
+        logger.info(f"Downloading from YouTube Music (fallback): {track_info}")
         
         # Convert URL to YouTube Music if needed
         url = track_info.url
