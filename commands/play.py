@@ -1049,6 +1049,23 @@ class PlayCommand(commands.Cog):
                 logger.info(f"🎵 Playing playlist first track: {track.title}")
             
             first_track_played = True
+            
+            # ========================================
+            # IMMEDIATELY prepare next 3 tracks while playing
+            # ========================================
+            async def prepare_upcoming_tracks():
+                """Prepare next tracks in background while first track plays"""
+                await asyncio.sleep(2)  # Wait for queue to populate
+                
+                queue_items = queue_cog.queues.get(guild_id, [])
+                if len(queue_items) > 0:
+                    from services.audio.playlist_cache import get_playlist_cache
+                    cache = get_playlist_cache()
+                    
+                    logger.info(f"🔄 Preparing next {min(3, len(queue_items))} tracks...")
+                    await cache.prepare_next_tracks(0, queue_items)
+            
+            asyncio.create_task(prepare_upcoming_tracks())
         
         async def on_track_ready(track: TrackInfo):
             """Called for each subsequent track - add to queue"""
@@ -1284,6 +1301,18 @@ class PlayCommand(commands.Cog):
                 logger.info(f"🎵 Playing YouTube playlist first track: {track.title}")
             
             first_track_played = True
+            
+            # Immediately prepare next 3 tracks while playing
+            async def prepare_upcoming_tracks():
+                await asyncio.sleep(2)  # Wait for queue to populate
+                queue_items = queue_cog.queues.get(guild_id, [])
+                if len(queue_items) > 0:
+                    from services.audio.playlist_cache import get_playlist_cache
+                    cache = get_playlist_cache()
+                    logger.info(f"🔄 Preparing next {min(3, len(queue_items))} tracks...")
+                    await cache.prepare_next_tracks(0, queue_items)
+            
+            asyncio.create_task(prepare_upcoming_tracks())
         
         async def on_track_ready(track: TrackInfo):
             """Called for each subsequent track - add to queue"""
