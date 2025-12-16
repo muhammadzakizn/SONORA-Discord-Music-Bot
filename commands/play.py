@@ -622,50 +622,20 @@ class PlayCommand(commands.Cog):
         # Not in cache, proceed with download
         errors = []
         
-        # Tier 1: Spotify
+        # ========================================
+        # TIER 1: MusicDL via YouTubeDownloader (PRIMARY)
+        # YouTubeDownloader internally uses MusicDL first, then yt-dlp
+        # ========================================
         try:
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
                     "Downloading",
-                    f"Source: Spotify\n⏳ Downloading audio..."
-                )
-            )
-            
-            result = await self.spotify_downloader.download(track_info)
-            result.source = "Spotify"
-            
-            # Verify downloaded file
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Verifying",
-                    f"✅ Memverifikasi audio...\n**{track_info.title}**"
-                )
-            )
-            from utils.track_verifier import TrackVerifier
-            verification = await TrackVerifier.verify_track(result.file_path, track_info)
-            
-            if not verification.success:
-                logger.warning(f"Spotify verification failed: {verification.message}")
-                raise Exception(f"Verification failed: {verification.message}")
-            
-            logger.info(f"✓ Downloaded & verified from Spotify: {result.title} (confidence: {verification.confidence:.2f})")
-            return result
-        
-        except Exception as e:
-            errors.append({"source": "Spotify", "error": str(e)})
-            logger.warning(f"Spotify download failed: {e}")
-        
-        # Tier 2: YouTube Music
-        try:
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Downloading",
-                    f"Source: YouTube Music (fallback)\n⏳ Downloading audio..."
+                    f"Source: Music Library\n⏳ Mengunduh audio..."
                 )
             )
             
             result = await self.youtube_downloader.download(track_info)
-            result.source = "YouTube Music"
+            result.source = "MusicDL"
             
             # Verify downloaded file
             await self._safe_loader_update(loader, 
@@ -678,15 +648,54 @@ class PlayCommand(commands.Cog):
             verification = await TrackVerifier.verify_track(result.file_path, track_info)
             
             if not verification.success:
-                logger.warning(f"YouTube verification failed: {verification.message}")
+                logger.warning(f"MusicDL verification failed: {verification.message}")
                 raise Exception(f"Verification failed: {verification.message}")
             
-            logger.info(f"✓ Downloaded & verified from YouTube Music: {result.title} (confidence: {verification.confidence:.2f})")
+            logger.info(f"✓ Downloaded & verified from MusicDL: {result.title} (confidence: {verification.confidence:.2f})")
             return result
         
         except Exception as e:
-            errors.append({"source": "YouTube Music", "error": str(e)})
-            logger.warning(f"YouTube Music download failed: {e}")
+            errors.append({"source": "MusicDL", "error": str(e)})
+            logger.warning(f"MusicDL/YouTube download failed: {e}")
+        
+        # ========================================
+        # TIER 2: Spotify via spotdl (FALLBACK)
+        # Only for tracks with Spotify URL
+        # ========================================
+        if track_info.url and 'spotify.com' in str(track_info.url):
+            try:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_loading(
+                        "Downloading",
+                        f"Source: Spotify (fallback)\n⏳ Mengunduh audio..."
+                    )
+                )
+                
+                result = await self.spotify_downloader.download(track_info)
+                result.source = "Spotify"
+                
+                # Verify downloaded file
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_loading(
+                        "Verifying",
+                        f"✅ Memverifikasi audio...\n**{track_info.title}**"
+                    )
+                )
+                from utils.track_verifier import TrackVerifier
+                verification = await TrackVerifier.verify_track(result.file_path, track_info)
+                
+                if not verification.success:
+                    logger.warning(f"Spotify verification failed: {verification.message}")
+                    raise Exception(f"Verification failed: {verification.message}")
+                
+                logger.info(f"✓ Downloaded & verified from Spotify: {result.title} (confidence: {verification.confidence:.2f})")
+                return result
+            
+            except Exception as e:
+                errors.append({"source": "Spotify", "error": str(e)})
+                logger.warning(f"Spotify download failed: {e}")
+        else:
+            logger.debug("No Spotify URL, skipping Spotify fallback")
         
         # All failed
         raise DownloadError("All sources failed", details=errors)
