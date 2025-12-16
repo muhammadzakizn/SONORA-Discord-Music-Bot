@@ -173,11 +173,15 @@ class MusicDLHandler:
             return None
         
         try:
-            # Run in thread pool (MusicDL is synchronous)
+            # Run in thread pool with TIMEOUT (MusicDL is synchronous and can be slow)
+            # 5 second timeout - if slower, fallback to yt-dlp immediately
             loop = asyncio.get_event_loop()
-            results = await loop.run_in_executor(
-                None,
-                lambda: self._music_client.search(keyword=query)
+            results = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: self._music_client.search(keyword=query)
+                ),
+                timeout=5.0  # Max 5 seconds for search
             )
             
             if not results:
