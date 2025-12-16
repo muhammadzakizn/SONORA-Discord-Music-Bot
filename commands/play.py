@@ -121,57 +121,83 @@ class PlayCommand(commands.Cog):
             await self._safe_loader_update(loader, 
                 embed=EmbedBuilder.create_loading(
                     "Found",
-                    f"**{track_info.title}** - *{track_info.artist}*\n\nDownloading..."
+                    f"**{track_info.title}** - *{track_info.artist}*\n\nPreparing..."
                 )
             )
             
-            # Stage 2: Download with Verification (3x retry)
-            MAX_DOWNLOAD_RETRIES = 3
+            # ========================================
+            # SINGLE TRACK: TRY STREAMING FIRST
+            # ========================================
+            stream_url = None
             audio_result = None
-            last_error = None
+            use_streaming = False
             
-            for attempt in range(1, MAX_DOWNLOAD_RETRIES + 1):
-                try:
-                    await self._safe_loader_update(loader, 
-                        embed=EmbedBuilder.create_loading(
-                            f"Downloading ({attempt}/{MAX_DOWNLOAD_RETRIES})",
-                            f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                            f"🔄 Mengunduh dan memverifikasi audio..."
-                        )
-                    )
-                    
-                    audio_result = await self._download_with_fallback(track_info, loader)
-                    
-                    if audio_result and audio_result.is_success:
-                        logger.info(f"✓ Download & verification success (attempt {attempt})")
-                        break  # Success, exit retry loop
-                    else:
-                        last_error = "Download returned empty result"
-                        logger.warning(f"Download attempt {attempt} failed: {last_error}")
-                        
-                except Exception as e:
-                    last_error = str(e)
-                    logger.warning(f"Download attempt {attempt} error: {e}")
-                    
-                    if attempt < MAX_DOWNLOAD_RETRIES:
+            # Try to get stream URL for instant playback
+            await self._safe_loader_update(loader, 
+                embed=EmbedBuilder.create_loading(
+                    "Streaming",
+                    f"**{track_info.title}** - *{track_info.artist}*\n\n🌐 Getting stream..."
+                )
+            )
+            
+            try:
+                stream_url = await self.youtube_downloader.get_stream_url(track_info)
+                if stream_url:
+                    use_streaming = True
+                    logger.info(f"✓ Got stream URL, using streaming mode")
+                else:
+                    logger.info("No stream URL, falling back to download")
+            except Exception as e:
+                logger.warning(f"Stream URL failed: {e}, falling back to download")
+            
+            # If streaming not available, download
+            if not use_streaming:
+                # Stage 2: Download with Verification (3x retry)
+                MAX_DOWNLOAD_RETRIES = 3
+                last_error = None
+                
+                for attempt in range(1, MAX_DOWNLOAD_RETRIES + 1):
+                    try:
                         await self._safe_loader_update(loader, 
                             embed=EmbedBuilder.create_loading(
-                                f"Retry ({attempt}/{MAX_DOWNLOAD_RETRIES})",
-                                f"⚠️ Percobaan {attempt} gagal\n"
-                                f"🔄 Mencoba ulang dalam 2 detik..."
+                                f"Downloading ({attempt}/{MAX_DOWNLOAD_RETRIES})",
+                                f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                                f"🔄 Mengunduh dan memverifikasi audio..."
                             )
                         )
-                        await asyncio.sleep(2)
-            
-            if not audio_result or not audio_result.is_success:
-                await self._safe_loader_update(loader, 
-                    embed=EmbedBuilder.create_error(
-                        "Download Failed",
-                        f"❌ Gagal setelah {MAX_DOWNLOAD_RETRIES} percobaan\n\n"
-                        f"**Error:** {last_error or 'Unknown'}"
+                        
+                        audio_result = await self._download_with_fallback(track_info, loader)
+                        
+                        if audio_result and audio_result.is_success:
+                            logger.info(f"✓ Download & verification success (attempt {attempt})")
+                            break  # Success, exit retry loop
+                        else:
+                            last_error = "Download returned empty result"
+                            logger.warning(f"Download attempt {attempt} failed: {last_error}")
+                            
+                    except Exception as e:
+                        last_error = str(e)
+                        logger.warning(f"Download attempt {attempt} error: {e}")
+                        
+                        if attempt < MAX_DOWNLOAD_RETRIES:
+                            await self._safe_loader_update(loader, 
+                                embed=EmbedBuilder.create_loading(
+                                    f"Retry ({attempt}/{MAX_DOWNLOAD_RETRIES})",
+                                    f"⚠️ Percobaan {attempt} gagal\n"
+                                    f"🔄 Mencoba ulang dalam 2 detik..."
+                                )
+                            )
+                            await asyncio.sleep(2)
+                
+                if not audio_result or not audio_result.is_success:
+                    await self._safe_loader_update(loader, 
+                        embed=EmbedBuilder.create_error(
+                            "Download Failed",
+                            f"❌ Gagal setelah {MAX_DOWNLOAD_RETRIES} percobaan\n\n"
+                            f"**Error:** {last_error or 'Unknown'}"
+                        )
                     )
-                )
-                return
+                    return
             
             # Stage 3: Process Metadata (parallel: artwork + lyrics)
             await self._safe_loader_update(loader, 
@@ -182,14 +208,20 @@ class PlayCommand(commands.Cog):
             )
             
             # Single track: Always use Apple Music artwork (highest quality)
+            # For streaming mode, audio_result may be None
             metadata = await self.metadata_processor.process(
                 track_info,
-                audio_result,
+                audio_result,  # Can be None for streaming mode
                 requested_by=interaction.user.display_name,
                 requested_by_id=interaction.user.id,
                 prefer_apple_artwork=True,  # Single tracks always use Apple Music
                 voice_channel_id=voice_channel.id  # Track which voice channel
             )
+            
+            # Store stream_url in metadata for streaming mode
+            if use_streaming and stream_url:
+                metadata.stream_url = stream_url
+                logger.info(f"Metadata prepared for streaming: {metadata.title}")
             
             # Stage 4: Check if already connected
             voice_connection = self.bot.voice_manager.connections.get(interaction.guild.id)
@@ -309,15 +341,22 @@ class PlayCommand(commands.Cog):
             
             # Set voice channel status
             try:
-                status_text = f"🎵 NOW PLAYING: {metadata.title[:30]} - {metadata.artist[:20]}"
+                if use_streaming:
+                    status_text = f"🌐 STREAMING: {metadata.title[:30]} - {metadata.artist[:20]}"
+                else:
+                    status_text = f"🎵 NOW PLAYING: {metadata.title[:30]} - {metadata.artist[:20]}"
                 await voice_channel.edit(status=status_text)
                 logger.debug(f"Set voice channel status: {status_text}")
             except Exception as e:
                 logger.debug(f"Could not set voice channel status: {e}")
             
-            await player.start(volume=volume)
-            
-            logger.info(f"✓ Now playing: {metadata.title}")
+            # Start playback - streaming or file-based
+            if use_streaming and stream_url:
+                await player.start_from_stream(stream_url, volume=volume)
+                logger.info(f"🌐 Streaming: {metadata.title}")
+            else:
+                await player.start(volume=volume)
+                logger.info(f"✓ Now playing: {metadata.title}")
         
         except Exception as e:
             logger.error(f"Play command failed: {e}", exc_info=True)
