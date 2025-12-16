@@ -308,6 +308,7 @@ class YouTubeDownloader(BaseDownloader):
         
         Called while streaming to prepare high-quality file for future use.
         Uses MusicDL to find FLAC/best quality, then uploads to FTP.
+        Verifies title matches to avoid remixes/covers.
         
         Args:
             artist: Artist name
@@ -316,6 +317,7 @@ class YouTubeDownloader(BaseDownloader):
         try:
             from services.audio.musicdl_handler import get_musicdl_handler
             from services.storage.ftp_storage import get_ftp_cache
+            import re
             
             ftp_cache = get_ftp_cache()
             if not ftp_cache.is_enabled:
@@ -324,12 +326,13 @@ class YouTubeDownloader(BaseDownloader):
             
             # Check if already cached
             if await ftp_cache.exists(artist, title):
-                logger.debug(f"Already in FTP cache: {title}")
+                logger.info(f"✓ Already in FTP cache: {title}")
                 return
             
             logger.info(f"📥 Background: Downloading for cache: {artist} - {title}")
             
             musicdl = get_musicdl_handler()
+            use_ytdlp = False
             
             if musicdl.is_available:
                 # Search for best quality (FLAC preferred)
@@ -337,45 +340,67 @@ class YouTubeDownloader(BaseDownloader):
                 song_info = await musicdl.search_best_quality(query)
                 
                 if song_info:
-                    # Download
-                    downloaded_file = await musicdl.download(song_info, self.download_dir)
+                    # ========================================
+                    # VERIFY TITLE - No remixes/covers
+                    # ========================================
+                    found_title = song_info.get('title', '').lower()
+                    expected_title = title.lower()
                     
-                    if downloaded_file and downloaded_file.exists():
-                        # Upload to FTP
-                        success = await ftp_cache.upload(downloaded_file, artist, title)
+                    # Check for unwanted keywords
+                    unwanted = ['remix', 'cover', 'bootleg', 'mashup', 'dj ', 'live version', 'instrumental']
+                    is_remix = any(kw in found_title and kw not in expected_title for kw in unwanted)
+                    
+                    if is_remix:
+                        logger.warning(f"⚠️ MusicDL returned remix/cover: '{song_info.get('title')}'")
+                        logger.info(f"🔄 Falling back to yt-dlp AAC...")
+                        use_ytdlp = True
+                    else:
+                        # Title OK, download via MusicDL
+                        downloaded_file = await musicdl.download(song_info, self.download_dir)
                         
-                        if success:
-                            logger.info(f"☁️ Cached to FTP: {title} ({song_info.get('ext', 'unknown')})")
-                            # Clean up local file
-                            try:
-                                downloaded_file.unlink()
-                            except:
-                                pass
-                        return
+                        if downloaded_file and downloaded_file.exists():
+                            # Upload to FTP
+                            success = await ftp_cache.upload(downloaded_file, artist, title)
+                            
+                            if success:
+                                logger.info(f"☁️ Cached to FTP: {title} ({song_info.get('ext', 'unknown')})")
+                                # Clean up local file
+                                try:
+                                    downloaded_file.unlink()
+                                except:
+                                    pass
+                            return
+                else:
+                    logger.info(f"MusicDL found no results for: {query}")
+                    use_ytdlp = True
+            else:
+                use_ytdlp = True
             
-            # Fallback: Use yt-dlp if MusicDL fails
-            logger.info(f"MusicDL failed, trying yt-dlp for cache: {title}")
-            
-            # Download via yt-dlp (best audio)
-            from database.models import TrackInfo as TI
-            temp_track = TI(
-                title=title,
-                artist=artist,
-                url=None,
-                source="youtube_music"
-            )
-            
-            # Use regular download
-            result = await self.download(temp_track)
-            if result and result.file_path and result.file_path.exists():
-                success = await ftp_cache.upload(result.file_path, artist, title)
-                if success:
-                    logger.info(f"☁️ Cached to FTP via yt-dlp: {title}")
-                # Clean up
-                try:
-                    result.file_path.unlink()
-                except:
-                    pass
+            # ========================================
+            # FALLBACK: Use yt-dlp AAC
+            # ========================================
+            if use_ytdlp:
+                logger.info(f"📥 yt-dlp AAC fallback for: {title}")
+                
+                from database.models import TrackInfo as TI
+                temp_track = TI(
+                    title=title,
+                    artist=artist,
+                    url=None,
+                    source="youtube_music"
+                )
+                
+                # Use regular download (yt-dlp)
+                result = await self.download(temp_track)
+                if result and result.file_path and result.file_path.exists():
+                    success = await ftp_cache.upload(result.file_path, artist, title)
+                    if success:
+                        logger.info(f"☁️ Cached to FTP via yt-dlp: {title}")
+                    # Clean up
+                    try:
+                        result.file_path.unlink()
+                    except:
+                        pass
                     
         except Exception as e:
             logger.error(f"Background cache download failed: {e}")
