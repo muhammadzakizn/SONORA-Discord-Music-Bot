@@ -35,13 +35,15 @@ class MusicDLHandler:
     """
     
     # Clients to use for searching
-    # Ordered by priority: HiFi sources first
-    # NOTE: TIDALMusicClient requires separate auth via browser, not included in default
+    # NOTE: Only Netease for speed - other Chinese clients are slow
+    # If Netease fails, fall back to yt-dlp directly (faster than trying other Chinese services)
+    # TIDALMusicClient requires separate auth via browser, not included
     DEFAULT_CLIENTS = [
-        'NeteaseMusicClient',     # Large Chinese library
-        'KugouMusicClient',       # Another large source
-        'KuwoMusicClient',        # Kuwo music
-        'QianqianMusicClient',    # Qianqian music
+        'NeteaseMusicClient',     # Primary: Large library, fast response
+        # Other clients disabled for speed:
+        # 'KugouMusicClient',     # Slow, causes timeouts
+        # 'KuwoMusicClient',      # Slow
+        # 'QianqianMusicClient',  # Slow
     ]
     
     # Additional clients for specific platforms
