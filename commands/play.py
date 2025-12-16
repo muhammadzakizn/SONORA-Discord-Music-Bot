@@ -703,6 +703,31 @@ class PlayCommand(commands.Cog):
                 )
             else:
                 logger.info(f"✓ Cache verified: {track_info.title} (confidence: {verification.confidence:.2f})")
+                
+                # Check if this cached file needs to be uploaded to FTP
+                try:
+                    from services.storage.ftp_storage import get_ftp_cache
+                    ftp_cache = get_ftp_cache()
+                    if ftp_cache.is_enabled:
+                        # Check if file exists in FTP
+                        if not await ftp_cache.exists(track_info.artist, track_info.title):
+                            async def _upload_cache_to_ftp():
+                                try:
+                                    success = await ftp_cache.upload(cached_file, track_info.artist, track_info.title)
+                                    if success:
+                                        logger.info(f"☁️ Local cache uploaded to FTP: {track_info.title}")
+                                    else:
+                                        logger.warning(f"⚠️ FTP upload from cache failed: {track_info.title}")
+                                except Exception as e:
+                                    logger.error(f"❌ FTP upload error: {e}")
+                            
+                            asyncio.create_task(_upload_cache_to_ftp())
+                            logger.info(f"☁️ Syncing local cache to FTP: {track_info.title}")
+                        else:
+                            logger.debug(f"✓ Already in FTP cache: {track_info.title}")
+                except Exception as e:
+                    logger.debug(f"FTP cache check skipped: {e}")
+                
                 # Create AudioResult from cached file
                 result = AudioResult(
                     file_path=cached_file,
