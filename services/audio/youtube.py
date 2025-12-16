@@ -250,6 +250,9 @@ class YouTubeDownloader(BaseDownloader):
                 )
                 
                 if downloaded_file and downloaded_file.exists():
+                    # Check file size limit (100MB)
+                    self._check_file_size(downloaded_file)
+                    
                     actual_format = downloaded_file.suffix.lstrip('.')
                     logger.info(f"Downloaded via MusicDL: {downloaded_file.name}")
                     
@@ -360,6 +363,9 @@ class YouTubeDownloader(BaseDownloader):
             # Get actual format from file extension
             actual_format = output_path.suffix.lstrip('.')
             
+            # Check file size limit (100MB)
+            self._check_file_size(output_path)
+            
             logger.info(f"✓ Downloaded from YouTube Music: {output_path.name}")
             logger.info(f"  Format: {actual_format}")
             
@@ -414,6 +420,9 @@ class YouTubeDownloader(BaseDownloader):
                 output_path = possible_files[0]
                 actual_format = output_path.suffix.lstrip('.')
                 
+                # Check file size limit (100MB)
+                self._check_file_size(output_path)
+                
                 logger.info(f"✓ Downloaded (web client): {output_path.name}")
                 
                 return AudioResult(
@@ -463,6 +472,9 @@ class YouTubeDownloader(BaseDownloader):
                 possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
                 output_path = possible_files[0]
                 actual_format = output_path.suffix.lstrip('.')
+                
+                # Check file size limit (100MB)
+                self._check_file_size(output_path)
                 
                 logger.info(f"✓ Downloaded (tv_embedded): {output_path.name}")
                 

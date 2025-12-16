@@ -12,8 +12,16 @@ from config.logging_config import get_logger
 logger = get_logger('audio.base')
 
 
+class FileTooLargeError(Exception):
+    """Raised when downloaded file exceeds maximum size limit"""
+    pass
+
+
 class BaseDownloader(ABC):
     """Abstract base class for audio downloaders"""
+    
+    # Maximum file size in bytes (100MB)
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
     
     def __init__(self, download_dir: Path):
         """
@@ -25,6 +33,38 @@ class BaseDownloader(ABC):
         self.download_dir = download_dir
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.source = AudioSource.UNKNOWN
+    
+    def _check_file_size(self, file_path: Path) -> None:
+        """
+        Check if file exceeds maximum size limit
+        
+        Args:
+            file_path: Path to the file to check
+            
+        Raises:
+            FileTooLargeError: If file exceeds MAX_FILE_SIZE (100MB)
+        """
+        if not file_path.exists():
+            return
+        
+        file_size = file_path.stat().st_size
+        file_size_mb = file_size / (1024 * 1024)
+        
+        if file_size > self.MAX_FILE_SIZE:
+            # Delete the file to save space
+            try:
+                file_path.unlink()
+                logger.warning(f"Deleted oversized file: {file_path.name} ({file_size_mb:.1f}MB)")
+            except Exception as e:
+                logger.error(f"Failed to delete oversized file: {e}")
+            
+            raise FileTooLargeError(
+                f"File terlalu besar! ({file_size_mb:.1f}MB)\n"
+                f"Batas maksimum: 100MB\n"
+                f"Coba cari versi lagu yang lebih pendek atau format berbeda."
+            )
+        
+        logger.debug(f"File size OK: {file_path.name} ({file_size_mb:.1f}MB)")
     
     @abstractmethod
     async def download(self, track_info: TrackInfo) -> AudioResult:
