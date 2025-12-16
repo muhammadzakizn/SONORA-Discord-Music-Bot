@@ -795,12 +795,23 @@ class PlayCommand(commands.Cog):
                         from services.storage.ftp_storage import get_ftp_cache
                         ftp_cache = get_ftp_cache()
                         if ftp_cache.is_enabled:
-                            asyncio.create_task(
-                                ftp_cache.upload(result.file_path, track_info.artist, track_info.title)
-                            )
-                            logger.info(f"☁️ Uploading to FTP cache: {track_info.title}")
+                            # Use wrapper to ensure logs are shown
+                            async def _safe_ftp_upload():
+                                try:
+                                    success = await ftp_cache.upload(result.file_path, track_info.artist, track_info.title)
+                                    if success:
+                                        logger.info(f"☁️ FTP upload complete: {track_info.title}")
+                                    else:
+                                        logger.warning(f"⚠️ FTP upload returned False: {track_info.title}")
+                                except Exception as upload_error:
+                                    logger.error(f"❌ FTP upload error: {upload_error}")
+                            
+                            asyncio.create_task(_safe_ftp_upload())
+                            logger.info(f"☁️ FTP upload started: {track_info.title}")
+                        else:
+                            logger.debug("FTP cache not enabled, skipping upload")
                     except Exception as e:
-                        logger.warning(f"FTP upload failed: {e}")
+                        logger.warning(f"FTP upload setup failed: {e}")
                     
                     return result
                 else:
