@@ -77,15 +77,16 @@ class MusicDLHandler:
                 return
             
             # Initialize config with quality preferences
-            # Prefer MP3 320kbps over FLAC to save storage (~10MB vs ~190MB)
+            # Prefer AAC 256kbps (better quality than MP3, smaller than FLAC)
+            # AAC 256kbps ≈ 5-8MB per song (vs FLAC 150-200MB)
             init_cfg = {}
             for client in active_clients:
                 init_cfg[client] = {
                     'work_dir': str(self.work_dir / client.replace('MusicClient', '').lower()),
                     'search_size_per_source': 5,
                     'disable_print': True,
-                    'download_preference': ['320k', '256k', 'mp3', 'aac'],  # Prefer smaller formats
-                    'audio_quality': '320k',  # Max 320kbps
+                    'download_preference': ['aac', 'm4a', '256k', '192k', 'mp3'],  # AAC first
+                    'audio_quality': '256k',  # 256kbps AAC = excellent quality
                 }
             
             self._music_client = musicdl.MusicClient(
