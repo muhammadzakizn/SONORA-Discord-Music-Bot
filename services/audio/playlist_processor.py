@@ -401,7 +401,7 @@ class PlaylistProcessor:
                     '--save-file', temp_path
                 ]
                 
-                stdout, stderr, returncode = await self.spotify._run_command(command, timeout=90)
+                stdout, stderr, returncode = await self.spotify._run_command(command, timeout=180)
                 
                 if returncode != 0:
                     if 'rate' in stderr.lower() or 'limit' in stderr.lower():
@@ -786,15 +786,56 @@ class PlaylistProcessor:
         
         try:
             if content_type == 'track':
-                # Single track - search on Spotify using Apple Music URL
-                # Spotify can often find tracks from Apple Music URLs
-                track = await self.spotify.search(url)
-                if track:
-                    return [track]
+                # Single track - try to get metadata from gamdl, then search
+                logger.info(f"Processing Apple Music single track")
                 
-                # Fallback: Try YouTube search
-                logger.debug("Spotify search failed, trying YouTube")
-                track = await self.youtube.search(url)
+                # First try gamdl to get track metadata
+                try:
+                    am_handler = get_apple_music_handler()
+                    track_data = await am_handler.get_track_info(url)
+                    if track_data:
+                        # Got metadata, create TrackInfo for YouTube search
+                        track = TrackInfo(
+                            title=track_data.get('title', 'Unknown'),
+                            artist=track_data.get('artist', 'Unknown'),
+                            album=track_data.get('album', ''),
+                            url=None,  # Will search on YouTube Music
+                            track_id=None
+                        )
+                        logger.info(f"Got Apple Music metadata: {track.title} - {track.artist}")
+                        return [track]
+                except Exception as e:
+                    logger.debug(f"gamdl metadata failed: {e}")
+                
+                # Fallback: Try MusicDL search with URL as query
+                try:
+                    from services.audio.musicdl_handler import get_musicdl_handler
+                    musicdl = get_musicdl_handler()
+                    if musicdl.is_available:
+                        # Extract track name from URL for search
+                        import re
+                        match = re.search(r'/album/([^/]+)/', url)
+                        search_term = match.group(1).replace('-', ' ') if match else url
+                        result = await musicdl.search(search_term)
+                        if result:
+                            track = TrackInfo(
+                                title=result.get('title', 'Unknown'),
+                                artist=result.get('artist', 'Unknown'),
+                                url=None,
+                                track_id=None
+                            )
+                            track.musicdl_data = result
+                            return [track]
+                except Exception as e:
+                    logger.debug(f"MusicDL search failed: {e}")
+                
+                # Final fallback: YouTube search with extracted info
+                logger.info("Falling back to YouTube search")
+                # Try to extract title from URL
+                import re
+                match = re.search(r'/album/([^/]+)/', url)
+                search_term = match.group(1).replace('-', ' ') if match else "apple music track"
+                track = await self.youtube.search(search_term)
                 return [track] if track else []
             
             elif content_type == 'album':
