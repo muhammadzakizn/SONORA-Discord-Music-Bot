@@ -249,12 +249,10 @@ class MusicDLHandler:
         
         try:
             loop = asyncio.get_event_loop()
-            results = await asyncio.wait_for(
-                loop.run_in_executor(
-                    None,
-                    lambda: self._music_client.search(keyword=query)
-                ),
-                timeout=10.0  # Longer timeout for quality search
+            # No timeout for background quality search - let it complete
+            results = await loop.run_in_executor(
+                None,
+                lambda: self._music_client.search(keyword=query)
             )
             
             if not results:
@@ -305,9 +303,6 @@ class MusicDLHandler:
                 'raw_data': song,
             }
             
-        except asyncio.TimeoutError:
-            logger.warning(f"MusicDL best quality search timeout: {query}")
-            return None
         except Exception as e:
             logger.error(f"MusicDL best quality search error: {e}")
             return None
