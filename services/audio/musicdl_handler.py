@@ -307,6 +307,22 @@ class MusicDLHandler:
             
             best = scored_results[0]
             song = best['song']
+            song_name = song.get('song_name', '').lower()
+            
+            # ========================================
+            # FINAL CHECK: Reject if best result is remix/cover
+            # ========================================
+            if not is_remix_requested:
+                for kw in remix_keywords:
+                    if kw in song_name:
+                        logger.warning(f"⚠️ Best result is remix/cover: {song.get('song_name')}")
+                        logger.info(f"❌ Rejecting MusicDL result, will use yt-dlp fallback")
+                        return None
+            
+            # Also reject if score is negative (heavy penalties applied)
+            if best['score'] < 0:
+                logger.warning(f"⚠️ Best result has low quality score: {best['score']}")
+                return None
             
             logger.info(f"Found best quality ({song.get('ext', 'unknown')}): {song.get('song_name')}")
             return {
