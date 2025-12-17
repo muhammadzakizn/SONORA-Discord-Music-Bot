@@ -11,8 +11,8 @@ from pathlib import Path
 import time
 
 # Configuration
-WEB_PORT = 9072  # Port untuk web dashboard
-BOT_API_PORT = 5000  # Port untuk bot API
+WEB_PORT = 9072  # Port for web dashboard (legacy, now on Vercel)
+BOT_API_PORT = 9072  # Port for bot API (use public port since Vercel needs access)
 WEB_DIR = Path('web')
 
 class Colors:
@@ -145,31 +145,25 @@ def run_production():
     
     env = os.environ.copy()
     env['BOT_VERSION'] = 'stable'
-    env['WEB_DASHBOARD_PORT'] = str(BOT_API_PORT)
+    env['WEB_DASHBOARD_PORT'] = str(BOT_API_PORT)  # Bot API on public port
     env['DATABASE_PATH'] = 'bot.db'
     env['NODE_ENV'] = 'production'
     env['PORT'] = str(WEB_PORT)
     
-    # Start Bot
-    print(f"{Colors.CYAN}Starting Discord Bot...{Colors.END}")
+    # Start Bot with API on public port (accessible from Vercel)
+    print(f"{Colors.CYAN}Starting Discord Bot with API...{Colors.END}")
     proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
     time.sleep(3)
-    print(f"{Colors.GREEN}✓ Bot started (API: http://localhost:{BOT_API_PORT}){Colors.END}")
+    print(f"{Colors.GREEN}✓ Bot started with API on port {BOT_API_PORT}{Colors.END}")
     
-    # Start Web Dashboard (Production)
-    print(f"{Colors.CYAN}Starting Web Dashboard (Production)...{Colors.END}")
-    proc_web = subprocess.Popen(
-        ['npm', 'run', 'start', '--', '-p', str(WEB_PORT)],
-        cwd=WEB_DIR,
-        env=env
-    )
-    time.sleep(4)
-    print(f"{Colors.GREEN}✓ Web Dashboard started{Colors.END}")
+    # Web Dashboard now runs on Vercel (https://sonora.muhammadzakizn.com)
+    # No need to start local web dashboard
+    proc_web = None
     
     print(f"\n{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}")
     print(f"{Colors.GREEN}  ✅ SONORA Production Running!{Colors.END}")
     print(f"{Colors.CYAN}  🌐 Web Dashboard: https://sonora.muhammadzakizn.com{Colors.END}")
-    print(f"{Colors.CYAN}  🔌 Bot API:       http://localhost:{BOT_API_PORT}{Colors.END}")
+    print(f"{Colors.CYAN}  🔌 Bot API:       http://waguri.caliphdev.com:{BOT_API_PORT}{Colors.END}")
     print(f"{Colors.YELLOW}  Press Ctrl+C to stop all services{Colors.END}")
     print(f"{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}\n")
     
@@ -221,10 +215,8 @@ def run_production():
                     print(f"\n{Colors.RED}Bot has stopped unexpectedly!{Colors.END}")
                     break
             
-            # Check if web has crashed
-            if proc_web.poll() is not None:
-                print(f"\n{Colors.RED}Web Dashboard has stopped unexpectedly!{Colors.END}")
-                break
+            # Web is now on Vercel, so we only monitor bot process
+            # (proc_web is None in production mode)
             
             time.sleep(1)
             
@@ -232,13 +224,16 @@ def run_production():
         print(f"\n{Colors.YELLOW}Stopping all services...{Colors.END}")
     finally:
         proc_bot.terminate()
-        proc_web.terminate()
+        if proc_web is not None:
+            proc_web.terminate()
         try:
             proc_bot.wait(timeout=5)
-            proc_web.wait(timeout=5)
+            if proc_web is not None:
+                proc_web.wait(timeout=5)
         except:
             proc_bot.kill()
-            proc_web.kill()
+            if proc_web is not None:
+                proc_web.kill()
         # Clean up signal files
         for sig_file in [restart_signal_file, Path('.dashboard_restart')]:
             try:
