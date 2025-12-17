@@ -168,7 +168,7 @@ def run_production():
     
     print(f"\n{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}")
     print(f"{Colors.GREEN}  ✅ SONORA Production Running!{Colors.END}")
-    print(f"{Colors.CYAN}  🌐 Web Dashboard: http://waguri.caliphdev.com:{WEB_PORT}{Colors.END}")
+    print(f"{Colors.CYAN}  🌐 Web Dashboard: https://sonora.muhammadzakizn.com{Colors.END}")
     print(f"{Colors.CYAN}  🔌 Bot API:       http://localhost:{BOT_API_PORT}{Colors.END}")
     print(f"{Colors.YELLOW}  Press Ctrl+C to stop all services{Colors.END}")
     print(f"{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}\n")
