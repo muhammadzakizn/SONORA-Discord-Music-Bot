@@ -228,7 +228,7 @@ export default function GuildsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("managed");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchGuilds = async () => {
@@ -276,11 +276,12 @@ export default function GuildsPage() {
     return null;
   };
 
-  // Filter guilds based on view mode and search
+  // Filter guilds - by default only show user's managed servers (admin/owner access)
   const filteredGuilds = guilds.filter(guild => {
     const matchesSearch = guild.name.toLowerCase().includes(search.toLowerCase());
-    const matchesMode = viewMode === "all" || managedGuildIds.has(String(guild.id));
-    return matchesSearch && matchesMode;
+    // Only show servers where user has manage permissions
+    const isManaged = managedGuildIds.has(String(guild.id));
+    return matchesSearch && isManaged;
   });
 
   // Stats
@@ -312,7 +313,7 @@ export default function GuildsPage() {
             {t('servers.title')}
           </h1>
           <p className={cn("mt-1", isDark ? "text-zinc-500" : "text-gray-500")}>
-            {`${t('servers.subtitle')} (${guilds.length})`}
+            {`Manage your servers (${filteredGuilds.length})`}
           </p>
         </div>
 
