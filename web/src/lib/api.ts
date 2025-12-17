@@ -97,50 +97,50 @@ class ApiClient {
 
   // Bot Status
   async getStatus(): Promise<BotStatus> {
-    return this.fetch<BotStatus>('/api/status');
+    return this.fetch<BotStatus>('/status');
   }
 
   // Guilds
   async getGuilds(): Promise<Guild[]> {
-    return this.fetch<Guild[]>('/api/guilds');
+    return this.fetch<Guild[]>('/guilds');
   }
 
   async getGuild(guildId: number): Promise<Guild> {
-    return this.fetch<Guild>(`/api/guild/${guildId}`);
+    return this.fetch<Guild>(`/guild/${guildId}`);
   }
 
   // Admin
   async getHealth(): Promise<HealthStatus> {
-    return this.fetch<HealthStatus>('/api/admin/health');
+    return this.fetch<HealthStatus>('/admin/health');
   }
 
   async getActivity(days: number = 7): Promise<ActivityStats> {
-    return this.fetch<ActivityStats>(`/api/admin/activity?days=${days}`);
+    return this.fetch<ActivityStats>(`/admin/activity?days=${days}`);
   }
 
   async getCache(): Promise<{
     downloads: { count: number; size_mb: number; recent: Array<{ name: string; size_mb: number }> };
     cache: { count: number; size_mb: number };
   }> {
-    return this.fetch('/api/admin/cache');
+    return this.fetch('/admin/cache');
   }
 
   // Controls
   async control(guildId: number, action: 'pause' | 'resume' | 'skip' | 'stop'): Promise<{ status: string }> {
-    return this.fetch(`/api/control/${guildId}/${action}`, {
+    return this.fetch(`/control/${guildId}/${action}`, {
       method: 'POST',
     });
   }
 
   // Admin Actions
   async shutdownBot(): Promise<{ status: string }> {
-    return this.fetch('/api/admin/shutdown', {
+    return this.fetch('/admin/shutdown', {
       method: 'POST',
     });
   }
 
   async clearCache(): Promise<{ status: string; cleared: number }> {
-    return this.fetch('/api/admin/cache/clear', {
+    return this.fetch('/admin/cache/clear', {
       method: 'POST',
     });
   }
@@ -151,7 +151,7 @@ class ApiClient {
     all_channels?: boolean;
     mention_type?: 'none' | 'everyone' | 'here';
   }): Promise<{ success: boolean; sent: number; failed: number }> {
-    return this.fetch('/api/admin/broadcast', {
+    return this.fetch('/admin/broadcast', {
       method: 'POST',
       body: JSON.stringify({ message, ...options }),
     });
@@ -162,7 +162,7 @@ class ApiClient {
     logs: Array<{ timestamp: string; level: string; message: string; file?: string }>;
     total: number;
   }> {
-    return this.fetch(`/api/admin/logs?type=${type}&lines=${lines}`);
+    return this.fetch(`/admin/logs?type=${type}&lines=${lines}`);
   }
 
   // Guilds with Channels (for broadcast)
@@ -172,7 +172,7 @@ class ApiClient {
     icon: string | null;
     channels: Array<{ id: string; name: string; type: string }>;
   }>> {
-    return this.fetch('/api/admin/guilds/channels');
+    return this.fetch('/admin/guilds/channels');
   }
 }
 
