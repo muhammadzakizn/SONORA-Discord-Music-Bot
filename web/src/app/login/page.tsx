@@ -1303,11 +1303,6 @@ function LoginPageContent() {
                           }}
                           theme="dark"
                         />
-                        {captchaVerified && (
-                          <p className="text-green-400 text-sm text-center mt-2 flex items-center justify-center gap-1">
-                            <CheckCircle className="w-4 h-4" /> Verified
-                          </p>
-                        )}
                       </div>
                     )}
 
