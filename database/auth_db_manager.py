@@ -269,6 +269,7 @@ class AuthDatabaseManager:
             await self.db.execute("PRAGMA journal_mode = WAL")  # Better performance & crash recovery
             await self.db.execute("PRAGMA synchronous = NORMAL")
             await self._create_tables()
+            await self._run_migrations()
             logger.info("✓ Auth database connected with bank-level security")
         except Exception as e:
             logger.error(f"Failed to connect to auth database: {e}", exc_info=True)
@@ -365,14 +366,14 @@ class AuthDatabaseManager:
             )
         """)
         
-        # Verification codes (OTP, email, discord)
+        # Verification codes (OTP, email, discord, passkey)
         await self.db.execute("""
             CREATE TABLE IF NOT EXISTS verification_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
                 discord_id TEXT,
                 code_hash TEXT NOT NULL,  -- Hashed code
-                code_type TEXT NOT NULL CHECK(code_type IN ('email', 'discord', 'account_verify', 'mfa', 'password_reset')),
+                code_type TEXT NOT NULL CHECK(code_type IN ('email', 'discord', 'account_verify', 'mfa', 'password_reset', 'passkey_challenge')),
                 expires_at TIMESTAMP NOT NULL,
                 used_at TIMESTAMP,
                 attempts INTEGER DEFAULT 0,
@@ -461,6 +462,67 @@ class AuthDatabaseManager:
         
         await self.db.commit()
         logger.info("✓ Auth database tables created with security indexes")
+    
+    async def _run_migrations(self) -> None:
+        """Run database migrations to fix existing tables"""
+        try:
+            # Migration 1: Fix verification_codes CHECK constraint to include passkey_challenge
+            # Check if we need to migrate by trying to insert a passkey_challenge
+            try:
+                # Test insert with passkey_challenge type
+                await self.db.execute("""
+                    INSERT INTO verification_codes (user_id, code_hash, code_type, expires_at)
+                    VALUES (NULL, 'test', 'passkey_challenge', datetime('now', '+1 minute'))
+                """)
+                # Delete the test row
+                await self.db.execute("""
+                    DELETE FROM verification_codes WHERE code_hash = 'test' AND code_type = 'passkey_challenge'
+                """)
+                await self.db.commit()
+                logger.debug("✓ verification_codes table already supports passkey_challenge")
+            except Exception as e:
+                if "CHECK constraint" in str(e):
+                    logger.info("Migrating verification_codes table to support passkey_challenge...")
+                    
+                    # SQLite doesn't support ALTER CHECK, so we need to recreate the table
+                    # 1. Rename old table
+                    await self.db.execute("ALTER TABLE verification_codes RENAME TO verification_codes_old")
+                    
+                    # 2. Create new table with updated CHECK constraint
+                    await self.db.execute("""
+                        CREATE TABLE verification_codes (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER,
+                            discord_id TEXT,
+                            code_hash TEXT NOT NULL,
+                            code_type TEXT NOT NULL CHECK(code_type IN ('email', 'discord', 'account_verify', 'mfa', 'password_reset', 'passkey_challenge')),
+                            expires_at TIMESTAMP NOT NULL,
+                            used_at TIMESTAMP,
+                            attempts INTEGER DEFAULT 0,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE CASCADE
+                        )
+                    """)
+                    
+                    # 3. Copy data from old table
+                    await self.db.execute("""
+                        INSERT INTO verification_codes (id, user_id, discord_id, code_hash, code_type, expires_at, used_at, attempts, created_at)
+                        SELECT id, user_id, discord_id, code_hash, code_type, expires_at, used_at, attempts, created_at
+                        FROM verification_codes_old
+                    """)
+                    
+                    # 4. Drop old table
+                    await self.db.execute("DROP TABLE verification_codes_old")
+                    
+                    # 5. Recreate indexes
+                    await self.db.execute("CREATE INDEX IF NOT EXISTS idx_verification_codes ON verification_codes(code_hash, code_type)")
+                    
+                    await self.db.commit()
+                    logger.info("✓ verification_codes table migrated successfully")
+                else:
+                    raise
+        except Exception as e:
+            logger.warning(f"Migration check failed (may be new database): {e}")
     
     # ==================== USER MANAGEMENT ====================
     
