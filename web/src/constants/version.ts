@@ -2,8 +2,8 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.7.0";
-export const BOT_VERSION = "3.7.0";
+export const WEB_VERSION = "3.8.0";
+export const BOT_VERSION = "3.8.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -17,6 +17,36 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.8.0",
+    date: "2025-12-17",
+    title: "Storage Optimization - Auto-Delete Audio",
+    highlights: [
+      "Semua file audio langsung dihapus setelah diputar",
+      "Hemat storage hingga 90%",
+      "Cocok untuk VPS/Pterodactyl dengan disk terbatas",
+      "FTP cache tetap menyimpan untuk penggunaan ulang"
+    ],
+    changes: [
+      {
+        category: "Storage Optimization",
+        items: [
+          "Auto-delete ALL audio files after playback (bukan hanya >100MB)",
+          "File dari FTP cache: diunduh, diputar, lalu dihapus dari local",
+          "File download sementara langsung dihapus",
+          "Log lebih detail menampilkan ukuran file yang dihapus"
+        ]
+      },
+      {
+        category: "Files Modified",
+        items: [
+          "ui/media_player.py - _cleanup_audio_file() always deletes",
+          "services/audio/download_manager.py - _cleanup_old_tracks() always deletes",
+          "services/audio/playlist_cache.py - _cleanup_track() with size logging"
+        ]
+      }
+    ]
+  },
   {
     version: "3.7.0",
     date: "2025-12-13",

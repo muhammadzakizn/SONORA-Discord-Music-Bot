@@ -399,15 +399,17 @@ class PlaylistCacheManager:
             logger.error(f"FTP upload error: {e}")
     
     def _cleanup_track(self, index: int) -> None:
-        """Clean up a track from local cache."""
+        """Clean up a track from local cache after playback."""
         if index in self.prepared_tracks:
             cached = self.prepared_tracks[index]
             if cached.audio_path and cached.audio_path.exists():
                 try:
+                    file_size = cached.audio_path.stat().st_size
+                    file_size_mb = file_size / (1024 * 1024)
                     cached.audio_path.unlink()
-                    logger.debug(f"🗑️ Cleaned up: {cached.audio_path.name}")
-                except:
-                    pass
+                    logger.info(f"🗑️ Auto-deleted playlist track: {cached.audio_path.name} ({file_size_mb:.1f}MB)")
+                except Exception as e:
+                    logger.warning(f"Cleanup error: {e}")
             del self.prepared_tracks[index]
     
     def cleanup_all(self) -> None:

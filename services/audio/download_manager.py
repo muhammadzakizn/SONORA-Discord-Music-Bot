@@ -202,7 +202,7 @@ class RollingDownloadManager:
         """
         Delete downloaded files for tracks already played.
         
-        Only deletes files >100MB to save storage.
+        ALWAYS deletes files to save storage.
         
         Args:
             before_index: Delete tracks before this index
@@ -216,12 +216,9 @@ class RollingDownloadManager:
                         file_size = result.file_path.stat().st_size
                         file_size_mb = file_size / (1024 * 1024)
                         
-                        # Delete if >100MB
-                        if file_size > self.MAX_FILE_SIZE:
-                            result.file_path.unlink()
-                            logger.info(f"🗑️ Deleted large file: {result.file_path.name} ({file_size_mb:.1f}MB)")
-                        else:
-                            logger.debug(f"Keeping cached: {result.file_path.name} ({file_size_mb:.1f}MB)")
+                        # ALWAYS delete to save storage
+                        result.file_path.unlink()
+                        logger.info(f"🗑️ Auto-deleted after playback: {result.file_path.name} ({file_size_mb:.1f}MB)")
                     except Exception as e:
                         logger.warning(f"Cleanup error: {e}")
                 
