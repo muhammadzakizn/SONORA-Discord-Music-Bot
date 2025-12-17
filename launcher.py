@@ -39,26 +39,18 @@ def print_banner():
 
 def print_menu():
     print(f"{Colors.BOLD}Select Option:{Colors.END}\n")
-    print(f"{Colors.GREEN}1. {Colors.BOLD}🚀 Start Production (Bot + Web){Colors.END}")
-    print(f"   └─ Recommended for production server")
-    print(f"   └─ Bot API: {BOT_API_PORT} | Web: {WEB_PORT}")
+    print(f"{Colors.GREEN}1. {Colors.BOLD}🚀 Start Production (Bot + API){Colors.END}")
+    print(f"   └─ Bot with Flask API for Vercel dashboard")
+    print(f"   └─ API Port: {BOT_API_PORT}")
+    print(f"   └─ Web: https://sonora.muhammadzakizn.com (Vercel)")
     print()
-    print(f"{Colors.YELLOW}2. {Colors.BOLD}🔨 Build Web Dashboard{Colors.END}")
-    print(f"   └─ Required before first production start")
+    print(f"{Colors.BLUE}2. {Colors.BOLD}🎵 Start Bot Only{Colors.END}")
+    print(f"   └─ Discord bot without API server")
     print()
-    print(f"{Colors.BLUE}3. {Colors.BOLD}🎵 Start Bot Only{Colors.END}")
-    print(f"   └─ Discord bot without web dashboard")
-    print()
-    print(f"{Colors.WHITE}4. {Colors.BOLD}🌐 Start Web Only (Production){Colors.END}")
-    print(f"   └─ Web dashboard only (requires bot running)")
-    print()
-    print(f"{Colors.MAGENTA}5. {Colors.BOLD}🧪 Development Mode{Colors.END}")
-    print(f"   └─ Hot-reload for development")
-    print()
-    print(f"{Colors.CYAN}6. {Colors.BOLD}⚙️  Configuration{Colors.END}")
+    print(f"{Colors.CYAN}3. {Colors.BOLD}⚙️  Configuration{Colors.END}")
     print(f"   └─ Edit environment files")
     print()
-    print(f"{Colors.RED}7. {Colors.BOLD}❌ Exit{Colors.END}")
+    print(f"{Colors.RED}4. {Colors.BOLD}❌ Exit{Colors.END}")
     print()
 
 def check_requirements():
@@ -127,18 +119,10 @@ def build_web():
     return True
 
 def run_production():
-    """Run Bot + Web in production mode"""
+    """Run Bot + API in production mode (Web is on Vercel)"""
     cleanup_processes()
     
-    if not check_web_build():
-        choice = input(f"{Colors.YELLOW}Build now? (y/n): {Colors.END}")
-        if choice.lower() == 'y':
-            if not build_web():
-                return
-        else:
-            return
-    
-    print(f"{Colors.GREEN}{Colors.BOLD}🚀 Starting SONORA Production...{Colors.END}\n")
+    print(f"{Colors.GREEN}{Colors.BOLD}🚀 Starting SONORA Production (Bot + API)...{Colors.END}\n")
     
     # Restart signal file - checked by launcher to auto-restart bot
     restart_signal_file = Path('.restart_signal')
@@ -406,21 +390,15 @@ def main():
         print_banner()
         print_menu()
         
-        choice = input(f"{Colors.BOLD}Enter your choice (1-7): {Colors.END}")
+        choice = input(f"{Colors.BOLD}Enter your choice (1-4): {Colors.END}")
         
         if choice == '1':
             run_production()
         elif choice == '2':
-            build_web()
-        elif choice == '3':
             run_bot_only()
-        elif choice == '4':
-            run_web_production()
-        elif choice == '5':
-            run_development()
-        elif choice == '6':
+        elif choice == '3':
             configuration_menu()
-        elif choice == '7':
+        elif choice == '4':
             print(f"\n{Colors.CYAN}Thank you for using SONORA Bot! 👋{Colors.END}\n")
             sys.exit(0)
         else:
