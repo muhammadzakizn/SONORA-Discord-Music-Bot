@@ -103,12 +103,11 @@ export default function Turnstile({
                     }
                 }}
             />
+            {/* Container for Turnstile widget - do NOT use data-* attributes here
+                as we manually render the widget via turnstile.render() */}
             <div
                 ref={containerRef}
                 className="cf-turnstile flex justify-center"
-                data-sitekey={siteKey}
-                data-theme={theme}
-                data-size={size}
             />
         </>
     );
