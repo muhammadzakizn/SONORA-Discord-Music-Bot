@@ -229,6 +229,11 @@ function LoginPageContent() {
   const { t } = useSettings();
   const { user, isLoggedIn, isLoading: sessionLoading, refreshSession } = useSession();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Check if we're in verify flow from URL - if so, start with loading state
+  const isVerifyFromUrl = searchParams.get('verify') === 'true';
+  const [isProcessingVerify, setIsProcessingVerify] = useState(isVerifyFromUrl);
+
   const [loginMode, setLoginMode] = useState<LoginMode>("select");
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
@@ -353,6 +358,7 @@ function LoginPageContent() {
           // Set Discord as selected method and go to Discord-first verification
           setSelectedMfaMethod('discord');
           setLoginMode('mfa-discord-first');
+          setIsProcessingVerify(false);
 
           // Note: sendVerificationCode is triggered by useEffect on loginMode change
           return;
@@ -376,6 +382,7 @@ function LoginPageContent() {
           }
 
           setLoginMode('mfa-select');
+          setIsProcessingVerify(false);
           return;
         } else {
           // trusted state or no MFA needed - go directly to admin
@@ -1050,7 +1057,21 @@ function LoginPageContent() {
               )}
 
               <AnimatePresence mode="wait">
-                {loginMode === "select" && (
+                {/* Loading state while processing OAuth callback */}
+                {isProcessingVerify && (
+                  <motion.div
+                    key="processing"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="relative z-10 flex flex-col items-center justify-center py-16"
+                  >
+                    <div className="w-12 h-12 border-4 border-white/20 border-t-purple-500 rounded-full animate-spin mb-4" />
+                    <p className="text-white/70 text-sm">Verifying session...</p>
+                  </motion.div>
+                )}
+
+                {!isProcessingVerify && loginMode === "select" && (
                   <motion.div
                     key="select"
                     initial={{ opacity: 0, x: 20 }}
