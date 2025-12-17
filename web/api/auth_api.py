@@ -1074,12 +1074,14 @@ def send_discord_dm_code():
         db = ensure_db_connected()
         
         # Create approval request (15 second timeout)
+        # NOTE: Pass user_id=None to avoid FK constraint error if user not in auth_users yet
+        # We have discord_id for identification anyway
         request_id = run_async(db.create_mfa_approval_request(
             discord_id=discord_id,
             device_info=device_info,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=user_id if isinstance(user_id, int) else None,
+            user_id=None,  # Don't pass user_id to avoid FK constraint if user not registered
             expires_seconds=15
         ))
         
