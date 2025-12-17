@@ -1047,7 +1047,19 @@ class PlayCommand(commands.Cog):
         
         async def on_first_track(track: TrackInfo):
             """Called when first track is ready - STREAM immediately (faster!)"""
-            nonlocal first_track_played
+            nonlocal first_track_played, tracks_queued
+            
+            # CRITICAL: If bot already playing, queue this track instead of interrupting
+            if is_already_playing:
+                # Bot already playing, queue first track too
+                track.voice_channel_id = voice_channel.id
+                track.requested_by = interaction.user.display_name
+                track.requested_by_id = interaction.user.id
+                queue_cog.queues[guild_id].append(track)
+                tracks_queued += 1
+                logger.info(f"📋 Queued first track (bot already playing): {track.title}")
+                first_track_played = True  # Skip playback flow
+                return
             
             # Try streaming first for instant playback
             stream_url = None
