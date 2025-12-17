@@ -1272,23 +1272,30 @@ def verify_discord_dm_code():
         data = request.json
         user_id = data.get('user_id')
         code = data.get('code')
+        discord_id = data.get('discord_id')  # Optional: frontend can pass discord_id directly
         
-        if not all([user_id, code]):\
+        if not all([user_id, code]):
             return jsonify({'error': 'User ID and code required'}), 400
         
         db = ensure_db_connected()
         
         # Find approved MFA request for this user
+        # Search by: user_id, discord_id from auth_users, OR discord_id directly
+        # (user_id might actually be discord_id for new users not yet in auth_users)
         approved_request = run_async(db.db.execute("""
             SELECT request_id, code_hash, discord_id 
             FROM mfa_approval_requests 
-            WHERE (user_id = ? OR discord_id IN (SELECT discord_id FROM auth_users WHERE id = ?))
+            WHERE (
+                user_id = ? 
+                OR discord_id IN (SELECT discord_id FROM auth_users WHERE id = ?)
+                OR discord_id = ?
+            )
             AND status = 'approved'
             AND code_hash IS NOT NULL
             AND responded_at > datetime('now', '-5 minutes')
             ORDER BY responded_at DESC
             LIMIT 1
-        """, (user_id, user_id)))
+        """, (user_id, user_id, str(user_id))))
         
         row = run_async(approved_request.fetchone())
         
