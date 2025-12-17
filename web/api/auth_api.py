@@ -451,8 +451,9 @@ def verify_totp():
 # ==================== PASSKEY (WebAuthn) ====================
 
 RP_NAME = "SONORA Dashboard"
-RP_ID = os.environ.get('PASSKEY_RP_ID', 'localhost')
-ORIGIN = os.environ.get('NEXT_PUBLIC_APP_URL', 'http://localhost:3000')
+# RP_ID must match the domain where passkey is registered (Vercel domain)
+RP_ID = os.environ.get('PASSKEY_RP_ID', 'sonora.muhammadzakizn.com')
+ORIGIN = os.environ.get('NEXT_PUBLIC_APP_URL', 'https://sonora.muhammadzakizn.com')
 
 
 @auth_bp.route('/mfa/passkey/register', methods=['POST'])
