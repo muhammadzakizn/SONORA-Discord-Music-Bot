@@ -1068,21 +1068,7 @@ function LoginPageContent() {
               )}
 
               <AnimatePresence mode="wait">
-                {/* Loading state while processing OAuth callback */}
-                {!isVerifyReady && (
-                  <motion.div
-                    key="processing"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="relative z-10 flex flex-col items-center justify-center py-16"
-                  >
-                    <div className="w-12 h-12 border-4 border-white/20 border-t-purple-500 rounded-full animate-spin mb-4" />
-                    <p className="text-white/70 text-sm">Verifying session...</p>
-                  </motion.div>
-                )}
-
-                {isVerifyReady && loginMode === "select" && (
+                {loginMode === "select" && (
                   <motion.div
                     key="select"
                     initial={{ opacity: 0, x: 20 }}
