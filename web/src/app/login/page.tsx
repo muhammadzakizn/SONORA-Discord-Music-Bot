@@ -1484,7 +1484,7 @@ function LoginPageContent() {
                 )}
 
                 {/* MFA Method Selection */}
-                {loginMode === "mfa-select" && user && (
+                {loginMode === "mfa-select" && (user || authUser) && (
                   <motion.div
                     key="mfa-select"
                     initial={{ opacity: 0, x: 20 }}
