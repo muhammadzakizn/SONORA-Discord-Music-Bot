@@ -404,19 +404,31 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Check for MFA verified cookie
+  const [isMfaVerified, setIsMfaVerified] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Check if MFA verification is complete
+    const cookies = document.cookie;
+    const hasMfaCookie = cookies.includes('sonora-mfa-verified=true');
+    setIsMfaVerified(hasMfaCookie);
+  }, []);
+
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
       router.push('/login');
       return;
     }
-    // MFA check disabled for now - OAuth is sufficient
-    // MFA can be re-enabled after integration into login page
-    // if (!isLoading && isLoggedIn && !isMfaVerified) {
-    //   router.push('/mfa?redirect=/admin');
-    // }
-  }, [isLoading, isLoggedIn, router]);
+    // Security: If logged in but MFA not verified, redirect to login
+    if (!isLoading && isLoggedIn && isMfaVerified === false) {
+      console.warn('[Security] User logged in but MFA not verified - redirecting to login');
+      router.push('/login?mfa_pending=true');
+      return;
+    }
+  }, [isLoading, isLoggedIn, isMfaVerified, router]);
 
-  if (isLoading) {
+  // Show loading while checking session or MFA status
+  if (isLoading || isMfaVerified === null) {
     return (
       <div className={cn(
         "h-screen flex items-center justify-center",
@@ -430,7 +442,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isLoggedIn) {
+  // Redirect if not logged in or MFA not verified
+  if (!isLoggedIn || isMfaVerified === false) {
     return null;
   }
 
