@@ -423,27 +423,87 @@ class SynchronizedMediaPlayer:
         
         ALWAYS deletes the audio file after playback to conserve disk space.
         This is called in _on_end after playback finishes.
-        """
-        if not self.metadata or not self.metadata.audio_path:
-            return
         
-        try:
-            audio_path = self.metadata.audio_path
-            
-            # Check if file exists
-            if not audio_path.exists():
-                return
-            
-            # Get file size for logging
-            file_size = audio_path.stat().st_size
-            file_size_mb = file_size / (1024 * 1024)
-            
-            # ALWAYS delete to save storage
-            audio_path.unlink()
-            logger.info(f"🗑️ Auto-deleted after playback: {audio_path.name} ({file_size_mb:.1f}MB)")
-            
-        except Exception as e:
-            logger.warning(f"Failed to cleanup audio file: {e}")
+        Two-pronged approach:
+        1. Delete known audio_path if exists
+        2. Search and delete matching files in downloads folder (for streaming mode)
+        """
+        deleted = False
+        
+        # Method 1: Delete known audio_path
+        if self.metadata and self.metadata.audio_path:
+            try:
+                audio_path = self.metadata.audio_path
+                
+                if audio_path.exists():
+                    file_size = audio_path.stat().st_size
+                    file_size_mb = file_size / (1024 * 1024)
+                    audio_path.unlink()
+                    logger.info(f"🗑️ Deleted (audio_path): {audio_path.name} ({file_size_mb:.1f}MB)")
+                    deleted = True
+            except Exception as e:
+                logger.warning(f"Failed to cleanup audio_path: {e}")
+        
+        # Method 2: Aggressively search downloads folder for matching files
+        # This catches: streaming mode downloads, background cache downloads, etc.
+        if self.metadata:
+            try:
+                from config.settings import Settings
+                from pathlib import Path
+                import re
+                
+                downloads_dir = Settings.DOWNLOADS_DIR
+                if downloads_dir.exists():
+                    # Create search pattern from artist and title
+                    artist = self.metadata.artist or ""
+                    title = self.metadata.title or ""
+                    
+                    # Sanitize for filename matching
+                    def sanitize(s):
+                        return re.sub(r'[^\w\s-]', '', s.lower()).strip()
+                    
+                    artist_clean = sanitize(artist)
+                    title_clean = sanitize(title)
+                    
+                    # Search for matching files
+                    for ext in ['*.opus', '*.m4a', '*.mp3', '*.flac', '*.webm']:
+                        for f in downloads_dir.glob(ext):
+                            try:
+                                filename_clean = sanitize(f.stem)
+                                
+                                # Match if both artist and title are in filename
+                                if artist_clean and title_clean:
+                                    if artist_clean in filename_clean and title_clean in filename_clean:
+                                        file_size = f.stat().st_size
+                                        file_size_mb = file_size / (1024 * 1024)
+                                        f.unlink()
+                                        logger.info(f"🗑️ Deleted (pattern match): {f.name} ({file_size_mb:.1f}MB)")
+                                        deleted = True
+                            except:
+                                pass
+                    
+                    # Also check playlist_cache folder
+                    playlist_cache = downloads_dir / "playlist_cache"
+                    if playlist_cache.exists():
+                        for ext in ['*.opus', '*.m4a', '*.mp3', '*.flac', '*.webm']:
+                            for f in playlist_cache.glob(ext):
+                                try:
+                                    filename_clean = sanitize(f.stem)
+                                    if artist_clean and title_clean:
+                                        if artist_clean in filename_clean or title_clean in filename_clean:
+                                            file_size = f.stat().st_size
+                                            file_size_mb = file_size / (1024 * 1024)
+                                            f.unlink()
+                                            logger.info(f"🗑️ Deleted (playlist cache): {f.name} ({file_size_mb:.1f}MB)")
+                                            deleted = True
+                                except:
+                                    pass
+                    
+            except Exception as e:
+                logger.warning(f"Aggressive cleanup failed: {e}")
+        
+        if not deleted and self.metadata:
+            logger.debug(f"No files to cleanup for: {self.metadata.title}")
     
     async def _save_play_history(self, completed: bool = True) -> None:
         """
@@ -623,16 +683,18 @@ class SynchronizedMediaPlayer:
         try:
             # ========================================
             # CLEANUP: Delete finished track's audio file
+            # CRITICAL: Always delete to save storage!
             # ========================================
-            if self.metadata and hasattr(self.metadata, 'file_path') and self.metadata.file_path:
+            if self.metadata and self.metadata.audio_path:
                 try:
-                    from pathlib import Path
-                    finished_file = Path(self.metadata.file_path)
-                    if finished_file.exists() and 'playlist_cache' in str(finished_file):
+                    finished_file = self.metadata.audio_path
+                    if finished_file.exists():
+                        file_size = finished_file.stat().st_size
+                        file_size_mb = file_size / (1024 * 1024)
                         finished_file.unlink()
-                        logger.info(f"🗑️ Cleaned up finished track: {finished_file.name}")
+                        logger.info(f"🗑️ Auto-deleted after next track: {finished_file.name} ({file_size_mb:.1f}MB)")
                 except Exception as e:
-                    logger.debug(f"Cleanup failed: {e}")
+                    logger.warning(f"Cleanup failed: {e}")
             
             # Check if voice is still connected
             if not self.voice or not self.voice.is_connected():
