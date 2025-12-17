@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SONORA Discord Audio Bot - Website sedang dalam tahap konstruksi">
+    <meta name="theme-color" content="#6B1B2E">
+    <title>SONORA - Sedang Dalam Konstruksi</title>
+    <link rel="icon" type="image/png" href="sonora-logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #8B2541;
+            --primary-dark: #6B1B2E;
+            --primary-light: #A83553;
+            --bg-dark: #0A0A0B;
+            --bg-gradient: linear-gradient(135deg, #0A0A0B 0%, #1A0A10 50%, #0A0A0B 100%);
+            --text: #FFFFFF;
+            --text-muted: #A0A0A0;
+            --glow: rgba(139, 37, 65, 0.4);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--primary);
+            top: -100px;
+            left: -100px;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: var(--primary-light);
+            bottom: -80px;
+            right: -80px;
+            animation-delay: -7s;
+        }
+
+        .orb-3 {
+            width: 200px;
+            height: 200px;
+            background: var(--primary-dark);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: -14s;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            25% {
+                transform: translate(30px, -30px) scale(1.05);
+            }
+
+            50% {
+                transform: translate(-20px, 20px) scale(0.95);
+            }
+
+            75% {
+                transform: translate(-30px, -20px) scale(1.02);
+            }
+        }
+
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 2rem;
+            max-width: 600px;
+        }
+
+        /* Logo */
+        .logo-container {
+            margin-bottom: 2rem;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        .logo {
+            width: 120px;
+            height: 120px;
+            border-radius: 24px;
+            animation: pulse-glow 3s ease-in-out infinite;
+            filter: drop-shadow(0 0 30px var(--glow));
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                transform: scale(1);
+                filter: drop-shadow(0 0 30px var(--glow));
+            }
+
+            50% {
+                transform: scale(1.03);
+                filter: drop-shadow(0 0 50px var(--glow));
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Title */
+        .title {
+            font-size: clamp(2rem, 6vw, 3rem);
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+            animation: fadeInUp 1s ease-out 0.2s both;
+        }
+
+        .subtitle {
+            font-size: clamp(0.9rem, 3vw, 1.1rem);
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-bottom: 2.5rem;
+            animation: fadeInUp 1s ease-out 0.4s both;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Construction Icon Animation */
+        .construction-icon {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            animation: fadeInUp 1s ease-out 0.6s both;
+        }
+
+        .gear {
+            font-size: 2.5rem;
+            animation: spin 8s linear infinite;
+        }
+
+        .gear:nth-child(2) {
+            animation-direction: reverse;
+            animation-duration: 6s;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto 2rem;
+            animation: fadeInUp 1s ease-out 0.8s both;
+        }
+
+        .progress-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary-dark), var(--primary-light));
+            border-radius: 3px;
+            animation: progress-animate 3s ease-out forwards, shimmer 2s ease-in-out infinite;
+        }
+
+        @keyframes progress-animate {
+            from {
+                width: 0%;
+            }
+
+            to {
+                width: 65%;
+            }
+        }
+
+        @keyframes shimmer {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        /* Message */
+        .message {
+            font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+            line-height: 1.7;
+            color: var(--text-muted);
+            margin-bottom: 2.5rem;
+            animation: fadeInUp 1s ease-out 1s both;
+        }
+
+        /* Back Button */
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.9rem 2rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1rem;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            animation: fadeInUp 1s ease-out 1.2s both;
+            box-shadow: 0 4px 20px rgba(139, 37, 65, 0.4);
+        }
+
+        .back-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(139, 37, 65, 0.6);
+        }
+
+        .back-button:active {
+            transform: translateY(-1px);
+        }
+
+        .back-arrow {
+            transition: transform 0.3s ease;
+        }
+
+        .back-button:hover .back-arrow {
+            transform: translateX(-4px);
+        }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            opacity: 0.6;
+            animation: fadeIn 1s ease-out 1.5s both;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 0.6;
+            }
+        }
+
+        /* Floating Particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary-light);
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: float-particle 15s infinite ease-in-out;
+        }
+
+        @keyframes float-particle {
+
+            0%,
+            100% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 0.3;
+            }
+
+            90% {
+                opacity: 0.3;
+            }
+
+            100% {
+                transform: translateY(-100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .logo {
+                width: 100px;
+                height: 100px;
+                border-radius: 20px;
+            }
+
+            .gear {
+                font-size: 2rem;
+            }
+
+            .orb-1,
+            .orb-2,
+            .orb-3 {
+                filter: blur(60px);
+            }
+
+            .orb-1 {
+                width: 250px;
+                height: 250px;
+            }
+
+            .orb-2 {
+                width: 200px;
+                height: 200px;
+            }
+
+            .orb-3 {
+                width: 150px;
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Background Animation -->
+    <div class="bg-animation">
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-orb orb-2"></div>
+        <div class="bg-orb orb-3"></div>
+    </div>
+
+    <!-- Floating Particles -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <div class="logo-container">
+            <img src="sonora-logo.png" alt="SONORA Logo" class="logo">
+        </div>
+
+        <h1 class="title">SONORA</h1>
+        <p class="subtitle">Discord Audio Bot</p>
+
+        <div class="construction-icon">
+            <span class="gear">⚙️</span>
+            <span class="gear">⚙️</span>
+        </div>
+
+        <div class="progress-container">
+            <div class="progress-label">
+                <span>Dalam Pengembangan</span>
+                <span>65%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+
+        <p class="message">
+            Website ini sedang dalam tahap konstruksi.<br>
+            Kami sedang membangun sesuatu yang luar biasa untuk kamu!
+        </p>
+
+        <a href="https://muhammadzakizn.com" class="back-button">
+            <span class="back-arrow">←</span>
+            Kembali ke Beranda
+        </a>
+    </div>
+
+    <div class="footer">
+        © 2025 SONORA • muhammadzakizn.com
+    </div>
+
+    <script>
+        // Create floating particles
+        (function createParticles() {
+            const container = document.getElementById('particles');
+            const particleCount = 15; // Keep it light for performance
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                particle.style.width = (2 + Math.random() * 4) + 'px';
+                particle.style.height = particle.style.width;
+                container.appendChild(particle);
+            }
+        })();
+    </script>
+</body>
+
+</html>
