@@ -230,9 +230,10 @@ function LoginPageContent() {
   const { user, isLoggedIn, isLoading: sessionLoading, refreshSession } = useSession();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // Check if we're in verify flow from URL - if so, start with loading state
+  // Check if we're in verify flow from URL - use state to track processing
   const isVerifyFromUrl = searchParams.get('verify') === 'true';
   const [isProcessingVerify, setIsProcessingVerify] = useState(isVerifyFromUrl);
+  const [isVerifyReady, setIsVerifyReady] = useState(!isVerifyFromUrl);
 
   const [loginMode, setLoginMode] = useState<LoginMode>("select");
   const [showPassword, setShowPassword] = useState(false);
@@ -359,6 +360,7 @@ function LoginPageContent() {
           setSelectedMfaMethod('discord');
           setLoginMode('mfa-discord-first');
           setIsProcessingVerify(false);
+          setIsVerifyReady(true);
 
           // Note: sendVerificationCode is triggered by useEffect on loginMode change
           return;
@@ -383,6 +385,7 @@ function LoginPageContent() {
 
           setLoginMode('mfa-select');
           setIsProcessingVerify(false);
+          setIsVerifyReady(true);
           return;
         } else {
           // trusted state or no MFA needed - go directly to admin
@@ -1058,7 +1061,7 @@ function LoginPageContent() {
 
               <AnimatePresence mode="wait">
                 {/* Loading state while processing OAuth callback */}
-                {isProcessingVerify && (
+                {!isVerifyReady && (
                   <motion.div
                     key="processing"
                     initial={{ opacity: 0 }}
@@ -1071,7 +1074,7 @@ function LoginPageContent() {
                   </motion.div>
                 )}
 
-                {!isProcessingVerify && loginMode === "select" && (
+                {isVerifyReady && loginMode === "select" && (
                   <motion.div
                     key="select"
                     initial={{ opacity: 0, x: 20 }}
