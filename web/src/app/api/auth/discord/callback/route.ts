@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BOT_API_URL = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+const BOT_API_URL = process.env.BOT_API_URL || 'http://localhost:5000';
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
             // Continue without auth database - treat as new user to show MFA setup
             // This ensures MFA is set up even if bot API is offline
             authState = 'new';
-            authUserId = Date.now(); // Use timestamp as temporary ID
+            authUserId = Number(userData.id); // Use discord_id as ID for MFA verify
         }
 
         // Create session data
