@@ -54,7 +54,7 @@ interface SecurityLogEntry {
     created_at: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+const API_BASE = '/api/bot';
 
 const STATUS_COLORS = {
     pending: { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Pending' },

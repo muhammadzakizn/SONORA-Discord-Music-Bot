@@ -116,7 +116,7 @@ export function CacheManagementDialog({ isOpen, onClose }: CacheManagementDialog
 
     const [originalSettings, setOriginalSettings] = useState<CacheSettings>(settings);
 
-    const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+    const API_BASE = '/api/bot';
 
     // Fetch cache stats
     const fetchCacheStats = useCallback(async () => {

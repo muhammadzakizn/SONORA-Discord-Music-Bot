@@ -3,7 +3,8 @@
  * Client-side functions to interact with Auth API
  */
 
-const BOT_API_URL = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+// Use Next.js API proxy for bot API calls (client-side can't reach localhost)
+const BOT_API_URL = '/api/bot';
 
 interface AuthUser {
   id: number;

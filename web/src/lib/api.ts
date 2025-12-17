@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+// Use Next.js API proxy for bot API calls
+// Client-side can't reach localhost:5000, so we proxy through /api/bot/*
+const API_BASE_URL = '/api/bot';
 
 export interface BotStatus {
   status: string;

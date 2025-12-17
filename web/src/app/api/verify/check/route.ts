@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const BOT_API_URL = process.env.BOT_API_URL || 'http://localhost:5000';
+
 export async function POST(request: NextRequest) {
     try {
         const { userId, code } = await request.json();
@@ -15,7 +17,7 @@ export async function POST(request: NextRequest) {
 
         // Call bot API to verify the code
         try {
-            const botResponse = await fetch('http://localhost:5000/api/verify/check', {
+            const botResponse = await fetch(`${BOT_API_URL}/api/verify/check`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, code }),

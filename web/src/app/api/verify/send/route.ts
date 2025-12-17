@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EMAIL_OTP_DAILY_LIMIT } from '@/config/access-control';
 
+const BOT_API_URL = process.env.BOT_API_URL || 'http://localhost:5000';
+
 // In-memory verification codes storage (in production, use Redis or database)
 // Map: userId -> { code: string, expiresAt: number, method: string }
 const verificationCodes = new Map<string, { code: string; expiresAt: number; method: string }>();
@@ -68,7 +70,7 @@ export async function POST(request: NextRequest) {
         if (method === 'discord') {
             // Send code via Discord bot API
             try {
-                const botResponse = await fetch('http://localhost:5000/api/verify/send-dm', {
+                const botResponse = await fetch(`${BOT_API_URL}/api/verify/send-dm`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, code }),

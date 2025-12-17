@@ -33,7 +33,7 @@ interface BanRecord {
     isActive: boolean;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+const API_BASE = '/api/bot';
 
 export default function BansPage() {
     const { isDark } = useSettings();
