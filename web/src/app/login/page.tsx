@@ -360,7 +360,11 @@ function LoginPageContent() {
           setSelectedMfaMethod('discord');
           setLoginMode('mfa-discord-first');
           setIsProcessingVerify(false);
-          setIsVerifyReady(true);
+          // Use setTimeout to ensure React processes state updates before re-rendering
+          setTimeout(() => {
+            setIsVerifyReady(true);
+            console.log('[Login] isVerifyReady set to true (discord-first flow)');
+          }, 100);
 
           // Note: sendVerificationCode is triggered by useEffect on loginMode change
           return;
@@ -385,7 +389,11 @@ function LoginPageContent() {
 
           setLoginMode('mfa-select');
           setIsProcessingVerify(false);
-          setIsVerifyReady(true);
+          // Use setTimeout to ensure React processes state updates before re-rendering
+          setTimeout(() => {
+            setIsVerifyReady(true);
+            console.log('[Login] isVerifyReady set to true');
+          }, 100);
           return;
         } else {
           // trusted state or no MFA needed - go directly to admin
