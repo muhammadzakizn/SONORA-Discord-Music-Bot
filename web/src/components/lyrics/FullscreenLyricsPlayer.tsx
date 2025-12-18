@@ -562,53 +562,43 @@ export default function FullscreenLyricsPlayer({
                                             const isPastLine = index < currentLineIndex;
                                             const isFutureLine = index > currentLineIndex;
 
+                                            // Only collapse past lines when not scrolling
+                                            const shouldCollapse = isPastLine && !isUserScrolling;
+
                                             return (
                                                 <div
                                                     key={index}
                                                     ref={isCurrentLine ? currentLineRef : null}
                                                     className={cn(
-                                                        "transition-all duration-500 ease-out",
+                                                        "transition-all duration-500 ease-out overflow-hidden",
                                                         // When scrolling: show all lines normally
                                                         isUserScrolling && "opacity-100",
-                                                        // Past lines: dimmed but visible (Apple Music style)
-                                                        isPastLine && !isUserScrolling && "opacity-40",
-                                                        // Future lines: slightly grayed
+                                                        // Past lines: fade, blur, and collapse
+                                                        shouldCollapse && "max-h-0 opacity-0 blur-sm my-0",
+                                                        // Future lines: grayed out
                                                         isFutureLine && !isUserScrolling && "opacity-50"
                                                     )}
+                                                    style={{
+                                                        maxHeight: shouldCollapse ? 0 : '200px',
+                                                        marginTop: shouldCollapse ? 0 : undefined,
+                                                        marginBottom: shouldCollapse ? 0 : undefined,
+                                                        filter: shouldCollapse ? 'blur(4px)' : 'none',
+                                                    }}
                                                 >
-                                                    {/* Per-word animation for current line */}
-                                                    {isCurrentLine && line.words.length > 0 ? (
-                                                        <p className="text-4xl xs:text-5xl font-bold text-left leading-tight text-white">
-                                                            {line.words.map((word, wordIndex) => {
-                                                                const progress = getWordProgress(word);
-                                                                return (
-                                                                    <span
-                                                                        key={wordIndex}
-                                                                        className="inline-block mr-[0.3em] transition-all duration-100"
-                                                                        style={{
-                                                                            color: `rgba(255, 255, 255, ${0.4 + progress * 0.6})`,
-                                                                            textShadow: progress > 0.1
-                                                                                ? `0 0 ${progress * 20}px rgba(255, 255, 255, ${progress * 0.4})`
-                                                                                : "none",
-                                                                        }}
-                                                                    >
-                                                                        {word.text}
-                                                                    </span>
-                                                                );
-                                                            })}
-                                                        </p>
-                                                    ) : (
-                                                        <p
-                                                            className={cn(
-                                                                "text-left leading-tight font-semibold transition-all duration-300",
-                                                                isCurrentLine
-                                                                    ? "text-4xl xs:text-5xl text-white"
-                                                                    : "text-3xl lg:text-4xl text-white"
-                                                            )}
-                                                        >
-                                                            {line.text || "• • •"}
-                                                        </p>
-                                                    )}
+                                                    {/* Current line with glow effect */}
+                                                    <p
+                                                        className={cn(
+                                                            "text-left leading-tight font-semibold transition-all duration-300",
+                                                            isCurrentLine
+                                                                ? "text-4xl xs:text-5xl text-white"
+                                                                : "text-3xl lg:text-4xl text-white"
+                                                        )}
+                                                        style={isCurrentLine ? {
+                                                            textShadow: "0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.3)"
+                                                        } : undefined}
+                                                    >
+                                                        {line.text || "• • •"}
+                                                    </p>
 
                                                     {/* Romanization */}
                                                     {showRomanization && line.romanized && (
