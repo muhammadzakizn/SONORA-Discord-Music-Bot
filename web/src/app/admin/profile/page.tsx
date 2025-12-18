@@ -51,6 +51,7 @@ export default function ProfilePage() {
     const cropCanvasRef = useRef<HTMLCanvasElement>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [isSliding, setIsSliding] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
     // Initialize local display name from context
@@ -633,7 +634,7 @@ export default function ProfilePage() {
                                             top: cropArea.y,
                                             width: cropArea.size,
                                             height: cropArea.size,
-                                            boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
+                                            boxShadow: (isDragging || isSliding) ? '0 0 0 9999px rgba(0,0,0,0.5)' : 'none',
                                             background: 'transparent',
                                         }}
                                         onMouseDown={handleMouseDown}
@@ -661,6 +662,9 @@ export default function ProfilePage() {
                                     max={Math.min(imageSize.width, imageSize.height) || 300}
                                     value={cropArea.size}
                                     onChange={(e) => handleSizeChange(Number(e.target.value))}
+                                    onMouseDown={() => setIsSliding(true)}
+                                    onMouseUp={() => setIsSliding(false)}
+                                    onMouseLeave={() => setIsSliding(false)}
                                     className="w-full accent-[#7B1E3C]"
                                 />
                             </div>

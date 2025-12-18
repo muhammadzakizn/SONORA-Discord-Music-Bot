@@ -372,6 +372,7 @@ function NavButton({
                         width={28}
                         height={28}
                         className="nav-btn-icon rounded-full"
+                        unoptimized
                     />
                 ) : devInitial ? (
                     <div className="nav-btn-icon w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-sm">
@@ -695,6 +696,7 @@ function ProfileMenu({
                         width={48}
                         height={48}
                         className="rounded-xl"
+                        unoptimized={!!customAvatar}
                     />
                     <div className="flex-1 min-w-0">
                         <p className={cn("font-semibold truncate", isDark ? "text-white" : "text-gray-900")}>
@@ -757,6 +759,7 @@ function ProfileMenu({
                     width={48}
                     height={48}
                     className="rounded-xl"
+                    unoptimized={!!customAvatar}
                 />
                 <div className="flex-1 min-w-0">
                     <p className={cn("font-semibold truncate", isDark ? "text-white" : "text-gray-900")}>

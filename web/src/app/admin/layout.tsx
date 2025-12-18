@@ -155,6 +155,7 @@ function Sidebar({
                   width={40}
                   height={40}
                   className="rounded-full"
+                  unoptimized={!!customAvatar}
                 />
                 <div className="flex-1 min-w-0">
                   <p className={cn(
@@ -294,6 +295,7 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
                 width={32}
                 height={32}
                 className="rounded-full"
+                unoptimized={!!customAvatar}
               />
             ) : (
               <div className="w-8 h-8 bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] rounded-full flex items-center justify-center">
