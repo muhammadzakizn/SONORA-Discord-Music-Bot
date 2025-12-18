@@ -120,7 +120,8 @@ export default function FullscreenLyricsPlayer({
     // Fetch lyrics data
     const fetchLyrics = useCallback(async () => {
         try {
-            const sourceParam = lyricsSource !== 'auto' ? `?source=${lyricsSource}` : '';
+            // Always use the current lyricsSource (default: musixmatch for dashboard)
+            const sourceParam = `?source=${lyricsSource}`;
             const response = await fetch(`${API_BASE}/guild/${guildId}/lyrics${sourceParam}`);
             const data = await response.json();
 
@@ -144,7 +145,7 @@ export default function FullscreenLyricsPlayer({
             console.error("Failed to fetch lyrics:", err);
             setError("Failed to load lyrics");
         }
-    }, [guildId]);
+    }, [guildId, lyricsSource]);
 
     // Smooth time interpolation between fetches - improved sync
     useEffect(() => {
@@ -299,7 +300,7 @@ export default function FullscreenLyricsPlayer({
                         showLyrics ? "w-1/2 max-w-[500px]" : "w-full max-w-[450px]"
                     )}>
                         {/* Album Art */}
-                        <div className="mb-4">
+                        <div className="mb-2">
                             {track?.artwork_url ? (
                                 <img
                                     src={track.artwork_url}
@@ -313,8 +314,8 @@ export default function FullscreenLyricsPlayer({
                             )}
                         </div>
 
-                        {/* Track Info - Apple Music Style (Tighter spacing) */}
-                        <div className="mb-3">
+                        {/* Track Info - Apple Music Style (Compact) */}
+                        <div className="mb-2">
                             <div className="flex items-center justify-between gap-2">
                                 <h2 className="text-white text-xl font-semibold truncate flex-1">
                                     {track?.title || "Unknown Track"}
@@ -330,96 +331,109 @@ export default function FullscreenLyricsPlayer({
                                         <MoreHorizontal className="w-5 h-5" />
                                     </button>
 
-                                    {/* Dropdown Menu */}
+                                    {/* Dropdown Menu - Fixed position to avoid overflow */}
                                     {showMenu && (
-                                        <div
-                                            className="absolute right-0 top-full mt-2 w-64 py-2 bg-zinc-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 z-[100]"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            {/* Lyrics Section */}
-                                            <div className="px-4 py-3 border-b border-white/10">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <Type className="w-4 h-4 text-white/60" />
-                                                        <span className="text-sm text-white/80">Lyrics</span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setShowLyrics(!showLyrics)}
-                                                        className={`px-2.5 py-1 text-xs rounded-full transition-colors ${showLyrics ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}
-                                                    >
-                                                        {showLyrics ? 'ON' : 'OFF'}
-                                                    </button>
-                                                </div>
-                                                <p className="text-xs text-white/40 mb-2">Source</p>
-                                                <div className="flex gap-1">
-                                                    {(['musixmatch', 'lrclib', 'auto'] as const).map((src) => (
+                                        <>
+                                            {/* Backdrop */}
+                                            <div
+                                                className="fixed inset-0 z-[200]"
+                                                onClick={() => setShowMenu(false)}
+                                            />
+                                            <div
+                                                className="fixed z-[201] w-64 py-2 bg-zinc-900/98 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10"
+                                                style={{
+                                                    top: 'auto',
+                                                    left: '50%',
+                                                    transform: 'translateX(-50%)',
+                                                    bottom: '20%',
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                {/* Lyrics Section */}
+                                                <div className="px-4 py-3 border-b border-white/10">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <Type className="w-4 h-4 text-white/60" />
+                                                            <span className="text-sm text-white/80">Lyrics</span>
+                                                        </div>
                                                         <button
-                                                            key={src}
-                                                            onClick={() => setLyricsSource(src)}
-                                                            className={`px-2 py-1 text-xs rounded-md transition-colors ${lyricsSource === src ? 'bg-white/20 text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+                                                            onClick={() => setShowLyrics(!showLyrics)}
+                                                            className={`px-2.5 py-1 text-xs rounded-full transition-colors ${showLyrics ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}
                                                         >
-                                                            {src === 'auto' ? 'Auto' : src === 'musixmatch' ? 'Musixmatch' : 'LRCLIB'}
+                                                            {showLyrics ? 'ON' : 'OFF'}
                                                         </button>
-                                                    ))}
+                                                    </div>
+                                                    <p className="text-xs text-white/40 mb-2">Source</p>
+                                                    <div className="flex gap-1">
+                                                        {(['musixmatch', 'lrclib', 'auto'] as const).map((src) => (
+                                                            <button
+                                                                key={src}
+                                                                onClick={() => setLyricsSource(src)}
+                                                                className={`px-2 py-1 text-xs rounded-md transition-colors ${lyricsSource === src ? 'bg-white/20 text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+                                                            >
+                                                                {src === 'auto' ? 'Auto' : src === 'musixmatch' ? 'Musixmatch' : 'LRCLIB'}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    {currentSource && (
+                                                        <p className="text-xs text-white/30 mt-1.5">Current: {currentSource}</p>
+                                                    )}
                                                 </div>
-                                                {currentSource && (
-                                                    <p className="text-xs text-white/30 mt-1.5">Current: {currentSource}</p>
-                                                )}
+
+                                                {/* Romanization Toggle */}
+                                                <button
+                                                    onClick={() => setShowRomanization(!showRomanization)}
+                                                    className="w-full px-4 py-2.5 flex items-center justify-between text-white/80 hover:bg-white/5 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <Languages className="w-4 h-4" />
+                                                        <span className="text-sm">Romanization</span>
+                                                    </div>
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${showRomanization ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
+                                                        {showRomanization ? 'ON' : 'OFF'}
+                                                    </span>
+                                                </button>
+
+                                                {/* Queue Toggle */}
+                                                <button
+                                                    onClick={() => {
+                                                        setShowQueue(!showQueue);
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className="w-full px-4 py-2.5 flex items-center justify-between text-white/80 hover:bg-white/5 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <ListMusic className="w-4 h-4" />
+                                                        <span className="text-sm">Up Next</span>
+                                                    </div>
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${showQueue ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
+                                                        {showQueue ? 'ON' : 'OFF'}
+                                                    </span>
+                                                </button>
+
+                                                {/* Fullscreen Toggle */}
+                                                <button
+                                                    onClick={() => {
+                                                        if (document.fullscreenElement) {
+                                                            document.exitFullscreen();
+                                                            setIsFullscreen(false);
+                                                        } else {
+                                                            document.documentElement.requestFullscreen();
+                                                            setIsFullscreen(true);
+                                                        }
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className="w-full px-4 py-2.5 flex items-center gap-3 text-white/80 hover:bg-white/5 transition-colors border-t border-white/10 mt-1"
+                                                >
+                                                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                                                    <span className="text-sm">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+                                                </button>
                                             </div>
-
-                                            {/* Romanization Toggle */}
-                                            <button
-                                                onClick={() => setShowRomanization(!showRomanization)}
-                                                className="w-full px-4 py-2.5 flex items-center justify-between text-white/80 hover:bg-white/5 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <Languages className="w-4 h-4" />
-                                                    <span className="text-sm">Romanization</span>
-                                                </div>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full ${showRomanization ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
-                                                    {showRomanization ? 'ON' : 'OFF'}
-                                                </span>
-                                            </button>
-
-                                            {/* Queue Toggle */}
-                                            <button
-                                                onClick={() => {
-                                                    setShowQueue(!showQueue);
-                                                    setShowMenu(false);
-                                                }}
-                                                className="w-full px-4 py-2.5 flex items-center justify-between text-white/80 hover:bg-white/5 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <ListMusic className="w-4 h-4" />
-                                                    <span className="text-sm">Up Next</span>
-                                                </div>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full ${showQueue ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
-                                                    {showQueue ? 'ON' : 'OFF'}
-                                                </span>
-                                            </button>
-
-                                            {/* Fullscreen Toggle */}
-                                            <button
-                                                onClick={() => {
-                                                    if (document.fullscreenElement) {
-                                                        document.exitFullscreen();
-                                                        setIsFullscreen(false);
-                                                    } else {
-                                                        document.documentElement.requestFullscreen();
-                                                        setIsFullscreen(true);
-                                                    }
-                                                    setShowMenu(false);
-                                                }}
-                                                className="w-full px-4 py-2.5 flex items-center gap-3 text-white/80 hover:bg-white/5 transition-colors border-t border-white/10 mt-1"
-                                            >
-                                                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                                                <span className="text-sm">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
-                                            </button>
-                                        </div>
+                                        </>
                                     )}
                                 </div>
                             </div>
-                            <p className="text-white/60 text-sm truncate mt-0.5">
+                            <p className="text-white/60 text-sm truncate -mt-0.5">
                                 {track?.artist || "Unknown Artist"} — {track?.album || "Unknown Album"}
                             </p>
                         </div>
