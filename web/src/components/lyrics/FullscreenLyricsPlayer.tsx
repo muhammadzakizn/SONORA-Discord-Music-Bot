@@ -20,6 +20,7 @@ import {
     Type,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import WebGLBackground from "./WebGLBackground";
 
 interface LyricWord {
     text: string;
@@ -231,50 +232,51 @@ export default function FullscreenLyricsPlayer({
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-[100] flex"
             >
-                {/* Apple Music Style Animated Background */}
+                {/* Beautiful-Lyrics Style WebGL Background */}
                 <div className="absolute inset-0 overflow-hidden bg-black">
                     <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-black to-zinc-900" />
 
-                    {/* Animated Color Orbs */}
-                    <div
-                        className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-60 animate-orb-1"
-                        style={{
-                            background: 'radial-gradient(circle, #3b82f6 0%, transparent 70%)',
-                            top: '-20%',
-                            left: '-10%',
-                        }}
-                    />
-                    <div
-                        className="absolute w-[500px] h-[500px] rounded-full blur-[100px] opacity-50 animate-orb-2"
-                        style={{
-                            background: 'radial-gradient(circle, #ef4444 0%, transparent 70%)',
-                            top: '30%',
-                            right: '-15%',
-                        }}
-                    />
-                    <div
-                        className="absolute w-[400px] h-[400px] rounded-full blur-[80px] opacity-40 animate-orb-3"
-                        style={{
-                            background: 'radial-gradient(circle, #8b5cf6 0%, transparent 70%)',
-                            bottom: '-10%',
-                            left: '20%',
-                        }}
-                    />
-                    <div
-                        className="absolute w-[450px] h-[450px] rounded-full blur-[90px] opacity-45 animate-orb-4"
-                        style={{
-                            background: 'radial-gradient(circle, #f97316 0%, transparent 70%)',
-                            bottom: '20%',
-                            right: '10%',
-                        }}
-                    />
-
+                    {/* WebGL Animated Background with rotating circles */}
                     {track?.artwork_url && (
-                        <img
-                            src={track.artwork_url}
-                            alt=""
-                            className="absolute inset-0 w-full h-full object-cover scale-150 blur-[150px] opacity-30 mix-blend-overlay"
-                        />
+                        <WebGLBackground artworkUrl={track.artwork_url} />
+                    )}
+
+                    {/* Fallback gradient orbs if no artwork or WebGL not supported */}
+                    {!track?.artwork_url && (
+                        <>
+                            <div
+                                className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-60 animate-orb-1"
+                                style={{
+                                    background: 'radial-gradient(circle, #3b82f6 0%, transparent 70%)',
+                                    top: '-20%',
+                                    left: '-10%',
+                                }}
+                            />
+                            <div
+                                className="absolute w-[500px] h-[500px] rounded-full blur-[100px] opacity-50 animate-orb-2"
+                                style={{
+                                    background: 'radial-gradient(circle, #ef4444 0%, transparent 70%)',
+                                    top: '30%',
+                                    right: '-15%',
+                                }}
+                            />
+                            <div
+                                className="absolute w-[400px] h-[400px] rounded-full blur-[80px] opacity-40 animate-orb-3"
+                                style={{
+                                    background: 'radial-gradient(circle, #8b5cf6 0%, transparent 70%)',
+                                    bottom: '-10%',
+                                    left: '20%',
+                                }}
+                            />
+                            <div
+                                className="absolute w-[450px] h-[450px] rounded-full blur-[90px] opacity-45 animate-orb-4"
+                                style={{
+                                    background: 'radial-gradient(circle, #f97316 0%, transparent 70%)',
+                                    bottom: '20%',
+                                    right: '10%',
+                                }}
+                            />
+                        </>
                     )}
 
                     <div className="absolute inset-0 opacity-[0.03] bg-noise" />
