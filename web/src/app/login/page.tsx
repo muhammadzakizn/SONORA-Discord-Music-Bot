@@ -1491,19 +1491,31 @@ function LoginPageContent() {
                     </div>
 
                     {/* User Info */}
-                    <div className="flex items-center gap-4 p-4 mb-6 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
-                      <Image
-                        src={getAvatarUrl(user)}
-                        alt={user.username}
-                        width={48}
-                        height={48}
-                        className="rounded-full"
-                      />
-                      <div>
-                        <p className="font-medium text-white">{user.username}</p>
-                        <p className="text-sm text-white/50">Discord ID: {user.id}</p>
-                      </div>
-                    </div>
+                    {(() => {
+                      const displayUser = user || (authUser ? {
+                        id: authUser.discord_id,
+                        username: authUser.username,
+                        avatar: authUser.avatar_url?.split('/').pop()?.split('.')[0] || null,
+                        discriminator: '',
+                        email: authUser.email || ''
+                      } as const : null);
+                      if (!displayUser) return null;
+                      return (
+                        <div className="flex items-center gap-4 p-4 mb-6 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
+                          <Image
+                            src={getAvatarUrl(displayUser)}
+                            alt={displayUser.username}
+                            width={48}
+                            height={48}
+                            className="rounded-full"
+                          />
+                          <div>
+                            <p className="font-medium text-white">{displayUser.username}</p>
+                            <p className="text-sm text-white/50">Discord ID: {displayUser.id}</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* MFA Methods */}
                     <div className="space-y-3">
