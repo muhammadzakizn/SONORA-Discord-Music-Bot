@@ -147,7 +147,7 @@ def run_production():
     
     # Start Cloudflare Tunnel for HTTPS API access
     proc_tunnel = None
-    cloudflared_path = Path('SONORA/cloudflared')
+    cloudflared_path = Path('cloudflared')  # Relative to current dir (inside SONORA folder)
     tunnel_token = os.getenv('CLOUDFLARE_TUNNEL_TOKEN', '')
     
     if cloudflared_path.exists() and tunnel_token:
