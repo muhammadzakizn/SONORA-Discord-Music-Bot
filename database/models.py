@@ -50,6 +50,7 @@ class LyricLine:
     start_time: float = 0.0  # seconds
     end_time: float = 0.0  # seconds
     romanized: Optional[str] = None  # Romanized/transliterated version (for non-latin scripts)
+    words: Optional[List[dict]] = None  # Word-level timing from Musixmatch richsync
     
     def is_active(self, current_time: float) -> bool:
         """Check if this line is active at current time"""

@@ -273,7 +273,11 @@ def api_guild_detail(guild_id: int):
 
 @app.route('/api/guild/<int:guild_id>/lyrics')
 def api_guild_lyrics(guild_id: int):
-    """Get synced lyrics for current track - Apple Music style"""
+    """Get synced lyrics for current track - Apple Music style
+    
+    Query params:
+    - source: 'auto' (default), 'musixmatch', 'lrclib'
+    """
     bot = get_bot()
     if not bot:
         return jsonify({"error": "Bot not connected"}), 503
@@ -282,6 +286,9 @@ def api_guild_lyrics(guild_id: int):
         guild = bot.get_guild(guild_id)
         if not guild:
             return jsonify({"error": "Guild not found"}), 404
+        
+        # Get source preference
+        source_pref = request.args.get('source', 'auto').lower()
         
         # Check if playing
         connection = bot.voice_manager.get_connection(guild_id)
@@ -319,8 +326,75 @@ def api_guild_lyrics(guild_id: int):
         
         # Build lyrics data
         lyrics_data = None
-        if metadata.lyrics and metadata.lyrics.lines:
+        lyrics_source_used = "none"
+        
+        # Try Musixmatch if requested
+        if source_pref == 'musixmatch':
+            try:
+                from services.lyrics.musixmatch import MusixmatchFetcher
+                from database.models import TrackInfo as TrackInfoModel
+                
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                fetcher = MusixmatchFetcher()
+                track = TrackInfoModel(
+                    title=metadata.title,
+                    artist=metadata.artist,
+                    duration=int(metadata.duration) if metadata.duration else 0
+                )
+                
+                musix_lyrics = loop.run_until_complete(fetcher.fetch(track))
+                loop.run_until_complete(fetcher.close())
+                loop.close()
+                
+                if musix_lyrics and musix_lyrics.lines:
+                    lyrics_source_used = "musixmatch"
+                    # Convert to response format with word timing
+                    lines = []
+                    for line in musix_lyrics.lines:
+                        # Use actual word timing from richsync if available
+                        words = []
+                        if hasattr(line, 'words') and line.words:
+                            words = line.words
+                        else:
+                            # Estimate word timing
+                            text = line.text.strip()
+                            if text and text != "• • •":
+                                word_list = text.split()
+                                if word_list:
+                                    line_duration = line.end_time - line.start_time
+                                    word_duration = line_duration / len(word_list) if word_list else 0
+                                    
+                                    for i, word in enumerate(word_list):
+                                        words.append({
+                                            "text": word,
+                                            "start_time": line.start_time + (i * word_duration),
+                                            "end_time": line.start_time + ((i + 1) * word_duration)
+                                        })
+                        
+                        lines.append({
+                            "text": line.text,
+                            "start_time": line.start_time,
+                            "end_time": line.end_time,
+                            "romanized": line.romanized,
+                            "words": words
+                        })
+                    
+                    lyrics_data = {
+                        "is_synced": musix_lyrics.is_synced,
+                        "source": "musixmatch",
+                        "offset": musix_lyrics.offset,
+                        "lines": lines,
+                        "total_lines": len(lines)
+                    }
+            except Exception as e:
+                logger.error(f"Musixmatch fetch failed: {e}", exc_info=True)
+        
+        # Use existing lyrics if Musixmatch not requested or failed
+        if lyrics_data is None and metadata.lyrics and metadata.lyrics.lines:
             lyrics = metadata.lyrics
+            lyrics_source_used = lyrics.source.value if hasattr(lyrics.source, 'value') else str(lyrics.source)
             
             # Convert LyricLine objects to dict with word-level timing estimation
             lines = []
@@ -351,7 +425,7 @@ def api_guild_lyrics(guild_id: int):
             
             lyrics_data = {
                 "is_synced": lyrics.is_synced,
-                "source": lyrics.source.value if hasattr(lyrics.source, 'value') else str(lyrics.source),
+                "source": lyrics_source_used,
                 "offset": lyrics.offset,
                 "lines": lines,
                 "total_lines": len(lines)
@@ -363,12 +437,15 @@ def api_guild_lyrics(guild_id: int):
             "current_time": current_time,
             "is_playing": is_playing,
             "is_paused": is_paused,
-            "duration": metadata.duration
+            "duration": metadata.duration,
+            "lyrics_source": lyrics_source_used,
+            "available_sources": ["auto", "musixmatch", "lrclib"]
         })
     
     except Exception as e:
         logger.error(f"Failed to get lyrics: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/api/history')

@@ -85,6 +85,8 @@ export default function FullscreenLyricsPlayer({
     const [showMenu, setShowMenu] = useState(false);
     const [isControlling, setIsControlling] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [lyricsSource, setLyricsSource] = useState<'auto' | 'musixmatch' | 'lrclib'>('auto');
+    const [currentSource, setCurrentSource] = useState<string>('');
 
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
     const currentLineRef = useRef<HTMLDivElement>(null);
@@ -116,7 +118,8 @@ export default function FullscreenLyricsPlayer({
     // Fetch lyrics data
     const fetchLyrics = useCallback(async () => {
         try {
-            const response = await fetch(`${API_BASE}/guild/${guildId}/lyrics`);
+            const sourceParam = lyricsSource !== 'auto' ? `?source=${lyricsSource}` : '';
+            const response = await fetch(`${API_BASE}/guild/${guildId}/lyrics${sourceParam}`);
             const data = await response.json();
 
             if (data.error && !data.track) {
@@ -129,6 +132,7 @@ export default function FullscreenLyricsPlayer({
             setLyrics(data.lyrics);
             setIsPlaying(data.is_playing);
             setIsPaused(data.is_paused);
+            setCurrentSource(data.lyrics_source || data.lyrics?.source || '');
 
             // Update current time from server - this is the source of truth
             lastFetchTime.current = Date.now();
@@ -341,7 +345,31 @@ export default function FullscreenLyricsPlayer({
 
                                         {/* Dropdown Menu */}
                                         {showMenu && (
-                                            <div className="absolute right-0 top-full mt-2 w-48 py-2 bg-zinc-800/95 backdrop-blur-xl rounded-xl shadow-xl border border-white/10 z-50">
+                                            <div className="absolute right-0 top-full mt-2 w-56 py-2 bg-zinc-800/95 backdrop-blur-xl rounded-xl shadow-xl border border-white/10 z-50">
+                                                {/* Lyrics Source Selector */}
+                                                <div className="px-4 py-2 border-b border-white/10 mb-2">
+                                                    <p className="text-xs text-white/40 mb-2">Lyrics Source</p>
+                                                    <div className="flex gap-1">
+                                                        {(['auto', 'musixmatch', 'lrclib'] as const).map((src) => (
+                                                            <button
+                                                                key={src}
+                                                                onClick={() => {
+                                                                    setLyricsSource(src);
+                                                                }}
+                                                                className={`px-2 py-1 text-xs rounded-md transition-colors ${lyricsSource === src
+                                                                        ? 'bg-white/20 text-white'
+                                                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
+                                                                    }`}
+                                                            >
+                                                                {src === 'auto' ? 'Auto' : src === 'musixmatch' ? 'Musixmatch' : 'LRCLIB'}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    {currentSource && (
+                                                        <p className="text-xs text-white/30 mt-1">Current: {currentSource}</p>
+                                                    )}
+                                                </div>
+
                                                 <button
                                                     onClick={() => {
                                                         setShowLyrics(!showLyrics);
