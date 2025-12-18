@@ -271,6 +271,106 @@ def api_guild_detail(guild_id: int):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/guild/<int:guild_id>/lyrics')
+def api_guild_lyrics(guild_id: int):
+    """Get synced lyrics for current track - Apple Music style"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            return jsonify({"error": "Guild not found"}), 404
+        
+        # Check if playing
+        connection = bot.voice_manager.get_connection(guild_id)
+        if not connection or not connection.connection:
+            return jsonify({"error": "Not playing", "lyrics": None}), 200
+        
+        is_playing = connection.connection.is_playing()
+        is_paused = connection.connection.is_paused()
+        
+        if not is_playing and not is_paused:
+            return jsonify({"error": "Not playing", "lyrics": None}), 200
+        
+        # Get player and metadata
+        if not hasattr(bot, 'players') or guild_id not in bot.players:
+            return jsonify({"error": "No player", "lyrics": None}), 200
+        
+        player = bot.players[guild_id]
+        metadata = player.metadata
+        
+        if not metadata:
+            return jsonify({"error": "No metadata", "lyrics": None}), 200
+        
+        # Get current playback time
+        current_time = player.get_current_time()
+        
+        # Build track info
+        track_info = {
+            "title": metadata.title,
+            "artist": metadata.artist,
+            "album": metadata.album,
+            "artwork_url": metadata.artwork_url,
+            "duration": metadata.duration,
+            "requested_by": metadata.requested_by
+        }
+        
+        # Build lyrics data
+        lyrics_data = None
+        if metadata.lyrics and metadata.lyrics.lines:
+            lyrics = metadata.lyrics
+            
+            # Convert LyricLine objects to dict with word-level timing estimation
+            lines = []
+            for line in lyrics.lines:
+                # Estimate word-level timing for Apple Music style animation
+                words = []
+                text = line.text.strip()
+                if text and text != "• • •":
+                    word_list = text.split()
+                    if word_list:
+                        line_duration = line.end_time - line.start_time
+                        word_duration = line_duration / len(word_list) if word_list else 0
+                        
+                        for i, word in enumerate(word_list):
+                            words.append({
+                                "text": word,
+                                "start_time": line.start_time + (i * word_duration),
+                                "end_time": line.start_time + ((i + 1) * word_duration)
+                            })
+                
+                lines.append({
+                    "text": line.text,
+                    "start_time": line.start_time,
+                    "end_time": line.end_time,
+                    "romanized": line.romanized,
+                    "words": words  # Word-level timing for per-word animation
+                })
+            
+            lyrics_data = {
+                "is_synced": lyrics.is_synced,
+                "source": lyrics.source.value if hasattr(lyrics.source, 'value') else str(lyrics.source),
+                "offset": lyrics.offset,
+                "lines": lines,
+                "total_lines": len(lines)
+            }
+        
+        return jsonify({
+            "track": track_info,
+            "lyrics": lyrics_data,
+            "current_time": current_time,
+            "is_playing": is_playing,
+            "is_paused": is_paused,
+            "duration": metadata.duration
+        })
+    
+    except Exception as e:
+        logger.error(f"Failed to get lyrics: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/history')
 def api_history():
     """Get play history"""

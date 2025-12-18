@@ -31,7 +31,7 @@ def print_banner():
 {Colors.CYAN}{Colors.BOLD}
 ╔══════════════════════════════════════════════════════════════╗
 ║                      SONORA MUSIC BOT                        ║
-║               Discord Audio Bot - Version 3.8.0              ║
+║               Discord Audio Bot - Version 3.9.9              ║
 ║          Production Mode for Pterodactyl Server              ║
 ╚══════════════════════════════════════════════════════════════╝
 {Colors.END}

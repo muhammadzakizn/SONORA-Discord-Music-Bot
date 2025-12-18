@@ -25,10 +25,12 @@ import {
     GripVertical,
     ChevronUp,
     ChevronDown,
+    Mic2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/contexts/SessionContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import FullscreenLyricsPlayer from "@/components/lyrics/FullscreenLyricsPlayer";
 
 interface GuildDetail {
     id: string;  // String to handle Discord snowflake IDs
@@ -78,6 +80,7 @@ export default function GuildDetailPage() {
     const [isControlling, setIsControlling] = useState(false);
     const [actionMessage, setActionMessage] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [lyricsOpen, setLyricsOpen] = useState(false);
 
     // For smooth progress bar animation
     const [displayProgress, setDisplayProgress] = useState(0);
@@ -524,6 +527,17 @@ export default function GuildDetailPage() {
                                     >
                                         <Square className="w-6 h-6" />
                                     </button>
+                                    {/* Lyrics Button */}
+                                    <button
+                                        onClick={() => setLyricsOpen(true)}
+                                        className={cn(
+                                            "p-4 rounded-full transition-colors",
+                                            isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
+                                        )}
+                                        title="Show Lyrics"
+                                    >
+                                        <Mic2 className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
+                                    </button>
                                 </div>
                             )}
 
@@ -699,6 +713,15 @@ export default function GuildDetailPage() {
                     <p className="text-2xl font-bold text-yellow-400">{guild.member_count?.toLocaleString()}</p>
                 </div>
             </div>
+
+            {/* Fullscreen Lyrics Player */}
+            <FullscreenLyricsPlayer
+                guildId={guildId}
+                isOpen={lyricsOpen}
+                onClose={() => setLyricsOpen(false)}
+                queue={guild?.queue}
+                onControl={handleControl}
+            />
         </div>
     );
 }
