@@ -63,6 +63,8 @@ function formatDuration(seconds: number): string {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+// Proxy at /api/bot/[...path] forwards to BOT_API_URL/api/{path}
+// So /api/bot/guild/xxx -> BOT_API_URL/api/guild/xxx
 const API_BASE = '/api/bot';
 
 export default function GuildDetailPage() {
@@ -93,7 +95,7 @@ export default function GuildDetailPage() {
 
     const fetchGuild = useCallback(async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/guild/${guildId}`);
+            const response = await fetch(`${API_BASE}/guild/${guildId}`);
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || "Failed to fetch");
@@ -159,7 +161,7 @@ export default function GuildDetailPage() {
         setActionMessage(null);
 
         try {
-            const response = await fetch(`${API_BASE}/api/control/${guildId}/${action}`, {
+            const response = await fetch(`${API_BASE}/control/${guildId}/${action}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username })
@@ -193,7 +195,7 @@ export default function GuildDetailPage() {
         if (!isManaged) return;
 
         try {
-            const response = await fetch(`${API_BASE}/api/queue/${guildId}/remove/${position}`, {
+            const response = await fetch(`${API_BASE}/queue/${guildId}/remove/${position}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username })
@@ -220,7 +222,7 @@ export default function GuildDetailPage() {
         if (newPosition < 1 || (guild && newPosition > guild.queue_length)) return;
 
         try {
-            const response = await fetch(`${API_BASE}/api/queue/${guildId}/move`, {
+            const response = await fetch(`${API_BASE}/queue/${guildId}/move`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
