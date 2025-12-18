@@ -330,6 +330,7 @@ def api_guild_lyrics(guild_id: int):
         
         # Try Musixmatch if requested
         if source_pref == 'musixmatch':
+            logger.info(f"[Musixmatch] Attempting fetch for: {metadata.title} - {metadata.artist}")
             try:
                 from services.lyrics.musixmatch import MusixmatchFetcher
                 from database.models import TrackInfo as TrackInfoModel
@@ -344,11 +345,13 @@ def api_guild_lyrics(guild_id: int):
                     duration=int(metadata.duration) if metadata.duration else 0
                 )
                 
+                logger.info(f"[Musixmatch] Fetching lyrics for track: {track.title} by {track.artist}")
                 musix_lyrics = loop.run_until_complete(fetcher.fetch(track))
                 loop.run_until_complete(fetcher.close())
                 loop.close()
                 
                 if musix_lyrics and musix_lyrics.lines:
+                    logger.info(f"[Musixmatch] SUCCESS! Got {len(musix_lyrics.lines)} lines")
                     lyrics_source_used = "musixmatch"
                     # Convert to response format with word timing
                     lines = []
@@ -388,8 +391,10 @@ def api_guild_lyrics(guild_id: int):
                         "lines": lines,
                         "total_lines": len(lines)
                     }
+                else:
+                    logger.warning(f"[Musixmatch] No lyrics found for: {metadata.title} - {metadata.artist}")
             except Exception as e:
-                logger.error(f"Musixmatch fetch failed: {e}", exc_info=True)
+                logger.error(f"[Musixmatch] Fetch FAILED: {e}", exc_info=True)
         
         # Use existing lyrics if Musixmatch not requested or failed
         # NOTE: Non-Musixmatch sources do NOT get word timing - show full line highlight
