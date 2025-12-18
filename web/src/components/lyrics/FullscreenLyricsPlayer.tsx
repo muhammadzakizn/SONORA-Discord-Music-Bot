@@ -123,12 +123,13 @@ export default function FullscreenLyricsPlayer({
         return lyrics.lines.length - 1;
     }, [lyrics, currentTime]);
 
-    // Fetch lyrics data
+    // Fetch lyrics data - with caching to avoid refetching same track
+    const lastTrackIdRef = useRef<string>('');
+
     const fetchLyrics = useCallback(async () => {
         try {
-            // Always use the current lyricsSource (default: musixmatch for dashboard)
+            // Always use the current lyricsSource (default: applemusic for dashboard)
             const sourceParam = `?source=${lyricsSource}`;
-            console.log(`[Lyrics] Fetching with source: ${lyricsSource}`);
             const response = await fetch(`${API_BASE}/guild/${guildId}/lyrics${sourceParam}`);
             const data = await response.json();
 
@@ -138,19 +139,26 @@ export default function FullscreenLyricsPlayer({
             }
 
             setError(null);
-            setTrack(data.track);
-            setLyrics(data.lyrics);
             setIsPlaying(data.is_playing);
             setIsPaused(data.is_paused);
-
-            const sourceUsed = data.lyrics_source || data.lyrics?.source || 'unknown';
-            console.log(`[Lyrics] Source used: ${sourceUsed}, Lines: ${data.lyrics?.lines?.length || 0}`);
-            setCurrentSource(sourceUsed);
 
             // Update current time from server - this is the source of truth
             lastFetchTime.current = Date.now();
             serverTimeRef.current = data.current_time || 0;
             setCurrentTime(data.current_time || 0);
+
+            // Only update track and lyrics if track changed (to avoid spam)
+            const newTrackId = `${data.track?.title}-${data.track?.artist}`;
+            if (newTrackId !== lastTrackIdRef.current) {
+                console.log(`[Lyrics] New track: ${newTrackId}`);
+                lastTrackIdRef.current = newTrackId;
+                setTrack(data.track);
+                setLyrics(data.lyrics);
+
+                const sourceUsed = data.lyrics_source || data.lyrics?.source || 'unknown';
+                console.log(`[Lyrics] Source: ${sourceUsed}, Lines: ${data.lyrics?.lines?.length || 0}`);
+                setCurrentSource(sourceUsed);
+            }
         } catch (err) {
             console.error("Failed to fetch lyrics:", err);
             setError("Failed to load lyrics");
@@ -182,12 +190,13 @@ export default function FullscreenLyricsPlayer({
         };
     }, [isOpen, isPlaying, isPaused]);
 
-    // Fetch lyrics on open and poll more frequently for better sync
+    // Fetch lyrics on open and poll for time sync (less frequently now)
     useEffect(() => {
         if (!isOpen) return;
 
         fetchLyrics();
-        const interval = setInterval(fetchLyrics, 1000); // Poll every second for better sync
+        // Poll every 3 seconds - lyrics are cached, this is mainly for time sync
+        const interval = setInterval(fetchLyrics, 3000);
 
         return () => clearInterval(interval);
     }, [isOpen, fetchLyrics]);
@@ -585,20 +594,49 @@ export default function FullscreenLyricsPlayer({
                                                         filter: shouldCollapse ? 'blur(4px)' : 'none',
                                                     }}
                                                 >
-                                                    {/* Current line with glow effect */}
-                                                    <p
-                                                        className={cn(
-                                                            "text-left leading-tight font-semibold transition-all duration-300",
-                                                            isCurrentLine
-                                                                ? "text-4xl xs:text-5xl text-white"
-                                                                : "text-3xl lg:text-4xl text-white"
-                                                        )}
-                                                        style={isCurrentLine ? {
-                                                            textShadow: "0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.3)"
-                                                        } : undefined}
-                                                    >
-                                                        {line.text || "• • •"}
-                                                    </p>
+                                                    {/* Current line with per-word highlighting */}
+                                                    {isCurrentLine && line.words && line.words.length > 0 ? (
+                                                        <p className="text-4xl xs:text-5xl font-bold text-left leading-tight">
+                                                            {line.words.map((word: { text: string; start_time: number; end_time: number }, wordIndex: number) => {
+                                                                // Calculate word progress (0 to 1)
+                                                                let progress = 0;
+                                                                if (currentTime >= word.end_time) {
+                                                                    progress = 1;
+                                                                } else if (currentTime >= word.start_time) {
+                                                                    progress = (currentTime - word.start_time) / (word.end_time - word.start_time);
+                                                                }
+
+                                                                return (
+                                                                    <span
+                                                                        key={wordIndex}
+                                                                        className="inline-block mr-[0.3em] transition-all duration-100"
+                                                                        style={{
+                                                                            color: `rgba(255, 255, 255, ${0.4 + progress * 0.6})`,
+                                                                            textShadow: progress > 0.1
+                                                                                ? `0 0 ${progress * 25}px rgba(255, 255, 255, ${progress * 0.5})`
+                                                                                : "none",
+                                                                        }}
+                                                                    >
+                                                                        {word.text}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </p>
+                                                    ) : (
+                                                        <p
+                                                            className={cn(
+                                                                "text-left leading-tight font-semibold transition-all duration-300",
+                                                                isCurrentLine
+                                                                    ? "text-4xl xs:text-5xl text-white"
+                                                                    : "text-3xl lg:text-4xl text-white"
+                                                            )}
+                                                            style={isCurrentLine ? {
+                                                                textShadow: "0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.3)"
+                                                            } : undefined}
+                                                        >
+                                                            {line.text || "• • •"}
+                                                        </p>
+                                                    )}
 
                                                     {/* Romanization */}
                                                     {showRomanization && line.romanized && (
