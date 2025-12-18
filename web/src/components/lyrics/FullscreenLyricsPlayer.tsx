@@ -3,18 +3,19 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    X,
     Play,
     Pause,
     SkipForward,
+    SkipBack,
     Square,
     ChevronDown,
-    ChevronUp,
     ListMusic,
     Music,
     Languages,
-    Maximize2,
-    Minimize2,
+    MoreHorizontal,
+    Eye,
+    EyeOff,
+    Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -79,13 +80,16 @@ export default function FullscreenLyricsPlayer({
     const [isPlaying, setIsPlaying] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [showQueue, setShowQueue] = useState(false);
+    const [showLyrics, setShowLyrics] = useState(true);
     const [showRomanization, setShowRomanization] = useState(true);
+    const [showMenu, setShowMenu] = useState(false);
     const [isControlling, setIsControlling] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
     const currentLineRef = useRef<HTMLDivElement>(null);
     const lastFetchTime = useRef<number>(0);
+    const serverTimeRef = useRef<number>(0);
     const animationFrameRef = useRef<number | undefined>(undefined);
 
     // Find current line index based on time
@@ -126,8 +130,9 @@ export default function FullscreenLyricsPlayer({
             setIsPlaying(data.is_playing);
             setIsPaused(data.is_paused);
 
-            // Update current time from server
+            // Update current time from server - this is the source of truth
             lastFetchTime.current = Date.now();
+            serverTimeRef.current = data.current_time || 0;
             setCurrentTime(data.current_time || 0);
         } catch (err) {
             console.error("Failed to fetch lyrics:", err);
@@ -135,14 +140,19 @@ export default function FullscreenLyricsPlayer({
         }
     }, [guildId]);
 
-    // Animate time locally between fetches for smooth sync
+    // Smooth time interpolation between fetches - improved sync
     useEffect(() => {
         if (!isOpen || !isPlaying || isPaused) return;
 
+        let lastFrameTime = Date.now();
+
         const animate = () => {
-            const elapsed = (Date.now() - lastFetchTime.current) / 1000;
-            setCurrentTime(prev => prev + elapsed / 60); // Small increments
-            lastFetchTime.current = Date.now();
+            const now = Date.now();
+            const deltaSeconds = (now - lastFrameTime) / 1000;
+            lastFrameTime = now;
+
+            // Interpolate time locally for smooth animation
+            setCurrentTime(prev => prev + deltaSeconds);
             animationFrameRef.current = requestAnimationFrame(animate);
         };
 
@@ -155,12 +165,12 @@ export default function FullscreenLyricsPlayer({
         };
     }, [isOpen, isPlaying, isPaused]);
 
-    // Fetch lyrics on open and poll
+    // Fetch lyrics on open and poll more frequently for better sync
     useEffect(() => {
         if (!isOpen) return;
 
         fetchLyrics();
-        const interval = setInterval(fetchLyrics, 2000);
+        const interval = setInterval(fetchLyrics, 1000); // Poll every second for better sync
 
         return () => clearInterval(interval);
     }, [isOpen, fetchLyrics]);
@@ -188,16 +198,19 @@ export default function FullscreenLyricsPlayer({
 
     // Format time
     const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
+        const mins = Math.floor(Math.abs(seconds) / 60);
+        const secs = Math.floor(Math.abs(seconds) % 60);
         return `${mins}:${secs.toString().padStart(2, "0")}`;
     };
 
-    // Get word progress (0 to 1) for per-word animation
+    // Get word progress with easing for smoother animation
     const getWordProgress = (word: LyricWord) => {
         if (currentTime < word.start_time) return 0;
         if (currentTime >= word.end_time) return 1;
-        return (currentTime - word.start_time) / (word.end_time - word.start_time);
+
+        const linear = (currentTime - word.start_time) / (word.end_time - word.start_time);
+        // Apply easing for smoother glow
+        return Math.sin(linear * Math.PI / 2); // Ease out sine
     };
 
     if (!isOpen) return null;
@@ -208,11 +221,10 @@ export default function FullscreenLyricsPlayer({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex flex-col"
+                className="fixed inset-0 z-[100] flex"
             >
                 {/* Apple Music Style Animated Background */}
                 <div className="absolute inset-0 overflow-hidden bg-black">
-                    {/* Base gradient */}
                     <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-black to-zinc-900" />
 
                     {/* Animated Color Orbs */}
@@ -249,7 +261,6 @@ export default function FullscreenLyricsPlayer({
                         }}
                     />
 
-                    {/* Album art color extraction overlay */}
                     {track?.artwork_url && (
                         <img
                             src={track.artwork_url}
@@ -258,29 +269,28 @@ export default function FullscreenLyricsPlayer({
                         />
                     )}
 
-                    {/* Subtle noise texture */}
                     <div className="absolute inset-0 opacity-[0.03] bg-noise" />
                 </div>
 
-                {/* Content - Apple Music Style Layout */}
-                <div className="relative z-10 flex h-full">
-                    {/* Close button - minimal */}
+                {/* Content */}
+                <div className="relative z-10 flex h-full w-full">
+                    {/* Close button */}
                     <button
                         onClick={onClose}
-                        className="absolute top-4 left-4 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                        className="absolute top-6 left-6 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
                     >
                         <ChevronDown className="w-6 h-6 text-white" />
                     </button>
 
-                    {/* Settings buttons - top right */}
-                    <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+                    {/* Settings buttons */}
+                    <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
                         <button
                             onClick={() => setShowRomanization(!showRomanization)}
                             className={cn(
                                 "p-2 rounded-full transition-colors",
                                 showRomanization ? "bg-white/20 text-white" : "bg-white/10 text-white/60"
                             )}
-                            title="Toggle Romanization"
+                            title="Romanization"
                         >
                             <Languages className="w-5 h-5" />
                         </button>
@@ -290,41 +300,81 @@ export default function FullscreenLyricsPlayer({
                                 "p-2 rounded-full transition-colors",
                                 showQueue ? "bg-white/20 text-white" : "bg-white/10 text-white/60"
                             )}
+                            title="Queue"
                         >
                             <ListMusic className="w-5 h-5" />
                         </button>
                     </div>
 
-                    {/* LEFT PANEL - Album Art + Info + Controls */}
-                    <div className="w-full md:w-[380px] flex-shrink-0 flex flex-col items-center justify-center p-8 md:p-12">
+                    {/* LEFT PANEL - Album Art + Controls */}
+                    <div className="w-[420px] flex-shrink-0 flex flex-col justify-center px-12 py-8">
                         {/* Album Art */}
-                        <div className="relative mb-6">
+                        <div className="mb-8">
                             {track?.artwork_url ? (
                                 <img
                                     src={track.artwork_url}
                                     alt={track.title}
-                                    className="w-64 h-64 md:w-72 md:h-72 rounded-xl shadow-2xl object-cover"
+                                    className="w-full aspect-square rounded-xl shadow-2xl object-cover"
                                 />
                             ) : (
-                                <div className="w-64 h-64 md:w-72 md:h-72 rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center shadow-2xl">
+                                <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center shadow-2xl">
                                     <Music className="w-24 h-24 text-white/80" />
                                 </div>
                             )}
                         </div>
 
-                        {/* Track Info */}
-                        <div className="text-center mb-4 w-full max-w-[300px]">
-                            <h2 className="text-white text-xl font-bold truncate">
-                                {track?.title || "Unknown Track"}
-                            </h2>
-                            <p className="text-white/60 text-sm truncate">
+                        {/* Track Info - Apple Music Style */}
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between gap-2">
+                                <h2 className="text-white text-xl font-semibold truncate flex-1">
+                                    {track?.title || "Unknown Track"}
+                                </h2>
+                                <div className="flex items-center gap-1">
+                                    <button className="p-1.5 text-white/60 hover:text-white transition-colors">
+                                        <Star className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowMenu(!showMenu)}
+                                        className="p-1.5 text-white/60 hover:text-white transition-colors relative"
+                                    >
+                                        <MoreHorizontal className="w-5 h-5" />
+
+                                        {/* Dropdown Menu */}
+                                        {showMenu && (
+                                            <div className="absolute right-0 top-full mt-2 w-48 py-2 bg-zinc-800/95 backdrop-blur-xl rounded-xl shadow-xl border border-white/10 z-50">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowLyrics(!showLyrics);
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className="w-full px-4 py-2 flex items-center gap-3 text-white/80 hover:bg-white/10 transition-colors"
+                                                >
+                                                    {showLyrics ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                    <span className="text-sm">{showLyrics ? "Hide Lyrics" : "Show Lyrics"}</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowRomanization(!showRomanization);
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className="w-full px-4 py-2 flex items-center gap-3 text-white/80 hover:bg-white/10 transition-colors"
+                                                >
+                                                    <Languages className="w-4 h-4" />
+                                                    <span className="text-sm">{showRomanization ? "Hide Romanization" : "Show Romanization"}</span>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                            <p className="text-white/60 text-sm truncate mt-0.5">
                                 {track?.artist || "Unknown Artist"} — {track?.album || "Unknown Album"}
                             </p>
                         </div>
 
                         {/* Progress Bar */}
-                        <div className="w-full max-w-[300px] mb-6">
-                            <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+                        <div className="mb-2">
+                            <div className="h-1 bg-white/20 rounded-full overflow-hidden cursor-pointer hover:h-1.5 transition-all">
                                 <motion.div
                                     className="h-full bg-white rounded-full"
                                     style={{
@@ -332,23 +382,33 @@ export default function FullscreenLyricsPlayer({
                                     }}
                                 />
                             </div>
-                            <div className="flex justify-between text-white/50 text-xs mt-1">
+                            <div className="flex justify-between text-white/50 text-xs mt-1.5">
                                 <span>{formatTime(currentTime)}</span>
                                 <span>-{formatTime((track?.duration || 0) - currentTime)}</span>
                             </div>
                         </div>
 
-                        {/* Controls - Apple Music style */}
-                        <div className="flex items-center justify-center gap-6">
+                        {/* Audio Quality Badge */}
+                        <div className="flex justify-center mb-6">
+                            <div className="flex items-center gap-1.5 text-white/40 text-xs">
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                                </svg>
+                                <span>Streaming</span>
+                            </div>
+                        </div>
+
+                        {/* Controls - Apple Music Style */}
+                        <div className="flex items-center justify-center gap-8">
                             <button
                                 onClick={() => handleControl(isPaused ? "resume" : "pause")}
                                 disabled={isControlling}
-                                className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
+                                className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
                             >
                                 {isPaused ? (
-                                    <Play className="w-10 h-10 text-white" fill="white" />
+                                    <Play className="w-8 h-8 text-white" fill="white" />
                                 ) : (
-                                    <Pause className="w-10 h-10 text-white" fill="white" />
+                                    <Pause className="w-8 h-8 text-white" fill="white" />
                                 )}
                             </button>
                             <button
@@ -356,119 +416,125 @@ export default function FullscreenLyricsPlayer({
                                 disabled={isControlling}
                                 className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
                             >
-                                <SkipForward className="w-7 h-7 text-white" fill="white" />
+                                <SkipForward className="w-8 h-8 text-white" fill="white" />
                             </button>
                             <button
                                 onClick={() => handleControl("stop")}
                                 disabled={isControlling}
                                 className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
                             >
-                                <Square className="w-6 h-6 text-rose-400" />
+                                <Square className="w-7 h-7 text-rose-400" />
                             </button>
                         </div>
                     </div>
 
                     {/* RIGHT PANEL - Lyrics */}
-                    <div className="hidden md:flex flex-1 flex-col justify-center overflow-hidden">
-                        <div
-                            ref={lyricsContainerRef}
-                            className="overflow-y-auto scrollbar-hide px-8 py-16 max-h-full"
-                        >
-                            {lyrics?.lines.length ? (
-                                <div className="space-y-6">
-                                    {lyrics.lines.map((line, index) => {
-                                        const isCurrentLine = index === currentLineIndex;
-                                        const isPastLine = index < currentLineIndex;
-                                        const isFutureLine = index > currentLineIndex;
+                    {showLyrics && (
+                        <div className="flex-1 flex flex-col justify-center overflow-hidden">
+                            <div
+                                ref={lyricsContainerRef}
+                                className="overflow-y-auto scrollbar-hide px-12 py-20 max-h-full"
+                            >
+                                {lyrics?.lines.length ? (
+                                    <div className="space-y-5">
+                                        {lyrics.lines.map((line, index) => {
+                                            const isCurrentLine = index === currentLineIndex;
+                                            const isPastLine = index < currentLineIndex;
+                                            const isFutureLine = index > currentLineIndex;
 
-                                        return (
-                                            <div
-                                                key={index}
-                                                ref={isCurrentLine ? currentLineRef : null}
-                                                className={cn(
-                                                    "transition-all duration-500 ease-out",
-                                                    isCurrentLine && "scale-100",
-                                                    isPastLine && "opacity-40",
-                                                    isFutureLine && "opacity-50"
-                                                )}
-                                            >
-                                                {/* Per-word animation for current line */}
-                                                {isCurrentLine && line.words.length > 0 ? (
-                                                    <p className="text-3xl md:text-4xl font-bold text-left leading-relaxed">
-                                                        {line.words.map((word, wordIndex) => {
-                                                            const progress = getWordProgress(word);
-                                                            return (
-                                                                <span
-                                                                    key={wordIndex}
-                                                                    className="inline-block mr-2 transition-all duration-150"
-                                                                    style={{
-                                                                        color: progress > 0
-                                                                            ? `rgba(255, 255, 255, ${0.5 + progress * 0.5})`
-                                                                            : "rgba(255, 255, 255, 0.5)",
-                                                                        textShadow: progress > 0
-                                                                            ? `0 0 ${progress * 30}px rgba(255, 255, 255, ${progress * 0.6})`
-                                                                            : "none",
-                                                                    }}
-                                                                >
-                                                                    {word.text}
-                                                                </span>
-                                                            );
-                                                        })}
-                                                    </p>
-                                                ) : (
-                                                    <p
-                                                        className={cn(
-                                                            "text-left leading-relaxed transition-all duration-300 font-semibold",
-                                                            isCurrentLine
-                                                                ? "text-3xl md:text-4xl text-white"
-                                                                : "text-2xl md:text-3xl text-white/50"
-                                                        )}
-                                                    >
-                                                        {line.text || "• • •"}
-                                                    </p>
-                                                )}
+                                            return (
+                                                <div
+                                                    key={index}
+                                                    ref={isCurrentLine ? currentLineRef : null}
+                                                    className={cn(
+                                                        "transition-all duration-300 ease-out",
+                                                        isPastLine && "opacity-40",
+                                                        isFutureLine && "opacity-50"
+                                                    )}
+                                                >
+                                                    {/* Per-word animation for current line */}
+                                                    {isCurrentLine && line.words.length > 0 ? (
+                                                        <p className="text-3xl font-bold text-left leading-snug">
+                                                            {line.words.map((word, wordIndex) => {
+                                                                const progress = getWordProgress(word);
+                                                                return (
+                                                                    <span
+                                                                        key={wordIndex}
+                                                                        className="inline-block mr-[0.3em] transition-all duration-100"
+                                                                        style={{
+                                                                            color: `rgba(255, 255, 255, ${0.4 + progress * 0.6})`,
+                                                                            textShadow: progress > 0.1
+                                                                                ? `0 0 ${progress * 20}px rgba(255, 255, 255, ${progress * 0.4})`
+                                                                                : "none",
+                                                                        }}
+                                                                    >
+                                                                        {word.text}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </p>
+                                                    ) : (
+                                                        <p
+                                                            className={cn(
+                                                                "text-left leading-snug font-semibold",
+                                                                isCurrentLine
+                                                                    ? "text-3xl text-white"
+                                                                    : "text-2xl text-white/50"
+                                                            )}
+                                                        >
+                                                            {line.text || "• • •"}
+                                                        </p>
+                                                    )}
 
-                                                {/* Romanization */}
-                                                {showRomanization && line.romanized && (
-                                                    <p
-                                                        className={cn(
-                                                            "text-left italic mt-1 transition-all duration-300",
-                                                            isCurrentLine
-                                                                ? "text-xl text-white/60"
-                                                                : "text-lg text-white/30"
-                                                        )}
-                                                    >
-                                                        {line.romanized}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-start justify-center h-full">
-                                    <p className="text-white/40 text-3xl font-semibold">• • •</p>
-                                    <p className="text-white/30 text-lg mt-2">
-                                        {error || "Lyrics will appear here"}
-                                    </p>
-                                </div>
-                            )}
+                                                    {/* Romanization */}
+                                                    {showRomanization && line.romanized && (
+                                                        <p
+                                                            className={cn(
+                                                                "text-left italic mt-1",
+                                                                isCurrentLine
+                                                                    ? "text-base text-white/50"
+                                                                    : "text-sm text-white/30"
+                                                            )}
+                                                        >
+                                                            {line.romanized}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-start justify-center h-full">
+                                        <p className="text-white/40 text-3xl font-semibold">• • •</p>
+                                        <p className="text-white/30 text-lg mt-2">
+                                            {error || "Lyrics will appear here when available"}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Queue Panel (Collapsible) - Now on far right */}
+                    {/* Album Only Mode - Show larger album */}
+                    {!showLyrics && (
+                        <div className="flex-1 flex items-center justify-center">
+                            <p className="text-white/30 text-xl">Album view</p>
+                        </div>
+                    )}
+
+                    {/* Queue Panel */}
                     <AnimatePresence>
                         {showQueue && (
                             <motion.div
                                 initial={{ width: 0, opacity: 0 }}
-                                animate={{ width: 280, opacity: 1 }}
+                                animate={{ width: 300, opacity: 1 }}
                                 exit={{ width: 0, opacity: 0 }}
                                 className="flex-shrink-0 bg-black/60 backdrop-blur-xl overflow-hidden border-l border-white/10"
                             >
-                                <div className="p-4 h-full flex flex-col">
-                                    <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                                <div className="p-5 h-full flex flex-col">
+                                    <h3 className="text-white font-semibold mb-4 flex items-center gap-2 text-lg">
                                         <ListMusic className="w-5 h-5" />
-                                        Queue ({queue.length})
+                                        Up Next
                                     </h3>
                                     <div className="flex-1 overflow-y-auto space-y-2">
                                         {queue.length > 0 ? (
@@ -496,6 +562,14 @@ export default function FullscreenLyricsPlayer({
                         )}
                     </AnimatePresence>
                 </div>
+
+                {/* Click outside to close menu */}
+                {showMenu && (
+                    <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowMenu(false)}
+                    />
+                )}
             </motion.div>
         </AnimatePresence>
     );
