@@ -102,29 +102,66 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
         return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
     }, []);
 
-    // Create blurred image from artwork
+    // Create blurred image from artwork with circular mask (beautiful-lyrics style)
     const createBlurredTexture = useCallback(async (url: string): Promise<THREE.Texture | null> => {
         return new Promise((resolve) => {
             const img = new Image();
             img.crossOrigin = "anonymous";
             img.onload = () => {
-                // Create canvas for blur effect
-                const size = isLowPower ? 256 : 512; // Lower resolution for mobile
-                const canvas = document.createElement('canvas');
-                canvas.width = size;
-                canvas.height = size;
-                const ctx = canvas.getContext('2d');
+                // 1. Create a square, circular clipped version of the image
+                const originalSize = Math.min(img.width, img.height);
+                const circleCanvas = document.createElement('canvas');
+                circleCanvas.width = originalSize;
+                circleCanvas.height = originalSize;
+                const circleCtx = circleCanvas.getContext('2d');
 
-                if (!ctx) {
+                if (!circleCtx) {
                     resolve(null);
                     return;
                 }
 
-                // Draw and blur
-                ctx.filter = `blur(${isLowPower ? 30 : 40}px)`;
-                ctx.drawImage(img, 0, 0, size, size);
+                // Create circular clipping mask
+                circleCtx.beginPath();
+                circleCtx.arc(originalSize / 2, originalSize / 2, originalSize / 2, 0, Math.PI * 2);
+                circleCtx.closePath();
+                circleCtx.clip();
 
-                const texture = new THREE.CanvasTexture(canvas);
+                // Draw image centered
+                circleCtx.drawImage(
+                    img,
+                    (img.width - originalSize) / 2, (img.height - originalSize) / 2,
+                    originalSize, originalSize,
+                    0, 0,
+                    originalSize, originalSize
+                );
+
+                // 2. Create the final blurred texture with padding
+                const blurExtent = 40; // Fixed blur amount from reference
+                const padding = blurExtent * 2; // Extra padding to avoid clipping blur
+                const finalSize = isLowPower ? 256 : 512; // Resample to power of 2 for performance
+
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = finalSize;
+                finalCanvas.height = finalSize;
+                const finalCtx = finalCanvas.getContext('2d');
+
+                if (!finalCtx) {
+                    resolve(null);
+                    return;
+                }
+
+                // Apply blur and draw the circular image centered
+                // We draw the high-res circleCanvas onto the finalCanvas, scaling it down
+                finalCtx.filter = `blur(${isLowPower ? 20 : 30}px)`; // Slightly reduced blur for smaller final texture
+
+                // Calculate draw dimensions to keep aspect ratio and centering
+                const drawSize = finalSize - (padding * (finalSize / 512)); // Scale padding relative to final size
+                const offset = (finalSize - drawSize) / 2;
+
+                finalCtx.drawImage(circleCanvas, offset, offset, drawSize, drawSize);
+
+                const texture = new THREE.CanvasTexture(finalCanvas);
+                // Use LinearFilter for smooth scaling
                 texture.minFilter = THREE.LinearFilter;
                 texture.magFilter = THREE.LinearFilter;
                 resolve(texture);
@@ -139,17 +176,20 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
         if (!containerRef.current) return;
 
         const container = containerRef.current;
-        const width = container.clientWidth;
-        const height = container.clientHeight;
+        let width = container.clientWidth;
+        let height = container.clientHeight;
 
         // Create renderer with performance settings
         const renderer = new THREE.WebGLRenderer({
             alpha: true,
-            antialias: !isLowPower, // Disable antialiasing on mobile
+            antialias: !isLowPower,
             powerPreference: isLowPower ? "low-power" : "high-performance"
         });
         renderer.setSize(width, height);
-        renderer.setPixelRatio(isLowPower ? 1 : Math.min(window.devicePixelRatio, 2));
+        // Use device pixel ratio for sharp rendering, capped at 2
+        const pixelRatio = isLowPower ? 1 : Math.min(window.devicePixelRatio, 2);
+        renderer.setPixelRatio(pixelRatio);
+
         container.appendChild(renderer.domElement);
         rendererRef.current = renderer;
 
@@ -161,20 +201,34 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
         const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
         camera.position.z = 1;
 
+        // Initial sizing calculations matching reference
+        const scaledW = width * pixelRatio;
+        const scaledH = height * pixelRatio;
+        const maxAxis = Math.max(scaledW, scaledH);
+        const largestAxisName = scaledW > scaledH ? "X" : "Y";
+
         // Create shader material
         const material = new THREE.ShaderMaterial({
             uniforms: {
                 uTime: { value: 0 },
                 uBlurredArt: { value: null },
                 uResolution: { value: new THREE.Vector2(width, height) },
-                uBackgroundOrigin: { value: new THREE.Vector2(width / 2, height / 2) },
-                uBackgroundRadius: { value: Math.max(width, height) * 1.5 },
-                uCenterOrigin: { value: new THREE.Vector2(width / 2, height / 2) },
-                uCenterRadius: { value: Math.max(width, height) },
-                uLeftOrigin: { value: new THREE.Vector2(0, height) },
-                uLeftRadius: { value: Math.max(width, height) * 0.75 },
-                uRightOrigin: { value: new THREE.Vector2(width, 0) },
-                uRightRadius: { value: Math.max(width, height) * 0.65 },
+
+                // Background Circle (Center, 1.5x max)
+                uBackgroundOrigin: { value: new THREE.Vector2(scaledW / 2, scaledH / 2) },
+                uBackgroundRadius: { value: maxAxis * 1.5 },
+
+                // Center Circle (Center, 1x or 0.75x max)
+                uCenterOrigin: { value: new THREE.Vector2(scaledW / 2, scaledH / 2) },
+                uCenterRadius: { value: maxAxis * (largestAxisName === "X" ? 1.0 : 0.75) },
+
+                // Left Circle (Bottom-Left, 0.75x max)
+                uLeftOrigin: { value: new THREE.Vector2(0, scaledH) },
+                uLeftRadius: { value: maxAxis * 0.75 },
+
+                // Right Circle (Top-Right, 0.65x or 0.5x max)
+                uRightOrigin: { value: new THREE.Vector2(scaledW, 0) },
+                uRightRadius: { value: maxAxis * (largestAxisName === "X" ? 0.65 : 0.5) },
             },
             vertexShader,
             fragmentShader,
@@ -186,7 +240,7 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
         const mesh = new THREE.Mesh(geometry, material);
         scene.add(mesh);
 
-        // Animation loop with frame limiting for mobile
+        // Animation loop
         let lastFrame = 0;
         const targetFPS = isLowPower ? 30 : 60;
         const frameInterval = 1000 / targetFPS;
@@ -194,10 +248,10 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
         const animate = (time: number) => {
             animationRef.current = requestAnimationFrame(animate);
 
-            // Frame limiting
             if (time - lastFrame < frameInterval) return;
             lastFrame = time;
 
+            // Slow down time factor to match reference (time / 3500)
             material.uniforms.uTime.value = time / 3500;
             renderer.render(scene, camera);
         };
@@ -205,23 +259,31 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
 
         // Handle resize
         const handleResize = () => {
+            if (!container) return;
             const w = container.clientWidth;
             const h = container.clientHeight;
-            const pixelRatio = isLowPower ? 1 : Math.min(window.devicePixelRatio, 2);
-            const scaledW = w * pixelRatio;
-            const scaledH = h * pixelRatio;
-            const maxAxis = Math.max(scaledW, scaledH);
+            const pRatio = isLowPower ? 1 : Math.min(window.devicePixelRatio, 2);
+            const sW = w * pRatio;
+            const sH = h * pRatio;
+            const mAxis = Math.max(sW, sH);
+            const lAxisName = sW > sH ? "X" : "Y";
 
             renderer.setSize(w, h);
+            renderer.setPixelRatio(pRatio);
+
             material.uniforms.uResolution.value.set(w, h);
-            material.uniforms.uBackgroundOrigin.value.set(scaledW / 2, scaledH / 2);
-            material.uniforms.uBackgroundRadius.value = maxAxis * 1.5;
-            material.uniforms.uCenterOrigin.value.set(scaledW / 2, scaledH / 2);
-            material.uniforms.uCenterRadius.value = maxAxis;
-            material.uniforms.uLeftOrigin.value.set(0, scaledH);
-            material.uniforms.uLeftRadius.value = maxAxis * 0.75;
-            material.uniforms.uRightOrigin.value.set(scaledW, 0);
-            material.uniforms.uRightRadius.value = maxAxis * 0.65;
+
+            material.uniforms.uBackgroundOrigin.value.set(sW / 2, sH / 2);
+            material.uniforms.uBackgroundRadius.value = mAxis * 1.5;
+
+            material.uniforms.uCenterOrigin.value.set(sW / 2, sH / 2);
+            material.uniforms.uCenterRadius.value = mAxis * (lAxisName === "X" ? 1.0 : 0.75);
+
+            material.uniforms.uLeftOrigin.value.set(0, sH);
+            material.uniforms.uLeftRadius.value = mAxis * 0.75;
+
+            material.uniforms.uRightOrigin.value.set(sW, 0);
+            material.uniforms.uRightRadius.value = mAxis * (lAxisName === "X" ? 0.65 : 0.5);
         };
 
         window.addEventListener('resize', handleResize);
@@ -234,7 +296,9 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
             geometry.dispose();
             material.dispose();
             if (textureRef.current) textureRef.current.dispose();
-            container.removeChild(renderer.domElement);
+            if (container.contains(renderer.domElement)) {
+                container.removeChild(renderer.domElement);
+            }
         };
     }, [isLowPower]);
 
