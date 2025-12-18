@@ -392,35 +392,20 @@ def api_guild_lyrics(guild_id: int):
                 logger.error(f"Musixmatch fetch failed: {e}", exc_info=True)
         
         # Use existing lyrics if Musixmatch not requested or failed
+        # NOTE: Non-Musixmatch sources do NOT get word timing - show full line highlight
         if lyrics_data is None and metadata.lyrics and metadata.lyrics.lines:
             lyrics = metadata.lyrics
             lyrics_source_used = lyrics.source.value if hasattr(lyrics.source, 'value') else str(lyrics.source)
             
-            # Convert LyricLine objects to dict with word-level timing estimation
+            # Convert LyricLine objects to dict - NO word timing for non-Musixmatch
             lines = []
             for line in lyrics.lines:
-                # Estimate word-level timing for Apple Music style animation
-                words = []
-                text = line.text.strip()
-                if text and text != "• • •":
-                    word_list = text.split()
-                    if word_list:
-                        line_duration = line.end_time - line.start_time
-                        word_duration = line_duration / len(word_list) if word_list else 0
-                        
-                        for i, word in enumerate(word_list):
-                            words.append({
-                                "text": word,
-                                "start_time": line.start_time + (i * word_duration),
-                                "end_time": line.start_time + ((i + 1) * word_duration)
-                            })
-                
                 lines.append({
                     "text": line.text,
                     "start_time": line.start_time,
                     "end_time": line.end_time,
                     "romanized": line.romanized,
-                    "words": words  # Word-level timing for per-word animation
+                    "words": []  # Empty - frontend will show full line highlight
                 })
             
             lyrics_data = {
