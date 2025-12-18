@@ -269,6 +269,9 @@ export default function FullscreenLyricsPlayer({
                         <WebGLBackground artworkUrl={track.artwork_url} />
                     )}
 
+                    {/* Dark overlay for "black accents" and better text contrast */}
+                    <div className="absolute inset-0 bg-black/50 z-[1]" />
+
                     {/* Fallback gradient orbs if no artwork or WebGL not supported */}
                     {!track?.artwork_url && (
                         <>
@@ -328,7 +331,8 @@ export default function FullscreenLyricsPlayer({
                     {/* LEFT PANEL - Album Art + Controls */}
                     <div className={cn(
                         "flex flex-col justify-center px-12 py-8 transition-all duration-300",
-                        showLyrics ? "w-1/2" : "w-full max-w-[450px]"
+                        // Apple Style: Smaller left panel (5/12) when lyrics active
+                        showLyrics ? "w-5/12 max-w-[400px]" : "w-full max-w-[450px]"
                     )}>
                         {/* Album Art */}
                         <div className="mb-2">
@@ -520,14 +524,14 @@ export default function FullscreenLyricsPlayer({
 
                     {/* RIGHT PANEL - Lyrics */}
                     {showLyrics && (
-                        <div className="w-1/2 flex flex-col justify-center overflow-hidden">
+                        <div className="w-7/12 flex flex-col justify-center overflow-hidden">
                             <div
                                 ref={lyricsContainerRef}
-                                className="overflow-y-auto scrollbar-hide px-12 py-20 max-h-full"
+                                className="overflow-y-auto scrollbar-hide px-12 py-[40vh] max-h-full"
                                 onScroll={handleLyricsScroll}
                             >
                                 {lyrics?.lines.length ? (
-                                    <div className="space-y-4">
+                                    <div className="space-y-6">
                                         {lyrics.lines.map((line, index) => {
                                             const isCurrentLine = index === currentLineIndex;
                                             const isPastLine = index < currentLineIndex;
@@ -560,7 +564,7 @@ export default function FullscreenLyricsPlayer({
                                                 >
                                                     {/* Per-word animation for current line */}
                                                     {isCurrentLine && line.words.length > 0 ? (
-                                                        <p className="text-3xl font-bold text-left leading-snug">
+                                                        <p className="text-4xl xs:text-5xl font-bold text-left leading-tight">
                                                             {line.words.map((word, wordIndex) => {
                                                                 const progress = getWordProgress(word);
                                                                 return (
@@ -582,12 +586,12 @@ export default function FullscreenLyricsPlayer({
                                                     ) : (
                                                         <p
                                                             className={cn(
-                                                                "text-left leading-snug font-semibold transition-all duration-300",
+                                                                "text-left leading-tight font-semibold transition-all duration-300",
                                                                 isCurrentLine
-                                                                    ? "text-3xl text-white"
+                                                                    ? "text-4xl xs:text-5xl text-white"
                                                                     : isPastLine
-                                                                        ? "text-2xl text-white/40"
-                                                                        : "text-2xl text-white/60"
+                                                                        ? "text-3xl lg:text-4xl text-white/40"
+                                                                        : "text-3xl lg:text-4xl text-white/60"
                                                             )}
                                                         >
                                                             {line.text || "• • •"}
