@@ -1067,7 +1067,7 @@ function LoginPageContent() {
                 <div className="absolute inset-0 bg-gradient-to-br from-white/[0.1] via-transparent to-transparent pointer-events-none rounded-3xl" />
               )}
 
-              <AnimatePresence mode="wait">
+              <AnimatePresence>
                 {loginMode === "select" && (
                   <motion.div
                     key="select"
