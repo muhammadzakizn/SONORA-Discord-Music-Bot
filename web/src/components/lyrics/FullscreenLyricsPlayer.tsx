@@ -128,6 +128,7 @@ export default function FullscreenLyricsPlayer({
         try {
             // Always use the current lyricsSource (default: musixmatch for dashboard)
             const sourceParam = `?source=${lyricsSource}`;
+            console.log(`[Lyrics] Fetching with source: ${lyricsSource}`);
             const response = await fetch(`${API_BASE}/guild/${guildId}/lyrics${sourceParam}`);
             const data = await response.json();
 
@@ -141,7 +142,10 @@ export default function FullscreenLyricsPlayer({
             setLyrics(data.lyrics);
             setIsPlaying(data.is_playing);
             setIsPaused(data.is_paused);
-            setCurrentSource(data.lyrics_source || data.lyrics?.source || '');
+
+            const sourceUsed = data.lyrics_source || data.lyrics?.source || 'unknown';
+            console.log(`[Lyrics] Source used: ${sourceUsed}, Lines: ${data.lyrics?.lines?.length || 0}`);
+            setCurrentSource(sourceUsed);
 
             // Update current time from server - this is the source of truth
             lastFetchTime.current = Date.now();
