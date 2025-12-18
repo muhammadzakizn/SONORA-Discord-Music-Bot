@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Play,
@@ -331,22 +332,17 @@ export default function FullscreenLyricsPlayer({
                                         <MoreHorizontal className="w-5 h-5" />
                                     </button>
 
-                                    {/* Dropdown Menu - Fixed position to avoid overflow */}
-                                    {showMenu && (
-                                        <>
+                                    {/* Dropdown Menu - Using Portal to fix click issues */}
+                                    {showMenu && typeof document !== 'undefined' && createPortal(
+                                        <div className="fixed inset-0 z-[9999]">
                                             {/* Backdrop */}
                                             <div
-                                                className="fixed inset-0 z-[200]"
+                                                className="absolute inset-0 bg-black/20"
                                                 onClick={() => setShowMenu(false)}
                                             />
+                                            {/* Menu */}
                                             <div
-                                                className="fixed z-[201] w-64 py-2 bg-zinc-900/98 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10"
-                                                style={{
-                                                    top: 'auto',
-                                                    left: '50%',
-                                                    transform: 'translateX(-50%)',
-                                                    bottom: '20%',
-                                                }}
+                                                className="absolute left-1/2 bottom-[20%] -translate-x-1/2 w-64 py-2 bg-zinc-900/98 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 pointer-events-auto"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 {/* Lyrics Section */}
@@ -429,7 +425,8 @@ export default function FullscreenLyricsPlayer({
                                                     <span className="text-sm">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
                                                 </button>
                                             </div>
-                                        </>
+                                        </div>,
+                                        document.body
                                     )}
                                 </div>
                             </div>
