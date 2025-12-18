@@ -1629,7 +1629,7 @@ function LoginPageContent() {
                 )}
 
                 {/* MFA Verification */}
-                {loginMode === "mfa-verify" && user && (
+                {loginMode === "mfa-verify" && (user || authUser) && (
                   <motion.div
                     key="mfa-verify"
                     initial={{ opacity: 0, x: 20 }}
@@ -1810,7 +1810,7 @@ function LoginPageContent() {
                 )}
 
                 {/* Discord First Verification (for new users) */}
-                {loginMode === "mfa-discord-first" && user && (
+                {loginMode === "mfa-discord-first" && (user || authUser) && (
                   <motion.div
                     key="mfa-discord-first"
                     initial={{ opacity: 0, x: 20 }}
@@ -1937,19 +1937,29 @@ function LoginPageContent() {
                     </div>
 
                     {/* User Info */}
-                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
-                      <Image
-                        src={getAvatarUrl(user)}
-                        alt={user.username}
-                        width={48}
-                        height={48}
-                        className="rounded-full"
-                      />
-                      <div>
-                        <p className="font-medium text-white">{user.username}</p>
-                        <p className="text-sm text-white/50">Discord: {user.id}</p>
-                      </div>
-                    </div>
+                    {(() => {
+                      const displayUsername = user?.username || authUser?.username || 'User';
+                      const displayId = user?.id || authUser?.discord_id || '';
+                      const avatarUrl = user
+                        ? getAvatarUrl(user)
+                        : (authUser?.avatar_url || `https://cdn.discordapp.com/embed/avatars/${Number(displayId) % 5}.png`);
+
+                      return (
+                        <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
+                          <Image
+                            src={avatarUrl}
+                            alt={displayUsername}
+                            width={48}
+                            height={48}
+                            className="rounded-full"
+                          />
+                          <div>
+                            <p className="font-medium text-white">{displayUsername}</p>
+                            <p className="text-sm text-white/50">Discord: {displayId}</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Instructions */}
                     {discordApprovalStatus === 'waiting' && (
@@ -1964,7 +1974,7 @@ function LoginPageContent() {
                 )}
 
                 {/* MFA Setup (for new users) */}
-                {loginMode === "mfa-setup" && user && (
+                {loginMode === "mfa-setup" && (user || authUser) && (
                   <motion.div
                     key="mfa-setup"
                     initial={{ opacity: 0, x: 20 }}
@@ -2116,7 +2126,7 @@ function LoginPageContent() {
                 )}
 
                 {/* Passkey Setup for Existing Users */}
-                {loginMode === "passkey-setup" && user && (
+                {loginMode === "passkey-setup" && (user || authUser) && (
                   <motion.div
                     key="passkey-setup"
                     initial={{ opacity: 0, x: 20 }}
@@ -2137,19 +2147,29 @@ function LoginPageContent() {
                     </div>
 
                     {/* User Info */}
-                    <div className="flex items-center gap-4 p-4 mb-6 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
-                      <Image
-                        src={getAvatarUrl(user)}
-                        alt={user.username}
-                        width={48}
-                        height={48}
-                        className="rounded-full"
-                      />
-                      <div>
-                        <p className="font-medium text-white">{user.username}</p>
-                        <p className="text-sm text-white/50">Setting up passkey</p>
-                      </div>
-                    </div>
+                    {(() => {
+                      const displayUsername = user?.username || authUser?.username || 'User';
+                      const displayId = user?.id || authUser?.discord_id || '';
+                      const avatarUrl = user
+                        ? getAvatarUrl(user)
+                        : (authUser?.avatar_url || `https://cdn.discordapp.com/embed/avatars/${Number(displayId) % 5}.png`);
+
+                      return (
+                        <div className="flex items-center gap-4 p-4 mb-6 rounded-2xl bg-white/[0.08] border border-white/[0.1]">
+                          <Image
+                            src={avatarUrl}
+                            alt={displayUsername}
+                            width={48}
+                            height={48}
+                            className="rounded-full"
+                          />
+                          <div>
+                            <p className="font-medium text-white">{displayUsername}</p>
+                            <p className="text-sm text-white/50">Setting up passkey</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Error Message */}
                     {passkeySetupError && (
@@ -2204,7 +2224,7 @@ function LoginPageContent() {
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({
                                   user_id: userId,
-                                  username: user.username
+                                  username: user?.username || authUser?.username || 'User'
                                 }),
                               });
 
