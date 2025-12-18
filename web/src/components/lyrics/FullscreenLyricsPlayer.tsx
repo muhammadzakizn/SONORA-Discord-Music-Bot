@@ -88,7 +88,7 @@ export default function FullscreenLyricsPlayer({
     const [showMenu, setShowMenu] = useState(false);
     const [isControlling, setIsControlling] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [lyricsSource, setLyricsSource] = useState<'auto' | 'musixmatch' | 'lrclib'>('musixmatch');
+    const [lyricsSource, setLyricsSource] = useState<'applemusic' | 'auto' | 'musixmatch' | 'lrclib'>('applemusic');
     const [currentSource, setCurrentSource] = useState<string>('');
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -418,14 +418,14 @@ export default function FullscreenLyricsPlayer({
                                                             </button>
                                                         </div>
                                                         <p className="text-xs text-white/40 mb-2">Source</p>
-                                                        <div className="flex gap-1">
-                                                            {(['musixmatch', 'lrclib', 'auto'] as const).map((src) => (
+                                                        <div className="flex gap-1 flex-wrap">
+                                                            {(['applemusic', 'musixmatch', 'lrclib', 'auto'] as const).map((src) => (
                                                                 <button
                                                                     key={src}
                                                                     onClick={() => setLyricsSource(src)}
                                                                     className={`px-2 py-1 text-xs rounded-md transition-colors ${lyricsSource === src ? 'bg-white/20 text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
                                                                 >
-                                                                    {src === 'auto' ? 'Auto' : src === 'musixmatch' ? 'Musixmatch' : 'LRCLIB'}
+                                                                    {src === 'applemusic' ? 'Apple Music' : src === 'auto' ? 'Auto' : src === 'musixmatch' ? 'Musixmatch' : 'LRCLIB'}
                                                                 </button>
                                                             ))}
                                                         </div>
