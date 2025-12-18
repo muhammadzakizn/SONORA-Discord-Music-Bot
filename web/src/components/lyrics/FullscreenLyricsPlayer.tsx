@@ -98,6 +98,10 @@ export default function FullscreenLyricsPlayer({
     const serverTimeRef = useRef<number>(0);
     const animationFrameRef = useRef<number | undefined>(undefined);
 
+    // Apple Music-style scroll detection
+    const [isUserScrolling, setIsUserScrolling] = useState(false);
+    const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
     // Find current line index based on time
     const currentLineIndex = useMemo(() => {
         if (!lyrics?.lines.length) return -1;
@@ -184,15 +188,39 @@ export default function FullscreenLyricsPlayer({
         return () => clearInterval(interval);
     }, [isOpen, fetchLyrics]);
 
-    // Scroll to current line
+    // Scroll to current line - only when not user scrolling
     useEffect(() => {
-        if (currentLineRef.current && lyricsContainerRef.current) {
+        if (currentLineRef.current && lyricsContainerRef.current && !isUserScrolling) {
             currentLineRef.current.scrollIntoView({
                 behavior: "smooth",
                 block: "center",
             });
         }
-    }, [currentLineIndex]);
+    }, [currentLineIndex, isUserScrolling]);
+
+    // Handle user scroll - show all lyrics temporarily
+    const handleLyricsScroll = useCallback(() => {
+        setIsUserScrolling(true);
+
+        // Clear existing timeout
+        if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+        }
+
+        // Reset after 3 seconds of no scrolling
+        scrollTimeoutRef.current = setTimeout(() => {
+            setIsUserScrolling(false);
+        }, 3000);
+    }, []);
+
+    // Cleanup scroll timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // Handle control actions
     const handleControl = async (action: string) => {
@@ -300,7 +328,7 @@ export default function FullscreenLyricsPlayer({
                     {/* LEFT PANEL - Album Art + Controls */}
                     <div className={cn(
                         "flex flex-col justify-center px-12 py-8 transition-all duration-300",
-                        showLyrics ? "w-1/2 max-w-[500px]" : "w-full max-w-[450px]"
+                        showLyrics ? "w-1/2" : "w-full max-w-[450px]"
                     )}>
                         {/* Album Art */}
                         <div className="mb-2">
@@ -496,23 +524,39 @@ export default function FullscreenLyricsPlayer({
                             <div
                                 ref={lyricsContainerRef}
                                 className="overflow-y-auto scrollbar-hide px-12 py-20 max-h-full"
+                                onScroll={handleLyricsScroll}
                             >
                                 {lyrics?.lines.length ? (
-                                    <div className="space-y-5">
+                                    <div className="space-y-4">
                                         {lyrics.lines.map((line, index) => {
                                             const isCurrentLine = index === currentLineIndex;
                                             const isPastLine = index < currentLineIndex;
                                             const isFutureLine = index > currentLineIndex;
+
+                                            // Apple Music-style: past lines collapse unless scrolling
+                                            const shouldCollapse = isPastLine && !isUserScrolling;
 
                                             return (
                                                 <div
                                                     key={index}
                                                     ref={isCurrentLine ? currentLineRef : null}
                                                     className={cn(
-                                                        "transition-all duration-300 ease-out",
-                                                        isPastLine && "opacity-40",
-                                                        isFutureLine && "opacity-50"
+                                                        "transition-all duration-500 ease-out overflow-hidden",
+                                                        // When scrolling: show all lines normally
+                                                        isUserScrolling && "opacity-100",
+                                                        // Past lines: collapse when not scrolling
+                                                        shouldCollapse && "max-h-0 opacity-0 my-0",
+                                                        // Future lines: blur effect when not scrolling
+                                                        isFutureLine && !isUserScrolling && "opacity-60"
                                                     )}
+                                                    style={{
+                                                        // Apply blur to future lines (not supported in all browsers via className)
+                                                        filter: isFutureLine && !isUserScrolling ? 'blur(2px)' : 'none',
+                                                        // Smooth collapse for past lines
+                                                        maxHeight: shouldCollapse ? 0 : '200px',
+                                                        marginTop: shouldCollapse ? 0 : undefined,
+                                                        marginBottom: shouldCollapse ? 0 : undefined,
+                                                    }}
                                                 >
                                                     {/* Per-word animation for current line */}
                                                     {isCurrentLine && line.words.length > 0 ? (
@@ -538,10 +582,12 @@ export default function FullscreenLyricsPlayer({
                                                     ) : (
                                                         <p
                                                             className={cn(
-                                                                "text-left leading-snug font-semibold",
+                                                                "text-left leading-snug font-semibold transition-all duration-300",
                                                                 isCurrentLine
                                                                     ? "text-3xl text-white"
-                                                                    : "text-2xl text-white/50"
+                                                                    : isPastLine
+                                                                        ? "text-2xl text-white/40"
+                                                                        : "text-2xl text-white/60"
                                                             )}
                                                         >
                                                             {line.text || "• • •"}
