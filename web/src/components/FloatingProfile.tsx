@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 const DEVELOPER_IDS = ["564879374843854869"]; // @thixxert
 
 export function FloatingProfileButton() {
-    const { user, displayName, isLoggedIn, logout } = useSession();
+    const { user, displayName, isLoggedIn, logout, customAvatar } = useSession();
     const { isDark, t } = useSettings();
     const [isOpen, setIsOpen] = useState(false);
 
@@ -48,11 +48,12 @@ export function FloatingProfileButton() {
                 aria-label="Profile menu"
             >
                 <Image
-                    src={getAvatarUrl(user)}
+                    src={customAvatar || getAvatarUrl(user)}
                     alt={user.username}
                     width={40}
                     height={40}
                     className="rounded-xl"
+                    unoptimized={!!customAvatar}
                 />
             </motion.button>
 
@@ -91,11 +92,12 @@ export function FloatingProfileButton() {
                             )}>
                                 <div className="flex items-center gap-3">
                                     <Image
-                                        src={getAvatarUrl(user)}
+                                        src={customAvatar || getAvatarUrl(user)}
                                         alt={user.username}
                                         width={48}
                                         height={48}
                                         className="rounded-xl"
+                                        unoptimized={!!customAvatar}
                                     />
                                     <div className="flex-1 min-w-0">
                                         <p className={cn(
@@ -183,7 +185,7 @@ export function FloatingProfileButton() {
 
 // Export for use in home page hero
 export function DashboardButton({ isDark }: { isDark: boolean }) {
-    const { user, isLoggedIn, devSession, isDevLoggedIn, isLoading } = useSession();
+    const { user, isLoggedIn, devSession, isDevLoggedIn, isLoading, customAvatar } = useSession();
     const { t } = useSettings();
     const [mounted, setMounted] = useState(false);
 
@@ -254,11 +256,12 @@ export function DashboardButton({ isDark }: { isDark: boolean }) {
                 )}
             >
                 <Image
-                    src={getAvatarUrl(user)}
+                    src={customAvatar || getAvatarUrl(user)}
                     alt={user.username}
                     width={28}
                     height={28}
                     className="rounded-full"
+                    unoptimized={!!customAvatar}
                 />
                 <span>{isDeveloper ? "Developer Panel" : "Admin Panel"}</span>
             </Link>
