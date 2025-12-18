@@ -279,7 +279,10 @@ export default function FullscreenLyricsPlayer({
                 </div>
 
                 {/* Content */}
-                <div className="relative z-10 flex h-full w-full">
+                <div className={cn(
+                    "relative z-10 flex h-full w-full",
+                    !showLyrics && "justify-center"
+                )}>
                     {/* Close button */}
                     <button
                         onClick={onClose}
@@ -291,9 +294,12 @@ export default function FullscreenLyricsPlayer({
 
 
                     {/* LEFT PANEL - Album Art + Controls */}
-                    <div className="w-[420px] flex-shrink-0 flex flex-col justify-center px-12 py-8">
+                    <div className={cn(
+                        "flex flex-col justify-center px-12 py-8 transition-all duration-300",
+                        showLyrics ? "w-1/2 max-w-[500px]" : "w-full max-w-[450px]"
+                    )}>
                         {/* Album Art */}
-                        <div className="mb-8">
+                        <div className="mb-4">
                             {track?.artwork_url ? (
                                 <img
                                     src={track.artwork_url}
@@ -307,8 +313,8 @@ export default function FullscreenLyricsPlayer({
                             )}
                         </div>
 
-                        {/* Track Info - Apple Music Style */}
-                        <div className="mb-4">
+                        {/* Track Info - Apple Music Style (Tighter spacing) */}
+                        <div className="mb-3">
                             <div className="flex items-center justify-between gap-2">
                                 <h2 className="text-white text-xl font-semibold truncate flex-1">
                                     {track?.title || "Unknown Track"}
@@ -419,7 +425,7 @@ export default function FullscreenLyricsPlayer({
                         </div>
 
                         {/* Progress Bar */}
-                        <div className="mb-2">
+                        <div className="mb-1">
                             <div className="h-1 bg-white/20 rounded-full overflow-hidden cursor-pointer hover:h-1.5 transition-all">
                                 <motion.div
                                     className="h-full bg-white rounded-full"
@@ -428,24 +434,21 @@ export default function FullscreenLyricsPlayer({
                                     }}
                                 />
                             </div>
-                            <div className="flex justify-between text-white/50 text-xs mt-1.5">
+                            <div className="flex justify-between items-center text-white/50 text-xs mt-1">
                                 <span>{formatTime(currentTime)}</span>
+                                {/* Audio Quality Badge - Centered */}
+                                <div className="flex items-center gap-1 text-white/40">
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                                    </svg>
+                                    <span className="text-[10px] font-medium">Lossless</span>
+                                </div>
                                 <span>-{formatTime((track?.duration || 0) - currentTime)}</span>
                             </div>
                         </div>
 
-                        {/* Audio Quality Badge */}
-                        <div className="flex justify-center mb-6">
-                            <div className="flex items-center gap-1.5 text-white/40 text-xs">
-                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                                </svg>
-                                <span>Streaming</span>
-                            </div>
-                        </div>
-
                         {/* Controls - Apple Music Style */}
-                        <div className="flex items-center justify-center gap-8">
+                        <div className="flex items-center justify-center gap-6 mt-4">
                             <button
                                 onClick={() => handleControl(isPaused ? "resume" : "pause")}
                                 disabled={isControlling}
@@ -476,7 +479,7 @@ export default function FullscreenLyricsPlayer({
 
                     {/* RIGHT PANEL - Lyrics */}
                     {showLyrics && (
-                        <div className="flex-1 flex flex-col justify-center overflow-hidden">
+                        <div className="w-1/2 flex flex-col justify-center overflow-hidden">
                             <div
                                 ref={lyricsContainerRef}
                                 className="overflow-y-auto scrollbar-hide px-12 py-20 max-h-full"
