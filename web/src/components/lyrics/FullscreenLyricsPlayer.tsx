@@ -262,81 +262,120 @@ export default function FullscreenLyricsPlayer({
                     <div className="absolute inset-0 opacity-[0.03] bg-noise" />
                 </div>
 
-                {/* Content */}
-                <div className="relative z-10 flex flex-col h-full">
-                    {/* Header */}
-                    <div className="flex items-center justify-between p-4 md:p-6">
-                        <button
-                            onClick={onClose}
-                            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-                        >
-                            <ChevronDown className="w-6 h-6 text-white" />
-                        </button>
+                {/* Content - Apple Music Style Layout */}
+                <div className="relative z-10 flex h-full">
+                    {/* Close button - minimal */}
+                    <button
+                        onClick={onClose}
+                        className="absolute top-4 left-4 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                    >
+                        <ChevronDown className="w-6 h-6 text-white" />
+                    </button>
 
-                        <div className="text-center">
-                            <p className="text-white/60 text-sm">Playing from</p>
-                            <p className="text-white font-medium truncate max-w-[200px]">
-                                {track?.album || "Unknown Album"}
+                    {/* Settings buttons - top right */}
+                    <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+                        <button
+                            onClick={() => setShowRomanization(!showRomanization)}
+                            className={cn(
+                                "p-2 rounded-full transition-colors",
+                                showRomanization ? "bg-white/20 text-white" : "bg-white/10 text-white/60"
+                            )}
+                            title="Toggle Romanization"
+                        >
+                            <Languages className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => setShowQueue(!showQueue)}
+                            className={cn(
+                                "p-2 rounded-full transition-colors",
+                                showQueue ? "bg-white/20 text-white" : "bg-white/10 text-white/60"
+                            )}
+                        >
+                            <ListMusic className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {/* LEFT PANEL - Album Art + Info + Controls */}
+                    <div className="w-full md:w-[380px] flex-shrink-0 flex flex-col items-center justify-center p-8 md:p-12">
+                        {/* Album Art */}
+                        <div className="relative mb-6">
+                            {track?.artwork_url ? (
+                                <img
+                                    src={track.artwork_url}
+                                    alt={track.title}
+                                    className="w-64 h-64 md:w-72 md:h-72 rounded-xl shadow-2xl object-cover"
+                                />
+                            ) : (
+                                <div className="w-64 h-64 md:w-72 md:h-72 rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center shadow-2xl">
+                                    <Music className="w-24 h-24 text-white/80" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Track Info */}
+                        <div className="text-center mb-4 w-full max-w-[300px]">
+                            <h2 className="text-white text-xl font-bold truncate">
+                                {track?.title || "Unknown Track"}
+                            </h2>
+                            <p className="text-white/60 text-sm truncate">
+                                {track?.artist || "Unknown Artist"} — {track?.album || "Unknown Album"}
                             </p>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        {/* Progress Bar */}
+                        <div className="w-full max-w-[300px] mb-6">
+                            <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+                                <motion.div
+                                    className="h-full bg-white rounded-full"
+                                    style={{
+                                        width: `${track?.duration ? (currentTime / track.duration) * 100 : 0}%`,
+                                    }}
+                                />
+                            </div>
+                            <div className="flex justify-between text-white/50 text-xs mt-1">
+                                <span>{formatTime(currentTime)}</span>
+                                <span>-{formatTime((track?.duration || 0) - currentTime)}</span>
+                            </div>
+                        </div>
+
+                        {/* Controls - Apple Music style */}
+                        <div className="flex items-center justify-center gap-6">
                             <button
-                                onClick={() => setShowRomanization(!showRomanization)}
-                                className={cn(
-                                    "p-2 rounded-full transition-colors",
-                                    showRomanization ? "bg-white/20 text-white" : "bg-white/10 text-white/60"
-                                )}
-                                title="Toggle Romanization"
+                                onClick={() => handleControl(isPaused ? "resume" : "pause")}
+                                disabled={isControlling}
+                                className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
                             >
-                                <Languages className="w-5 h-5" />
+                                {isPaused ? (
+                                    <Play className="w-10 h-10 text-white" fill="white" />
+                                ) : (
+                                    <Pause className="w-10 h-10 text-white" fill="white" />
+                                )}
                             </button>
                             <button
-                                onClick={() => setShowQueue(!showQueue)}
-                                className={cn(
-                                    "p-2 rounded-full transition-colors",
-                                    showQueue ? "bg-white/20 text-white" : "bg-white/10 text-white/60"
-                                )}
+                                onClick={() => handleControl("skip")}
+                                disabled={isControlling}
+                                className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
                             >
-                                <ListMusic className="w-5 h-5" />
+                                <SkipForward className="w-7 h-7 text-white" fill="white" />
+                            </button>
+                            <button
+                                onClick={() => handleControl("stop")}
+                                disabled={isControlling}
+                                className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
+                            >
+                                <Square className="w-6 h-6 text-rose-400" />
                             </button>
                         </div>
                     </div>
 
-                    {/* Main Content */}
-                    <div className="flex-1 flex flex-col md:flex-row overflow-hidden px-4 md:px-8 gap-4 md:gap-8">
-                        {/* Album Art (Left Side on Desktop) */}
-                        <div className="flex-shrink-0 flex items-center justify-center md:w-1/3">
-                            <div className="relative">
-                                {track?.artwork_url ? (
-                                    <img
-                                        src={track.artwork_url}
-                                        alt={track.title}
-                                        className="w-48 h-48 md:w-72 md:h-72 rounded-2xl shadow-2xl object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-48 h-48 md:w-72 md:h-72 rounded-2xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center shadow-2xl">
-                                        <Music className="w-24 h-24 text-white/80" />
-                                    </div>
-                                )}
-                                {/* Vinyl effect */}
-                                <div className={cn(
-                                    "absolute -right-4 top-1/2 -translate-y-1/2 w-48 h-48 md:w-72 md:h-72 rounded-full bg-black/80 -z-10 transition-transform duration-1000",
-                                    isPlaying && !isPaused && "animate-spin-slow"
-                                )} style={{ animationDuration: "8s" }}>
-                                    <div className="absolute inset-8 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900" />
-                                    <div className="absolute inset-1/3 rounded-full bg-black" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Lyrics (Center/Right) */}
+                    {/* RIGHT PANEL - Lyrics */}
+                    <div className="hidden md:flex flex-1 flex-col justify-center overflow-hidden">
                         <div
                             ref={lyricsContainerRef}
-                            className="flex-1 overflow-y-auto scrollbar-hide py-8 md:py-16"
+                            className="overflow-y-auto scrollbar-hide px-8 py-16 max-h-full"
                         >
                             {lyrics?.lines.length ? (
-                                <div className="space-y-4 md:space-y-6 px-4">
+                                <div className="space-y-6">
                                     {lyrics.lines.map((line, index) => {
                                         const isCurrentLine = index === currentLineIndex;
                                         const isPastLine = index < currentLineIndex;
@@ -349,13 +388,13 @@ export default function FullscreenLyricsPlayer({
                                                 className={cn(
                                                     "transition-all duration-500 ease-out",
                                                     isCurrentLine && "scale-100",
-                                                    isPastLine && "opacity-40 scale-95",
-                                                    isFutureLine && "opacity-60"
+                                                    isPastLine && "opacity-40",
+                                                    isFutureLine && "opacity-50"
                                                 )}
                                             >
                                                 {/* Per-word animation for current line */}
                                                 {isCurrentLine && line.words.length > 0 ? (
-                                                    <p className="text-2xl md:text-4xl font-bold text-left leading-relaxed">
+                                                    <p className="text-3xl md:text-4xl font-bold text-left leading-relaxed">
                                                         {line.words.map((word, wordIndex) => {
                                                             const progress = getWordProgress(word);
                                                             return (
@@ -364,13 +403,10 @@ export default function FullscreenLyricsPlayer({
                                                                     className="inline-block mr-2 transition-all duration-150"
                                                                     style={{
                                                                         color: progress > 0
-                                                                            ? `rgba(255, 255, 255, ${0.4 + progress * 0.6})`
-                                                                            : "rgba(255, 255, 255, 0.4)",
-                                                                        transform: progress > 0 && progress < 1
-                                                                            ? `scale(${1 + progress * 0.1})`
-                                                                            : "scale(1)",
+                                                                            ? `rgba(255, 255, 255, ${0.5 + progress * 0.5})`
+                                                                            : "rgba(255, 255, 255, 0.5)",
                                                                         textShadow: progress > 0
-                                                                            ? `0 0 ${progress * 20}px rgba(255, 255, 255, ${progress * 0.5})`
+                                                                            ? `0 0 ${progress * 30}px rgba(255, 255, 255, ${progress * 0.6})`
                                                                             : "none",
                                                                     }}
                                                                 >
@@ -382,10 +418,10 @@ export default function FullscreenLyricsPlayer({
                                                 ) : (
                                                     <p
                                                         className={cn(
-                                                            "text-left leading-relaxed transition-all duration-300",
+                                                            "text-left leading-relaxed transition-all duration-300 font-semibold",
                                                             isCurrentLine
-                                                                ? "text-2xl md:text-4xl font-bold text-white"
-                                                                : "text-lg md:text-2xl font-medium text-white/50"
+                                                                ? "text-3xl md:text-4xl text-white"
+                                                                : "text-2xl md:text-3xl text-white/50"
                                                         )}
                                                     >
                                                         {line.text || "• • •"}
@@ -398,8 +434,8 @@ export default function FullscreenLyricsPlayer({
                                                         className={cn(
                                                             "text-left italic mt-1 transition-all duration-300",
                                                             isCurrentLine
-                                                                ? "text-lg md:text-xl text-white/70"
-                                                                : "text-sm md:text-base text-white/30"
+                                                                ? "text-xl text-white/60"
+                                                                : "text-lg text-white/30"
                                                         )}
                                                     >
                                                         {line.romanized}
@@ -410,121 +446,55 @@ export default function FullscreenLyricsPlayer({
                                     })}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-center">
-                                    <Music className="w-16 h-16 text-white/30 mb-4" />
-                                    <p className="text-white/60 text-xl">
-                                        {error || "No lyrics available for this track"}
-                                    </p>
-                                    <p className="text-white/40 text-sm mt-2">
-                                        Lyrics will appear here when available
+                                <div className="flex flex-col items-start justify-center h-full">
+                                    <p className="text-white/40 text-3xl font-semibold">• • •</p>
+                                    <p className="text-white/30 text-lg mt-2">
+                                        {error || "Lyrics will appear here"}
                                     </p>
                                 </div>
                             )}
                         </div>
+                    </div>
 
-                        {/* Queue Panel (Collapsible) */}
-                        <AnimatePresence>
-                            {showQueue && (
-                                <motion.div
-                                    initial={{ width: 0, opacity: 0 }}
-                                    animate={{ width: 280, opacity: 1 }}
-                                    exit={{ width: 0, opacity: 0 }}
-                                    className="flex-shrink-0 bg-black/40 rounded-2xl backdrop-blur-xl overflow-hidden"
-                                >
-                                    <div className="p-4 h-full flex flex-col">
-                                        <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                                            <ListMusic className="w-5 h-5" />
-                                            Queue ({queue.length})
-                                        </h3>
-                                        <div className="flex-1 overflow-y-auto space-y-2">
-                                            {queue.length > 0 ? (
-                                                queue.map((item) => (
-                                                    <div
-                                                        key={item.position}
-                                                        className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-                                                    >
-                                                        <p className="text-white text-sm font-medium truncate">
-                                                            {item.title}
-                                                        </p>
-                                                        <p className="text-white/50 text-xs truncate">
-                                                            {item.artist}
-                                                        </p>
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <p className="text-white/40 text-sm text-center py-8">
-                                                    Queue is empty
-                                                </p>
-                                            )}
-                                        </div>
+                    {/* Queue Panel (Collapsible) - Now on far right */}
+                    <AnimatePresence>
+                        {showQueue && (
+                            <motion.div
+                                initial={{ width: 0, opacity: 0 }}
+                                animate={{ width: 280, opacity: 1 }}
+                                exit={{ width: 0, opacity: 0 }}
+                                className="flex-shrink-0 bg-black/60 backdrop-blur-xl overflow-hidden border-l border-white/10"
+                            >
+                                <div className="p-4 h-full flex flex-col">
+                                    <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                                        <ListMusic className="w-5 h-5" />
+                                        Queue ({queue.length})
+                                    </h3>
+                                    <div className="flex-1 overflow-y-auto space-y-2">
+                                        {queue.length > 0 ? (
+                                            queue.map((item) => (
+                                                <div
+                                                    key={item.position}
+                                                    className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                                                >
+                                                    <p className="text-white text-sm font-medium truncate">
+                                                        {item.title}
+                                                    </p>
+                                                    <p className="text-white/50 text-xs truncate">
+                                                        {item.artist}
+                                                    </p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-white/40 text-sm text-center py-8">
+                                                Queue is empty
+                                            </p>
+                                        )}
                                     </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-
-                    {/* Bottom Controls */}
-                    <div className="p-4 md:p-6 bg-gradient-to-t from-black/80 to-transparent">
-                        {/* Track Info */}
-                        <div className="text-center mb-4">
-                            <h2 className="text-white text-xl md:text-2xl font-bold truncate max-w-md mx-auto">
-                                {track?.title || "Unknown Track"}
-                            </h2>
-                            <p className="text-white/60 text-sm md:text-base">
-                                {track?.artist || "Unknown Artist"}
-                            </p>
-                            {track?.requested_by && (
-                                <p className="text-white/40 text-xs mt-1">
-                                    Requested by {track.requested_by}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div className="max-w-2xl mx-auto mb-4">
-                            <div className="h-1 bg-white/20 rounded-full overflow-hidden">
-                                <motion.div
-                                    className="h-full bg-white rounded-full"
-                                    style={{
-                                        width: `${track?.duration ? (currentTime / track.duration) * 100 : 0}%`,
-                                    }}
-                                />
-                            </div>
-                            <div className="flex justify-between text-white/60 text-xs mt-1">
-                                <span>{formatTime(currentTime)}</span>
-                                <span>{formatTime(track?.duration || 0)}</span>
-                            </div>
-                        </div>
-
-                        {/* Controls */}
-                        <div className="flex items-center justify-center gap-4">
-                            <button
-                                onClick={() => handleControl(isPaused ? "resume" : "pause")}
-                                disabled={isControlling}
-                                className="p-4 rounded-full bg-white text-black hover:bg-white/90 transition-colors disabled:opacity-50"
-                            >
-                                {isPaused ? (
-                                    <Play className="w-8 h-8" fill="currentColor" />
-                                ) : (
-                                    <Pause className="w-8 h-8" fill="currentColor" />
-                                )}
-                            </button>
-                            <button
-                                onClick={() => handleControl("skip")}
-                                disabled={isControlling}
-                                className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
-                            >
-                                <SkipForward className="w-6 h-6 text-white" />
-                            </button>
-                            <button
-                                onClick={() => handleControl("stop")}
-                                disabled={isControlling}
-                                className="p-3 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition-colors disabled:opacity-50"
-                            >
-                                <Square className="w-6 h-6" />
-                            </button>
-                        </div>
-                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             </motion.div>
         </AnimatePresence>
