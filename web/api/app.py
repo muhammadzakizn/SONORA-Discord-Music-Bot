@@ -328,9 +328,12 @@ def api_guild_lyrics(guild_id: int):
         lyrics_data = None
         lyrics_source_used = "none"
         
-        # Get cookies path for Apple Music
+        # Get cookies path for Apple Music (project root / cookies / apple_music_cookies.txt)
         import os
-        cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cookies', 'apple_music_cookies.txt')
+        # web/api/app.py -> web/api -> web -> project_root
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        cookies_path = os.path.join(project_root, 'cookies', 'apple_music_cookies.txt')
+        logger.info(f"[AppleMusic] Looking for cookies at: {cookies_path}")
         
         # Try Apple Music first (default) or if explicitly requested
         if source_pref in ['applemusic', 'auto']:
