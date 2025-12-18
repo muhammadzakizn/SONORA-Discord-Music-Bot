@@ -192,18 +192,33 @@ export default function FullscreenLyricsPlayer({
         return () => clearInterval(interval);
     }, [isOpen, fetchLyrics]);
 
+    // Flag to track if we're doing auto-scroll (not user scroll)
+    const isAutoScrollingRef = useRef(false);
+
     // Scroll to current line - only when not user scrolling
     useEffect(() => {
         if (currentLineRef.current && lyricsContainerRef.current && !isUserScrolling) {
+            // Set flag before auto-scroll
+            isAutoScrollingRef.current = true;
+
             currentLineRef.current.scrollIntoView({
                 behavior: "smooth",
                 block: "center",
             });
+
+            // Reset flag after scroll animation completes
+            setTimeout(() => {
+                isAutoScrollingRef.current = false;
+            }, 500);
         }
     }, [currentLineIndex, isUserScrolling]);
 
     // Handle user scroll - show all lyrics temporarily
+    // Only trigger if it's actually a user scroll, not auto-scroll
     const handleLyricsScroll = useCallback(() => {
+        // Ignore scroll events caused by auto-scroll
+        if (isAutoScrollingRef.current) return;
+
         setIsUserScrolling(true);
 
         // Clear existing timeout
