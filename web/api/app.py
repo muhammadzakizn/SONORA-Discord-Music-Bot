@@ -397,20 +397,38 @@ def api_guild_lyrics(guild_id: int):
                 logger.error(f"[Musixmatch] Fetch FAILED: {e}", exc_info=True)
         
         # Use existing lyrics if Musixmatch not requested or failed
-        # NOTE: Non-Musixmatch sources do NOT get word timing - show full line highlight
+        # Add word timing estimation so karaoke effect still works
         if lyrics_data is None and metadata.lyrics and metadata.lyrics.lines:
             lyrics = metadata.lyrics
             lyrics_source_used = lyrics.source.value if hasattr(lyrics.source, 'value') else str(lyrics.source)
+            logger.info(f"[Fallback] Using {lyrics_source_used} lyrics with word timing estimation")
             
-            # Convert LyricLine objects to dict - NO word timing for non-Musixmatch
+            # Convert LyricLine objects to dict WITH word timing estimation
             lines = []
             for line in lyrics.lines:
+                text = line.text.strip() if line.text else ""
+                words = []
+                
+                # Estimate word timing based on line duration
+                if text and text != "• • •":
+                    word_list = text.split()
+                    if word_list:
+                        line_duration = line.end_time - line.start_time
+                        word_duration = line_duration / len(word_list) if word_list else 0
+                        
+                        for i, word in enumerate(word_list):
+                            words.append({
+                                "text": word,
+                                "start_time": line.start_time + (i * word_duration),
+                                "end_time": line.start_time + ((i + 1) * word_duration)
+                            })
+                
                 lines.append({
                     "text": line.text,
                     "start_time": line.start_time,
                     "end_time": line.end_time,
                     "romanized": line.romanized,
-                    "words": []  # Empty - frontend will show full line highlight
+                    "words": words  # Now includes estimated word timing
                 })
             
             lyrics_data = {
