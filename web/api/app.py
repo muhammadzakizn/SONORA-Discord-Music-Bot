@@ -328,63 +328,86 @@ def api_guild_lyrics(guild_id: int):
         lyrics_data = None
         lyrics_source_used = "none"
         
-        # Get cookies path for Apple Music (project root / cookies / apple_music_cookies.txt)
-        import os
-        # web/api/app.py -> web/api -> web -> project_root
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        cookies_path = os.path.join(project_root, 'cookies', 'apple_music_cookies.txt')
-        logger.info(f"[AppleMusic] Looking for cookies at: {cookies_path}")
+        # Server-side lyrics cache to avoid repeated API calls
+        import time
+        global _lyrics_cache
+        if '_lyrics_cache' not in globals():
+            _lyrics_cache = {}
         
-        # Try Apple Music first (default) or if explicitly requested
-        if source_pref in ['applemusic', 'auto']:
-            logger.info(f"[AppleMusic] Attempting fetch for: {metadata.title} - {metadata.artist}")
-            try:
-                from services.lyrics.applemusic import AppleMusicFetcher
-                from database.models import TrackInfo as TrackInfoModel
-                
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
-                fetcher = AppleMusicFetcher(cookies_path=cookies_path)
-                track = TrackInfoModel(
-                    title=metadata.title,
-                    artist=metadata.artist,
-                    duration=int(metadata.duration) if metadata.duration else 0
-                )
-                
-                am_lyrics = loop.run_until_complete(fetcher.fetch(track))
-                loop.close()
-                
-                if am_lyrics and am_lyrics.lines:
-                    logger.info(f"[AppleMusic] SUCCESS! Got {len(am_lyrics.lines)} lines")
-                    lyrics_source_used = "applemusic"
+        cache_key = f"{metadata.title}:{metadata.artist}:{source_pref}"
+        cache_entry = _lyrics_cache.get(cache_key)
+        
+        # Use cached lyrics if available and not expired (10 min cache)
+        if cache_entry and (time.time() - cache_entry['timestamp']) < 600:
+            logger.info(f"[Lyrics] Using cached lyrics for: {metadata.title}")
+            lyrics_data = cache_entry['data']
+            lyrics_source_used = cache_entry['source']
+        else:
+            # Get cookies path for Apple Music (project root / cookies / apple_music_cookies.txt)
+            import os
+            # web/api/app.py -> web/api -> web -> project_root
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            cookies_path = os.path.join(project_root, 'cookies', 'apple_music_cookies.txt')
+            
+            # Try Apple Music first (default) or if explicitly requested
+            if source_pref in ['applemusic', 'auto']:
+                logger.info(f"[AppleMusic] Attempting fetch for: {metadata.title} - {metadata.artist}")
+                try:
+                    from services.lyrics.applemusic import AppleMusicFetcher
+                    from database.models import TrackInfo as TrackInfoModel
                     
-                    # Convert to response format
-                    lines = []
-                    for line in am_lyrics.lines:
-                        words = []
-                        if hasattr(line, 'words') and line.words:
-                            words = line.words if isinstance(line.words, list) else []
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    fetcher = AppleMusicFetcher(cookies_path=cookies_path)
+                    track = TrackInfoModel(
+                        title=metadata.title,
+                        artist=metadata.artist,
+                        duration=int(metadata.duration) if metadata.duration else 0
+                    )
+                    
+                    am_lyrics = loop.run_until_complete(fetcher.fetch(track))
+                    loop.close()
+                    
+                    if am_lyrics and am_lyrics.lines:
+                        logger.info(f"[AppleMusic] SUCCESS! Got {len(am_lyrics.lines)} lines")
+                        lyrics_source_used = "applemusic"
                         
-                        lines.append({
-                            "text": line.text,
-                            "start_time": line.start_time,
-                            "end_time": line.end_time,
-                            "romanized": line.romanized,
-                            "words": words
-                        })
-                    
-                    lyrics_data = {
-                        "is_synced": am_lyrics.is_synced,
-                        "source": "applemusic",
-                        "offset": am_lyrics.offset,
-                        "lines": lines,
-                        "total_lines": len(lines)
-                    }
-                else:
-                    logger.warning(f"[AppleMusic] No lyrics found for: {metadata.title} - {metadata.artist}")
-            except Exception as e:
-                logger.error(f"[AppleMusic] Fetch FAILED: {e}", exc_info=True)
+                        # Convert to response format
+                        lines = []
+                        for line in am_lyrics.lines:
+                            words = []
+                            if hasattr(line, 'words') and line.words:
+                                words = line.words if isinstance(line.words, list) else []
+                            
+                            lines.append({
+                                "text": line.text,
+                                "start_time": line.start_time,
+                                "end_time": line.end_time,
+                                "romanized": line.romanized,
+                                "words": words
+                            })
+                        
+                        lyrics_data = {
+                            "is_synced": am_lyrics.is_synced,
+                            "source": "applemusic",
+                            "offset": am_lyrics.offset,
+                            "lines": lines,
+                            "total_lines": len(lines)
+                        }
+                    else:
+                        logger.warning(f"[AppleMusic] No lyrics found for: {metadata.title} - {metadata.artist}")
+                except Exception as e:
+                    logger.error(f"[AppleMusic] Fetch FAILED: {e}", exc_info=True)
+            
+            # Save to cache if we got lyrics
+            if lyrics_data:
+                _lyrics_cache[cache_key] = {
+                    'data': lyrics_data,
+                    'source': lyrics_source_used,
+                    'timestamp': time.time()
+                }
+                logger.info(f"[Lyrics] Cached lyrics for: {metadata.title}")
         # Try Musixmatch if requested and no lyrics yet
         if source_pref == 'musixmatch' and lyrics_data is None:
             logger.info(f"[Musixmatch] Attempting fetch for: {metadata.title} - {metadata.artist}")
