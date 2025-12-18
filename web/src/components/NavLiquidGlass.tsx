@@ -62,7 +62,7 @@ type PopupType = "explore" | "profile" | "settings" | null;
 
 export default function NavLiquidGlass() {
     const pathname = usePathname();
-    const { user, isLoggedIn, logout, devSession, isDevLoggedIn, devLogout } = useSession();
+    const { user, isLoggedIn, logout, devSession, isDevLoggedIn, devLogout, customAvatar } = useSession();
     const {
         isDark,
         t,
@@ -193,6 +193,7 @@ export default function NavLiquidGlass() {
                                 isDevLoggedIn={isDevLoggedIn}
                                 devLogout={devLogout}
                                 isVerifying={pathname === "/login"}
+                                customAvatar={customAvatar}
                             />
                         )}
                         {activePopup === "settings" && (
@@ -280,7 +281,7 @@ export default function NavLiquidGlass() {
                                 icon={(isLoggedIn && user) || (isDevLoggedIn && devSession?.avatar) ? undefined : User}
                                 avatarUrl={
                                     isLoggedIn && user
-                                        ? getAvatarUrl(user)
+                                        ? (customAvatar || getAvatarUrl(user))
                                         : isDevLoggedIn && devSession?.avatar
                                             ? devSession.avatar
                                             : undefined
@@ -488,6 +489,7 @@ function ProfileMenu({
     isDevLoggedIn,
     devLogout,
     isVerifying = false,
+    customAvatar,
 }: {
     user: DiscordUser | null;
     isLoggedIn: boolean;
@@ -500,6 +502,7 @@ function ProfileMenu({
     isDevLoggedIn: boolean;
     devLogout: () => void;
     isVerifying?: boolean;
+    customAvatar?: string | null;
 }) {
     // Developer session active - show developer profile
     if (isDevLoggedIn && devSession) {
@@ -687,7 +690,7 @@ function ProfileMenu({
                     )}
                 >
                     <Image
-                        src={getAvatarUrl(user)}
+                        src={customAvatar || getAvatarUrl(user)}
                         alt={user.username}
                         width={48}
                         height={48}
@@ -749,7 +752,7 @@ function ProfileMenu({
                 )}
             >
                 <Image
-                    src={getAvatarUrl(user)}
+                    src={customAvatar || getAvatarUrl(user)}
                     alt={user.username}
                     width={48}
                     height={48}

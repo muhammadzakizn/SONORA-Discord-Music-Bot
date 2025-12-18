@@ -624,8 +624,7 @@ export default function ProfilePage() {
                                         className="max-w-full max-h-[300px] rounded-lg"
                                         onLoad={handleImageLoad}
                                     />
-                                    {/* Dark overlay */}
-                                    <div className="absolute inset-0 bg-black/50 rounded-lg pointer-events-none" />
+                                    {/* Crop overlay is handled by boxShadow on crop area */}
                                     {/* Crop area (clear) */}
                                     <div
                                         className="absolute border-2 border-white cursor-move"

@@ -58,7 +58,7 @@ function Sidebar({
   isMobile: boolean;
 }) {
   const pathname = usePathname();
-  const { user, managedGuilds } = useSession();
+  const { user, managedGuilds, customAvatar } = useSession();
   const { t } = useSettings();
 
   const handleNavClick = () => {
@@ -150,7 +150,7 @@ function Sidebar({
                 isDark ? "bg-white/[0.05]" : "bg-black/[0.03]"
               )}>
                 <Image
-                  src={getAvatarUrl(user)}
+                  src={customAvatar || getAvatarUrl(user)}
                   alt={user.username}
                   width={40}
                   height={40}
@@ -232,7 +232,7 @@ function Sidebar({
 
 function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void; sidebarOpen: boolean; isDark: boolean }) {
   const [showProfile, setShowProfile] = useState(false);
-  const { user, displayName, logout } = useSession();
+  const { user, displayName, logout, customAvatar } = useSession();
   const { t } = useSettings();
 
   return (
@@ -289,7 +289,7 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
           >
             {user ? (
               <Image
-                src={getAvatarUrl(user)}
+                src={customAvatar || getAvatarUrl(user)}
                 alt={user.username}
                 width={32}
                 height={32}
