@@ -614,13 +614,20 @@ function LoginPageContent() {
 
   // Handle passkey verification for returning users
   const handlePasskeyVerify = useCallback(async () => {
-    if (!user || !authUser) return;
+    // Need at least one user source (session user or authUser from OAuth)
+    if (!user && !authUser) {
+      console.error('[Passkey] No user available for verification');
+      setVerifyStatus("error");
+      setVerifyError("User not found. Please try again.");
+      return;
+    }
 
     setVerifyStatus("verifying");
     setVerifyError("");
 
     try {
-      const userId = authUser.id;
+      // Prefer authUser.id, fallback to session user id
+      const userId = authUser?.id || user?.id;
 
       // Step 1: Get authentication options
       const optionsResponse = await fetch("/api/mfa/passkey/authenticate", {
@@ -679,7 +686,14 @@ function LoginPageContent() {
 
   // Send verification code via Discord DM
   const sendVerificationCode = useCallback(async () => {
-    if (!user) return;
+    // Need at least one user source
+    const effectiveUser = user || authUser;
+    if (!effectiveUser) {
+      console.error('[MFA] No user available for sending verification code');
+      setVerifyStatus("error");
+      setVerifyError("User not found. Please try again.");
+      return;
+    }
 
     setVerifyStatus("sending");
     setVerifyError("");
@@ -687,8 +701,9 @@ function LoginPageContent() {
     try {
       // If in MFA mode, use MFA-specific API with button approval
       if (loginMode === 'mfa-select' || loginMode === 'mfa-verify' || loginMode === 'mfa-discord-first') {
-        const userId = authUser?.id || user.id;
-        const result = await sendDiscordDMCode(userId, user.id);
+        const userId = authUser?.id || user?.id;
+        const discordId = user?.id || authUser?.discord_id;
+        const result = await sendDiscordDMCode(userId || '', discordId || '');
 
         if (result.success && result.request_id) {
           setDiscordApprovalRequestId(result.request_id);
@@ -773,7 +788,7 @@ function LoginPageContent() {
       const response = await fetch("/api/verify/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
+        body: JSON.stringify({ userId: user?.id || authUser?.discord_id }),
       });
 
       const data = await response.json();
@@ -802,7 +817,13 @@ function LoginPageContent() {
 
   // Verify the entered code
   const handleVerifyCode = useCallback(async () => {
-    if (!user) return;
+    // Need at least one user source
+    if (!user && !authUser) {
+      console.error('[MFA] No user available for code verification');
+      setVerifyStatus("error");
+      setVerifyError("User not found. Please try again.");
+      return;
+    }
 
     const fullCode = verifyCode.join("");
     if (fullCode.length !== 6) return;
@@ -813,8 +834,8 @@ function LoginPageContent() {
     try {
       // If in MFA verify mode with Discord selected, use MFA API
       if ((loginMode === 'mfa-verify' || loginMode === 'mfa-discord-first') && selectedMfaMethod === 'discord') {
-        const userId = authUser?.id || user.id;
-        const result = await verifyDiscordDMCode(userId, fullCode);
+        const userId = authUser?.id || user?.id;
+        const result = await verifyDiscordDMCode(userId || '', fullCode);
 
         if (result.success) {
           setVerifyStatus("success");
@@ -868,7 +889,7 @@ function LoginPageContent() {
 
       // TOTP verification for returning users (verify against stored secret in DB)
       if (loginMode === 'mfa-verify' && selectedMfaMethod === 'totp') {
-        const userId = authUser?.id || user.id;
+        const userId = authUser?.id || user?.id;
         console.log('[MFA] Verifying TOTP for user:', userId);
 
         const result = await verifyTOTP(Number(userId), fullCode);
@@ -900,7 +921,7 @@ function LoginPageContent() {
       const response = await fetch("/api/verify/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, code: fullCode }),
+        body: JSON.stringify({ userId: user?.id || authUser?.discord_id, code: fullCode }),
       });
 
       const data = await response.json();
