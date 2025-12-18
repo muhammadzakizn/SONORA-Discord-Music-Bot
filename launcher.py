@@ -81,6 +81,7 @@ def cleanup_processes():
     subprocess.run(['pkill', '-f', 'next'], capture_output=True)
     subprocess.run(['pkill', '-f', 'npm'], capture_output=True)
     subprocess.run(['pkill', '-f', 'python3 main.py'], capture_output=True)
+    subprocess.run(['pkill', '-f', 'cloudflared'], capture_output=True)
     
     # Remove Next.js lock files
     for lock_file in [WEB_DIR / '.next/dev/lock', WEB_DIR / '.next/build/lock']:
@@ -144,10 +145,42 @@ def run_production():
     # No need to start local web dashboard
     proc_web = None
     
+    # Start Cloudflare Tunnel for HTTPS API access
+    proc_tunnel = None
+    cloudflared_path = Path('SONORA/cloudflared')
+    tunnel_token = os.getenv('CLOUDFLARE_TUNNEL_TOKEN', '')
+    
+    if cloudflared_path.exists() and tunnel_token:
+        print(f"{Colors.CYAN}Starting Cloudflare Tunnel...{Colors.END}")
+        try:
+            proc_tunnel = subprocess.Popen(
+                [str(cloudflared_path), 'tunnel', 'run', '--token', tunnel_token],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            time.sleep(3)
+            if proc_tunnel.poll() is None:
+                print(f"{Colors.GREEN}✓ Cloudflare Tunnel started (HTTPS API enabled){Colors.END}")
+            else:
+                print(f"{Colors.YELLOW}⚠️  Cloudflare Tunnel failed to start{Colors.END}")
+                proc_tunnel = None
+        except Exception as e:
+            print(f"{Colors.YELLOW}⚠️  Cloudflare Tunnel error: {e}{Colors.END}")
+            proc_tunnel = None
+    elif not cloudflared_path.exists():
+        print(f"{Colors.YELLOW}⚠️  cloudflared not found at {cloudflared_path}{Colors.END}")
+        print(f"{Colors.YELLOW}   API only accessible via HTTP (waguri.caliphdev.com:{BOT_API_PORT}){Colors.END}")
+    elif not tunnel_token:
+        print(f"{Colors.YELLOW}⚠️  CLOUDFLARE_TUNNEL_TOKEN not set in environment{Colors.END}")
+        print(f"{Colors.YELLOW}   API only accessible via HTTP (waguri.caliphdev.com:{BOT_API_PORT}){Colors.END}")
+    
     print(f"\n{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}")
     print(f"{Colors.GREEN}  ✅ SONORA Production Running!{Colors.END}")
     print(f"{Colors.CYAN}  🌐 Web Dashboard: https://sonora.muhammadzakizn.com{Colors.END}")
-    print(f"{Colors.CYAN}  🔌 Bot API:       http://waguri.caliphdev.com:{BOT_API_PORT}{Colors.END}")
+    if proc_tunnel:
+        print(f"{Colors.CYAN}  🔌 Bot API (HTTPS): https://api-sonora.muhammadzakizn.com{Colors.END}")
+    else:
+        print(f"{Colors.CYAN}  🔌 Bot API (HTTP):  http://waguri.caliphdev.com:{BOT_API_PORT}{Colors.END}")
     print(f"{Colors.YELLOW}  Press Ctrl+C to stop all services{Colors.END}")
     print(f"{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}\n")
     
@@ -210,14 +243,20 @@ def run_production():
         proc_bot.terminate()
         if proc_web is not None:
             proc_web.terminate()
+        if proc_tunnel is not None:
+            proc_tunnel.terminate()
         try:
             proc_bot.wait(timeout=5)
             if proc_web is not None:
                 proc_web.wait(timeout=5)
+            if proc_tunnel is not None:
+                proc_tunnel.wait(timeout=3)
         except:
             proc_bot.kill()
             if proc_web is not None:
                 proc_web.kill()
+            if proc_tunnel is not None:
+                proc_tunnel.kill()
         # Clean up signal files
         for sig_file in [restart_signal_file, Path('.dashboard_restart')]:
             try:
