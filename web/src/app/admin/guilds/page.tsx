@@ -284,12 +284,13 @@ export default function GuildsPage() {
     return matchesSearch && isManaged;
   });
 
-  // Stats
+  // Stats - only count user's managed servers (owner/admin access)
+  const managedGuildsData = guilds.filter(g => managedGuildIds.has(String(g.id)));
   const stats = {
-    total: guilds.length,
-    playing: guilds.filter(g => g.is_playing).length,
-    members: guilds.reduce((sum, g) => sum + (g.member_count || 0), 0),
-    managed: guilds.filter(g => managedGuildIds.has(String(g.id))).length,
+    total: managedGuildsData.length,  // Only user's managed servers
+    playing: managedGuildsData.filter(g => g.is_playing).length,
+    members: managedGuildsData.reduce((sum, g) => sum + (g.member_count || 0), 0), // Members in managed servers
+    managed: managedGuildsData.length,
   };
 
   if (loading) {

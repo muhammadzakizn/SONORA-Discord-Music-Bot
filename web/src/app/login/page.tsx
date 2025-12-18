@@ -674,7 +674,7 @@ function LoginPageContent() {
         setIsZooming(true);
       }, 1000);
       setTimeout(() => {
-        router.push("/admin");
+        window.location.href = "/admin";
       }, 2500);
 
     } catch (error: any) {
@@ -875,7 +875,7 @@ function LoginPageContent() {
             }, 1000);
             // Redirect after zoom animation fills screen completely
             setTimeout(() => {
-              router.push("/admin");
+              window.location.href = "/admin";
             }, 2500);
           }
         } else {
@@ -906,7 +906,7 @@ function LoginPageContent() {
             setIsZooming(true);
           }, 1000);
           setTimeout(() => {
-            router.push("/admin");
+            window.location.href = "/admin";
           }, 2500);
         } else {
           setVerifyStatus("error");
@@ -934,7 +934,7 @@ function LoginPageContent() {
         }, 1000);
         // Redirect after zoom animation fills screen completely
         setTimeout(() => {
-          router.push("/admin");
+          window.location.href = "/admin";
         }, 2500);
       } else {
         setVerifyStatus("error");
@@ -2289,7 +2289,7 @@ function LoginPageContent() {
                                 setIsZooming(true);
                               }, 1000);
                               setTimeout(() => {
-                                router.push("/admin");
+                                window.location.href = "/admin";
                               }, 2500);
 
                             } catch (error: any) {
