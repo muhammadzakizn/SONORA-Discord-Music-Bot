@@ -1054,3 +1054,95 @@ html:not(.dark) .logo-adaptive {
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
 }
+
+/* ========================================
+   APPLE MUSIC STYLE ANIMATED ORBS
+   ======================================== */
+
+/* Orb 1 - Blue, top-left, slow diagonal movement */
+@keyframes orb-float-1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(100px, 50px) scale(1.1);
+  }
+  50% {
+    transform: translate(50px, 100px) scale(0.95);
+  }
+  75% {
+    transform: translate(-30px, 60px) scale(1.05);
+  }
+}
+
+.animate-orb-1 {
+  animation: orb-float-1 20s ease-in-out infinite;
+}
+
+/* Orb 2 - Red, right side, circular movement */
+@keyframes orb-float-2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(-80px, -40px) scale(1.15);
+  }
+  50% {
+    transform: translate(-120px, 30px) scale(0.9);
+  }
+  75% {
+    transform: translate(-40px, 80px) scale(1.1);
+  }
+}
+
+.animate-orb-2 {
+  animation: orb-float-2 25s ease-in-out infinite;
+  animation-delay: -5s;
+}
+
+/* Orb 3 - Purple, bottom-left, vertical movement */
+@keyframes orb-float-3 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(60px, -80px) scale(1.2);
+  }
+  66% {
+    transform: translate(-40px, -120px) scale(0.85);
+  }
+}
+
+.animate-orb-3 {
+  animation: orb-float-3 18s ease-in-out infinite;
+  animation-delay: -8s;
+}
+
+/* Orb 4 - Orange, bottom-right, infinity pattern */
+@keyframes orb-float-4 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  20% {
+    transform: translate(-60px, -50px) scale(1.1);
+  }
+  40% {
+    transform: translate(-100px, 20px) scale(0.95);
+  }
+  60% {
+    transform: translate(-60px, 70px) scale(1.15);
+  }
+  80% {
+    transform: translate(20px, 30px) scale(0.9);
+  }
+}
+
+.animate-orb-4 {
+  animation: orb-float-4 22s ease-in-out infinite;
+  animation-delay: -3s;
+}
+
+/* Noise texture for subtle grain effect */
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
