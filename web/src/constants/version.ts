@@ -2,8 +2,8 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.9.4";
-export const BOT_VERSION = "3.11.4";
+export const WEB_VERSION = "3.9.5";
+export const BOT_VERSION = "3.11.5";
 
 export interface ChangelogEntry {
   version: string;

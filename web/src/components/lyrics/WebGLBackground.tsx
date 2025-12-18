@@ -251,8 +251,8 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
             if (time - lastFrame < frameInterval) return;
             lastFrame = time;
 
-            // Slow down time factor to match reference (time / 3500)
-            material.uniforms.uTime.value = time / 3500;
+            // Slow down time factor to match reference (time / 3500), sped up by 25%
+            material.uniforms.uTime.value = time / 2625;
             renderer.render(scene, camera);
         };
         animationRef.current = requestAnimationFrame(animate);

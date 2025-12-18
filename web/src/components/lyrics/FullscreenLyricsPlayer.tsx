@@ -543,34 +543,23 @@ export default function FullscreenLyricsPlayer({
                                             const isPastLine = index < currentLineIndex;
                                             const isFutureLine = index > currentLineIndex;
 
-                                            // Apple Music-style: past lines collapse unless scrolling
-                                            const shouldCollapse = isPastLine && !isUserScrolling;
-
                                             return (
                                                 <div
                                                     key={index}
                                                     ref={isCurrentLine ? currentLineRef : null}
                                                     className={cn(
-                                                        "transition-all duration-500 ease-out overflow-hidden",
+                                                        "transition-all duration-500 ease-out",
                                                         // When scrolling: show all lines normally
                                                         isUserScrolling && "opacity-100",
-                                                        // Past lines: collapse when not scrolling
-                                                        shouldCollapse && "max-h-0 opacity-0 my-0",
-                                                        // Future lines: blur effect when not scrolling
-                                                        isFutureLine && !isUserScrolling && "opacity-60"
+                                                        // Past lines: dimmed but visible (Apple Music style)
+                                                        isPastLine && !isUserScrolling && "opacity-40",
+                                                        // Future lines: slightly grayed
+                                                        isFutureLine && !isUserScrolling && "opacity-50"
                                                     )}
-                                                    style={{
-                                                        // Apply blur to future lines (not supported in all browsers via className)
-                                                        filter: isFutureLine && !isUserScrolling ? 'blur(2px)' : 'none',
-                                                        // Smooth collapse for past lines
-                                                        maxHeight: shouldCollapse ? 0 : '200px',
-                                                        marginTop: shouldCollapse ? 0 : undefined,
-                                                        marginBottom: shouldCollapse ? 0 : undefined,
-                                                    }}
                                                 >
                                                     {/* Per-word animation for current line */}
                                                     {isCurrentLine && line.words.length > 0 ? (
-                                                        <p className="text-4xl xs:text-5xl font-bold text-left leading-tight">
+                                                        <p className="text-4xl xs:text-5xl font-bold text-left leading-tight text-white">
                                                             {line.words.map((word, wordIndex) => {
                                                                 const progress = getWordProgress(word);
                                                                 return (
@@ -595,9 +584,7 @@ export default function FullscreenLyricsPlayer({
                                                                 "text-left leading-tight font-semibold transition-all duration-300",
                                                                 isCurrentLine
                                                                     ? "text-4xl xs:text-5xl text-white"
-                                                                    : isPastLine
-                                                                        ? "text-3xl lg:text-4xl text-white/40"
-                                                                        : "text-3xl lg:text-4xl text-white/60"
+                                                                    : "text-3xl lg:text-4xl text-white"
                                                             )}
                                                         >
                                                             {line.text || "• • •"}
