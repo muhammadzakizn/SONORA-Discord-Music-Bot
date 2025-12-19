@@ -68,6 +68,14 @@ if AUTH_DB_AVAILABLE:
     except ImportError as e:
         logger.warning(f"Auth API not available: {e}")
 
+# ==================== v3.11.0 YTDLP AUDIO API ====================
+try:
+    from web.api.ytdlp_api import ytdlp_bp
+    app.register_blueprint(ytdlp_bp)
+    logger.info("✓ YTDLP Audio API blueprint registered")
+except ImportError as e:
+    logger.warning(f"YTDLP API not available: {e}")
+
 # Global bot reference (will be set by main.py)
 _bot_instance = None
 
