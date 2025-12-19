@@ -26,6 +26,8 @@ import {
     ChevronUp,
     ChevronDown,
     Mic2,
+    X,
+    MoreVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/contexts/SessionContext";
@@ -81,6 +83,11 @@ export default function GuildDetailPage() {
     const [actionMessage, setActionMessage] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lyricsOpen, setLyricsOpen] = useState(false);
+    const [selectedQueueTrack, setSelectedQueueTrack] = useState<{
+        position: number;
+        title: string;
+        artist: string;
+    } | null>(null);
 
     // For smooth progress bar animation
     const [displayProgress, setDisplayProgress] = useState(0);
@@ -601,9 +608,19 @@ export default function GuildDetailPage() {
                             {guild.queue.map((track, i) => (
                                 <div
                                     key={i}
+                                    onClick={() => {
+                                        if (isManaged) {
+                                            setSelectedQueueTrack({
+                                                position: track.position,
+                                                title: track.title,
+                                                artist: track.artist
+                                            });
+                                        }
+                                    }}
                                     className={cn(
                                         "flex items-center gap-2 p-3 rounded-xl transition-colors group",
-                                        isDark ? "bg-zinc-800/50 hover:bg-zinc-800" : "bg-gray-100 hover:bg-gray-200"
+                                        isDark ? "bg-zinc-800/50 hover:bg-zinc-800" : "bg-gray-100 hover:bg-gray-200",
+                                        isManaged && "cursor-pointer sm:cursor-default"
                                     )}
                                 >
                                     <span className={cn(
@@ -633,39 +650,46 @@ export default function GuildDetailPage() {
                                         {formatDuration(track.duration)}
                                     </span>
 
-                                    {/* Queue controls - visible on hover */}
+                                    {/* Queue controls - visible on hover (desktop only) */}
                                     {isManaged && (
-                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => handleQueueMove(track.position, 'up')}
-                                                disabled={track.position === 1}
-                                                className={cn(
-                                                    "p-1 rounded-lg transition-colors disabled:opacity-30",
-                                                    isDark ? "hover:bg-zinc-700" : "hover:bg-gray-300"
-                                                )}
-                                                title="Move up"
-                                            >
-                                                <ChevronUp className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleQueueMove(track.position, 'down')}
-                                                disabled={track.position === guild.queue_length}
-                                                className={cn(
-                                                    "p-1 rounded-lg transition-colors disabled:opacity-30",
-                                                    isDark ? "hover:bg-zinc-700" : "hover:bg-gray-300"
-                                                )}
-                                                title="Move down"
-                                            >
-                                                <ChevronDown className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleQueueRemove(track.position)}
-                                                className="p-1 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors"
-                                                title="Remove"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
+                                        <>
+                                            {/* Desktop: hover controls */}
+                                            <div className="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleQueueMove(track.position, 'up'); }}
+                                                    disabled={track.position === 1}
+                                                    className={cn(
+                                                        "p-1 rounded-lg transition-colors disabled:opacity-30",
+                                                        isDark ? "hover:bg-zinc-700" : "hover:bg-gray-300"
+                                                    )}
+                                                    title="Move up"
+                                                >
+                                                    <ChevronUp className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleQueueMove(track.position, 'down'); }}
+                                                    disabled={track.position === guild.queue_length}
+                                                    className={cn(
+                                                        "p-1 rounded-lg transition-colors disabled:opacity-30",
+                                                        isDark ? "hover:bg-zinc-700" : "hover:bg-gray-300"
+                                                    )}
+                                                    title="Move down"
+                                                >
+                                                    <ChevronDown className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleQueueRemove(track.position); }}
+                                                    className="p-1 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors"
+                                                    title="Remove"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            {/* Mobile: show indicator that it's tappable */}
+                                            <div className="sm:hidden">
+                                                <MoreVertical className={cn("w-4 h-4", isDark ? "text-zinc-600" : "text-gray-400")} />
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             ))}
@@ -725,6 +749,96 @@ export default function GuildDetailPage() {
                     <p className="text-2xl font-bold text-yellow-400">{guild.member_count?.toLocaleString()}</p>
                 </div>
             </div>
+
+            {/* Mobile Queue Action Modal */}
+            <AnimatePresence>
+                {selectedQueueTrack && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setSelectedQueueTrack(null)}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center sm:hidden"
+                    >
+                        <motion.div
+                            initial={{ y: 300 }}
+                            animate={{ y: 0 }}
+                            exit={{ y: 300 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                                "w-full max-w-md rounded-t-2xl p-4 pb-8",
+                                isDark ? "bg-zinc-900" : "bg-white"
+                            )}
+                        >
+                            {/* Track Info */}
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center">
+                                    <Music className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className={cn("font-medium truncate", isDark ? "text-white" : "text-gray-900")}>
+                                        {selectedQueueTrack.title}
+                                    </p>
+                                    <p className={cn("text-sm truncate", isDark ? "text-zinc-500" : "text-gray-500")}>
+                                        {selectedQueueTrack.artist}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedQueueTrack(null)}
+                                    className={cn(
+                                        "p-2 rounded-full",
+                                        isDark ? "hover:bg-zinc-800" : "hover:bg-gray-100"
+                                    )}
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="space-y-2">
+                                <button
+                                    onClick={() => {
+                                        handleQueueMove(selectedQueueTrack.position, 'up');
+                                        setSelectedQueueTrack(null);
+                                    }}
+                                    disabled={selectedQueueTrack.position === 1}
+                                    className={cn(
+                                        "w-full flex items-center gap-3 p-4 rounded-xl transition-colors disabled:opacity-40",
+                                        isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-100 hover:bg-gray-200"
+                                    )}
+                                >
+                                    <ChevronUp className="w-5 h-5" />
+                                    <span className={isDark ? "text-white" : "text-gray-900"}>Move Up</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleQueueMove(selectedQueueTrack.position, 'down');
+                                        setSelectedQueueTrack(null);
+                                    }}
+                                    disabled={selectedQueueTrack.position === guild?.queue_length}
+                                    className={cn(
+                                        "w-full flex items-center gap-3 p-4 rounded-xl transition-colors disabled:opacity-40",
+                                        isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-100 hover:bg-gray-200"
+                                    )}
+                                >
+                                    <ChevronDown className="w-5 h-5" />
+                                    <span className={isDark ? "text-white" : "text-gray-900"}>Move Down</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleQueueRemove(selectedQueueTrack.position);
+                                        setSelectedQueueTrack(null);
+                                    }}
+                                    className="w-full flex items-center gap-3 p-4 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 transition-colors"
+                                >
+                                    <Trash2 className="w-5 h-5 text-rose-400" />
+                                    <span className="text-rose-400">Remove from Queue</span>
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Fullscreen Lyrics Player */}
             <FullscreenLyricsPlayer
