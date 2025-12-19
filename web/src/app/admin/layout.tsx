@@ -475,7 +475,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
             sidebarOpen={sidebarOpen}
             isDark={isDark}
           />
-          <main className="flex-1 p-4 md:p-6 overflow-x-hidden overflow-y-auto custom-scrollbar">
+          <main className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar">
             <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>

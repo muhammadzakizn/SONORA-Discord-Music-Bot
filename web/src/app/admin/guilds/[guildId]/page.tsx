@@ -419,7 +419,7 @@ export default function GuildDetailPage() {
                 )}
             </AnimatePresence>
 
-            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 -mx-4 sm:mx-0 px-4 sm:px-0">
+            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 w-full">
                 {/* Now Playing */}
                 <div className={cn(
                     "lg:col-span-2 p-4 sm:p-6 rounded-xl sm:rounded-2xl border",
