@@ -102,20 +102,26 @@ export default function FullscreenLyricsPlayer({
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Find current line index based on time
+    // Lyrics timing offset - negative value delays highlighting to match audio
+    // This compensates for server time being ahead of actual audio playback
+    const LYRICS_OFFSET = -0.3; // seconds
+
+    // Find current line index based on time (with offset applied)
     const currentLineIndex = useMemo(() => {
         if (!lyrics?.lines.length) return -1;
 
+        const adjustedTime = currentTime + LYRICS_OFFSET;
+
         for (let i = 0; i < lyrics.lines.length; i++) {
             const line = lyrics.lines[i];
-            if (currentTime >= line.start_time && currentTime <= line.end_time) {
+            if (adjustedTime >= line.start_time && adjustedTime <= line.end_time) {
                 return i;
             }
         }
 
         // Find next upcoming line
         for (let i = 0; i < lyrics.lines.length; i++) {
-            if (lyrics.lines[i].start_time > currentTime) {
+            if (lyrics.lines[i].start_time > adjustedTime) {
                 return i - 1;
             }
         }
@@ -635,12 +641,15 @@ export default function FullscreenLyricsPlayer({
                                                     {isCurrentLine && line.words && line.words.length > 0 ? (
                                                         <p className="text-4xl xs:text-5xl font-bold text-left leading-tight">
                                                             {line.words.map((word: { text: string; start_time: number; end_time: number }, wordIndex: number) => {
+                                                                // Apply offset for accurate sync
+                                                                const adjustedTime = currentTime + LYRICS_OFFSET;
+
                                                                 // Calculate word progress (0 to 1)
                                                                 let progress = 0;
-                                                                if (currentTime >= word.end_time) {
+                                                                if (adjustedTime >= word.end_time) {
                                                                     progress = 1;
-                                                                } else if (currentTime >= word.start_time) {
-                                                                    progress = (currentTime - word.start_time) / (word.end_time - word.start_time);
+                                                                } else if (adjustedTime >= word.start_time) {
+                                                                    progress = (adjustedTime - word.start_time) / (word.end_time - word.start_time);
                                                                 }
 
                                                                 // Beautiful-lyrics style glow curve:
