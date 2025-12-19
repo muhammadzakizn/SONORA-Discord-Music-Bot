@@ -493,7 +493,7 @@ export default function FullscreenLyricsPlayer({
                             {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
                                 <div
                                     ref={lyricsContainerRef}
-                                    className="h-full overflow-y-auto custom-scrollbar px-4"
+                                    className="h-full overflow-y-auto scrollbar-hide px-4 py-[30vh]"
                                     onScroll={() => {
                                         if (lyricsContainerRef.current) {
                                             setIsUserScrolling(true);
@@ -506,23 +506,40 @@ export default function FullscreenLyricsPlayer({
                                         }
                                     }}
                                 >
-                                    <div className="py-8">
+                                    <div className="space-y-4">
                                         {lyrics.lines.map((line, index) => {
-                                            const isActive = index === currentLineIndex;
-                                            const isPast = index < currentLineIndex;
+                                            const isCurrentLine = index === currentLineIndex;
+                                            const isPastLine = index < currentLineIndex;
+                                            const isFutureLine = index > currentLineIndex;
                                             const hasWords = line.words && line.words.length > 0;
                                             const displayText = showRomanization && line.romanized ? line.romanized : line.text;
+
+                                            // Only collapse past lines when not scrolling
+                                            const shouldCollapse = isPastLine && !isUserScrolling;
 
                                             return (
                                                 <div
                                                     key={index}
+                                                    ref={isCurrentLine ? currentLineRef : null}
                                                     data-lyric-index={index}
                                                     className={cn(
-                                                        "py-2 transition-all duration-300",
-                                                        isActive ? "scale-100" : "scale-95 origin-left"
+                                                        "transition-all duration-500 ease-out overflow-hidden",
+                                                        // When scrolling: show all lines normally
+                                                        isUserScrolling && "opacity-100",
+                                                        // Past lines: fade, blur, and collapse
+                                                        shouldCollapse && "max-h-0 opacity-0 blur-sm my-0",
+                                                        // Future lines: grayed out
+                                                        isFutureLine && !isUserScrolling && "opacity-50"
                                                     )}
+                                                    style={{
+                                                        maxHeight: shouldCollapse ? 0 : '200px',
+                                                        marginTop: shouldCollapse ? 0 : undefined,
+                                                        marginBottom: shouldCollapse ? 0 : undefined,
+                                                        filter: shouldCollapse ? 'blur(4px)' : 'none',
+                                                    }}
                                                 >
-                                                    {hasWords && isActive ? (
+                                                    {/* Current line with per-word highlighting */}
+                                                    {hasWords && isCurrentLine ? (
                                                         <p className="text-xl font-semibold leading-relaxed">
                                                             {line.words.map((word, wordIdx) => {
                                                                 const progress = getWordProgress(word);
@@ -547,7 +564,7 @@ export default function FullscreenLyricsPlayer({
                                                         <p
                                                             className={cn(
                                                                 "text-xl font-semibold leading-relaxed transition-colors duration-300",
-                                                                isActive ? "text-white" : isPast ? "text-white/30" : "text-white/40"
+                                                                isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
                                                             )}
                                                         >
                                                             {displayText || "♪"}
@@ -604,6 +621,13 @@ export default function FullscreenLyricsPlayer({
                                     className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
                                 >
                                     <SkipForward className="w-8 h-8 text-white" fill="white" />
+                                </button>
+                                <button
+                                    onClick={() => handleControl("stop")}
+                                    disabled={isControlling}
+                                    className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
+                                >
+                                    <Square className="w-7 h-7 text-white" fill="white" />
                                 </button>
                             </div>
                         </div>

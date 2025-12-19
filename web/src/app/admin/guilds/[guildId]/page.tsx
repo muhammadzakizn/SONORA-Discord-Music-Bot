@@ -766,7 +766,7 @@ export default function GuildDetailPage() {
                             exit={{ y: 300 }}
                             onClick={(e) => e.stopPropagation()}
                             className={cn(
-                                "w-full max-w-md rounded-t-2xl p-4 pb-8",
+                                "w-full max-w-md rounded-t-2xl p-4 pb-24",
                                 isDark ? "bg-zinc-900" : "bg-white"
                             )}
                         >
