@@ -10,6 +10,12 @@ import subprocess
 from pathlib import Path
 import time
 
+# Add Deno to PATH for yt-dlp EJS challenge solver
+# yt-dlp requires Deno/Node for YouTube signature solving since v2025.11.12
+deno_bin = Path.home() / '.deno' / 'bin'
+if deno_bin.exists():
+    os.environ['PATH'] = f"{deno_bin}:{os.environ.get('PATH', '')}"
+
 # Configuration
 WEB_PORT = 9072  # Port for web dashboard (legacy, now on Vercel)
 BOT_API_PORT = 9072  # Port for bot API (use public port since Vercel needs access)
