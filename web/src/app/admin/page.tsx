@@ -283,7 +283,7 @@ function SystemHealth({ health, t, isDark }: { health: HealthStatus | null; t: (
 
   return (
     <div className={cn(
-      "p-6 rounded-2xl border",
+      "p-6 rounded-2xl border overflow-hidden",
       isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
     )}>
       <h3 className={cn(
@@ -333,7 +333,7 @@ function TopTracks({ activity, isDark }: { activity: ActivityStats | null; isDar
 
   return (
     <div className={cn(
-      "p-6 rounded-2xl border",
+      "p-6 rounded-2xl border overflow-hidden",
       isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
     )}>
       <h3 className={cn(
