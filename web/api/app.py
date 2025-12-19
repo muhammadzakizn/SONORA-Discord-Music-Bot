@@ -630,19 +630,40 @@ def api_guild_stats(guild_id: int):
 
 @app.route('/api/control/<int:guild_id>/<action>', methods=['POST'])
 def api_control(guild_id: int, action: str):
-    """Control playback with Discord notification"""
+    """Control playback with Discord notification - requires user to be in voice channel"""
     bot = get_bot()
     if not bot:
         return jsonify({"error": "Bot not connected"}), 503
     
-    # Get username from request body for notification
+    # Get username and user_id from request body for notification and voice check
     data = request.get_json(silent=True) or {}
     username = data.get('username', 'Admin')
+    user_id = data.get('user_id')  # Discord user ID for voice check and mention
     
     try:
         connection = bot.voice_manager.get_connection(guild_id)
         if not connection or not connection.is_connected():
             return jsonify({"error": "Not connected to voice"}), 400
+        
+        # Voice Channel Check: Verify user is in the same voice channel as bot
+        if user_id and connection.channel:
+            guild = bot.get_guild(guild_id)
+            if guild:
+                voice_channel = connection.channel
+                user_in_voice = False
+                
+                # Check if user is in the bot's voice channel
+                for member in voice_channel.members:
+                    if str(member.id) == str(user_id):
+                        user_in_voice = True
+                        break
+                
+                if not user_in_voice:
+                    return jsonify({
+                        "error": f"You must be in voice channel '{voice_channel.name}' to control playback",
+                        "voice_channel": voice_channel.name,
+                        "voice_required": True
+                    }), 403
         
         # Track action for Discord notification
         action_emoji = ""
@@ -725,8 +746,14 @@ def api_control(guild_id: int, action: str):
                 channel = player.message.channel
                 logger.info(f"[NOTIFY] Sending to #{channel.name} (same as player)")
                 
+                # Build notification text with user attribution
+                if user_id:
+                    notification_text = f"{action_emoji} **{action_text}**\nvia Admin Dashboard\nby <@{user_id}>"
+                else:
+                    notification_text = f"{action_emoji} **{action_text}** via Dashboard"
+                
                 embed = discord.Embed(
-                    description=f"{action_emoji} **{action_text}** via Dashboard",
+                    description=notification_text,
                     color=0x7B1E3C
                 )
                 
@@ -757,15 +784,27 @@ def api_control(guild_id: int, action: str):
 
 @app.route('/api/queue/<int:guild_id>/remove/<int:position>', methods=['POST'])
 def api_queue_remove(guild_id: int, position: int):
-    """Remove track from queue by position (1-indexed)"""
+    """Remove track from queue by position (1-indexed) - requires voice channel"""
     bot = get_bot()
     if not bot:
         return jsonify({"error": "Bot not connected"}), 503
     
     data = request.get_json(silent=True) or {}
     username = data.get('username', 'Admin')
+    user_id = data.get('user_id')
     
     try:
+        # Voice Channel Check
+        connection = bot.voice_manager.get_connection(guild_id)
+        if user_id and connection and connection.channel:
+            voice_channel = connection.channel
+            user_in_voice = any(str(m.id) == str(user_id) for m in voice_channel.members)
+            if not user_in_voice:
+                return jsonify({
+                    "error": f"You must be in voice channel '{voice_channel.name}' to modify queue",
+                    "voice_required": True
+                }), 403
+        
         queue_cog = bot.get_cog('QueueCommands')
         if not queue_cog or guild_id not in queue_cog.queues:
             return jsonify({"error": "Queue is empty"}), 400
@@ -792,10 +831,13 @@ def api_queue_remove(guild_id: int, position: int):
                     return
                 
                 channel = player.message.channel
-                embed = discord.Embed(
-                    description=f"🗑️ Removed **{removed.title}** from queue via Dashboard",
-                    color=0x7B1E3C
-                )
+                
+                if user_id:
+                    desc = f"🗑️ Removed **{removed.title}** from queue\nvia Admin Dashboard\nby <@{user_id}>"
+                else:
+                    desc = f"🗑️ Removed **{removed.title}** from queue via Dashboard"
+                
+                embed = discord.Embed(description=desc, color=0x7B1E3C)
                 await channel.send(embed=embed, delete_after=15)
                 logger.info(f"✓ Queue remove notification sent")
             except Exception as e:

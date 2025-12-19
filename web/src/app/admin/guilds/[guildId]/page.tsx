@@ -159,7 +159,7 @@ export default function GuildDetailPage() {
     };
 
     const handleControl = async (action: string) => {
-        if (!isManaged) return;
+        // Allow all users to control if they're in voice (backend verifies)
         setIsControlling(true);
         setActionMessage(null);
 
@@ -167,13 +167,21 @@ export default function GuildDetailPage() {
             const response = await fetch(`${API_BASE}/control/${guildId}/${action}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username })
+                body: JSON.stringify({
+                    username,
+                    user_id: user?.id  // Send Discord user ID for voice check and notification mention
+                })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                setActionMessage(`⚠️ ${data.error || 'Action failed'}`);
+                // Special handling for voice channel requirement
+                if (data.voice_required) {
+                    setActionMessage(`🎤 ${data.error}`);
+                } else {
+                    setActionMessage(`⚠️ ${data.error || 'Action failed'}`);
+                }
             } else {
                 const actionLabels: Record<string, string> = {
                     pause: '⏸️ Paused',
@@ -195,21 +203,28 @@ export default function GuildDetailPage() {
     };
 
     const handleQueueRemove = async (position: number) => {
-        if (!isManaged) return;
-
+        // Allow all users in voice to modify queue (backend verifies)
         try {
             const response = await fetch(`${API_BASE}/queue/${guildId}/remove/${position}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username })
+                body: JSON.stringify({
+                    username,
+                    user_id: user?.id
+                })
             });
+
+            const data = await response.json();
 
             if (response.ok) {
                 setActionMessage('🗑️ Track removed');
                 await fetchGuild();
             } else {
-                const data = await response.json();
-                setActionMessage(`⚠️ ${data.error || 'Failed to remove'}`);
+                if (data.voice_required) {
+                    setActionMessage(`🎤 ${data.error}`);
+                } else {
+                    setActionMessage(`⚠️ ${data.error || 'Failed to remove'}`);
+                }
             }
         } catch (err) {
             setActionMessage('❌ Failed to remove track');
@@ -490,65 +505,62 @@ export default function GuildDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Controls */}
-                            {isManaged && (
-                                <div className="flex items-center justify-center gap-3 pt-4">
-                                    <button
-                                        onClick={() => handleControl(guild.current_track?.is_paused ? "resume" : "pause")}
-                                        disabled={isControlling}
-                                        className={cn(
-                                            "p-4 rounded-full transition-colors disabled:opacity-50",
-                                            isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
-                                        )}
-                                        title={guild.current_track?.is_paused ? "Resume" : "Pause"}
-                                    >
-                                        {guild.current_track?.is_paused ? (
-                                            <Play className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
-                                        ) : (
-                                            <Pause className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={() => handleControl("skip")}
-                                        disabled={isControlling}
-                                        className={cn(
-                                            "p-4 rounded-full transition-colors disabled:opacity-50",
-                                            isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
-                                        )}
-                                        title="Skip"
-                                    >
-                                        <SkipForward className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleControl("stop")}
-                                        disabled={isControlling}
-                                        className="p-4 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition-colors disabled:opacity-50"
-                                        title="Stop & Disconnect"
-                                    >
-                                        <Square className="w-6 h-6" />
-                                    </button>
-                                    {/* Lyrics Button */}
-                                    <button
-                                        onClick={() => setLyricsOpen(true)}
-                                        className={cn(
-                                            "p-4 rounded-full transition-colors",
-                                            isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
-                                        )}
-                                        title="Show Lyrics"
-                                    >
-                                        <Mic2 className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
-                                    </button>
-                                </div>
-                            )}
+                            {/* Controls - Available to all users (backend verifies voice channel) */}
+                            <div className="flex items-center justify-center gap-3 pt-4">
+                                <button
+                                    onClick={() => handleControl(guild.current_track?.is_paused ? "resume" : "pause")}
+                                    disabled={isControlling}
+                                    className={cn(
+                                        "p-4 rounded-full transition-colors disabled:opacity-50",
+                                        isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
+                                    )}
+                                    title={guild.current_track?.is_paused ? "Resume" : "Pause"}
+                                >
+                                    {guild.current_track?.is_paused ? (
+                                        <Play className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
+                                    ) : (
+                                        <Pause className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => handleControl("skip")}
+                                    disabled={isControlling}
+                                    className={cn(
+                                        "p-4 rounded-full transition-colors disabled:opacity-50",
+                                        isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
+                                    )}
+                                    title="Skip"
+                                >
+                                    <SkipForward className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
+                                </button>
+                                <button
+                                    onClick={() => handleControl("stop")}
+                                    disabled={isControlling}
+                                    className="p-4 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition-colors disabled:opacity-50"
+                                    title="Stop & Disconnect"
+                                >
+                                    <Square className="w-6 h-6" />
+                                </button>
+                                {/* Lyrics Button */}
+                                <button
+                                    onClick={() => setLyricsOpen(true)}
+                                    className={cn(
+                                        "p-4 rounded-full transition-colors",
+                                        isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
+                                    )}
+                                    title="Show Lyrics"
+                                >
+                                    <Mic2 className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
+                                </button>
+                            </div>
 
-                            {!isManaged && (
-                                <p className={cn(
-                                    "text-center text-sm pt-4",
-                                    isDark ? "text-zinc-500" : "text-gray-400"
-                                )}>
-                                    You need admin access to control playback
-                                </p>
-                            )}
+                            {/* Info message about voice channel requirement */}
+                            <p className={cn(
+                                "text-center text-sm pt-2",
+                                isDark ? "text-zinc-500" : "text-gray-400"
+                            )}>
+                                {isManaged ? "Manager access" : "Join voice channel to control"}
+                            </p>
                         </div>
                     ) : (
                         <div className="text-center py-12">

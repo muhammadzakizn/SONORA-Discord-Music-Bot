@@ -276,21 +276,26 @@ export default function GuildsPage() {
     return null;
   };
 
-  // Filter guilds - by default only show user's managed servers (admin/owner access)
-  const filteredGuilds = guilds.filter(guild => {
-    const matchesSearch = guild.name.toLowerCase().includes(search.toLowerCase());
-    // Only show servers where user has manage permissions
-    const isManaged = managedGuildIds.has(String(guild.id));
-    return matchesSearch && isManaged;
-  });
+  // Filter guilds by search
+  const searchFilteredGuilds = guilds.filter(guild =>
+    guild.name.toLowerCase().includes(search.toLowerCase())
+  );
 
-  // Stats - only count user's managed servers (owner/admin access)
-  const managedGuildsData = guilds.filter(g => managedGuildIds.has(String(g.id)));
+  // Separate into Manager (owner/admin) and Member (no permissions) guilds  
+  const managerGuilds = searchFilteredGuilds.filter(guild =>
+    managedGuildIds.has(String(guild.id))
+  );
+
+  const memberGuilds = searchFilteredGuilds.filter(guild =>
+    !managedGuildIds.has(String(guild.id))
+  );
+
+  // Stats - all servers user is in
   const stats = {
-    total: managedGuildsData.length,  // Only user's managed servers
-    playing: managedGuildsData.filter(g => g.is_playing).length,
-    members: managedGuildsData.reduce((sum, g) => sum + (g.member_count || 0), 0), // Members in managed servers
-    managed: managedGuildsData.length,
+    total: guilds.length,
+    playing: guilds.filter(g => g.is_playing).length,
+    members: guilds.reduce((sum, g) => sum + (g.member_count || 0), 0),
+    managed: managerGuilds.length,
   };
 
   if (loading) {
@@ -314,7 +319,7 @@ export default function GuildsPage() {
             {t('servers.title')}
           </h1>
           <p className={cn("mt-1", isDark ? "text-zinc-500" : "text-gray-500")}>
-            {`Manage your servers (${filteredGuilds.length})`}
+            {`Manage your servers (${searchFilteredGuilds.length})`}
           </p>
         </div>
 
@@ -408,46 +413,84 @@ export default function GuildsPage() {
         </div>
       </div>
 
-      {/* Guild Grid */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={viewMode}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="grid md:grid-cols-2 xl:grid-cols-3 gap-6"
-        >
-          {filteredGuilds.map((guild) => (
-            <GuildCard
-              key={guild.id}
-              guild={guild}
-              onControl={(action) => handleControl(guild.id, action)}
-              isManaged={managedGuildIds.has(String(guild.id))}
-              userRole={getUserRole(guild.id)}
-              isDark={isDark}
-            />
-          ))}
-        </motion.div>
-      </AnimatePresence>
+      {/* Manager Guilds Section */}
+      {managerGuilds.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Crown className="w-5 h-5 text-yellow-400" />
+            <h2 className={cn("text-lg font-semibold", isDark ? "text-white" : "text-gray-900")}>
+              Servers You Manage
+            </h2>
+            <span className={cn(
+              "ml-2 px-2 py-0.5 rounded-full text-xs font-medium",
+              "bg-yellow-500/20 text-yellow-400"
+            )}>
+              {managerGuilds.length}
+            </span>
+          </div>
 
-      {filteredGuilds.length === 0 && !error && (
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {managerGuilds.map((guild) => (
+              <GuildCard
+                key={guild.id}
+                guild={guild}
+                onControl={(action) => handleControl(guild.id, action)}
+                isManaged={true}
+                userRole={getUserRole(guild.id)}
+                isDark={isDark}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Member Guilds Section */}
+      {memberGuilds.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-cyan-400" />
+            <h2 className={cn("text-lg font-semibold", isDark ? "text-white" : "text-gray-900")}>
+              Other Servers
+            </h2>
+            <span className={cn(
+              "ml-2 px-2 py-0.5 rounded-full text-xs font-medium",
+              "bg-cyan-500/20 text-cyan-400"
+            )}>
+              {memberGuilds.length}
+            </span>
+            <span className={cn("text-xs ml-2", isDark ? "text-zinc-500" : "text-gray-400")}>
+              (Join voice to control)
+            </span>
+          </div>
+
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {memberGuilds.map((guild) => (
+              <GuildCard
+                key={guild.id}
+                guild={guild}
+                onControl={(action) => handleControl(guild.id, action)}
+                isManaged={false}
+                userRole={null}
+                isDark={isDark}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {managerGuilds.length === 0 && memberGuilds.length === 0 && !error && (
         <div className="text-center py-16">
           <Server className={cn(
             "w-16 h-16 mx-auto mb-4",
             isDark ? "text-zinc-700" : "text-gray-300"
           )} />
           <p className={cn("text-xl", isDark ? "text-zinc-500" : "text-gray-500")}>
-            {viewMode === "managed"
-              ? t('servers.noServers')
-              : t('servers.noServers')
-            }
+            {t('servers.noServers')}
           </p>
           <p className={cn("mt-2", isDark ? "text-zinc-600" : "text-gray-400")}>
             {search
               ? "Try a different search term"
-              : viewMode === "managed"
-                ? "You don't have owner/admin access to any servers with the bot"
-                : "Bot is not connected to any servers"
+              : "Bot is not connected to any of your servers"
             }
           </p>
         </div>
