@@ -83,8 +83,8 @@ class YouTubeDownloader(BaseDownloader):
         """
         Search for track on YouTube Music (forced)
         
-        Uses ytmusicsearch: prefix to force search on music.youtube.com
-        Extracts proper track/artist metadata from YouTube Music
+        Uses YTDLP API first, then falls back to direct yt-dlp CLI.
+        Extracts proper track/artist metadata from YouTube Music.
         
         Args:
             query: Search query or YouTube URL
@@ -94,6 +94,27 @@ class YouTubeDownloader(BaseDownloader):
         """
         logger.info(f"Searching YouTube Music: {query}")
         
+        # ========================================
+        # STEP 1: Try YTDLP API first
+        # ========================================
+        try:
+            from .ytdlp_client import get_ytdlp_api_client
+            api_client = get_ytdlp_api_client()
+            
+            if await api_client.is_available():
+                result = await api_client.search(query)
+                if result:
+                    logger.info(f"[API] Search success: {result.title}")
+                    return result
+                logger.info("[API] Search returned no results, trying direct CLI")
+            else:
+                logger.debug("[API] Not available, using direct CLI")
+        except Exception as e:
+            logger.warning(f"[API] Search failed, using CLI fallback: {e}")
+        
+        # ========================================  
+        # STEP 2: Fallback to direct yt-dlp CLI
+        # ========================================
         try:
             # Determine search query
             if query.startswith('http'):
@@ -217,17 +238,37 @@ class YouTubeDownloader(BaseDownloader):
         """
         Get direct stream URL without downloading.
         
-        This allows instant playback by streaming directly from YouTube Music.
-        Uses yt-dlp --get-url to extract the audio stream URL.
+        Uses YTDLP API first, then falls back to direct yt-dlp CLI.
         
         Args:
             track_info: Track information with URL
         
         Returns:
-            Direct audio stream URL or None if failed
+            Direct audio stream URL or None if failed (403, etc.)
         """
         logger.info(f"Getting stream URL for: {track_info}")
         
+        # ========================================
+        # STEP 1: Try YTDLP API first
+        # ========================================
+        try:
+            from .ytdlp_client import get_ytdlp_api_client
+            api_client = get_ytdlp_api_client()
+            
+            if await api_client.is_available():
+                stream_url = await api_client.get_stream_url(track_info)
+                if stream_url:
+                    logger.info(f"[API] Got stream URL: {track_info.title}")
+                    return stream_url
+                logger.info("[API] Stream URL failed (403?), trying CLI fallback")
+            else:
+                logger.debug("[API] Not available, using direct CLI")
+        except Exception as e:
+            logger.warning(f"[API] Stream URL failed: {e}")
+        
+        # ========================================  
+        # STEP 2: Fallback to direct yt-dlp CLI
+        # ========================================
         try:
             # Build URL for yt-dlp
             url = track_info.url
@@ -552,6 +593,8 @@ class YouTubeDownloader(BaseDownloader):
         """
         Download audio using yt-dlp directly (skip MusicDL).
         
+        Uses YTDLP API first, then falls back to direct yt-dlp CLI.
+        
         This method is used when:
         - MusicDL fails or is unavailable
         - Direct yt-dlp download is requested (e.g., after 403 stream failure)
@@ -563,9 +606,40 @@ class YouTubeDownloader(BaseDownloader):
             AudioResult with download result
         """
         # ========================================
-        # YouTube Music via yt-dlp 
+        # STEP 1: Try YTDLP API first
         # ========================================
-        logger.info(f"Downloading from YouTube Music (fallback): {track_info}")
+        try:
+            from .ytdlp_client import get_ytdlp_api_client
+            api_client = get_ytdlp_api_client()
+            
+            if await api_client.is_available():
+                logger.info(f"[API] Downloading: {track_info.title}")
+                downloaded_path = await api_client.download(track_info, self.download_dir)
+                
+                if downloaded_path and downloaded_path.exists():
+                    logger.info(f"[API] Downloaded: {downloaded_path.name}")
+                    actual_format = downloaded_path.suffix.lstrip('.')
+                    
+                    return AudioResult(
+                        file_path=downloaded_path,
+                        title=track_info.title,
+                        artist=track_info.artist,
+                        duration=track_info.duration,
+                        source=AudioSource.YOUTUBE_MUSIC,
+                        bitrate=Settings.AUDIO_BITRATE,
+                        format=actual_format,
+                        sample_rate=Settings.AUDIO_SAMPLE_RATE
+                    )
+                logger.info("[API] Download failed, trying CLI fallback")
+            else:
+                logger.debug("[API] Not available, using direct CLI")
+        except Exception as e:
+            logger.warning(f"[API] Download failed: {e}, using CLI fallback")
+        
+        # ========================================
+        # STEP 2: Fallback to direct yt-dlp CLI
+        # ========================================
+        logger.info(f"Downloading from YouTube Music (CLI fallback): {track_info}")
         
         # Convert URL to YouTube Music if needed
         url = track_info.url
