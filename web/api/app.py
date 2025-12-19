@@ -220,16 +220,19 @@ def api_guild_detail(guild_id: int):
         connection = bot.voice_manager.get_connection(guild_id)
         voice_channel = connection.channel if connection else None
         
-        # Get current player - only if actually playing/paused
+        # Get current player - check BOTH voice state AND player existence
         current_track = None
         is_actually_playing = False
+        is_paused = False
         
         # Check if voice connection is actually playing/paused
         if connection and connection.connection:
-            is_actually_playing = connection.connection.is_playing() or connection.connection.is_paused()
+            is_actually_playing = connection.connection.is_playing()
+            is_paused = connection.connection.is_paused()
         
-        # Only return track info if actually playing
-        if is_actually_playing and hasattr(bot, 'players') and guild_id in bot.players:
+        # Return track info if player has metadata (even if paused or buffering)
+        # This fixes the issue where Now Playing doesn't show during streaming
+        if hasattr(bot, 'players') and guild_id in bot.players:
             player = bot.players[guild_id]
             if player.metadata:
                 # Debug artwork URL
@@ -243,8 +246,8 @@ def api_guild_detail(guild_id: int):
                     "artwork_url": player.metadata.artwork_url,
                     "audio_source": player.metadata.audio_source,
                     "requested_by": player.metadata.requested_by,
-                    "is_playing": connection.connection.is_playing() if connection and connection.connection else False,
-                    "is_paused": connection.connection.is_paused() if connection and connection.connection else False
+                    "is_playing": is_actually_playing,
+                    "is_paused": is_paused
                 }
         
         # Get queue
@@ -366,18 +369,31 @@ def api_guild_lyrics(guild_id: int):
             lyrics_data = cache_entry['data']
             lyrics_source_used = cache_entry['source']
         else:
-            # Get cookies path for Apple Music (project root / cookies / apple_music_cookies.txt)
-            import os
-            # web/api/app.py -> web/api -> web -> project_root
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            cookies_path = os.path.join(project_root, 'cookies', 'apple_music_cookies.txt')
-            
-            # Try Apple Music first (default) or if explicitly requested
-            if source_pref in ['applemusic', 'auto']:
-                logger.info(f"[AppleMusic] Attempting fetch for: {metadata.title} - {metadata.artist}")
-                try:
-                    from services.lyrics.applemusic import AppleMusicFetcher
-                    from database.models import TrackInfo as TrackInfoModel
+            # CHECK 1: Use pre-fetched apple_lyrics from metadata (avoids RAM spike during playback)
+            if source_pref in ['applemusic', 'auto'] and hasattr(metadata, 'apple_lyrics') and metadata.apple_lyrics:
+                logger.info(f"[AppleMusic] Using PRE-FETCHED lyrics for: {metadata.title}")
+                lyrics_data = metadata.apple_lyrics
+                lyrics_source_used = "applemusic"
+                # Cache it
+                _lyrics_cache[cache_key] = {
+                    'data': lyrics_data,
+                    'source': lyrics_source_used,
+                    'timestamp': time.time()
+                }
+                logger.info(f"[Lyrics] Cached pre-fetched lyrics for: {metadata.title}")
+            else:
+                # Get cookies path for Apple Music (project root / cookies / apple_music_cookies.txt)
+                import os
+                # web/api/app.py -> web/api -> web -> project_root
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                cookies_path = os.path.join(project_root, 'cookies', 'apple_music_cookies.txt')
+                
+                # Try Apple Music first (default) or if explicitly requested
+                if source_pref in ['applemusic', 'auto']:
+                    logger.info(f"[AppleMusic] Attempting fetch for: {metadata.title} - {metadata.artist}")
+                    try:
+                        from services.lyrics.applemusic import AppleMusicFetcher
+                        from database.models import TrackInfo as TrackInfoModel
                     
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)

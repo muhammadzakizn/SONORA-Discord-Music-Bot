@@ -9,12 +9,12 @@ from config.logging_config import get_logger
 from .artwork import ArtworkFetcher
 from services.lyrics.genius import GeniusLyricsFetcher
 from services.lyrics.lrclib import LRCLIBFetcher
+from services.lyrics.applemusic import AppleMusicFetcher
 try:
     from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
     SYNCEDLYRICS_AVAILABLE = True
 except ImportError:
     SYNCEDLYRICS_AVAILABLE = False
-    logger.warning("syncedlyrics not available")
 
 logger = get_logger('metadata.processor')
 
@@ -26,7 +26,8 @@ class MetadataProcessor:
     Downloads in parallel:
     - Audio (from AudioDownloader)
     - Artwork (Apple Music → Spotify)
-    - Lyrics (Genius → Musixmatch)
+    - Lyrics (LRCLIB → Syncedlyrics → Genius)
+    - Apple Music Lyrics (for dashboard - pre-fetched to avoid RAM spikes)
     """
     
     def __init__(self):
@@ -34,14 +35,15 @@ class MetadataProcessor:
         self.artwork_fetcher = ArtworkFetcher()
         self.lrclib_fetcher = LRCLIBFetcher()  # Priority 1: Best quality with duration validation
         self.genius_fetcher = GeniusLyricsFetcher()
+        self.applemusic_fetcher = AppleMusicFetcher()  # For dashboard lyrics
         
         # Syncedlyrics as fallback
         if SYNCEDLYRICS_AVAILABLE:
             self.syncedlyrics_fetcher = SyncedLyricsFetcher()
-            logger.info("Metadata processor initialized (with LRCLIB + Syncedlyrics)")
+            logger.info("Metadata processor initialized (with LRCLIB + Syncedlyrics + AppleMusic)")
         else:
             self.syncedlyrics_fetcher = None
-            logger.info("Metadata processor initialized (with LRCLIB only)")
+            logger.info("Metadata processor initialized (with LRCLIB + AppleMusic)")
     
     async def process(
         self,
@@ -119,10 +121,22 @@ class MetadataProcessor:
         
         lyrics_task = fetch_lyrics_with_fallback()
         
-        # Wait for both
-        artwork_result, lyrics_result = await asyncio.gather(
+        # Fetch Apple Music lyrics in parallel (for dashboard - pre-fetched to avoid RAM spikes)
+        async def fetch_apple_lyrics():
+            try:
+                logger.info(f"Pre-fetching Apple Music lyrics: {track_info}")
+                return await self.applemusic_fetcher.fetch(track_info)
+            except Exception as e:
+                logger.warning(f"Apple Music lyrics pre-fetch failed: {e}")
+                return None
+        
+        apple_lyrics_task = fetch_apple_lyrics()
+        
+        # Wait for all three
+        artwork_result, lyrics_result, apple_lyrics_result = await asyncio.gather(
             artwork_task,
             lyrics_task,
+            apple_lyrics_task,
             return_exceptions=True
         )
         
@@ -134,6 +148,10 @@ class MetadataProcessor:
         if isinstance(lyrics_result, Exception):
             logger.warning(f"Lyrics fetch failed: {lyrics_result}")
             lyrics_result = None
+        
+        if isinstance(apple_lyrics_result, Exception):
+            logger.warning(f"Apple Music lyrics fetch failed: {apple_lyrics_result}")
+            apple_lyrics_result = None
         
         # Extract artwork data
         artwork_url = None
@@ -167,6 +185,7 @@ class MetadataProcessor:
             artwork_url=artwork_url,
             artwork_source=artwork_source,
             lyrics=lyrics_result,
+            apple_lyrics=apple_lyrics_result,  # Pre-fetched for dashboard
             release_year=track_info.release_year,
             isrc=track_info.isrc,
             requested_by=requested_by,
@@ -176,7 +195,8 @@ class MetadataProcessor:
         
         logger.info(
             f"✓ Metadata processed: audio={metadata.audio_source}, "
-            f"artwork={metadata.artwork_source}, lyrics={metadata.lyrics.source if metadata.lyrics else 'none'}"
+            f"artwork={metadata.artwork_source}, lyrics={metadata.lyrics.source if metadata.lyrics else 'none'}, "
+            f"apple_lyrics={'yes' if apple_lyrics_result else 'no'}"
         )
         
         return metadata

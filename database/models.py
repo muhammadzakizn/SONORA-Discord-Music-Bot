@@ -211,6 +211,7 @@ class MetadataInfo:
     
     # Lyrics
     lyrics: Optional[LyricsData] = None
+    apple_lyrics: Optional[LyricsData] = None  # Pre-fetched Apple Music lyrics for dashboard
     
     # Additional metadata
     release_year: Optional[int] = None
