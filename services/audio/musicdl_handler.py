@@ -230,7 +230,11 @@ class MusicDLHandler:
             }
             
         except Exception as e:
-            logger.error(f"MusicDL search error: {e}")
+            # Rich "Only one live display may be active" error - safe to ignore
+            if "live display" in str(e).lower():
+                logger.debug(f"MusicDL Rich display conflict (safe to ignore): {e}")
+            else:
+                logger.error(f"MusicDL search error: {e}")
             return None
     
     async def search_best_quality(self, query: str) -> Optional[Dict[str, Any]]:
@@ -338,7 +342,12 @@ class MusicDLHandler:
             }
             
         except Exception as e:
-            logger.error(f"MusicDL best quality search error: {e}")
+            # Rich "Only one live display may be active" error - safe to ignore
+            # MusicDL uses Rich progress which conflicts with other progress displays
+            if "live display" in str(e).lower():
+                logger.debug(f"MusicDL Rich display conflict (safe to ignore): {e}")
+            else:
+                logger.error(f"MusicDL best quality search error: {e}")
             return None
     
     async def search_and_download(
