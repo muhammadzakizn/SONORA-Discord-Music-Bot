@@ -555,11 +555,65 @@ class MusicBot(commands.Bot):
         """Called when bot is starting up"""
         logger.info("Running setup hook...")
         
+        # Cleanup cache on startup (clear downloads folder)
+        await self._startup_cleanup()
+        
         # Connect to database
         await self.db_manager.connect()
         
         # Load commands
         await self.load_commands()
+    
+    async def _startup_cleanup(self) -> None:
+        """
+        Clean up cache and downloads on startup.
+        
+        Removes old audio files to save disk space.
+        Called once when bot starts.
+        """
+        logger.info("🧹 Starting cache cleanup...")
+        
+        try:
+            from config.settings import Settings
+            import shutil
+            
+            cleaned_count = 0
+            cleaned_size = 0
+            
+            # 1. Clean downloads folder (audio files)
+            downloads_dir = Settings.DOWNLOADS_DIR
+            if downloads_dir.exists():
+                for ext in ['*.opus', '*.m4a', '*.mp3', '*.webm', '*.flac', '*.ogg']:
+                    for f in downloads_dir.glob(ext):
+                        try:
+                            size = f.stat().st_size
+                            f.unlink()
+                            cleaned_count += 1
+                            cleaned_size += size
+                        except Exception:
+                            pass
+                
+                # 2. Clean playlist_cache subfolder
+                playlist_cache = downloads_dir / 'playlist_cache'
+                if playlist_cache.exists():
+                    for ext in ['*.opus', '*.m4a', '*.mp3', '*.webm', '*.flac', '*.ogg']:
+                        for f in playlist_cache.glob(ext):
+                            try:
+                                size = f.stat().st_size
+                                f.unlink()
+                                cleaned_count += 1
+                                cleaned_size += size
+                            except Exception:
+                                pass
+            
+            size_mb = cleaned_size / (1024 * 1024)
+            if cleaned_count > 0:
+                logger.info(f"🧹 Startup cleanup: Deleted {cleaned_count} files ({size_mb:.1f}MB)")
+            else:
+                logger.info("🧹 Startup cleanup: No files to clean")
+                
+        except Exception as e:
+            logger.warning(f"Startup cleanup failed: {e}")
     
     async def load_commands(self) -> None:
         """Load command modules"""

@@ -361,10 +361,10 @@ class YouTubeDownloader(BaseDownloader):
     
     async def _upload_to_ftp_cache(self, file_path: Path, artist: str, title: str) -> None:
         """
-        Upload downloaded file to FTP cache (fire-and-forget).
+        Upload downloaded file to FTP cache.
         
-        This is called after a successful download to cache the file
-        for future use. Runs in background, doesn't block playback.
+        If FTP upload fails or FTP is unavailable, delete the local file
+        to save disk space (since we can't cache it anyway).
         
         Args:
             file_path: Local file path
@@ -376,13 +376,32 @@ class YouTubeDownloader(BaseDownloader):
             ftp_cache = get_ftp_cache()
             
             if ftp_cache.is_enabled:
-                # Upload in background (don't block playback)
-                asyncio.create_task(
-                    ftp_cache.upload(file_path, artist, title)
-                )
-                logger.debug(f"FTP upload scheduled: {title}")
+                # Upload and wait for result
+                success = await ftp_cache.upload(file_path, artist, title)
+                if success:
+                    logger.info(f"☁️ Uploaded to FTP: {title}")
+                else:
+                    logger.warning(f"FTP upload failed: {title}")
+                    # FTP failed - delete local file to save space
+                    self._delete_file_if_exists(file_path, "FTP upload failed")
+            else:
+                # FTP not enabled - delete local file to save space
+                self._delete_file_if_exists(file_path, "FTP not available")
         except Exception as e:
-            logger.warning(f"FTP upload scheduling failed: {e}")
+            logger.warning(f"FTP upload failed: {e}")
+            # Error - delete local file to save space
+            self._delete_file_if_exists(file_path, f"FTP error: {e}")
+    
+    def _delete_file_if_exists(self, file_path: Path, reason: str) -> None:
+        """Delete a file if it exists and log the reason."""
+        if file_path and file_path.exists():
+            try:
+                file_size = file_path.stat().st_size
+                file_size_mb = file_size / (1024 * 1024)
+                file_path.unlink()
+                logger.info(f"🗑️ Deleted file ({reason}): {file_path.name} ({file_size_mb:.1f}MB)")
+            except Exception as e:
+                logger.warning(f"Failed to delete file: {e}")
     
     async def background_download_for_cache(self, artist: str, title: str) -> None:
         """

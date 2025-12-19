@@ -394,7 +394,12 @@ class PlaylistCacheManager:
         return match_ratio >= 0.6
     
     async def _upload_to_ftp(self, artist: str, title: str, file_path: Path) -> None:
-        """Upload file to FTP cache (background)."""
+        """
+        Upload file to FTP cache (background).
+        
+        If FTP upload fails or FTP is unavailable, delete the local file
+        to save disk space (since we can't cache it anyway).
+        """
         try:
             from services.storage.ftp_storage import get_ftp_cache
             ftp = get_ftp_cache()
@@ -403,10 +408,29 @@ class PlaylistCacheManager:
                 success = await ftp.upload(file_path, artist, title)
                 if success:
                     logger.info(f"☁️ Uploaded to FTP: {title}")
+                    # FTP success - file can be kept for local cache or deleted
                 else:
                     logger.warning(f"FTP upload failed: {title}")
+                    # FTP failed - delete local file to save space
+                    self._delete_file_if_exists(file_path, "FTP upload failed")
+            else:
+                # FTP not enabled - delete local file to save space
+                self._delete_file_if_exists(file_path, "FTP not available")
         except Exception as e:
             logger.error(f"FTP upload error: {e}")
+            # Error - delete local file to save space
+            self._delete_file_if_exists(file_path, f"FTP error: {e}")
+    
+    def _delete_file_if_exists(self, file_path: Path, reason: str) -> None:
+        """Delete a file if it exists and log the reason."""
+        if file_path and file_path.exists():
+            try:
+                file_size = file_path.stat().st_size
+                file_size_mb = file_size / (1024 * 1024)
+                file_path.unlink()
+                logger.info(f"🗑️ Deleted file ({reason}): {file_path.name} ({file_size_mb:.1f}MB)")
+            except Exception as e:
+                logger.warning(f"Failed to delete file: {e}")
     
     def _cleanup_track(self, index: int) -> None:
         """Clean up a track from local cache after playback."""
