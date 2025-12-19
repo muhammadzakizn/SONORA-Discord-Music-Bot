@@ -394,50 +394,50 @@ def api_guild_lyrics(guild_id: int):
                     try:
                         from services.lyrics.applemusic import AppleMusicFetcher
                         from database.models import TrackInfo as TrackInfoModel
-                    
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    
-                    fetcher = AppleMusicFetcher(cookies_path=cookies_path)
-                    track = TrackInfoModel(
-                        title=metadata.title,
-                        artist=metadata.artist,
-                        duration=int(metadata.duration) if metadata.duration else 0
-                    )
-                    
-                    am_lyrics = loop.run_until_complete(fetcher.fetch(track))
-                    loop.close()
-                    
-                    if am_lyrics and am_lyrics.lines:
-                        logger.info(f"[AppleMusic] SUCCESS! Got {len(am_lyrics.lines)} lines")
-                        lyrics_source_used = "applemusic"
                         
-                        # Convert to response format
-                        lines = []
-                        for line in am_lyrics.lines:
-                            words = []
-                            if hasattr(line, 'words') and line.words:
-                                words = line.words if isinstance(line.words, list) else []
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        fetcher = AppleMusicFetcher(cookies_path=cookies_path)
+                        track = TrackInfoModel(
+                            title=metadata.title,
+                            artist=metadata.artist,
+                            duration=int(metadata.duration) if metadata.duration else 0
+                        )
+                        
+                        am_lyrics = loop.run_until_complete(fetcher.fetch(track))
+                        loop.close()
+                        
+                        if am_lyrics and am_lyrics.lines:
+                            logger.info(f"[AppleMusic] SUCCESS! Got {len(am_lyrics.lines)} lines")
+                            lyrics_source_used = "applemusic"
                             
-                            lines.append({
-                                "text": line.text,
-                                "start_time": line.start_time,
-                                "end_time": line.end_time,
-                                "romanized": line.romanized,
-                                "words": words
-                            })
-                        
-                        lyrics_data = {
-                            "is_synced": am_lyrics.is_synced,
-                            "source": "applemusic",
-                            "offset": am_lyrics.offset,
-                            "lines": lines,
-                            "total_lines": len(lines)
-                        }
-                    else:
-                        logger.warning(f"[AppleMusic] No lyrics found for: {metadata.title} - {metadata.artist}")
-                except Exception as e:
-                    logger.error(f"[AppleMusic] Fetch FAILED: {e}", exc_info=True)
+                            # Convert to response format
+                            lines = []
+                            for line in am_lyrics.lines:
+                                words = []
+                                if hasattr(line, 'words') and line.words:
+                                    words = line.words if isinstance(line.words, list) else []
+                                
+                                lines.append({
+                                    "text": line.text,
+                                    "start_time": line.start_time,
+                                    "end_time": line.end_time,
+                                    "romanized": line.romanized,
+                                    "words": words
+                                })
+                            
+                            lyrics_data = {
+                                "is_synced": am_lyrics.is_synced,
+                                "source": "applemusic",
+                                "offset": am_lyrics.offset,
+                                "lines": lines,
+                                "total_lines": len(lines)
+                            }
+                        else:
+                            logger.warning(f"[AppleMusic] No lyrics found for: {metadata.title} - {metadata.artist}")
+                    except Exception as e:
+                        logger.error(f"[AppleMusic] Fetch FAILED: {e}", exc_info=True)
             
             # Save to cache if we got lyrics
             if lyrics_data:
