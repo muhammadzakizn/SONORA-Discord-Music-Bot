@@ -492,7 +492,8 @@ def api_guild_lyrics(guild_id: int):
                         "source": "musixmatch",
                         "offset": musix_lyrics.offset,
                         "lines": lines,
-                        "total_lines": len(lines)
+                        "total_lines": len(lines),
+                        "has_syllable_timing": getattr(musix_lyrics, 'has_syllable_timing', True)  # Richsync always has syllable timing
                     }
                 else:
                     logger.warning(f"[Musixmatch] No lyrics found for: {metadata.title} - {metadata.artist}")
@@ -539,7 +540,8 @@ def api_guild_lyrics(guild_id: int):
                 "source": lyrics_source_used,
                 "offset": lyrics.offset,
                 "lines": lines,
-                "total_lines": len(lines)
+                "total_lines": len(lines),
+                "has_syllable_timing": getattr(lyrics, 'has_syllable_timing', False)  # From TTML or other source
             }
         
         return jsonify({

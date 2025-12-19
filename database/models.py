@@ -65,6 +65,7 @@ class LyricsData:
     is_synced: bool = False
     language: Optional[str] = None
     offset: float = 0.0  # Timing offset in seconds (can be negative)
+    has_syllable_timing: bool = False  # True if real syllable/word timing exists (not estimated)
     
     def get_lines_at_time(self, current_time: float, count: int = 3, include_romanization: bool = True) -> List[str]:
         """

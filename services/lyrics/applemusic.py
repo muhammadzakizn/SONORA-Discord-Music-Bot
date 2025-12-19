@@ -284,7 +284,8 @@ class AppleMusicFetcher(BaseLyricsFetcher):
                     lines=lines,
                     source=LyricsSource.SYNCED,
                     is_synced=True,
-                    offset=0.0
+                    offset=0.0,
+                    has_syllable_timing=has_syllable  # True only when real syllable timing exists
                 )
             
             return None

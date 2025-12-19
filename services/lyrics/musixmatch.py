@@ -308,7 +308,8 @@ class MusixmatchFetcher(BaseLyricsFetcher):
             lines=lines,
             source=LyricsSource.SYNCED,
             is_synced=True,
-            offset=0.0
+            offset=0.0,
+            has_syllable_timing=True  # Richsync always has real syllable timing
         )
     
     async def fetch(self, track_info: TrackInfo) -> Optional[LyricsData]:

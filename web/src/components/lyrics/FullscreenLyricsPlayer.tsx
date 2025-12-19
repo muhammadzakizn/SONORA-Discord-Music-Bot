@@ -42,6 +42,7 @@ interface LyricsData {
     offset: number;
     lines: LyricLine[];
     total_lines: number;
+    has_syllable_timing?: boolean;  // True when real per-word timing exists (not estimated)
 }
 
 interface TrackInfo {
@@ -682,8 +683,8 @@ export default function FullscreenLyricsPlayer({
                                                         filter: shouldCollapse ? 'blur(4px)' : 'none',
                                                     }}
                                                 >
-                                                    {/* Current line with per-word highlighting */}
-                                                    {isCurrentLine && line.words && line.words.length > 0 ? (
+                                                    {/* Current line with per-word highlighting (only when real syllable timing exists) */}
+                                                    {isCurrentLine && line.words && line.words.length > 0 && lyrics?.has_syllable_timing ? (
                                                         <p className="text-4xl xs:text-5xl font-bold text-left leading-tight">
                                                             {line.words.map((word: { text: string; start_time: number; end_time: number }, wordIndex: number) => {
                                                                 // Apply offset for accurate sync
