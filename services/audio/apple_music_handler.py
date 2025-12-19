@@ -195,7 +195,10 @@ class AppleMusicHandler:
     
     async def _search_ytmusic(self, title: str, artist: str = '') -> Optional[Dict]:
         """
-        Search a track on YouTube Music
+        Search a track on YouTube Music with improved matching.
+        
+        Fetches multiple results and picks the best match based on title similarity.
+        This prevents returning wrong songs from the same artist.
         
         Args:
             title: Track title
@@ -208,30 +211,111 @@ class AppleMusicHandler:
             # Build search query
             query = f"{artist} {title}" if artist else title
             
-            # Search on YouTube Music
+            # Search on YouTube Music - get multiple results for better matching
             results = await asyncio.to_thread(
                 self.ytmusic.search,
                 query,
                 filter='songs',
-                limit=1
+                limit=5  # Get 5 results for better matching
             )
             
             if not results:
                 return None
             
-            result = results[0]
-            return {
-                'title': result.get('title', title),
-                'artist': result['artists'][0]['name'] if result.get('artists') else artist,
-                'album': result.get('album', {}).get('name', '') if result.get('album') else '',
-                'duration': result.get('duration', ''),
-                'videoId': result.get('videoId', ''),
-                'thumbnails': result.get('thumbnails', [])
-            }
+            # Normalize search title for comparison
+            search_title_normalized = self._normalize_title(title)
+            
+            # Score each result by title similarity
+            best_match = None
+            best_score = 0.0
+            
+            for result in results:
+                result_title = result.get('title', '')
+                result_artist = result['artists'][0]['name'] if result.get('artists') else ''
+                
+                # Calculate title similarity score
+                result_title_normalized = self._normalize_title(result_title)
+                title_score = self._calculate_similarity(search_title_normalized, result_title_normalized)
+                
+                # Bonus for artist match if artist was provided
+                artist_bonus = 0.0
+                if artist:
+                    artist_normalized = self._normalize_title(artist)
+                    result_artist_normalized = self._normalize_title(result_artist)
+                    if artist_normalized in result_artist_normalized or result_artist_normalized in artist_normalized:
+                        artist_bonus = 0.2
+                
+                total_score = title_score + artist_bonus
+                
+                logger.debug(f"Match score {total_score:.2f}: '{result_title}' by '{result_artist}'")
+                
+                if total_score > best_score:
+                    best_score = total_score
+                    best_match = result
+            
+            # Only return if we have a reasonable match (>0.5 similarity)
+            if best_match and best_score >= 0.5:
+                logger.info(f"✅ Best match (score {best_score:.2f}): '{best_match.get('title')}' by '{best_match['artists'][0]['name'] if best_match.get('artists') else 'Unknown'}'")
+                return {
+                    'title': best_match.get('title', title),
+                    'artist': best_match['artists'][0]['name'] if best_match.get('artists') else artist,
+                    'album': best_match.get('album', {}).get('name', '') if best_match.get('album') else '',
+                    'duration': best_match.get('duration', ''),
+                    'videoId': best_match.get('videoId', ''),
+                    'thumbnails': best_match.get('thumbnails', [])
+                }
+            else:
+                # Fallback to first result if no good match found
+                logger.warning(f"⚠️ No good title match, using first result (score {best_score:.2f})")
+                result = results[0]
+                return {
+                    'title': result.get('title', title),
+                    'artist': result['artists'][0]['name'] if result.get('artists') else artist,
+                    'album': result.get('album', {}).get('name', '') if result.get('album') else '',
+                    'duration': result.get('duration', ''),
+                    'videoId': result.get('videoId', ''),
+                    'thumbnails': result.get('thumbnails', [])
+                }
             
         except Exception as e:
             logger.debug(f"YTMusic search error for '{title}': {e}")
             return None
+    
+    def _normalize_title(self, title: str) -> str:
+        """Normalize title for comparison - lowercase, remove special chars"""
+        import re
+        # Convert to lowercase
+        normalized = title.lower()
+        # Remove common suffixes like (Official Video), [Lyric Video], etc.
+        normalized = re.sub(r'\s*[\(\[].*?[\)\]]', '', normalized)
+        # Remove special characters except spaces
+        normalized = re.sub(r'[^\w\s]', '', normalized)
+        # Collapse multiple spaces
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+        return normalized
+    
+    def _calculate_similarity(self, str1: str, str2: str) -> float:
+        """Calculate similarity between two strings using Jaccard similarity + exact match bonus"""
+        if str1 == str2:
+            return 1.0
+        
+        # Check if one contains the other (partial match)
+        if str1 in str2 or str2 in str1:
+            longer = max(len(str1), len(str2))
+            shorter = min(len(str1), len(str2))
+            return shorter / longer if longer > 0 else 0.0
+        
+        # Jaccard similarity on words
+        words1 = set(str1.split())
+        words2 = set(str2.split())
+        
+        if not words1 or not words2:
+            return 0.0
+        
+        intersection = words1 & words2
+        union = words1 | words2
+        
+        return len(intersection) / len(union) if union else 0.0
     
     async def _enrich_tracks_with_ytmusic(self, tracks: List[Dict]) -> List[Dict]:
         """
