@@ -131,6 +131,7 @@ class YouTubeDownloader(BaseDownloader):
             
             command = [
                 'yt-dlp',
+                '--remote-components', 'ejs:github',  # Enable EJS challenge solver
                 '--dump-json',
                 '-I', '1',  # CRITICAL: Only get first item from results
                 '--no-check-certificate',
@@ -165,6 +166,7 @@ class YouTubeDownloader(BaseDownloader):
                 fallback_query = query if query.startswith('http') else f"ytsearch1:{query}"
                 fallback_cmd = [
                     'yt-dlp',
+                    '--remote-components', 'ejs:github',
                     '--dump-json',
                     '--no-playlist',
                     '--no-check-certificate',
@@ -683,6 +685,7 @@ class YouTubeDownloader(BaseDownloader):
         # Build base command - use android_music client for best YouTube Music compatibility with cookies
         command = [
             'yt-dlp',
+            '--remote-components', 'ejs:github',  # Enable EJS challenge solver
             url,
             '-I', '1',  # Only first result if URL is a search
             '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
@@ -695,7 +698,7 @@ class YouTubeDownloader(BaseDownloader):
             '--socket-timeout', '30',
             '--retries', '3',
             '--no-check-certificate',
-            # android_music client works with cookies and gets music.youtube.com audio
+            # ios,web client works with Deno for signature solving
             '--extractor-args', 'youtube:player_client=ios,web',
         ]
         
@@ -767,6 +770,7 @@ class YouTubeDownloader(BaseDownloader):
         
         command_fallback = [
             'yt-dlp',
+            '--remote-components', 'ejs:github',
             url,
             '-I', '1',  # Only first result if URL is a search
             '-f', 'bestaudio/best',  # More permissive format selection
@@ -827,6 +831,7 @@ class YouTubeDownloader(BaseDownloader):
         
         command_fallback2 = [
             'yt-dlp',
+            '--remote-components', 'ejs:github',
             url,
             '-I', '1',
             '-f', 'bestaudio/best',
