@@ -245,14 +245,18 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
         const targetFPS = isLowPower ? 30 : 60;
         const frameInterval = 1000 / targetFPS;
 
+        // Time divisor: larger = slower animation
+        // Low-power devices get slower animation for performance
+        // High-end devices get faster, smoother animation
+        const timeDivisor = isLowPower ? 6000 : 3000;
+
         const animate = (time: number) => {
             animationRef.current = requestAnimationFrame(animate);
 
             if (time - lastFrame < frameInterval) return;
             lastFrame = time;
 
-            // Slow down time factor for smooth animation (larger divisor = slower)
-            material.uniforms.uTime.value = time / 5000;
+            material.uniforms.uTime.value = time / timeDivisor;
             renderer.render(scene, camera);
         };
         animationRef.current = requestAnimationFrame(animate);
