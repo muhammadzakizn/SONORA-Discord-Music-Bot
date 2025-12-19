@@ -123,50 +123,84 @@ export default function FullscreenLyricsPlayer({
         return lyrics.lines.length - 1;
     }, [lyrics, currentTime]);
 
-    // Fetch lyrics data - with caching to avoid refetching same track
-    const lastTrackIdRef = useRef<string>('');
+    // ==================== BEAUTIFUL-LYRICS STYLE SPRING CLASS ====================
+    // Damped harmonic oscillator for smooth natural animations
+    class Spring {
+        position: number;
+        velocity: number = 0;
+        target: number;
+        damping: number;
+        frequency: number;
 
-    const fetchLyrics = useCallback(async () => {
+        constructor(initial: number, damping = 0.5, frequency = 1) {
+            this.position = initial;
+            this.target = initial;
+            this.damping = damping;
+            this.frequency = frequency;
+        }
+
+        update(deltaTime: number): number {
+            const force = (this.target - this.position) * this.frequency * 10;
+            this.velocity += force * deltaTime;
+            this.velocity *= (1 - this.damping);
+            this.position += this.velocity * deltaTime;
+            return this.position;
+        }
+
+        set(value: number) {
+            this.position = value;
+            this.target = value;
+            this.velocity = 0;
+        }
+
+        isSleeping(): boolean {
+            return Math.abs(this.velocity) < 0.001 && Math.abs(this.target - this.position) < 0.001;
+        }
+    }
+
+    // ==================== LYRICS CACHING & TIME SYNC ====================
+    const lastTrackIdRef = useRef<string>('');
+    const lyricsLoadedRef = useRef<boolean>(false);
+
+    // Fetch ONLY time sync from server (lightweight, frequent)
+    const fetchTimeSync = useCallback(async () => {
         try {
-            // Always use the current lyricsSource (default: applemusic for dashboard)
-            const sourceParam = `?source=${lyricsSource}`;
-            const response = await fetch(`${API_BASE}/guild/${guildId}/lyrics${sourceParam}`);
+            const response = await fetch(`${API_BASE}/guild/${guildId}/lyrics?source=${lyricsSource}`);
             const data = await response.json();
 
             if (data.error && !data.track) {
-                setError(data.error);
                 return;
             }
 
-            setError(null);
             setIsPlaying(data.is_playing);
             setIsPaused(data.is_paused);
 
-            // ALWAYS update current time from server - this ensures sync after pause/resume
+            // ALWAYS sync time from server (progress bar position) - critical for pause/resume
             const serverTime = data.current_time || 0;
             lastFetchTime.current = Date.now();
             serverTimeRef.current = serverTime;
             setCurrentTime(serverTime);
 
-            // Only update track and lyrics if track changed (to avoid re-render spam)
+            // Check if track changed - if so, need to refetch lyrics
             const newTrackId = `${data.track?.title}-${data.track?.artist}`;
             if (newTrackId !== lastTrackIdRef.current) {
-                console.log(`[Lyrics] New track: ${newTrackId}`);
+                console.log(`[Lyrics] Track changed: ${newTrackId}`);
                 lastTrackIdRef.current = newTrackId;
+                lyricsLoadedRef.current = false;
                 setTrack(data.track);
                 setLyrics(data.lyrics);
 
                 const sourceUsed = data.lyrics_source || data.lyrics?.source || 'unknown';
                 console.log(`[Lyrics] Source: ${sourceUsed}, Lines: ${data.lyrics?.lines?.length || 0}`);
                 setCurrentSource(sourceUsed);
+                lyricsLoadedRef.current = true;
             }
         } catch (err) {
-            console.error("Failed to fetch lyrics:", err);
-            setError("Failed to load lyrics");
+            console.error("Failed to sync time:", err);
         }
     }, [guildId, lyricsSource]);
 
-    // Smooth time interpolation between fetches - improved sync
+    // Smooth time interpolation between fetches using requestAnimationFrame
     useEffect(() => {
         if (!isOpen || !isPlaying || isPaused) return;
 
@@ -177,7 +211,7 @@ export default function FullscreenLyricsPlayer({
             const deltaSeconds = (now - lastFrameTime) / 1000;
             lastFrameTime = now;
 
-            // Interpolate time locally for smooth animation
+            // Interpolate time locally for smooth word animation
             setCurrentTime(prev => prev + deltaSeconds);
             animationFrameRef.current = requestAnimationFrame(animate);
         };
@@ -191,16 +225,18 @@ export default function FullscreenLyricsPlayer({
         };
     }, [isOpen, isPlaying, isPaused]);
 
-    // Fetch lyrics on open and poll for time sync (less frequently now)
+    // Initial fetch and time sync polling
     useEffect(() => {
         if (!isOpen) return;
 
-        fetchLyrics();
-        // Poll every 3 seconds - lyrics are cached, this is mainly for time sync
-        const interval = setInterval(fetchLyrics, 3000);
+        // Initial fetch
+        fetchTimeSync();
+
+        // Poll for time sync every 2 seconds - ensures sync after pause/resume
+        const interval = setInterval(fetchTimeSync, 2000);
 
         return () => clearInterval(interval);
-    }, [isOpen, fetchLyrics]);
+    }, [isOpen, fetchTimeSync]);
 
     // Flag to track if we're doing auto-scroll (not user scroll)
     const isAutoScrollingRef = useRef(false);
@@ -256,7 +292,7 @@ export default function FullscreenLyricsPlayer({
         setIsControlling(true);
         try {
             await onControl(action);
-            await fetchLyrics();
+            await fetchTimeSync();
         } finally {
             setTimeout(() => setIsControlling(false), 300);
         }
@@ -607,19 +643,39 @@ export default function FullscreenLyricsPlayer({
                                                                     progress = (currentTime - word.start_time) / (word.end_time - word.start_time);
                                                                 }
 
-                                                                // Brightness: dim (0.35) to bright (1.0)
-                                                                const brightness = 0.35 + progress * 0.65;
+                                                                // Beautiful-lyrics style glow curve:
+                                                                // 0-15%: ramp up to full glow
+                                                                // 15-60%: sustain full glow
+                                                                // 60-100%: fade out
+                                                                let glowAlpha = 0;
+                                                                if (progress < 0.15) {
+                                                                    glowAlpha = progress / 0.15; // Quick ramp up
+                                                                } else if (progress < 0.6) {
+                                                                    glowAlpha = 1; // Sustain
+                                                                } else {
+                                                                    glowAlpha = 1 - ((progress - 0.6) / 0.4); // Fade out
+                                                                }
+
+                                                                // Brightness: starts dim, lights up as sung
+                                                                const brightness = progress > 0 ? 0.5 + (progress * 0.5) : 0.35;
+
+                                                                // Scale: subtle pop effect at start
+                                                                const scale = progress > 0 && progress < 0.3
+                                                                    ? 1 + (0.02 * (1 - progress / 0.3))
+                                                                    : 1;
 
                                                                 return (
                                                                     <span
                                                                         key={wordIndex}
-                                                                        className="transition-all duration-75"
                                                                         style={{
                                                                             color: `rgba(255, 255, 255, ${brightness})`,
-                                                                            textShadow: progress > 0.5
-                                                                                ? `0 0 ${20 + progress * 15}px rgba(255, 255, 255, ${progress * 0.6})`
+                                                                            textShadow: glowAlpha > 0.1
+                                                                                ? `0 0 ${4 + glowAlpha * 12}px rgba(255, 255, 255, ${glowAlpha * 0.5})`
                                                                                 : "none",
                                                                             marginRight: "0.25em",
+                                                                            display: "inline-block",
+                                                                            transform: `scale(${scale})`,
+                                                                            transition: "transform 0.1s ease-out",
                                                                         }}
                                                                     >
                                                                         {word.text}
