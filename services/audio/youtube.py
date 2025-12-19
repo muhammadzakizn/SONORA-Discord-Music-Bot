@@ -467,11 +467,16 @@ class YouTubeDownloader(BaseDownloader):
                             
                             if success:
                                 logger.info(f"☁️ Cached to FTP: {title} ({song_info.get('ext', 'unknown')})")
-                                # Clean up local file
-                                try:
-                                    downloaded_file.unlink()
-                                except:
-                                    pass
+                            else:
+                                logger.warning(f"FTP upload failed for: {title}")
+                            
+                            # ALWAYS clean up local file (success or fail - save disk space)
+                            try:
+                                file_size = downloaded_file.stat().st_size / (1024 * 1024)
+                                downloaded_file.unlink()
+                                logger.info(f"🗑️ Deleted local file: {downloaded_file.name} ({file_size:.1f}MB)")
+                            except Exception as del_err:
+                                logger.warning(f"Failed to delete local file: {del_err}")
                             return
                 else:
                     logger.info(f"MusicDL found no results for: {query}")
@@ -499,11 +504,16 @@ class YouTubeDownloader(BaseDownloader):
                     success = await ftp_cache.upload(result.file_path, artist, title)
                     if success:
                         logger.info(f"☁️ Cached to FTP via yt-dlp: {title}")
-                    # Clean up
+                    else:
+                        logger.warning(f"FTP upload failed for: {title}")
+                    
+                    # ALWAYS clean up local file (success or fail - save disk space)
                     try:
+                        file_size = result.file_path.stat().st_size / (1024 * 1024)
                         result.file_path.unlink()
-                    except:
-                        pass
+                        logger.info(f"🗑️ Deleted local file: {result.file_path.name} ({file_size:.1f}MB)")
+                    except Exception as del_err:
+                        logger.warning(f"Failed to delete local file: {del_err}")
                     
         except Exception as e:
             logger.error(f"Background cache download failed: {e}")
