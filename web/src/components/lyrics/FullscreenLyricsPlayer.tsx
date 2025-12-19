@@ -92,6 +92,14 @@ export default function FullscreenLyricsPlayer({
     const [currentSource, setCurrentSource] = useState<string>('');
     const [isFullscreen, setIsFullscreen] = useState(false);
 
+    // Loading and error states for lyrics
+    const [lyricsLoading, setLyricsLoading] = useState(false);
+    const [lyricsFailed, setLyricsFailed] = useState(false);
+
+    // Track transition state
+    const [isTransitioning, setIsTransitioning] = useState(false);
+    const [previousTrack, setPreviousTrack] = useState<TrackInfo | null>(null);
+
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
     const currentLineRef = useRef<HTMLDivElement>(null);
     const lastFetchTime = useRef<number>(0);
@@ -101,6 +109,9 @@ export default function FullscreenLyricsPlayer({
     // Apple Music-style scroll detection
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Track change detection - prevent scroll during transition
+    const trackChangingRef = useRef(false);
 
     // Lyrics timing offset - negative value delays highlighting to match audio
     // This compensates for server time being ahead of actual audio playback
@@ -175,6 +186,8 @@ export default function FullscreenLyricsPlayer({
             const data = await response.json();
 
             if (data.error && !data.track) {
+                setLyricsFailed(true);
+                setLyricsLoading(false);
                 return;
             }
 
@@ -189,8 +202,20 @@ export default function FullscreenLyricsPlayer({
 
             // Check if track changed - if so, need to refetch lyrics
             const newTrackId = `${data.track?.title}-${data.track?.artist}`;
-            if (newTrackId !== lastTrackIdRef.current) {
+            if (newTrackId !== lastTrackIdRef.current && data.track) {
                 console.log(`[Lyrics] Track changed: ${newTrackId}`);
+
+                // Set transition flag to prevent scroll during change
+                trackChangingRef.current = true;
+                setIsTransitioning(true);
+                setLyricsLoading(true);
+                setLyricsFailed(false);
+
+                // Save previous track for transition animation
+                if (track) {
+                    setPreviousTrack(track);
+                }
+
                 lastTrackIdRef.current = newTrackId;
                 lyricsLoadedRef.current = false;
                 setTrack(data.track);
@@ -199,12 +224,29 @@ export default function FullscreenLyricsPlayer({
                 const sourceUsed = data.lyrics_source || data.lyrics?.source || 'unknown';
                 console.log(`[Lyrics] Source: ${sourceUsed}, Lines: ${data.lyrics?.lines?.length || 0}`);
                 setCurrentSource(sourceUsed);
-                lyricsLoadedRef.current = true;
+
+                // Check if lyrics loaded successfully
+                if (data.lyrics?.lines?.length > 0) {
+                    setLyricsLoading(false);
+                    lyricsLoadedRef.current = true;
+                } else {
+                    setLyricsLoading(false);
+                    setLyricsFailed(true);
+                }
+
+                // End transition after animation completes
+                setTimeout(() => {
+                    trackChangingRef.current = false;
+                    setIsTransitioning(false);
+                    setPreviousTrack(null);
+                }, 600);
             }
         } catch (err) {
             console.error("Failed to sync time:", err);
+            setLyricsLoading(false);
+            setLyricsFailed(true);
         }
-    }, [guildId, lyricsSource]);
+    }, [guildId, lyricsSource, track]);
 
     // Smooth time interpolation between fetches using requestAnimationFrame
     useEffect(() => {
@@ -247,9 +289,12 @@ export default function FullscreenLyricsPlayer({
     // Flag to track if we're doing auto-scroll (not user scroll)
     const isAutoScrollingRef = useRef(false);
 
-    // Scroll to current line - only when not user scrolling
+    // Scroll to current line - only when not user scrolling AND not during track change
     useEffect(() => {
-        if (currentLineRef.current && lyricsContainerRef.current && !isUserScrolling) {
+        // Don't scroll during track transitions or user scrolling
+        if (trackChangingRef.current || isUserScrolling) return;
+
+        if (currentLineRef.current && lyricsContainerRef.current) {
             // Set flag before auto-scroll
             isAutoScrollingRef.current = true;
 
@@ -727,22 +772,35 @@ export default function FullscreenLyricsPlayer({
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-start justify-center h-full">
-                                        <p className="text-white/40 text-3xl font-semibold">• • •</p>
-                                        <p className="text-white/30 text-lg mt-2">
-                                            {error || "Lyrics will appear here when available"}
-                                        </p>
+                                        {lyricsLoading ? (
+                                            <>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                    <p className="text-white/50 text-xl font-medium">Loading lyrics...</p>
+                                                </div>
+                                            </>
+                                        ) : lyricsFailed ? (
+                                            <>
+                                                <p className="text-white/40 text-3xl font-semibold">• • •</p>
+                                                <p className="text-white/30 text-lg mt-2">
+                                                    Lyrics unavailable for this track
+                                                </p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-white/40 text-3xl font-semibold">• • •</p>
+                                                <p className="text-white/30 text-lg mt-2">
+                                                    {error || "Lyrics will appear here when available"}
+                                                </p>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         </div>
                     )}
 
-                    {/* Album Only Mode - Show larger album */}
-                    {!showLyrics && (
-                        <div className="flex-1 flex items-center justify-center">
-                            <p className="text-white/30 text-xl">Album view</p>
-                        </div>
-                    )}
+                    {/* Album Only Mode - Left panel already handles centered display when !showLyrics */}
 
                     {/* Queue Panel */}
                     <AnimatePresence>
