@@ -51,9 +51,8 @@ class YTDLPApiClient:
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=300)  # 5 min timeout for downloads
-            )
+            # Don't set timeout in constructor - use per-request timeout instead
+            self._session = aiohttp.ClientSession()
         return self._session
     
     async def close(self):
@@ -65,11 +64,15 @@ class YTDLPApiClient:
         """Check if API is available."""
         try:
             session = await self._get_session()
-            async with session.get(f"{self.config.base_url}/info", timeout=5) as resp:
+            # Use ClientTimeout object, not int
+            timeout = aiohttp.ClientTimeout(total=5)
+            async with session.get(f"{self.config.base_url}/info", timeout=timeout) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     logger.debug(f"API available: {data.get('status')}")
                     return True
+        except asyncio.TimeoutError:
+            logger.warning("YTDLP API not available: timeout")
         except Exception as e:
             logger.warning(f"YTDLP API not available: {e}")
         return False
