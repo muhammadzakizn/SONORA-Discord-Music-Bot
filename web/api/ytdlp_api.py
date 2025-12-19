@@ -366,17 +366,39 @@ async def api_ytdlp_stream():
                     "error": "Stream not available"
                 }), 503
         
-        # Proxy the stream URL
-        logger.info(f"[YTDLP API] Proxying stream from YouTube")
+        # Proxy the stream URL with pre-buffering
+        logger.info(f"[YTDLP API] Proxying stream from YouTube with 6-second buffer")
         
         # Use synchronous requests for streaming proxy since we're in Flask
         import requests
+        
+        # Pre-buffer configuration
+        BUFFER_SECONDS = 6
+        CHUNK_SIZE = 8192
+        # Assuming ~128kbps audio = 16KB/second
+        # 6 seconds = ~96KB of pre-buffer
+        PREBUFFER_SIZE = 16 * 1024 * BUFFER_SECONDS  # ~96KB
         
         def generate():
             try:
                 with requests.get(stream_url, stream=True, timeout=30) as r:
                     r.raise_for_status()
-                    for chunk in r.iter_content(chunk_size=8192):
+                    
+                    # Pre-buffer: collect initial chunks before streaming
+                    prebuffer = b''
+                    for chunk in r.iter_content(chunk_size=CHUNK_SIZE):
+                        if chunk:
+                            prebuffer += chunk
+                            if len(prebuffer) >= PREBUFFER_SIZE:
+                                break
+                    
+                    logger.info(f"[YTDLP API] Pre-buffered {len(prebuffer)} bytes ({BUFFER_SECONDS}s)")
+                    
+                    # Send pre-buffered data first
+                    yield prebuffer
+                    
+                    # Continue streaming the rest
+                    for chunk in r.iter_content(chunk_size=CHUNK_SIZE):
                         if chunk:
                             yield chunk
             except Exception as e:
@@ -388,7 +410,8 @@ async def api_ytdlp_stream():
             headers={
                 'Content-Disposition': f'inline; filename="{track_info.title}.webm"',
                 'Accept-Ranges': 'bytes',
-                'Cache-Control': 'no-cache'
+                'Cache-Control': 'no-cache',
+                'X-Prebuffer-Seconds': str(BUFFER_SECONDS)
             }
         )
             
