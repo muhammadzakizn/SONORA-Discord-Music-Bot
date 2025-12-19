@@ -109,6 +109,9 @@ class SynchronizedMediaPlayer:
                 f"🎵 Now Playing: {self.metadata.title[:30]} - {self.metadata.artist[:20]}"
             )
             
+            # Notify dashboard that playback started (for synchronized lyrics)
+            await self._notify_dashboard_playing()
+            
             logger.info(f"Playback started: {self.metadata.title} (volume={volume})")
         
         except Exception as e:
@@ -408,6 +411,61 @@ class SynchronizedMediaPlayer:
                 self._transitioning_to_next = False
         else:
             logger.warning(f"Cannot schedule next track: bot={self.bot}, guild_id={self.guild_id}")
+    
+    async def _notify_dashboard_playing(self) -> None:
+        """
+        Notify dashboard that playback has started.
+        This triggers lyrics sync to begin.
+        """
+        if not self.guild_id or not self.metadata:
+            return
+        
+        try:
+            from web.api.track_state import get_track_state_manager
+            
+            state_manager = get_track_state_manager()
+            
+            # Set track as playing with metadata
+            state_manager.set_preparing(
+                self.guild_id,
+                title=self.metadata.title,
+                artist=self.metadata.artist,
+                album=self.metadata.album,
+                duration=self.metadata.duration,
+                artwork_url=self.metadata.artwork_url
+            )
+            
+            # Add lyrics if available
+            if self.metadata.lyrics:
+                state_manager.set_lyrics(self.guild_id, {
+                    "plain": getattr(self.metadata.lyrics, 'plain', None),
+                    "synced": getattr(self.metadata.lyrics, 'synced', None),
+                    "source": getattr(self.metadata.lyrics, 'source', None)
+                })
+            
+            # Set ready and start playing (no wait for ACK on initial play)
+            state_manager.set_ready(self.guild_id)
+            state_manager.set_playing(self.guild_id)
+            
+            logger.info(f"Dashboard notified: PLAYING - {self.metadata.title}")
+            
+        except Exception as e:
+            logger.warning(f"Dashboard notification failed: {e}")
+    
+    async def _notify_dashboard_ended(self) -> None:
+        """Notify dashboard that playback ended"""
+        if not self.guild_id:
+            return
+        
+        try:
+            from web.api.track_state import get_track_state_manager
+            
+            state_manager = get_track_state_manager()
+            state_manager.set_ended(self.guild_id)
+            logger.debug(f"Dashboard notified: ENDED - guild {self.guild_id}")
+            
+        except Exception as e:
+            logger.warning(f"Dashboard end notification failed: {e}")
     
     def get_current_time(self) -> float:
         """Get current playback time"""

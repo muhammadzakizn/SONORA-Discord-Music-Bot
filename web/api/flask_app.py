@@ -57,6 +57,16 @@ def set_bot_instance(bot):
     global _bot_instance
     _bot_instance = bot
     logger.info("Bot instance set for web dashboard")
+    
+    # Connect SocketIO to TrackStateManager for synchronized playback
+    try:
+        from web.api.track_state import get_track_state_manager
+        state_manager = get_track_state_manager()
+        state_manager.set_socketio(socketio)
+        logger.info("TrackStateManager connected to SocketIO")
+    except Exception as e:
+        logger.warning(f"TrackStateManager connection failed: {e}")
+
 
 
 def get_bot():
@@ -973,6 +983,56 @@ def handle_subscribe_guild(data):
     guild_id = data.get('guild_id')
     logger.info(f"Client subscribed to guild {guild_id}")
     # Client will receive updates via broadcast
+
+
+# ==================== TRACK STATE SYNC ====================
+
+@socketio.on('track_ack')
+def handle_track_ack(data):
+    """
+    Handle dashboard ACK for track ready.
+    Dashboard sends this when it's ready to display the track.
+    """
+    try:
+        from web.api.track_state import get_track_state_manager
+        
+        guild_id = data.get('guild_id')
+        if guild_id:
+            guild_id = int(guild_id)
+            state_manager = get_track_state_manager()
+            state_manager.receive_ack(guild_id)
+            logger.info(f"Dashboard ACK received for guild {guild_id}")
+            emit('ack_confirmed', {"guild_id": str(guild_id), "status": "ok"})
+    except Exception as e:
+        logger.error(f"Track ACK error: {e}")
+
+
+@app.route('/api/state/<int:guild_id>')
+def api_track_state(guild_id: int):
+    """Get current track state for a guild"""
+    try:
+        from web.api.track_state import get_track_state_manager
+        
+        state_manager = get_track_state_manager()
+        state = state_manager.get_state(guild_id)
+        return jsonify(state.to_dict())
+    except Exception as e:
+        logger.error(f"Track state error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/state/<int:guild_id>/ack', methods=['POST'])
+def api_track_ack(guild_id: int):
+    """HTTP fallback for track ACK (if WebSocket not available)"""
+    try:
+        from web.api.track_state import get_track_state_manager
+        
+        state_manager = get_track_state_manager()
+        state_manager.receive_ack(guild_id)
+        return jsonify({"status": "ok", "guild_id": str(guild_id)})
+    except Exception as e:
+        logger.error(f"Track ACK error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 # ==================== BACKGROUND TASKS ====================
