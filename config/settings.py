@@ -123,6 +123,11 @@ class Settings:
     # Set to "true" on servers where streaming returns 403 Forbidden
     DISABLE_STREAMING: bool = os.getenv('DISABLE_STREAMING', 'false').lower() == 'true'
     
+    # One Track One Process Mode - sequential playlist processing
+    # When enabled, only prepares 1 track at a time instead of 3
+    # Useful for limited resources or slow connections
+    ONE_TRACK_ONE_PROCESS: bool = os.getenv('ONE_TRACK_ONE_PROCESS', 'false').lower() == 'true'
+    
     @classmethod
     def validate(cls) -> bool:
         """Validate that all required settings are present"""

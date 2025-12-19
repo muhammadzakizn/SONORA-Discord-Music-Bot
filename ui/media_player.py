@@ -572,6 +572,8 @@ class SynchronizedMediaPlayer:
         Continuously pre-download tracks from queue in background.
         Downloads and processes tracks one by one, replacing TrackInfo with MetadataInfo
         so they're ready to play instantly when user skips or current track ends.
+        
+        In ONE_TRACK_ONE_PROCESS mode, only prefetches 1 track at a time.
         """
         try:
             # Wait 2 seconds after playback starts before beginning pre-download
@@ -587,8 +589,15 @@ class SynchronizedMediaPlayer:
                 logger.warning("PlayCommand not available for pre-fetching")
                 return
             
+            # Determine max prefetch based on ONE_TRACK_ONE_PROCESS setting
+            from config.settings import Settings
+            if Settings.ONE_TRACK_ONE_PROCESS:
+                max_prefetch = 1  # Only 1 track ahead in sequential mode
+                logger.info("📦 ONE_TRACK_ONE_PROCESS mode: prefetching 1 track only")
+            else:
+                max_prefetch = 5  # Normal mode: pre-download up to 5 tracks
+            
             processed_count = 0
-            max_prefetch = 5  # Maximum number of tracks to pre-download
             
             from database.models import TrackInfo, MetadataInfo
             

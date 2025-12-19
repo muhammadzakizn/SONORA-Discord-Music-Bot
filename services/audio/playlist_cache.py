@@ -54,14 +54,22 @@ class PlaylistCacheManager:
     1. Check FTP cache first
     2. If in FTP → download from FTP to local cache
     3. If NOT in FTP → download via MusicDL → upload to FTP
-    4. Keep 3 tracks prepared ahead
+    4. Keep buffer tracks prepared ahead (1 or 3 based on ONE_TRACK_ONE_PROCESS)
     5. Delete local files after playback
-    6. When track plays → prepare 1 more
+    6. When track plays → prepare next
     
     IMPORTANT: Downloads are SEQUENTIAL (one at a time)
     """
     
-    BUFFER_SIZE = 3  # Keep 3 tracks prepared
+    DEFAULT_BUFFER_SIZE = 3  # Default: Keep 3 tracks prepared
+    
+    @property
+    def buffer_size(self) -> int:
+        """Get buffer size based on ONE_TRACK_ONE_PROCESS setting."""
+        from config.settings import Settings
+        if Settings.ONE_TRACK_ONE_PROCESS:
+            return 1  # Sequential: only 1 track ahead
+        return self.DEFAULT_BUFFER_SIZE
     
     def __init__(self, download_dir: Path):
         """Initialize playlist cache manager."""
@@ -77,7 +85,9 @@ class PlaylistCacheManager:
         self._download_lock = asyncio.Lock()
         self._is_preparing = False
         
-        logger.info(f"PlaylistCacheManager initialized: buffer={self.BUFFER_SIZE}, cache_dir={self.cache_dir}")
+        from config.settings import Settings
+        mode = "ONE_TRACK_ONE_PROCESS" if Settings.ONE_TRACK_ONE_PROCESS else "NORMAL"
+        logger.info(f"PlaylistCacheManager initialized: buffer={self.buffer_size}, mode={mode}, cache_dir={self.cache_dir}")
     
     async def check_and_prepare_first_track(self, track: TrackInfo) -> bool:
         """
@@ -272,7 +282,7 @@ class PlaylistCacheManager:
     
     async def prepare_next_tracks(self, current_index: int, queue: List[TrackInfo]) -> None:
         """
-        Prepare the next BUFFER_SIZE tracks ahead - SEQUENTIALLY.
+        Prepare the next buffer_size tracks ahead - SEQUENTIALLY.
         
         Downloads ONE at a time, waits for completion before next.
         """
@@ -286,7 +296,7 @@ class PlaylistCacheManager:
         try:
             prepared_count = 0
             
-            for i in range(1, self.BUFFER_SIZE + 1):
+            for i in range(1, self.buffer_size + 1):
                 next_idx = current_index + i
                 
                 if next_idx >= len(queue):
@@ -325,7 +335,7 @@ class PlaylistCacheManager:
                 self._cleanup_track(old_idx)
         
         # Check buffer status
-        next_needed = index + self.BUFFER_SIZE
+        next_needed = index + self.buffer_size
         
         if next_needed < len(queue) and next_needed not in self.prepared_tracks:
             track = queue[next_needed]
