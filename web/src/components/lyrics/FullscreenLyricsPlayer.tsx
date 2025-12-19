@@ -142,12 +142,13 @@ export default function FullscreenLyricsPlayer({
             setIsPlaying(data.is_playing);
             setIsPaused(data.is_paused);
 
-            // Update current time from server - this is the source of truth
+            // ALWAYS update current time from server - this ensures sync after pause/resume
+            const serverTime = data.current_time || 0;
             lastFetchTime.current = Date.now();
-            serverTimeRef.current = data.current_time || 0;
-            setCurrentTime(data.current_time || 0);
+            serverTimeRef.current = serverTime;
+            setCurrentTime(serverTime);
 
-            // Only update track and lyrics if track changed (to avoid spam)
+            // Only update track and lyrics if track changed (to avoid re-render spam)
             const newTrackId = `${data.track?.title}-${data.track?.artist}`;
             if (newTrackId !== lastTrackIdRef.current) {
                 console.log(`[Lyrics] New track: ${newTrackId}`);
@@ -606,15 +607,19 @@ export default function FullscreenLyricsPlayer({
                                                                     progress = (currentTime - word.start_time) / (word.end_time - word.start_time);
                                                                 }
 
+                                                                // Brightness: dim (0.35) to bright (1.0)
+                                                                const brightness = 0.35 + progress * 0.65;
+
                                                                 return (
                                                                     <span
                                                                         key={wordIndex}
-                                                                        className="inline-block mr-[0.3em] transition-all duration-100"
+                                                                        className="transition-all duration-75"
                                                                         style={{
-                                                                            color: `rgba(255, 255, 255, ${0.4 + progress * 0.6})`,
-                                                                            textShadow: progress > 0.1
-                                                                                ? `0 0 ${progress * 25}px rgba(255, 255, 255, ${progress * 0.5})`
+                                                                            color: `rgba(255, 255, 255, ${brightness})`,
+                                                                            textShadow: progress > 0.5
+                                                                                ? `0 0 ${20 + progress * 15}px rgba(255, 255, 255, ${progress * 0.6})`
                                                                                 : "none",
+                                                                            marginRight: "0.25em",
                                                                         }}
                                                                     >
                                                                         {word.text}

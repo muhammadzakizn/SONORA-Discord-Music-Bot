@@ -330,9 +330,24 @@ def api_guild_lyrics(guild_id: int):
         
         # Server-side lyrics cache to avoid repeated API calls
         import time
-        global _lyrics_cache
+        global _lyrics_cache, _last_track_key
         if '_lyrics_cache' not in globals():
             _lyrics_cache = {}
+        if '_last_track_key' not in globals():
+            _last_track_key = {}
+        
+        # Track key for this guild
+        current_track_key = f"{metadata.title}:{metadata.artist}"
+        last_key = _last_track_key.get(guild_id, "")
+        
+        # Clear cache if playing a different song
+        if current_track_key != last_key:
+            # Clear old cached lyrics for this guild
+            keys_to_remove = [k for k in _lyrics_cache.keys() if k.startswith(f"{last_key}:")]
+            for k in keys_to_remove:
+                del _lyrics_cache[k]
+            _last_track_key[guild_id] = current_track_key
+            logger.info(f"[Lyrics] New track detected, cleared old cache")
         
         cache_key = f"{metadata.title}:{metadata.artist}:{source_pref}"
         cache_entry = _lyrics_cache.get(cache_key)
