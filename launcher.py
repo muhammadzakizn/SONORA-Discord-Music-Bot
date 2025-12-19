@@ -16,6 +16,9 @@ deno_bin = Path.home() / '.deno' / 'bin'
 if deno_bin.exists():
     os.environ['PATH'] = f"{deno_bin}:{os.environ.get('PATH', '')}"
 
+# Cloudflare Tunnel token for HTTPS API access
+os.environ['CLOUDFLARE_TUNNEL_TOKEN'] = "eyJhIjoiYzAxZjBkYjYzMDY0YjJjOWFhMmQ3NjIxYjMxYTJkNWMiLCJ0IjoiOTg5MDJmZWMtMmFmYy00Y2U2LTg2NDktZDQ5ODIzZjdkZjRjIiwicyI6Ik5UbGhOekkwTnprdFpXVmxZeTAwWXpJeUxUZ3lNVGN0WldRNFltVmhPVGd6WkRWbCJ9"
+
 # Configuration
 WEB_PORT = 9072  # Port for web dashboard (legacy, now on Vercel)
 BOT_API_PORT = 9072  # Port for bot API (use public port since Vercel needs access)
