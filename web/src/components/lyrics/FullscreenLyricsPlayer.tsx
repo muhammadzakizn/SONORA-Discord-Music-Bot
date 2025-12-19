@@ -447,143 +447,185 @@ export default function FullscreenLyricsPlayer({
 
                     {/* ========== MOBILE LAYOUT ========== */}
                     <div className="sm:hidden flex flex-col h-full">
-                        {/* Mobile Header: Album Art + Title + Menu */}
-                        <div className="shrink-0 px-4 pt-14 pb-2">
-                            <div className="flex items-center gap-3">
-                                {/* Album Art (small) */}
-                                <div className="w-14 h-14 shrink-0">
+                        {showLyrics ? (
+                            <>
+                                {/* Mobile Header: Album Art + Title + Menu */}
+                                <div className="shrink-0 px-4 pt-14 pb-2">
+                                    <div className="flex items-center gap-3">
+                                        {/* Album Art (small) */}
+                                        <div className="w-14 h-14 shrink-0">
+                                            {track?.artwork_url ? (
+                                                <img
+                                                    src={track.artwork_url}
+                                                    alt={track.title}
+                                                    className="w-full h-full rounded-lg shadow-lg object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full rounded-lg bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center">
+                                                    <Music className="w-6 h-6 text-white/80" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Track Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <h2 className="text-white text-base font-semibold truncate">
+                                                {track?.title || "Unknown Track"}
+                                            </h2>
+                                            <p className="text-white/60 text-sm truncate">
+                                                {track?.artist || "Unknown Artist"}
+                                            </p>
+                                        </div>
+                                        {/* Menu Button */}
+                                        <div className="relative">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setShowMenu(!showMenu);
+                                                }}
+                                                className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all"
+                                            >
+                                                <MoreHorizontal className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Mobile Lyrics Area (scrollable, takes remaining space) */}
+                                <div className="flex-1 overflow-hidden">
+                                    {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
+                                        <div
+                                            ref={lyricsContainerRef}
+                                            className="h-full overflow-y-auto scrollbar-hide px-4 py-[30vh]"
+                                            onScroll={() => {
+                                                if (lyricsContainerRef.current) {
+                                                    setIsUserScrolling(true);
+                                                    if (scrollTimeoutRef.current) {
+                                                        clearTimeout(scrollTimeoutRef.current);
+                                                    }
+                                                    scrollTimeoutRef.current = setTimeout(() => {
+                                                        setIsUserScrolling(false);
+                                                    }, 3000);
+                                                }
+                                            }}
+                                        >
+                                            <div className="space-y-4">
+                                                {lyrics.lines.map((line, index) => {
+                                                    const isCurrentLine = index === currentLineIndex;
+                                                    const isPastLine = index < currentLineIndex;
+                                                    const isFutureLine = index > currentLineIndex;
+                                                    const hasWords = line.words && line.words.length > 0;
+                                                    const displayText = showRomanization && line.romanized ? line.romanized : line.text;
+
+                                                    // Only collapse past lines when not scrolling
+                                                    const shouldCollapse = isPastLine && !isUserScrolling;
+
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            ref={isCurrentLine ? currentLineRef : null}
+                                                            data-lyric-index={index}
+                                                            className={cn(
+                                                                "transition-all duration-500 ease-out overflow-hidden",
+                                                                // When scrolling: show all lines normally
+                                                                isUserScrolling && "opacity-100",
+                                                                // Past lines: fade, blur, and collapse
+                                                                shouldCollapse && "max-h-0 opacity-0 blur-sm my-0",
+                                                                // Future lines: grayed out
+                                                                isFutureLine && !isUserScrolling && "opacity-50"
+                                                            )}
+                                                            style={{
+                                                                maxHeight: shouldCollapse ? 0 : '200px',
+                                                                marginTop: shouldCollapse ? 0 : undefined,
+                                                                marginBottom: shouldCollapse ? 0 : undefined,
+                                                                filter: shouldCollapse ? 'blur(4px)' : 'none',
+                                                            }}
+                                                        >
+                                                            {/* Current line with per-word highlighting */}
+                                                            {hasWords && isCurrentLine ? (
+                                                                <p className="text-xl font-semibold leading-relaxed">
+                                                                    {line.words.map((word, wordIdx) => {
+                                                                        const progress = getWordProgress(word);
+                                                                        return (
+                                                                            <span
+                                                                                key={wordIdx}
+                                                                                className="inline-block transition-colors duration-100"
+                                                                                style={{
+                                                                                    color: progress > 0
+                                                                                        ? `rgba(255, 255, 255, ${0.4 + progress * 0.6})`
+                                                                                        : 'rgba(255, 255, 255, 0.4)',
+                                                                                    textShadow: progress > 0.5 ? '0 0 20px rgba(255,255,255,0.3)' : 'none',
+                                                                                }}
+                                                                            >
+                                                                                {word.text}
+                                                                                {wordIdx < line.words.length - 1 ? ' ' : ''}
+                                                                            </span>
+                                                                        );
+                                                                    })}
+                                                                </p>
+                                                            ) : (
+                                                                <p
+                                                                    className={cn(
+                                                                        "text-xl font-semibold leading-relaxed transition-colors duration-300",
+                                                                        isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
+                                                                    )}
+                                                                >
+                                                                    {displayText || "♪"}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="h-full flex items-center justify-center">
+                                            <div className="text-center text-white/40">
+                                                <Music className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                <p className="text-sm">{lyricsLoading ? "Loading lyrics..." : "No lyrics available"}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            /* Mobile No-Lyrics View: Centered Album Art */
+                            <div className="flex-1 flex flex-col items-center justify-center px-8">
+                                {/* Large Album Art */}
+                                <div className="w-full max-w-[280px] mb-6">
                                     {track?.artwork_url ? (
                                         <img
                                             src={track.artwork_url}
                                             alt={track.title}
-                                            className="w-full h-full rounded-lg shadow-lg object-cover"
+                                            className="w-full aspect-square rounded-xl shadow-2xl object-cover"
                                         />
                                     ) : (
-                                        <div className="w-full h-full rounded-lg bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center">
-                                            <Music className="w-6 h-6 text-white/80" />
+                                        <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center shadow-2xl">
+                                            <Music className="w-20 h-20 text-white/80" />
                                         </div>
                                     )}
                                 </div>
                                 {/* Track Info */}
-                                <div className="flex-1 min-w-0">
-                                    <h2 className="text-white text-base font-semibold truncate">
-                                        {track?.title || "Unknown Track"}
-                                    </h2>
+                                <div className="w-full max-w-[280px] mb-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <h2 className="text-white text-xl font-semibold truncate flex-1">
+                                            {track?.title || "Unknown Track"}
+                                        </h2>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowMenu(!showMenu);
+                                            }}
+                                            className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all shrink-0"
+                                        >
+                                            <MoreHorizontal className="w-5 h-5" />
+                                        </button>
+                                    </div>
                                     <p className="text-white/60 text-sm truncate">
-                                        {track?.artist || "Unknown Artist"}
+                                        {track?.artist || "Unknown Artist"} — {track?.album || "Unknown Album"}
                                     </p>
                                 </div>
-                                {/* Menu Button */}
-                                <div className="relative">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setShowMenu(!showMenu);
-                                        }}
-                                        className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all"
-                                    >
-                                        <MoreHorizontal className="w-5 h-5" />
-                                    </button>
-                                </div>
                             </div>
-                        </div>
-
-                        {/* Mobile Lyrics Area (scrollable, takes remaining space) */}
-                        <div className="flex-1 overflow-hidden">
-                            {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
-                                <div
-                                    ref={lyricsContainerRef}
-                                    className="h-full overflow-y-auto scrollbar-hide px-4 py-[30vh]"
-                                    onScroll={() => {
-                                        if (lyricsContainerRef.current) {
-                                            setIsUserScrolling(true);
-                                            if (scrollTimeoutRef.current) {
-                                                clearTimeout(scrollTimeoutRef.current);
-                                            }
-                                            scrollTimeoutRef.current = setTimeout(() => {
-                                                setIsUserScrolling(false);
-                                            }, 3000);
-                                        }
-                                    }}
-                                >
-                                    <div className="space-y-4">
-                                        {lyrics.lines.map((line, index) => {
-                                            const isCurrentLine = index === currentLineIndex;
-                                            const isPastLine = index < currentLineIndex;
-                                            const isFutureLine = index > currentLineIndex;
-                                            const hasWords = line.words && line.words.length > 0;
-                                            const displayText = showRomanization && line.romanized ? line.romanized : line.text;
-
-                                            // Only collapse past lines when not scrolling
-                                            const shouldCollapse = isPastLine && !isUserScrolling;
-
-                                            return (
-                                                <div
-                                                    key={index}
-                                                    ref={isCurrentLine ? currentLineRef : null}
-                                                    data-lyric-index={index}
-                                                    className={cn(
-                                                        "transition-all duration-500 ease-out overflow-hidden",
-                                                        // When scrolling: show all lines normally
-                                                        isUserScrolling && "opacity-100",
-                                                        // Past lines: fade, blur, and collapse
-                                                        shouldCollapse && "max-h-0 opacity-0 blur-sm my-0",
-                                                        // Future lines: grayed out
-                                                        isFutureLine && !isUserScrolling && "opacity-50"
-                                                    )}
-                                                    style={{
-                                                        maxHeight: shouldCollapse ? 0 : '200px',
-                                                        marginTop: shouldCollapse ? 0 : undefined,
-                                                        marginBottom: shouldCollapse ? 0 : undefined,
-                                                        filter: shouldCollapse ? 'blur(4px)' : 'none',
-                                                    }}
-                                                >
-                                                    {/* Current line with per-word highlighting */}
-                                                    {hasWords && isCurrentLine ? (
-                                                        <p className="text-xl font-semibold leading-relaxed">
-                                                            {line.words.map((word, wordIdx) => {
-                                                                const progress = getWordProgress(word);
-                                                                return (
-                                                                    <span
-                                                                        key={wordIdx}
-                                                                        className="inline-block transition-colors duration-100"
-                                                                        style={{
-                                                                            color: progress > 0
-                                                                                ? `rgba(255, 255, 255, ${0.4 + progress * 0.6})`
-                                                                                : 'rgba(255, 255, 255, 0.4)',
-                                                                            textShadow: progress > 0.5 ? '0 0 20px rgba(255,255,255,0.3)' : 'none',
-                                                                        }}
-                                                                    >
-                                                                        {word.text}
-                                                                        {wordIdx < line.words.length - 1 ? ' ' : ''}
-                                                                    </span>
-                                                                );
-                                                            })}
-                                                        </p>
-                                                    ) : (
-                                                        <p
-                                                            className={cn(
-                                                                "text-xl font-semibold leading-relaxed transition-colors duration-300",
-                                                                isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
-                                                            )}
-                                                        >
-                                                            {displayText || "♪"}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="h-full flex items-center justify-center">
-                                    <div className="text-center text-white/40">
-                                        <Music className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                        <p className="text-sm">{lyricsLoading ? "Loading lyrics..." : "No lyrics available"}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        )}
 
                         {/* Mobile Controls (bottom fixed) */}
                         <div className="shrink-0 px-4 pb-6 pt-2">
