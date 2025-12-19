@@ -12,6 +12,13 @@ from config.constants import AudioSource
 from config.settings import Settings
 from config.logging_config import get_logger
 
+# Import ytmusicapi for better search matching
+try:
+    from ytmusicapi import YTMusic
+    YTMUSIC_AVAILABLE = True
+except ImportError:
+    YTMUSIC_AVAILABLE = False
+
 logger = get_logger('audio.youtube')
 
 
@@ -25,6 +32,14 @@ class YouTubeDownloader(BaseDownloader):
         
         # Force YouTube Music domain
         self.ytmusic_domain = "music.youtube.com"
+        
+        # Initialize ytmusicapi for better search matching
+        if YTMUSIC_AVAILABLE:
+            self.ytmusic = YTMusic()
+            logger.info("YTMusic API initialized for improved search matching")
+        else:
+            self.ytmusic = None
+            logger.warning("ytmusicapi not available - using yt-dlp search only")
         
         # Verify yt-dlp is installed
         self._verify_ytdlp()
@@ -83,8 +98,8 @@ class YouTubeDownloader(BaseDownloader):
         """
         Search for track on YouTube Music (forced)
         
-        Uses YTDLP API first, then falls back to direct yt-dlp CLI.
-        Extracts proper track/artist metadata from YouTube Music.
+        Uses ytmusicapi with title matching first for accuracy,
+        then falls back to yt-dlp CLI.
         
         Args:
             query: Search query or YouTube URL
@@ -94,8 +109,24 @@ class YouTubeDownloader(BaseDownloader):
         """
         logger.info(f"Searching YouTube Music: {query}")
         
+        # If it's a URL, skip ytmusicapi search - go directly to yt-dlp
+        is_url = query.startswith('http')
+        
         # ========================================
-        # STEP 1: Try YTDLP API first
+        # STEP 1: Use ytmusicapi with title matching (NON-URL ONLY)
+        # ========================================
+        if not is_url and self.ytmusic:
+            try:
+                result = await self._search_ytmusic_with_matching(query)
+                if result:
+                    logger.info(f"[YTMusicAPI] Found: {result.title} - {result.artist}")
+                    return result
+                logger.info("[YTMusicAPI] No results, falling back to yt-dlp")
+            except Exception as e:
+                logger.warning(f"[YTMusicAPI] Search failed: {e}, falling back to yt-dlp")
+        
+        # ========================================
+        # STEP 2: Try YTDLP API
         # ========================================
         try:
             from .ytdlp_client import get_ytdlp_api_client
@@ -235,6 +266,140 @@ class YouTubeDownloader(BaseDownloader):
         except Exception as e:
             logger.error(f"YouTube Music search failed: {e}", exc_info=True)
             return None
+    
+    async def _search_ytmusic_with_matching(self, query: str) -> Optional[TrackInfo]:
+        """
+        Search YouTube Music using ytmusicapi with title matching.
+        
+        Fetches multiple results and picks the best match based on title similarity.
+        This prevents returning wrong songs from the same artist.
+        
+        Args:
+            query: Search query (title or "artist title")
+            
+        Returns:
+            TrackInfo if found, None otherwise
+        """
+        if not self.ytmusic:
+            return None
+        
+        try:
+            # Search on YouTube Music - get 5 results for better matching
+            results = await asyncio.to_thread(
+                self.ytmusic.search,
+                query,
+                filter='songs',
+                limit=5
+            )
+            
+            if not results:
+                return None
+            
+            # Normalize query for comparison
+            query_normalized = self._normalize_title(query)
+            
+            # Score each result by title similarity
+            best_match = None
+            best_score = 0.0
+            
+            for result in results:
+                result_title = result.get('title', '')
+                result_artist = result['artists'][0]['name'] if result.get('artists') else ''
+                
+                # Calculate title similarity score
+                result_title_normalized = self._normalize_title(result_title)
+                title_score = self._calculate_similarity(query_normalized, result_title_normalized)
+                
+                # Also check with artist + title combination
+                full_result = f"{result_artist} {result_title}"
+                full_result_normalized = self._normalize_title(full_result)
+                full_score = self._calculate_similarity(query_normalized, full_result_normalized)
+                
+                # Use the better score
+                final_score = max(title_score, full_score)
+                
+                logger.debug(f"Match score {final_score:.2f}: '{result_title}' by '{result_artist}'")
+                
+                if final_score > best_score:
+                    best_score = final_score
+                    best_match = result
+            
+            # Only return if we have a reasonable match (>0.4 similarity)
+            if best_match and best_score >= 0.4:
+                title = best_match.get('title', query)
+                artist = best_match['artists'][0]['name'] if best_match.get('artists') else 'Unknown'
+                album = best_match.get('album', {}).get('name', '') if best_match.get('album') else ''
+                video_id = best_match.get('videoId', '')
+                duration_str = best_match.get('duration', '')
+                
+                # Parse duration string (e.g., "3:45" -> 225 seconds)
+                duration = 0
+                if duration_str:
+                    parts = duration_str.split(':')
+                    if len(parts) == 2:
+                        duration = int(parts[0]) * 60 + int(parts[1])
+                    elif len(parts) == 3:
+                        duration = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                
+                # Get thumbnail
+                thumbnails = best_match.get('thumbnails', [])
+                thumbnail = thumbnails[-1].get('url') if thumbnails else None
+                
+                ytmusic_url = f"https://music.youtube.com/watch?v={video_id}" if video_id else None
+                
+                logger.info(f"✅ Best match (score {best_score:.2f}): '{title}' by '{artist}'")
+                
+                return TrackInfo(
+                    title=title,
+                    artist=artist,
+                    album=album,
+                    duration=duration,
+                    url=ytmusic_url,
+                    track_id=video_id,
+                    thumbnail_url=thumbnail
+                )
+            else:
+                logger.warning(f"⚠️ No good title match found (best score: {best_score:.2f})")
+                return None
+                
+        except Exception as e:
+            logger.debug(f"YTMusicAPI search error: {e}")
+            return None
+    
+    def _normalize_title(self, title: str) -> str:
+        """Normalize title for comparison - lowercase, remove special chars"""
+        # Convert to lowercase
+        normalized = title.lower()
+        # Remove common suffixes like (Official Video), [Lyric Video], etc.
+        normalized = re.sub(r'\s*[\(\[].*?[\)\]]', '', normalized)
+        # Remove special characters except spaces
+        normalized = re.sub(r'[^\w\s]', '', normalized)
+        # Collapse multiple spaces
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+        return normalized
+    
+    def _calculate_similarity(self, str1: str, str2: str) -> float:
+        """Calculate similarity between two strings using Jaccard similarity"""
+        if str1 == str2:
+            return 1.0
+        
+        # Check if one contains the other (partial match)
+        if str1 in str2 or str2 in str1:
+            longer = max(len(str1), len(str2))
+            shorter = min(len(str1), len(str2))
+            return shorter / longer if longer > 0 else 0.0
+        
+        # Jaccard similarity on words
+        words1 = set(str1.split())
+        words2 = set(str2.split())
+        
+        if not words1 or not words2:
+            return 0.0
+        
+        intersection = words1 & words2
+        union = words1 | words2
+        
+        return len(intersection) / len(union) if union else 0.0
     
     async def get_stream_url(self, track_info: TrackInfo) -> Optional[str]:
         """
