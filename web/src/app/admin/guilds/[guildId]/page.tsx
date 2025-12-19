@@ -419,10 +419,10 @@ export default function GuildDetailPage() {
                 )}
             </AnimatePresence>
 
-            <div className="grid lg:grid-cols-3 gap-6">
+            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
                 {/* Now Playing */}
                 <div className={cn(
-                    "lg:col-span-2 p-4 sm:p-6 rounded-2xl border",
+                    "lg:col-span-2 p-4 sm:p-6 rounded-xl sm:rounded-2xl border",
                     isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
                 )}>
                     <h2 className={cn(
@@ -577,7 +577,7 @@ export default function GuildDetailPage() {
 
                 {/* Queue with Management */}
                 <div className={cn(
-                    "p-4 sm:p-6 rounded-2xl border",
+                    "p-4 sm:p-6 rounded-xl sm:rounded-2xl border",
                     isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
                 )}>
                     <h2 className={cn(
