@@ -136,7 +136,7 @@ class YouTubeDownloader(BaseDownloader):
                 '--no-check-certificate',
                 '--geo-bypass',
                 # Force YouTube Music client for proper metadata (no video intro)
-                '--extractor-args', 'youtube:player_client=android_music',
+                '--extractor-args', 'youtube:player_client=ios,web',
             ]
             
             # ALWAYS add YouTube Music cookies for authenticated access
@@ -169,7 +169,7 @@ class YouTubeDownloader(BaseDownloader):
                     '--no-playlist',
                     '--no-check-certificate',
                     '--geo-bypass',
-                    '--extractor-args', 'youtube:player_client=android_music',
+                    '--extractor-args', 'youtube:player_client=ios,web',
                     fallback_query
                 ]
                 stdout, stderr, returncode = await self._run_command(fallback_cmd, timeout=30)
@@ -288,7 +288,7 @@ class YouTubeDownloader(BaseDownloader):
                 '--geo-bypass',
                 '--socket-timeout', '15',
                 '--no-check-certificate',
-                '--extractor-args', 'youtube:player_client=android_music',
+                '--extractor-args', 'youtube:player_client=ios,web',
             ]
             
             # Add cookies
@@ -696,7 +696,7 @@ class YouTubeDownloader(BaseDownloader):
             '--retries', '3',
             '--no-check-certificate',
             # android_music client works with cookies and gets music.youtube.com audio
-            '--extractor-args', 'youtube:player_client=android_music',
+            '--extractor-args', 'youtube:player_client=ios,web',
         ]
         
         # ALWAYS use YouTube Music cookies for authenticated downloads
@@ -763,7 +763,7 @@ class YouTubeDownloader(BaseDownloader):
             )
         
         # First attempt failed, try with web client (supports cookies, different extraction method)
-        logger.warning(f"android_music client failed, trying web client fallback...")
+        logger.warning(f"ios client failed, trying web client fallback...")
         
         command_fallback = [
             'yt-dlp',
