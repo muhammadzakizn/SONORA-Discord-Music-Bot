@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from database.models import MetadataInfo
 from services.audio.player import OptimizedAudioPlayer
+from services.audio.file_registry import get_audio_registry
 from utils.formatters import ProgressBarFormatter
 from .embeds import EmbedBuilder
 from .loading import SafeLoadingManager
@@ -76,6 +77,12 @@ class SynchronizedMediaPlayer:
                 volume=volume,
                 guild_id=self.guild_id
             )
+            
+            # Register audio file as active to prevent deletion
+            if self.guild_id and self.metadata.audio_path:
+                registry = get_audio_registry()
+                registry.register(self.guild_id, self.metadata.audio_path)
+                logger.debug(f"Registered active file: {self.metadata.audio_path.name}")
             
             # Record start time SEBELUM play
             self.start_time = time.time()
@@ -434,6 +441,12 @@ class SynchronizedMediaPlayer:
         if self.metadata and self.metadata.audio_path:
             try:
                 audio_path = self.metadata.audio_path
+                
+                # Unregister from active files first
+                if self.guild_id:
+                    registry = get_audio_registry()
+                    registry.unregister(self.guild_id, audio_path)
+                    logger.debug(f"Unregistered file: {audio_path.name}")
                 
                 if audio_path.exists():
                     file_size = audio_path.stat().st_size

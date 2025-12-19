@@ -570,15 +570,20 @@ class MusicBot(commands.Bot):
         
         Removes old audio files to save disk space.
         Called once when bot starts.
+        CRITICAL: Skips files that are registered as active.
         """
         logger.info("🧹 Starting cache cleanup...")
         
         try:
             from config.settings import Settings
-            import shutil
+            from services.audio.file_registry import get_audio_registry
+            
+            registry = get_audio_registry()
+            active_files = registry.get_all_active()
             
             cleaned_count = 0
             cleaned_size = 0
+            skipped_count = 0
             
             # 1. Clean downloads folder (audio files)
             downloads_dir = Settings.DOWNLOADS_DIR
@@ -586,6 +591,11 @@ class MusicBot(commands.Bot):
                 for ext in ['*.opus', '*.m4a', '*.mp3', '*.webm', '*.flac', '*.ogg']:
                     for f in downloads_dir.glob(ext):
                         try:
+                            # Skip active files
+                            if f in active_files:
+                                skipped_count += 1
+                                continue
+                            
                             size = f.stat().st_size
                             f.unlink()
                             cleaned_count += 1
@@ -599,6 +609,11 @@ class MusicBot(commands.Bot):
                     for ext in ['*.opus', '*.m4a', '*.mp3', '*.webm', '*.flac', '*.ogg']:
                         for f in playlist_cache.glob(ext):
                             try:
+                                # Skip active files
+                                if f in active_files:
+                                    skipped_count += 1
+                                    continue
+                                    
                                 size = f.stat().st_size
                                 f.unlink()
                                 cleaned_count += 1
@@ -607,8 +622,8 @@ class MusicBot(commands.Bot):
                                 pass
             
             size_mb = cleaned_size / (1024 * 1024)
-            if cleaned_count > 0:
-                logger.info(f"🧹 Startup cleanup: Deleted {cleaned_count} files ({size_mb:.1f}MB)")
+            if cleaned_count > 0 or skipped_count > 0:
+                logger.info(f"🧹 Startup cleanup: Deleted {cleaned_count} files ({size_mb:.1f}MB), skipped {skipped_count} active")
             else:
                 logger.info("🧹 Startup cleanup: No files to clean")
                 
