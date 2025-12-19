@@ -511,46 +511,46 @@ export default function GuildDetailPage() {
                                     onClick={() => handleControl(guild.current_track?.is_paused ? "resume" : "pause")}
                                     disabled={isControlling}
                                     className={cn(
-                                        "p-3 sm:p-4 rounded-full transition-colors disabled:opacity-50",
+                                        "p-2.5 sm:p-4 rounded-full transition-colors disabled:opacity-50",
                                         isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
                                     )}
                                     title={guild.current_track?.is_paused ? "Resume" : "Pause"}
                                 >
                                     {guild.current_track?.is_paused ? (
-                                        <Play className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
+                                        <Play className={cn("w-5 h-5 sm:w-6 sm:h-6", isDark ? "text-white" : "text-gray-700")} />
                                     ) : (
-                                        <Pause className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
+                                        <Pause className={cn("w-5 h-5 sm:w-6 sm:h-6", isDark ? "text-white" : "text-gray-700")} />
                                     )}
                                 </button>
                                 <button
                                     onClick={() => handleControl("skip")}
                                     disabled={isControlling}
                                     className={cn(
-                                        "p-3 sm:p-4 rounded-full transition-colors disabled:opacity-50",
+                                        "p-2.5 sm:p-4 rounded-full transition-colors disabled:opacity-50",
                                         isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
                                     )}
                                     title="Skip"
                                 >
-                                    <SkipForward className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
+                                    <SkipForward className={cn("w-5 h-5 sm:w-6 sm:h-6", isDark ? "text-white" : "text-gray-700")} />
                                 </button>
                                 <button
                                     onClick={() => handleControl("stop")}
                                     disabled={isControlling}
-                                    className="p-3 sm:p-4 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition-colors disabled:opacity-50"
+                                    className="p-2.5 sm:p-4 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition-colors disabled:opacity-50"
                                     title="Stop & Disconnect"
                                 >
-                                    <Square className="w-6 h-6" />
+                                    <Square className="w-5 h-5 sm:w-6 sm:h-6" />
                                 </button>
                                 {/* Lyrics Button */}
                                 <button
                                     onClick={() => setLyricsOpen(true)}
                                     className={cn(
-                                        "p-3 sm:p-4 rounded-full transition-colors",
+                                        "p-2.5 sm:p-4 rounded-full transition-colors",
                                         isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
                                     )}
                                     title="Show Lyrics"
                                 >
-                                    <Mic2 className={cn("w-6 h-6", isDark ? "text-white" : "text-gray-700")} />
+                                    <Mic2 className={cn("w-5 h-5 sm:w-6 sm:h-6", isDark ? "text-white" : "text-gray-700")} />
                                 </button>
                             </div>
 
