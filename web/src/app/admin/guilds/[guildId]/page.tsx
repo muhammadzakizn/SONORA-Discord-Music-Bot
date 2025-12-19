@@ -422,7 +422,7 @@ export default function GuildDetailPage() {
             <div className="grid lg:grid-cols-3 gap-6">
                 {/* Now Playing */}
                 <div className={cn(
-                    "lg:col-span-2 p-6 rounded-2xl border",
+                    "lg:col-span-2 p-4 sm:p-6 rounded-2xl border",
                     isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
                 )}>
                     <h2 className={cn(
@@ -506,12 +506,12 @@ export default function GuildDetailPage() {
                             </div>
 
                             {/* Controls - Available to all users (backend verifies voice channel) */}
-                            <div className="flex items-center justify-center gap-3 pt-4">
+                            <div className="flex items-center justify-center flex-wrap gap-2 sm:gap-3 pt-4">
                                 <button
                                     onClick={() => handleControl(guild.current_track?.is_paused ? "resume" : "pause")}
                                     disabled={isControlling}
                                     className={cn(
-                                        "p-4 rounded-full transition-colors disabled:opacity-50",
+                                        "p-3 sm:p-4 rounded-full transition-colors disabled:opacity-50",
                                         isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
                                     )}
                                     title={guild.current_track?.is_paused ? "Resume" : "Pause"}
@@ -526,7 +526,7 @@ export default function GuildDetailPage() {
                                     onClick={() => handleControl("skip")}
                                     disabled={isControlling}
                                     className={cn(
-                                        "p-4 rounded-full transition-colors disabled:opacity-50",
+                                        "p-3 sm:p-4 rounded-full transition-colors disabled:opacity-50",
                                         isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
                                     )}
                                     title="Skip"
@@ -536,7 +536,7 @@ export default function GuildDetailPage() {
                                 <button
                                     onClick={() => handleControl("stop")}
                                     disabled={isControlling}
-                                    className="p-4 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition-colors disabled:opacity-50"
+                                    className="p-3 sm:p-4 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition-colors disabled:opacity-50"
                                     title="Stop & Disconnect"
                                 >
                                     <Square className="w-6 h-6" />
@@ -545,7 +545,7 @@ export default function GuildDetailPage() {
                                 <button
                                     onClick={() => setLyricsOpen(true)}
                                     className={cn(
-                                        "p-4 rounded-full transition-colors",
+                                        "p-3 sm:p-4 rounded-full transition-colors",
                                         isDark ? "bg-zinc-800 hover:bg-zinc-700" : "bg-gray-200 hover:bg-gray-300"
                                     )}
                                     title="Show Lyrics"
@@ -577,7 +577,7 @@ export default function GuildDetailPage() {
 
                 {/* Queue with Management */}
                 <div className={cn(
-                    "p-6 rounded-2xl border",
+                    "p-4 sm:p-6 rounded-2xl border",
                     isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
                 )}>
                     <h2 className={cn(
