@@ -495,7 +495,7 @@ export default function FullscreenLyricsPlayer({
                                     {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
                                         <div
                                             ref={lyricsContainerRef}
-                                            className="h-full overflow-y-auto scrollbar-hide px-6 py-[30vh]"
+                                            className="h-full overflow-y-auto scrollbar-hide px-8 py-[30vh]"
                                             onScroll={() => {
                                                 if (lyricsContainerRef.current) {
                                                     setIsUserScrolling(true);
