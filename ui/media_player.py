@@ -985,6 +985,9 @@ class SynchronizedMediaPlayer:
             # Check if it's TrackInfo (needs download) or MetadataInfo (ready to play)
             from database.models import TrackInfo, MetadataInfo
             
+            # Initialize loading message variable
+            loading_msg = None
+            
             # CHECK: Use pre-fetched metadata if available (INSTANT PLAYBACK!)
             if self.prefetched_metadata and self.prefetched_metadata.title == next_item.title:
                 logger.info(f"⚡ Using pre-fetched track (instant playback): {next_item.title}")
@@ -995,9 +998,29 @@ class SynchronizedMediaPlayer:
                 # Need to download and process this track
                 logger.info(f"Processing next track: {next_item.title}")
                 
+                # ========================================
+                # SHOW LOADING MESSAGE - Let user know bot is processing
+                # ========================================
+                loading_msg = None
+                try:
+                    if hasattr(self.message, 'channel'):
+                        loading_embed = EmbedBuilder.create_loading(
+                            "⏭️ Loading Next Track...",
+                            f"**{next_item.title}**\n*{next_item.artist}*\n\n"
+                            f"📡 Getting stream URL..."
+                        )
+                        loading_msg = await self.message.channel.send(embed=loading_embed)
+                except discord.HTTPException:
+                    pass  # Could not send loading message
+                
                 play_cog = self.bot.get_cog('PlayCommand')
                 if not play_cog:
                     logger.error("PlayCommand not available for download")
+                    if loading_msg:
+                        try:
+                            await loading_msg.delete()
+                        except:
+                            pass
                     return
                 
                 try:
@@ -1090,7 +1113,24 @@ class SynchronizedMediaPlayer:
                     
                     if not audio_result and not use_streaming:
                         logger.error(f"Failed all methods: {next_item.title}")
+                        if loading_msg:
+                            try:
+                                await loading_msg.delete()
+                            except:
+                                pass
                         return await self._play_next_from_queue()
+                    
+                    # Update loading message - processing metadata
+                    try:
+                        if loading_msg:
+                            loading_embed = EmbedBuilder.create_loading(
+                                "⏭️ Loading Next Track...",
+                                f"**{next_item.title}**\n*{next_item.artist}*\n\n"
+                                f"🎨 Processing metadata & artwork..."
+                            )
+                            await loading_msg.edit(embed=loading_embed)
+                    except discord.HTTPException:
+                        pass
                     
                     # Process metadata
                     voice_ch_id = getattr(next_item, 'voice_channel_id', None)
@@ -1168,9 +1208,21 @@ class SynchronizedMediaPlayer:
                 if hasattr(self.bot, 'player_messages'):
                     self.bot.player_messages[self.guild_id] = player_msg
                 
+                # Delete loading message now that player is ready
+                if loading_msg:
+                    try:
+                        await loading_msg.delete()
+                    except:
+                        pass
+                
                 logger.info(f"✓ Created new player message for: {next_metadata.title}")
             except Exception as e:
                 logger.error(f"Failed to send new player message: {e}")
+                if loading_msg:
+                    try:
+                        await loading_msg.delete()
+                    except:
+                        pass
                 return
             
             # Update metadata
