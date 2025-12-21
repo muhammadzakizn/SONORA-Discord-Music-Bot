@@ -546,9 +546,7 @@ export default function FullscreenLyricsPlayer({
                                                                     "text-2xl font-bold leading-snug transition-all duration-300",
                                                                     isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
                                                                 )}
-                                                                style={{
-                                                                    textShadow: isCurrentLine ? '0 0 30px rgba(255,255,255,0.5), 0 0 60px rgba(255,255,255,0.3)' : 'none',
-                                                                }}
+                                                                {/* No textShadow - just use opacity/color for brightness */}
                                                             >
                                                                 {displayText || "♪"}
                                                             </p>
@@ -934,9 +932,6 @@ export default function FullscreenLyricsPlayer({
                                                                         key={wordIndex}
                                                                         style={{
                                                                             color: `rgba(255, 255, 255, ${brightness})`,
-                                                                            textShadow: glowAlpha > 0.1
-                                                                                ? `0 0 ${4 + glowAlpha * 12}px rgba(255, 255, 255, ${glowAlpha * 0.5})`
-                                                                                : "none",
                                                                             marginRight: "0.25em",
                                                                             display: "inline-block",
                                                                             transform: `scale(${scale})`,
@@ -956,9 +951,7 @@ export default function FullscreenLyricsPlayer({
                                                                     ? "text-4xl xs:text-5xl text-white"
                                                                     : "text-3xl lg:text-4xl text-white"
                                                             )}
-                                                            style={isCurrentLine ? {
-                                                                textShadow: "0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.3)"
-                                                            } : undefined}
+                                                            style={undefined}
                                                         >
                                                             {line.text || "• • •"}
                                                         </p>
