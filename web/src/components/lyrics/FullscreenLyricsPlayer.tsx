@@ -20,6 +20,12 @@ import {
     Type,
     ChevronUp,
     Trash2,
+    Upload,
+    Search,
+    X,
+    Check,
+    AlertTriangle,
+    FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import WebGLBackground from "./WebGLBackground";
@@ -169,6 +175,18 @@ export default function FullscreenLyricsPlayer({
     const [loadingPhase, setLoadingPhase] = useState<string>('');
     const [previousTrack, setPreviousTrack] = useState<TrackInfo | null>(null);
     const [trackEnded, setTrackEnded] = useState(false);
+
+    // Lyrics panel state
+    const [showLyricsPanel, setShowLyricsPanel] = useState(false);
+    const [previewLyrics, setPreviewLyrics] = useState<LyricsData | null>(null);
+    const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+    const [isApplyingLyrics, setIsApplyingLyrics] = useState(false);
+    const [customLyrics, setCustomLyrics] = useState<LyricsData | null>(null);
+    const [lyricsSearchQuery, setLyricsSearchQuery] = useState('');
+    const [lyricsSearchResults, setLyricsSearchResults] = useState<any[]>([]);
+    const [isSearchingLyrics, setIsSearchingLyrics] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
     const currentLineRef = useRef<HTMLDivElement>(null);
@@ -445,6 +463,149 @@ export default function FullscreenLyricsPlayer({
         }
     };
 
+    // Parse LRC format lyrics
+    const parseLRC = (content: string): LyricsData | null => {
+        const lines: any[] = [];
+        const lrcLines = content.split('\n');
+
+        // LRC timestamp regex: [mm:ss.xx] or [mm:ss:xx] or [mm:ss]
+        const timestampRegex = /\[(\d{1,2}):(\d{2})(?:[.:](\d{2,3}))?\]/g;
+
+        let hasTimestamps = false;
+
+        for (const line of lrcLines) {
+            const matches = [...line.matchAll(timestampRegex)];
+            if (matches.length > 0) {
+                hasTimestamps = true;
+                const text = line.replace(timestampRegex, '').trim();
+                if (text) {
+                    for (const match of matches) {
+                        const minutes = parseInt(match[1]);
+                        const seconds = parseInt(match[2]);
+                        const ms = match[3] ? parseInt(match[3].padEnd(3, '0')) : 0;
+                        const startTime = minutes * 60 + seconds + ms / 1000;
+
+                        lines.push({
+                            start_time: startTime,
+                            end_time: startTime + 5, // Default 5s duration, will be adjusted
+                            text: text,
+                            words: null
+                        });
+                    }
+                }
+            }
+        }
+
+        if (!hasTimestamps) {
+            return null; // Reject if no timestamps
+        }
+
+        // Sort by start time
+        lines.sort((a, b) => a.start_time - b.start_time);
+
+        // Adjust end times based on next line
+        for (let i = 0; i < lines.length - 1; i++) {
+            lines[i].end_time = lines[i + 1].start_time;
+        }
+
+        return {
+            lines,
+            source: 'custom',
+            offset: 0,
+            total_lines: lines.length,
+            is_synced: true
+        };
+    };
+
+    // Handle file upload
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setUploadError(null);
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const content = e.target?.result as string;
+            const parsed = parseLRC(content);
+
+            if (!parsed) {
+                setUploadError('File tidak memiliki timestamp. Format yang didukung: [mm:ss.xx]text');
+                return;
+            }
+
+            setPreviewLyrics(parsed);
+            setShowPreviewDialog(true);
+        };
+        reader.readAsText(file);
+
+        // Reset input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    // Apply previewed lyrics
+    const handleApplyLyrics = () => {
+        if (!previewLyrics) return;
+
+        setIsApplyingLyrics(true);
+        setShowPreviewDialog(false);
+
+        // Simulate loading for UX
+        setTimeout(() => {
+            setCustomLyrics(previewLyrics);
+            setLyrics(previewLyrics);
+            setPreviewLyrics(null);
+            setIsApplyingLyrics(false);
+            setShowLyricsPanel(false);
+        }, 1000);
+    };
+
+    // Cancel preview
+    const handleCancelPreview = () => {
+        setPreviewLyrics(null);
+        setShowPreviewDialog(false);
+    };
+
+    // Search lyrics
+    const handleSearchLyrics = async () => {
+        if (!lyricsSearchQuery.trim() || !track) return;
+
+        setIsSearchingLyrics(true);
+        setLyricsSearchResults([]);
+
+        try {
+            // Search using current API
+            const response = await fetch(`/api/bot/lyrics/search?q=${encodeURIComponent(lyricsSearchQuery)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`);
+            if (response.ok) {
+                const data = await response.json();
+                setLyricsSearchResults(data.results || []);
+            }
+        } catch (err) {
+            console.error('Lyrics search failed:', err);
+        } finally {
+            setIsSearchingLyrics(false);
+        }
+    };
+
+    // Select search result for preview
+    const handleSelectSearchResult = (result: any) => {
+        if (result.lyrics) {
+            setPreviewLyrics(result.lyrics);
+            setShowPreviewDialog(true);
+        }
+    };
+
+    // Check if lyrics are plain text (no proper sync)
+    const isPlainTextLyrics = useMemo(() => {
+        if (!lyrics?.lines?.length) return false;
+        // If all lines have the same or very close start times, it's plain text
+        const times = lyrics.lines.map(l => l.start_time);
+        const uniqueTimes = new Set(times);
+        return uniqueTimes.size < lyrics.lines.length * 0.5;
+    }, [lyrics]);
+
     // Format time
     const formatTime = (seconds: number) => {
         const mins = Math.floor(Math.abs(seconds) / 60);
@@ -527,12 +688,13 @@ export default function FullscreenLyricsPlayer({
 
                 {/* Loading Overlay for Track Transitions */}
                 <AnimatePresence>
-                    {(isTransitioning || loadingPhase) && queue.length > 0 && (
+                    {((isTransitioning || loadingPhase) && queue.length > 0) ||
+                        (track && currentTime >= track.duration - 0.5 && queue.length > 0 && !trackEnded) ? (
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl"
+                            className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xl"
                         >
                             <div className="text-center">
                                 {/* Spinner */}
@@ -541,19 +703,19 @@ export default function FullscreenLyricsPlayer({
                                 </div>
                                 {/* Loading Phase Text */}
                                 <motion.p
-                                    key={loadingPhase}
+                                    key={loadingPhase || 'preparing'}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className="text-white/80 text-lg font-medium"
+                                    className="text-white/90 text-lg font-medium"
                                 >
-                                    {loadingPhase || 'Loading next track...'}
+                                    {loadingPhase || 'Preparing next track...'}
                                 </motion.p>
-                                <p className="text-white/40 text-sm mt-2">
+                                <p className="text-white/50 text-sm mt-2">
                                     Please wait a moment
                                 </p>
                             </div>
                         </motion.div>
-                    )}
+                    ) : null}
                 </AnimatePresence>
 
                 {/* Empty State - No Track Playing */}
@@ -877,48 +1039,20 @@ export default function FullscreenLyricsPlayer({
                                                     className="absolute left-1/2 bottom-[20%] -translate-x-1/2 w-64 py-2 bg-zinc-900/98 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 pointer-events-auto"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    {/* Lyrics Section */}
-                                                    <div className="px-4 py-3 border-b border-white/10">
-                                                        <div className="flex items-center justify-between mb-3">
-                                                            <div className="flex items-center gap-2">
-                                                                <Type className="w-4 h-4 text-white/60" />
-                                                                <span className="text-sm text-white/80">Lyrics</span>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => setShowLyrics(!showLyrics)}
-                                                                className={`px-2.5 py-1 text-xs rounded-full transition-colors ${showLyrics ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}
-                                                            >
-                                                                {showLyrics ? 'ON' : 'OFF'}
-                                                            </button>
-                                                        </div>
-                                                        <p className="text-xs text-white/40 mb-2">Source</p>
-                                                        <div className="flex gap-1 flex-wrap">
-                                                            {(['applemusic', 'musixmatch', 'lrclib', 'auto'] as const).map((src) => (
-                                                                <button
-                                                                    key={src}
-                                                                    onClick={() => setLyricsSource(src)}
-                                                                    className={`px-2 py-1 text-xs rounded-md transition-colors ${lyricsSource === src ? 'bg-white/20 text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
-                                                                >
-                                                                    {src === 'applemusic' ? 'Apple Music' : src === 'auto' ? 'Auto' : src === 'musixmatch' ? 'Musixmatch' : 'LRCLIB'}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                        {currentSource && (
-                                                            <p className="text-xs text-white/30 mt-1.5">Current: {currentSource}</p>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Romanization Toggle */}
+                                                    {/* Lyrics Section - Opens Panel */}
                                                     <button
-                                                        onClick={() => setShowRomanization(!showRomanization)}
+                                                        onClick={() => {
+                                                            setShowLyricsPanel(true);
+                                                            setShowMenu(false);
+                                                        }}
                                                         className="w-full px-4 py-2.5 flex items-center justify-between text-white/80 hover:bg-white/5 transition-colors"
                                                     >
                                                         <div className="flex items-center gap-3">
-                                                            <Languages className="w-4 h-4" />
-                                                            <span className="text-sm">Romanization</span>
+                                                            <Type className="w-4 h-4" />
+                                                            <span className="text-sm">Lyrics</span>
                                                         </div>
-                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${showRomanization ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
-                                                            {showRomanization ? 'ON' : 'OFF'}
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${showLyrics ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
+                                                            {showLyrics ? 'ON' : 'OFF'}
                                                         </span>
                                                     </button>
 
@@ -1340,6 +1474,283 @@ export default function FullscreenLyricsPlayer({
                                     Close
                                 </button>
                             </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Lyrics Panel */}
+                <AnimatePresence>
+                    {showLyricsPanel && (
+                        <motion.div
+                            initial={{ x: 320, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: 320, opacity: 0 }}
+                            className="fixed right-0 top-0 bottom-0 w-80 z-50 bg-black/60 backdrop-blur-xl border-l border-white/10"
+                        >
+                            <div className="p-5 h-full flex flex-col overflow-hidden">
+                                {/* Header */}
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                                        <Type className="w-5 h-5" />
+                                        Lyrics Settings
+                                    </h3>
+                                    <button
+                                        onClick={() => setShowLyricsPanel(false)}
+                                        className="p-1.5 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                {/* Controls */}
+                                <div className="space-y-4 flex-1 overflow-y-auto">
+                                    {/* Lyrics Toggle */}
+                                    <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <Type className="w-4 h-4 text-white/60" />
+                                            <span className="text-white text-sm">Lyrics</span>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowLyrics(!showLyrics)}
+                                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${showLyrics ? 'bg-white text-black' : 'bg-white/20 text-white/60'
+                                                }`}
+                                        >
+                                            {showLyrics ? 'ON' : 'OFF'}
+                                        </button>
+                                    </div>
+
+                                    {/* Romanization Toggle */}
+                                    <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <Languages className="w-4 h-4 text-white/60" />
+                                            <span className="text-white text-sm">Romanization</span>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowRomanization(!showRomanization)}
+                                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${showRomanization ? 'bg-white text-black' : 'bg-white/20 text-white/60'
+                                                }`}
+                                        >
+                                            {showRomanization ? 'ON' : 'OFF'}
+                                        </button>
+                                    </div>
+
+                                    {/* Source Selection */}
+                                    <div className="p-3 rounded-xl bg-white/5">
+                                        <p className="text-white/60 text-xs mb-2">Source</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {(['applemusic', 'musixmatch', 'lrclib', 'auto'] as const).map((src) => (
+                                                <button
+                                                    key={src}
+                                                    onClick={() => setLyricsSource(src)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${lyricsSource === src
+                                                        ? 'bg-white text-black'
+                                                        : 'bg-white/10 text-white/70 hover:bg-white/20'
+                                                        }`}
+                                                >
+                                                    {src === 'applemusic' ? 'Apple Music' :
+                                                        src === 'musixmatch' ? 'Musixmatch' :
+                                                            src === 'lrclib' ? 'LRCLIB' : 'Auto'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {currentSource && (
+                                            <p className="text-white/40 text-xs mt-2">Current: {currentSource}</p>
+                                        )}
+                                    </div>
+
+                                    {/* Divider */}
+                                    <div className="border-t border-white/10 my-4" />
+
+                                    {/* Manual Upload */}
+                                    <div className="p-3 rounded-xl bg-white/5">
+                                        <p className="text-white/60 text-xs mb-2">Upload Lyrics</p>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept=".lrc,.txt"
+                                            onChange={handleFileUpload}
+                                            className="hidden"
+                                        />
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm transition-colors"
+                                        >
+                                            <Upload className="w-4 h-4" />
+                                            Choose LRC File
+                                        </button>
+                                        <p className="text-white/40 text-xs mt-2 text-center">
+                                            Format: .lrc atau .txt dengan timestamp
+                                        </p>
+                                        {uploadError && (
+                                            <div className="mt-2 p-2 rounded-lg bg-rose-500/20 border border-rose-500/30">
+                                                <p className="text-rose-400 text-xs flex items-center gap-1">
+                                                    <AlertTriangle className="w-3 h-3" />
+                                                    {uploadError}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Search Lyrics */}
+                                    <div className="p-3 rounded-xl bg-white/5">
+                                        <p className="text-white/60 text-xs mb-2">Search Lyrics</p>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={lyricsSearchQuery}
+                                                onChange={(e) => setLyricsSearchQuery(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleSearchLyrics()}
+                                                placeholder="Title or artist..."
+                                                className="flex-1 bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-white/30"
+                                            />
+                                            <button
+                                                onClick={handleSearchLyrics}
+                                                disabled={isSearchingLyrics}
+                                                className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50"
+                                            >
+                                                {isSearchingLyrics ? (
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                ) : (
+                                                    <Search className="w-4 h-4" />
+                                                )}
+                                            </button>
+                                        </div>
+
+                                        {/* Search Results */}
+                                        {lyricsSearchResults.length > 0 && (
+                                            <div className="mt-3 space-y-2 max-h-40 overflow-y-auto">
+                                                {lyricsSearchResults.map((result, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => handleSelectSearchResult(result)}
+                                                        className="w-full text-left p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                                                    >
+                                                        <p className="text-white text-sm truncate">{result.title || 'Unknown'}</p>
+                                                        <p className="text-white/50 text-xs truncate">{result.source || 'Unknown source'}</p>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Custom Lyrics Indicator */}
+                                    {customLyrics && (
+                                        <div className="p-3 rounded-xl bg-green-500/20 border border-green-500/30">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Check className="w-4 h-4 text-green-400" />
+                                                    <span className="text-green-400 text-sm">Custom lyrics applied</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        setCustomLyrics(null);
+                                                        setLyrics(null);
+                                                    }}
+                                                    className="text-white/50 hover:text-white text-xs"
+                                                >
+                                                    Reset
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Preview Dialog */}
+                <AnimatePresence>
+                    {showPreviewDialog && previewLyrics && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+                            onClick={handleCancelPreview}
+                        >
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="relative bg-zinc-900/90 backdrop-blur-xl rounded-2xl max-w-md w-full border border-white/20 overflow-hidden"
+                            >
+                                {/* Header */}
+                                <div className="p-5 border-b border-white/10">
+                                    <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                                        <FileText className="w-5 h-5" />
+                                        Lyrics Preview
+                                    </h3>
+                                    <p className="text-white/50 text-sm mt-1">
+                                        {previewLyrics.total_lines} lines found
+                                    </p>
+                                </div>
+
+                                {/* Preview Content */}
+                                <div className="p-5 max-h-60 overflow-y-auto">
+                                    <div className="space-y-2">
+                                        {previewLyrics.lines.slice(0, 8).map((line, idx) => (
+                                            <div key={idx} className="flex items-start gap-3">
+                                                <span className="text-white/30 text-xs font-mono shrink-0 mt-0.5">
+                                                    [{Math.floor(line.start_time / 60)}:{String(Math.floor(line.start_time % 60)).padStart(2, '0')}]
+                                                </span>
+                                                <p className="text-white/80 text-sm">{line.text}</p>
+                                            </div>
+                                        ))}
+                                        {previewLyrics.lines.length > 8 && (
+                                            <p className="text-white/40 text-sm text-center pt-2">
+                                                ... dan {previewLyrics.lines.length - 8} baris lagi
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Warning */}
+                                <div className="px-5 py-3 bg-amber-500/10 border-t border-amber-500/20">
+                                    <p className="text-amber-400 text-xs flex items-center gap-2">
+                                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                                        Audio mungkin akan terganggu selama proses ini
+                                    </p>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="p-5 flex gap-3 border-t border-white/10">
+                                    <button
+                                        onClick={handleCancelPreview}
+                                        className="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleApplyLyrics}
+                                        className="flex-1 py-2.5 rounded-xl bg-white text-black font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                        Apply Lyrics
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Applying Lyrics Loading */}
+                <AnimatePresence>
+                    {isApplyingLyrics && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-xl"
+                        >
+                            <div className="text-center">
+                                <div className="w-12 h-12 mx-auto mb-4 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+                                <p className="text-white font-medium">Applying lyrics...</p>
+                                <p className="text-white/50 text-sm mt-1">Audio mungkin terganggu sementara</p>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
