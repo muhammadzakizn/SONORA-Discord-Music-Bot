@@ -564,9 +564,12 @@ export default function FullscreenLyricsPlayer({
                                                             ) : (
                                                                 <p
                                                                     className={cn(
-                                                                        "text-2xl font-bold leading-snug transition-colors duration-300",
+                                                                        "text-2xl font-bold leading-snug transition-all duration-300",
                                                                         isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
                                                                     )}
+                                                                    style={{
+                                                                        textShadow: isCurrentLine ? '0 0 30px rgba(255,255,255,0.5), 0 0 60px rgba(255,255,255,0.3)' : 'none',
+                                                                    }}
                                                                 >
                                                                     {displayText || "♪"}
                                                                 </p>
