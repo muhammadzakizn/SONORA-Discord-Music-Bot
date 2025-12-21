@@ -166,7 +166,9 @@ export default function FullscreenLyricsPlayer({
 
     // Track transition state
     const [isTransitioning, setIsTransitioning] = useState(false);
+    const [loadingPhase, setLoadingPhase] = useState<string>('');
     const [previousTrack, setPreviousTrack] = useState<TrackInfo | null>(null);
+    const [trackEnded, setTrackEnded] = useState(false);
 
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
     const currentLineRef = useRef<HTMLDivElement>(null);
@@ -268,6 +270,18 @@ export default function FullscreenLyricsPlayer({
             serverTimeRef.current = serverTime;
             setCurrentTime(serverTime);
 
+            // Detect if track ended (no track playing)
+            if (!data.track && !data.is_playing) {
+                setTrackEnded(true);
+                setTrack(null);
+                setLyrics(null);
+                lastTrackIdRef.current = '';
+                return;
+            }
+
+            // Track is playing, clear ended state
+            setTrackEnded(false);
+
             // Check if track changed - if so, need to refetch lyrics
             const newTrackId = `${data.track?.title}-${data.track?.artist}`;
             if (newTrackId !== lastTrackIdRef.current && data.track) {
@@ -279,6 +293,9 @@ export default function FullscreenLyricsPlayer({
                 setLyricsLoading(true);
                 setLyricsFailed(false);
 
+                // Show loading phases
+                setLoadingPhase('Fetching metadata...');
+
                 // Save previous track for transition animation
                 if (track) {
                     setPreviousTrack(track);
@@ -286,6 +303,11 @@ export default function FullscreenLyricsPlayer({
 
                 lastTrackIdRef.current = newTrackId;
                 lyricsLoadedRef.current = false;
+
+                // Simulate loading phases for better UX
+                setTimeout(() => setLoadingPhase('Loading artwork...'), 200);
+                setTimeout(() => setLoadingPhase('Fetching lyrics...'), 500);
+
                 setTrack(data.track);
                 setLyrics(data.lyrics);
 
@@ -295,11 +317,16 @@ export default function FullscreenLyricsPlayer({
 
                 // Check if lyrics loaded successfully
                 if (data.lyrics?.lines?.length > 0) {
-                    setLyricsLoading(false);
-                    lyricsLoadedRef.current = true;
+                    setTimeout(() => setLoadingPhase('Preparing playback...'), 300);
+                    setTimeout(() => {
+                        setLyricsLoading(false);
+                        lyricsLoadedRef.current = true;
+                        setLoadingPhase('');
+                    }, 500);
                 } else {
                     setLyricsLoading(false);
                     setLyricsFailed(true);
+                    setLoadingPhase('');
                 }
 
                 // End transition after animation completes
@@ -307,12 +334,13 @@ export default function FullscreenLyricsPlayer({
                     trackChangingRef.current = false;
                     setIsTransitioning(false);
                     setPreviousTrack(null);
-                }, 600);
+                }, 800);
             }
         } catch (err) {
             console.error("Failed to sync time:", err);
             setLyricsLoading(false);
             setLyricsFailed(true);
+            setLoadingPhase('');
         }
     }, [guildId, lyricsSource, track]);
 
@@ -496,6 +524,69 @@ export default function FullscreenLyricsPlayer({
 
                     <div className="absolute inset-0 opacity-[0.03] bg-noise" />
                 </div>
+
+                {/* Loading Overlay for Track Transitions */}
+                <AnimatePresence>
+                    {(isTransitioning || loadingPhase) && queue.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl"
+                        >
+                            <div className="text-center">
+                                {/* Spinner */}
+                                <div className="w-16 h-16 mx-auto mb-6">
+                                    <div className="w-full h-full border-4 border-white/20 border-t-white rounded-full animate-spin" />
+                                </div>
+                                {/* Loading Phase Text */}
+                                <motion.p
+                                    key={loadingPhase}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="text-white/80 text-lg font-medium"
+                                >
+                                    {loadingPhase || 'Loading next track...'}
+                                </motion.p>
+                                <p className="text-white/40 text-sm mt-2">
+                                    Please wait a moment
+                                </p>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Empty State - No Track Playing */}
+                <AnimatePresence>
+                    {trackEnded && !isTransitioning && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 z-40 flex items-center justify-center"
+                        >
+                            <div className="text-center px-8">
+                                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-white/10 flex items-center justify-center">
+                                    <Music className="w-10 h-10 text-white/40" />
+                                </div>
+                                <h3 className="text-white text-xl font-semibold mb-2">
+                                    No Track Playing
+                                </h3>
+                                <p className="text-white/50 text-sm max-w-xs mx-auto">
+                                    {queue.length > 0
+                                        ? `${queue.length} track${queue.length > 1 ? 's' : ''} in queue. Waiting for playback to start...`
+                                        : 'The queue is empty. Add some music to get started!'}
+                                </p>
+                                <button
+                                    onClick={onClose}
+                                    className="mt-6 px-6 py-2.5 bg-white/10 hover:bg-white/20 rounded-full text-white text-sm font-medium transition-colors"
+                                >
+                                    Close Player
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* Content */}
                 <div className={cn(
