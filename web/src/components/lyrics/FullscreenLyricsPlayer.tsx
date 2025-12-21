@@ -186,6 +186,8 @@ export default function FullscreenLyricsPlayer({
     const [lyricsSearchResults, setLyricsSearchResults] = useState<any[]>([]);
     const [isSearchingLyrics, setIsSearchingLyrics] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [isLoadingSourcePreview, setIsLoadingSourcePreview] = useState(false);
+    const [pendingSource, setPendingSource] = useState<typeof lyricsSource | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
@@ -566,6 +568,7 @@ export default function FullscreenLyricsPlayer({
     const handleCancelPreview = () => {
         setPreviewLyrics(null);
         setShowPreviewDialog(false);
+        setPendingSource(null);
     };
 
     // Search lyrics - re-fetch with custom query
@@ -612,6 +615,55 @@ export default function FullscreenLyricsPlayer({
         if (result.lyrics) {
             setPreviewLyrics(result.lyrics);
             setShowPreviewDialog(true);
+        }
+    };
+
+    // Preview lyrics from a specific source before applying
+    const handleSourcePreview = async (source: typeof lyricsSource) => {
+        if (!guildId || !track) return;
+        if (source === lyricsSource) return; // Already using this source
+
+        setIsLoadingSourcePreview(true);
+        setPendingSource(source);
+
+        try {
+            // Fetch lyrics with the new source
+            const response = await fetch(
+                `/api/bot/guild/${guildId}/lyrics?source=${source}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.lyrics?.lines?.length > 0) {
+                    setPreviewLyrics(data.lyrics);
+                    setShowPreviewDialog(true);
+                } else {
+                    // No lyrics found from this source
+                    alert(`Tidak ditemukan lirik dari ${source === 'applemusic' ? 'Apple Music' :
+                        source === 'lyricify' ? 'Lyricify (QQ)' :
+                            source === 'musixmatch' ? 'Musixmatch' :
+                                source === 'lrclib' ? 'LRCLIB' : 'Auto'}`);
+                }
+            } else {
+                console.error('Failed to fetch lyrics from source:', source);
+                alert('Gagal mengambil lirik dari source tersebut');
+            }
+        } catch (err) {
+            console.error('Source preview failed:', err);
+            alert('Terjadi kesalahan saat mengambil lirik');
+        } finally {
+            setIsLoadingSourcePreview(false);
+        }
+    };
+
+    // Apply lyrics from source preview
+    const handleApplySourcePreview = () => {
+        if (pendingSource && previewLyrics) {
+            setLyricsSource(pendingSource);
+            setLyrics(previewLyrics);
+            setPreviewLyrics(null);
+            setShowPreviewDialog(false);
+            setPendingSource(null);
         }
     };
 
@@ -1690,21 +1742,25 @@ export default function FullscreenLyricsPlayer({
 
                                     {/* Source Selection */}
                                     <div className="p-3 rounded-xl bg-white/5">
-                                        <p className="text-white/60 text-xs mb-2">Source</p>
+                                        <p className="text-white/60 text-xs mb-2">Source (tap to preview)</p>
                                         <div className="flex flex-wrap gap-2">
                                             {(['applemusic', 'lyricify', 'musixmatch', 'lrclib', 'auto'] as const).map((src) => (
                                                 <button
                                                     key={src}
-                                                    onClick={() => setLyricsSource(src)}
+                                                    onClick={() => handleSourcePreview(src)}
+                                                    disabled={isLoadingSourcePreview || lyricsSource === src}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${lyricsSource === src
                                                         ? 'bg-white text-black'
-                                                        : 'bg-white/10 text-white/70 hover:bg-white/20'
+                                                        : pendingSource === src && isLoadingSourcePreview
+                                                            ? 'bg-white/30 text-white animate-pulse'
+                                                            : 'bg-white/10 text-white/70 hover:bg-white/20 disabled:opacity-50'
                                                         }`}
                                                 >
-                                                    {src === 'applemusic' ? 'Apple Music' :
-                                                        src === 'lyricify' ? 'Lyricify (QQ)' :
-                                                            src === 'musixmatch' ? 'Musixmatch' :
-                                                                src === 'lrclib' ? 'LRCLIB' : 'Auto'}
+                                                    {pendingSource === src && isLoadingSourcePreview ? '...' :
+                                                        src === 'applemusic' ? 'Apple Music' :
+                                                            src === 'lyricify' ? 'Lyricify (QQ)' :
+                                                                src === 'musixmatch' ? 'Musixmatch' :
+                                                                    src === 'lrclib' ? 'LRCLIB' : 'Auto'}
                                                 </button>
                                             ))}
                                         </div>
@@ -1903,11 +1959,11 @@ export default function FullscreenLyricsPlayer({
                                         Cancel
                                     </button>
                                     <button
-                                        onClick={handleApplyLyrics}
+                                        onClick={pendingSource ? handleApplySourcePreview : handleApplyLyrics}
                                         className="flex-1 py-2.5 rounded-xl bg-white text-black font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
                                     >
                                         <Check className="w-4 h-4" />
-                                        Apply Lyrics
+                                        {pendingSource ? 'Use This Source' : 'Apply Lyrics'}
                                     </button>
                                 </div>
                             </motion.div>
