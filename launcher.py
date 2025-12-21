@@ -155,9 +155,10 @@ def run_production():
     
     # Start LyricifyApi C# microservice (for QQ Music syllable lyrics)
     proc_lyricify = None
-    lyricify_binary = LYRICIFY_DIR / 'publish' / 'linux-x64' / 'LyricifyApi'
+    lyricify_binary = (LYRICIFY_DIR / 'publish' / 'linux-x64' / 'LyricifyApi').resolve()
+    lyricify_workdir = (LYRICIFY_DIR / 'publish' / 'linux-x64').resolve()
     
-    if lyricify_binary.exists():
+    if lyricify_binary.exists() and lyricify_binary.is_file():
         # Use pre-built Linux binary (no .NET SDK required)
         print(f"{Colors.CYAN}Starting LyricifyApi (pre-built binary)...{Colors.END}")
         try:
@@ -166,9 +167,10 @@ def run_production():
             
             proc_lyricify = subprocess.Popen(
                 [str(lyricify_binary)],
-                cwd=str(LYRICIFY_DIR / 'publish' / 'linux-x64'),
+                cwd=str(lyricify_workdir),
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
+                shell=False
             )
             time.sleep(3)
             if proc_lyricify.poll() is None:
