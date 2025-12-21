@@ -155,8 +155,8 @@ def run_production():
     
     # Start LyricifyApi C# microservice (for QQ Music syllable lyrics)
     proc_lyricify = None
-    lyricify_binary = (LYRICIFY_DIR / 'publish' / 'linux-x64' / 'LyricifyApi').resolve()
-    lyricify_workdir = (LYRICIFY_DIR / 'publish' / 'linux-x64').resolve()
+    lyricify_binary = (LYRICIFY_DIR / 'publish' / 'linux-x64-single' / 'LyricifyApi').resolve()
+    lyricify_workdir = (LYRICIFY_DIR / 'publish' / 'linux-x64-single').resolve()
     
     if lyricify_binary.exists() and lyricify_binary.is_file():
         # Use pre-built Linux binary (no .NET SDK required)
