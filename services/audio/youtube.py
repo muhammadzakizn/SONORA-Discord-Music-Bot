@@ -353,6 +353,21 @@ class YouTubeDownloader(BaseDownloader):
                 if matches_in_artist and not matches_in_title:
                     final_score *= 0.5  # Reduce score - probably wrong song same artist
                 
+                # CRITICAL: Penalize unwanted variations (remix, cover, live, etc.)
+                # when query doesn't request them
+                unwanted_variations = ['remix', 'cover', 'live', 'acoustic', 'instrumental', 
+                                      'karaoke', 'version', 'edit', 'bootleg', 'mashup', 'extended']
+                query_lower = query.lower()
+                result_title_lower = result_title.lower()
+                
+                for variation in unwanted_variations:
+                    # If result contains variation but query doesn't
+                    if variation in result_title_lower and variation not in query_lower:
+                        # Strong penalty - prefer original over variations
+                        final_score *= 0.3
+                        logger.debug(f"Penalized for unwanted '{variation}': {result_title}")
+                        break  # Apply penalty once
+                
                 details = f"title_cov={title_coverage:.2f}, total_cov={total_coverage:.2f}, bonus={title_bonus:.2f}"
                 logger.debug(f"Score {final_score:.2f} ({details}): '{result_title}' by '{result_artist}'")
                 
