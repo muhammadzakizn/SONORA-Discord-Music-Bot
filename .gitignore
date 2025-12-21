@@ -112,3 +112,7 @@ web/.git
 downloads/playlist_cache/
 .beautiful-lyrics-study/
 .beautiful-lyrics-study
+lyricify_helper/
+
+LyricifyApi/bin/
+LyricifyApi/obj/

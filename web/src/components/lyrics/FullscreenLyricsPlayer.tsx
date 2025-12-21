@@ -159,7 +159,7 @@ export default function FullscreenLyricsPlayer({
     const [showMenu, setShowMenu] = useState(false);
     const [isControlling, setIsControlling] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [lyricsSource, setLyricsSource] = useState<'applemusic' | 'auto' | 'musixmatch' | 'lrclib'>('applemusic');
+    const [lyricsSource, setLyricsSource] = useState<'applemusic' | 'auto' | 'musixmatch' | 'lrclib' | 'lyricify'>('applemusic');
     const [currentSource, setCurrentSource] = useState<string>('');
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -1692,7 +1692,7 @@ export default function FullscreenLyricsPlayer({
                                     <div className="p-3 rounded-xl bg-white/5">
                                         <p className="text-white/60 text-xs mb-2">Source</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {(['applemusic', 'musixmatch', 'lrclib', 'auto'] as const).map((src) => (
+                                            {(['applemusic', 'lyricify', 'musixmatch', 'lrclib', 'auto'] as const).map((src) => (
                                                 <button
                                                     key={src}
                                                     onClick={() => setLyricsSource(src)}
@@ -1702,8 +1702,9 @@ export default function FullscreenLyricsPlayer({
                                                         }`}
                                                 >
                                                     {src === 'applemusic' ? 'Apple Music' :
-                                                        src === 'musixmatch' ? 'Musixmatch' :
-                                                            src === 'lrclib' ? 'LRCLIB' : 'Auto'}
+                                                        src === 'lyricify' ? 'Lyricify (QQ)' :
+                                                            src === 'musixmatch' ? 'Musixmatch' :
+                                                                src === 'lrclib' ? 'LRCLIB' : 'Auto'}
                                                 </button>
                                             ))}
                                         </div>
@@ -1931,7 +1932,7 @@ export default function FullscreenLyricsPlayer({
                         </motion.div>
                     )}
                 </AnimatePresence>
-            </motion.div>
-        </AnimatePresence>
+            </motion.div >
+        </AnimatePresence >
     );
 }

@@ -22,7 +22,9 @@ os.environ['CLOUDFLARE_TUNNEL_TOKEN'] = "eyJhIjoiYzAxZjBkYjYzMDY0YjJjOWFhMmQ3NjI
 # Configuration
 WEB_PORT = 9072  # Port for web dashboard (legacy, now on Vercel)
 BOT_API_PORT = 9072  # Port for bot API (use public port since Vercel needs access)
+LYRICIFY_API_PORT = 5050  # Port for LyricifyApi C# microservice
 WEB_DIR = Path('web')
+LYRICIFY_DIR = Path('LyricifyApi')
 
 class Colors:
     GREEN = '\033[92m'
@@ -40,7 +42,7 @@ def print_banner():
 {Colors.CYAN}{Colors.BOLD}
 ╔══════════════════════════════════════════════════════════════╗
 ║                      SONORA MUSIC BOT                        ║
-║               Discord Audio Bot - Version 3.19.0             ║
+║               Discord Audio Bot - Version 3.24.0             ║
 ║          Production Mode for Pterodactyl Server              ║
 ╚══════════════════════════════════════════════════════════════╝
 {Colors.END}
@@ -91,6 +93,7 @@ def cleanup_processes():
     subprocess.run(['pkill', '-f', 'npm'], capture_output=True)
     subprocess.run(['pkill', '-f', 'python3 main.py'], capture_output=True)
     subprocess.run(['pkill', '-f', 'cloudflared'], capture_output=True)
+    subprocess.run(['pkill', '-f', 'LyricifyApi'], capture_output=True)
     
     # Remove Next.js lock files
     for lock_file in [WEB_DIR / '.next/dev/lock', WEB_DIR / '.next/build/lock']:
@@ -149,6 +152,34 @@ def run_production():
     proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
     time.sleep(3)
     print(f"{Colors.GREEN}✓ Bot started with API on port {BOT_API_PORT}{Colors.END}")
+    
+    # Start LyricifyApi C# microservice (for QQ Music syllable lyrics)
+    proc_lyricify = None
+    if LYRICIFY_DIR.exists() and (LYRICIFY_DIR / 'LyricifyApi.csproj').exists():
+        print(f"{Colors.CYAN}Starting LyricifyApi (Syllable Lyrics)...{Colors.END}")
+        try:
+            # Check if dotnet is available
+            dotnet_check = subprocess.run(['which', 'dotnet'], capture_output=True)
+            if dotnet_check.returncode == 0:
+                proc_lyricify = subprocess.Popen(
+                    ['dotnet', 'run', '--no-build'],
+                    cwd=str(LYRICIFY_DIR),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                time.sleep(3)
+                if proc_lyricify.poll() is None:
+                    print(f"{Colors.GREEN}✓ LyricifyApi started on port {LYRICIFY_API_PORT}{Colors.END}")
+                else:
+                    print(f"{Colors.YELLOW}⚠️  LyricifyApi failed to start (build first with 'dotnet build'){Colors.END}")
+                    proc_lyricify = None
+            else:
+                print(f"{Colors.YELLOW}⚠️  .NET SDK not installed - LyricifyApi disabled{Colors.END}")
+        except Exception as e:
+            print(f"{Colors.YELLOW}⚠️  LyricifyApi error: {e}{Colors.END}")
+            proc_lyricify = None
+    else:
+        print(f"{Colors.YELLOW}⚠️  LyricifyApi not found - Syllable lyrics from QQ Music disabled{Colors.END}")
     
     # Web Dashboard now runs on Vercel (https://sonora.muhammadzakizn.com)
     # No need to start local web dashboard
@@ -254,18 +285,24 @@ def run_production():
             proc_web.terminate()
         if proc_tunnel is not None:
             proc_tunnel.terminate()
+        if proc_lyricify is not None:
+            proc_lyricify.terminate()
         try:
             proc_bot.wait(timeout=5)
             if proc_web is not None:
                 proc_web.wait(timeout=5)
             if proc_tunnel is not None:
                 proc_tunnel.wait(timeout=3)
+            if proc_lyricify is not None:
+                proc_lyricify.wait(timeout=3)
         except:
             proc_bot.kill()
             if proc_web is not None:
                 proc_web.kill()
             if proc_tunnel is not None:
                 proc_tunnel.kill()
+            if proc_lyricify is not None:
+                proc_lyricify.kill()
         # Clean up signal files
         for sig_file in [restart_signal_file, Path('.dashboard_restart')]:
             try:

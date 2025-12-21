@@ -18,6 +18,7 @@ class LyricsSource(str, Enum):
     GENIUS = "Genius"
     MUSIXMATCH = "Musixmatch"
     SYNCED = "Syncedlyrics"
+    LYRICIFY = "Lyricify"
     NONE = "No Lyrics"
 
 

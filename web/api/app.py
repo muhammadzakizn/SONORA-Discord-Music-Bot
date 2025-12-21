@@ -463,6 +463,63 @@ def api_guild_lyrics(guild_id: int):
                     except Exception as e:
                         logger.error(f"[AppleMusic] Fetch FAILED: {e}", exc_info=True)
             
+            # Try Lyricify (QQ Music) if requested
+            if source_pref == 'lyricify' and lyrics_data is None:
+                logger.info(f"[Lyricify] Attempting fetch for: {metadata.title} - {metadata.artist}")
+                try:
+                    from services.lyrics.lyricify_client import LyricifyClient
+                    from database.models import TrackInfo as TrackInfoModel
+                    
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    client = LyricifyClient()
+                    track = TrackInfoModel(
+                        title=metadata.title,
+                        artist=metadata.artist,
+                        duration=int(metadata.duration) if metadata.duration else 0
+                    )
+                    
+                    lyricify_lyrics = loop.run_until_complete(client.fetch(track))
+                    loop.close()
+                    
+                    if lyricify_lyrics and lyricify_lyrics.lines:
+                        logger.info(f"[Lyricify] SUCCESS! Got {len(lyricify_lyrics.lines)} lines with syllable timing")
+                        lyrics_source_used = "lyricify"
+                        
+                        # Convert to response format
+                        lines = []
+                        for line in lyricify_lyrics.lines:
+                            words = []
+                            if hasattr(line, 'words') and line.words:
+                                for word in line.words:
+                                    words.append({
+                                        "text": word.text,
+                                        "start_time": word.start_time,
+                                        "end_time": word.end_time
+                                    })
+                            
+                            lines.append({
+                                "text": line.text,
+                                "start_time": line.start_time,
+                                "end_time": line.end_time,
+                                "romanized": getattr(line, 'romanized', None),
+                                "words": words
+                            })
+                        
+                        lyrics_data = {
+                            "is_synced": lyricify_lyrics.is_synced,
+                            "source": "lyricify",
+                            "offset": getattr(lyricify_lyrics, 'offset', 0),
+                            "lines": lines,
+                            "total_lines": len(lines),
+                            "has_syllable_timing": getattr(lyricify_lyrics, 'has_syllable_timing', True)
+                        }
+                    else:
+                        logger.warning(f"[Lyricify] No lyrics found for: {metadata.title} - {metadata.artist}")
+                except Exception as e:
+                    logger.error(f"[Lyricify] Fetch FAILED: {e}", exc_info=True)
+            
             # Save to cache if we got lyrics
             if lyrics_data:
                 _lyrics_cache[cache_key] = {
@@ -592,13 +649,92 @@ def api_guild_lyrics(guild_id: int):
             "is_paused": is_paused,
             "duration": metadata.duration,
             "lyrics_source": lyrics_source_used,
-            "available_sources": ["auto", "musixmatch", "lrclib"]
+            "available_sources": ["applemusic", "lyricify", "musixmatch", "lrclib", "auto"]
         })
     
     except Exception as e:
         logger.error(f"Failed to get lyrics: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/lyrics/search')
+def api_lyrics_search():
+    """Search for lyrics by query - supports multiple sources"""
+    query = request.args.get('q', '')
+    source = request.args.get('source', 'auto')  # auto, lyricify, syncedlyrics
+    
+    if not query:
+        return jsonify({"error": "Query parameter 'q' is required"}), 400
+    
+    try:
+        logger.info(f"Lyrics search request: {query} (source: {source})")
+        
+        lyrics_data = None
+        
+        # Try Lyricify first if requested or auto
+        if source in ['lyricify', 'auto']:
+            try:
+                from services.lyrics.lyricify_client import LyricifyClient
+                
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                client = LyricifyClient()
+                lyrics_data = loop.run_until_complete(client.search(query))
+                loop.close()
+                
+                if lyrics_data:
+                    logger.info(f"[Lyricify] Found {len(lyrics_data.lines)} lines")
+            except Exception as e:
+                logger.warning(f"Lyricify search failed: {e}")
+        
+        # Fallback to syncedlyrics if Lyricify didn't find anything
+        if not lyrics_data and source in ['syncedlyrics', 'auto']:
+            try:
+                from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
+                
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                fetcher = SyncedLyricsFetcher()
+                lyrics_data = loop.run_until_complete(fetcher.search(query))
+                loop.close()
+                
+                if lyrics_data:
+                    logger.info(f"[Syncedlyrics] Found {len(lyrics_data.lines)} lines")
+            except Exception as e:
+                logger.warning(f"Syncedlyrics search failed: {e}")
+        
+        if not lyrics_data:
+            logger.info(f"No lyrics found for: {query}")
+            return jsonify({"found": False, "lyrics": None})
+        
+        # Convert to dict
+        lyrics_dict = {
+            "lines": [
+                {
+                    "text": line.text,
+                    "start_time": line.start_time,
+                    "end_time": line.end_time,
+                    "romanized": getattr(line, 'romanized', None),
+                    "words": [
+                        {"text": w.text, "start_time": w.start_time, "end_time": w.end_time}
+                        for w in (line.words or [])
+                    ] if hasattr(line, 'words') and line.words else []
+                }
+                for line in lyrics_data.lines
+            ],
+            "total_lines": len(lyrics_data.lines),
+            "is_synced": lyrics_data.is_synced,
+            "source": str(lyrics_data.source.value) if lyrics_data.source else "unknown",
+            "has_syllable_timing": getattr(lyrics_data, 'has_syllable_timing', False)
+        }
+        
+        logger.info(f"Found {len(lyrics_data.lines)} lines for: {query}")
+        return jsonify({"found": True, "lyrics": lyrics_dict})
+    except Exception as e:
+        logger.error(f"Failed to search lyrics: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/history')
