@@ -155,10 +155,34 @@ def run_production():
     
     # Start LyricifyApi C# microservice (for QQ Music syllable lyrics)
     proc_lyricify = None
-    if LYRICIFY_DIR.exists() and (LYRICIFY_DIR / 'LyricifyApi.csproj').exists():
-        print(f"{Colors.CYAN}Starting LyricifyApi (Syllable Lyrics)...{Colors.END}")
+    lyricify_binary = LYRICIFY_DIR / 'publish' / 'linux-x64' / 'LyricifyApi'
+    
+    if lyricify_binary.exists():
+        # Use pre-built Linux binary (no .NET SDK required)
+        print(f"{Colors.CYAN}Starting LyricifyApi (pre-built binary)...{Colors.END}")
         try:
-            # Check if dotnet is available
+            # Make sure it's executable
+            subprocess.run(['chmod', '+x', str(lyricify_binary)], capture_output=True)
+            
+            proc_lyricify = subprocess.Popen(
+                [str(lyricify_binary)],
+                cwd=str(LYRICIFY_DIR / 'publish' / 'linux-x64'),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            time.sleep(3)
+            if proc_lyricify.poll() is None:
+                print(f"{Colors.GREEN}✓ LyricifyApi started on port {LYRICIFY_API_PORT}{Colors.END}")
+            else:
+                print(f"{Colors.YELLOW}⚠️  LyricifyApi failed to start{Colors.END}")
+                proc_lyricify = None
+        except Exception as e:
+            print(f"{Colors.YELLOW}⚠️  LyricifyApi error: {e}{Colors.END}")
+            proc_lyricify = None
+    elif LYRICIFY_DIR.exists() and (LYRICIFY_DIR / 'LyricifyApi.csproj').exists():
+        # Try dotnet if available
+        print(f"{Colors.CYAN}Starting LyricifyApi (via dotnet)...{Colors.END}")
+        try:
             dotnet_check = subprocess.run(['which', 'dotnet'], capture_output=True)
             if dotnet_check.returncode == 0:
                 proc_lyricify = subprocess.Popen(
@@ -171,15 +195,15 @@ def run_production():
                 if proc_lyricify.poll() is None:
                     print(f"{Colors.GREEN}✓ LyricifyApi started on port {LYRICIFY_API_PORT}{Colors.END}")
                 else:
-                    print(f"{Colors.YELLOW}⚠️  LyricifyApi failed to start (build first with 'dotnet build'){Colors.END}")
+                    print(f"{Colors.YELLOW}⚠️  LyricifyApi failed to start{Colors.END}")
                     proc_lyricify = None
             else:
-                print(f"{Colors.YELLOW}⚠️  .NET SDK not installed - LyricifyApi disabled{Colors.END}")
+                print(f"{Colors.YELLOW}⚠️  .NET SDK not installed and no pre-built binary{Colors.END}")
         except Exception as e:
             print(f"{Colors.YELLOW}⚠️  LyricifyApi error: {e}{Colors.END}")
             proc_lyricify = None
     else:
-        print(f"{Colors.YELLOW}⚠️  LyricifyApi not found - Syllable lyrics from QQ Music disabled{Colors.END}")
+        print(f"{Colors.YELLOW}⚠️  LyricifyApi not found - Syllable lyrics disabled{Colors.END}")
     
     # Web Dashboard now runs on Vercel (https://sonora.muhammadzakizn.com)
     # No need to start local web dashboard
