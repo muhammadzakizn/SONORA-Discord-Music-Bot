@@ -623,6 +623,72 @@ export default function FullscreenLyricsPlayer({
         return uniqueTimes.size < lyrics.lines.length * 0.5;
     }, [lyrics]);
 
+    // Interlude detection - gaps >= 3.5 seconds between lyrics
+    const INTERLUDE_THRESHOLD = 3.5; // seconds
+    const interludeInfo = useMemo(() => {
+        if (!lyrics?.lines?.length) return null;
+
+        const adjustedTime = currentTime + LYRICS_OFFSET;
+
+        // Check intro (before first lyric)
+        const firstLine = lyrics.lines[0];
+        if (adjustedTime < firstLine.start_time && firstLine.start_time >= INTERLUDE_THRESHOLD) {
+            const progress = adjustedTime / firstLine.start_time;
+            return {
+                isActive: true,
+                progress: Math.max(0, Math.min(1, progress)),
+                gapDuration: firstLine.start_time,
+                isIntro: true
+            };
+        }
+
+        // Check gaps between lyrics
+        for (let i = 0; i < lyrics.lines.length - 1; i++) {
+            const currentLine = lyrics.lines[i];
+            const nextLine = lyrics.lines[i + 1];
+            const gapStart = currentLine.end_time;
+            const gapEnd = nextLine.start_time;
+            const gap = gapEnd - gapStart;
+
+            if (gap >= INTERLUDE_THRESHOLD && adjustedTime > gapStart && adjustedTime < gapEnd) {
+                const progress = (adjustedTime - gapStart) / gap;
+                return {
+                    isActive: true,
+                    progress: Math.max(0, Math.min(1, progress)),
+                    gapDuration: gap,
+                    isIntro: false
+                };
+            }
+        }
+
+        return null;
+    }, [lyrics, currentTime, LYRICS_OFFSET]);
+
+    // Calculate individual dot opacities based on interlude progress
+    const dotOpacities = useMemo(() => {
+        if (!interludeInfo?.isActive) return [0.2, 0.2, 0.2];
+
+        const progress = interludeInfo.progress;
+
+        // Base opacity (dimmed like upcoming lyrics)
+        const baseOpacity = 0.2;
+        const fullOpacity = 1.0;
+
+        // Dot 1: starts lighting up at 0%, full at 30%
+        // Dot 2: starts lighting up at 30%, full at 70%
+        // Dot 3: starts lighting up at 70%, full at 100%
+
+        const dot1Progress = Math.min(1, progress / 0.3);
+        const dot2Progress = progress > 0.3 ? Math.min(1, (progress - 0.3) / 0.4) : 0;
+        const dot3Progress = progress > 0.7 ? Math.min(1, (progress - 0.7) / 0.3) : 0;
+
+        return [
+            baseOpacity + (fullOpacity - baseOpacity) * dot1Progress,
+            baseOpacity + (fullOpacity - baseOpacity) * dot2Progress,
+            baseOpacity + (fullOpacity - baseOpacity) * dot3Progress
+        ];
+    }, [interludeInfo]);
+
     // Format time
     const formatTime = (seconds: number) => {
         const mins = Math.floor(Math.abs(seconds) / 60);
@@ -846,6 +912,40 @@ export default function FullscreenLyricsPlayer({
                                             }}
                                         >
                                             <div className="space-y-3">
+                                                {/* Interlude Dots Animation */}
+                                                <AnimatePresence>
+                                                    {interludeInfo?.isActive && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, scale: 0.8 }}
+                                                            animate={{
+                                                                opacity: interludeInfo.progress >= 0.98 ? 0 : 1,
+                                                                scale: interludeInfo.progress >= 0.98 ? 0.3 : 1
+                                                            }}
+                                                            exit={{ opacity: 0, scale: 0.3 }}
+                                                            transition={{ duration: 0.2 }}
+                                                            className="flex items-center justify-center gap-3 py-8"
+                                                        >
+                                                            {[0, 1, 2].map((dotIndex) => (
+                                                                <motion.div
+                                                                    key={dotIndex}
+                                                                    className="w-3 h-3 rounded-full bg-white"
+                                                                    style={{ opacity: dotOpacities[dotIndex] }}
+                                                                    animate={{
+                                                                        scale: dotOpacities[dotIndex] > 0.8 ? [1, 1.2, 1] : 1
+                                                                    }}
+                                                                    transition={{
+                                                                        scale: {
+                                                                            duration: 0.3,
+                                                                            repeat: dotOpacities[dotIndex] > 0.8 ? Infinity : 0,
+                                                                            repeatDelay: 0.5
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+
                                                 {lyrics.lines.map((line, index) => {
                                                     const isCurrentLine = index === currentLineIndex;
                                                     const isPastLine = index < currentLineIndex;
@@ -1186,6 +1286,40 @@ export default function FullscreenLyricsPlayer({
                             >
                                 {lyrics?.lines.length ? (
                                     <div className="space-y-6">
+                                        {/* Interlude Dots Animation - Desktop */}
+                                        <AnimatePresence>
+                                            {interludeInfo?.isActive && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{
+                                                        opacity: interludeInfo.progress >= 0.98 ? 0 : 1,
+                                                        scale: interludeInfo.progress >= 0.98 ? 0.3 : 1
+                                                    }}
+                                                    exit={{ opacity: 0, scale: 0.3 }}
+                                                    transition={{ duration: 0.2 }}
+                                                    className="flex items-center justify-start gap-4 py-8 pl-1"
+                                                >
+                                                    {[0, 1, 2].map((dotIndex) => (
+                                                        <motion.div
+                                                            key={dotIndex}
+                                                            className="w-4 h-4 rounded-full bg-white"
+                                                            style={{ opacity: dotOpacities[dotIndex] }}
+                                                            animate={{
+                                                                scale: dotOpacities[dotIndex] > 0.8 ? [1, 1.2, 1] : 1
+                                                            }}
+                                                            transition={{
+                                                                scale: {
+                                                                    duration: 0.3,
+                                                                    repeat: dotOpacities[dotIndex] > 0.8 ? Infinity : 0,
+                                                                    repeatDelay: 0.5
+                                                                }
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+
                                         {lyrics.lines.map((line, index) => {
                                             const isCurrentLine = index === currentLineIndex;
                                             const isPastLine = index < currentLineIndex;
