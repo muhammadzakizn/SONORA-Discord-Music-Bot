@@ -97,6 +97,9 @@ export default function FullscreenLyricsPlayer({
     const [lyricsLoading, setLyricsLoading] = useState(false);
     const [lyricsFailed, setLyricsFailed] = useState(false);
 
+    // Audio quality dialog state
+    const [showQualityDialog, setShowQualityDialog] = useState(false);
+
     // Track transition state
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [previousTrack, setPreviousTrack] = useState<TrackInfo | null>(null);
@@ -616,8 +619,18 @@ export default function FullscreenLyricsPlayer({
                                         }}
                                     />
                                 </div>
-                                <div className="flex justify-between text-white/50 text-xs mt-1">
+                                <div className="flex justify-between items-center text-white/50 text-xs mt-1">
                                     <span>{formatTime(currentTime)}</span>
+                                    {/* Audio Quality Badge */}
+                                    <button
+                                        onClick={() => setShowQualityDialog(true)}
+                                        className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-white/10 transition-colors border border-transparent hover:border-white/30"
+                                    >
+                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M2 6a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm3 2v3h2V8H5zm4 0v8h2V8H9zm4 0v5h2V8h-2zm4 0v6h2V8h-2z" />
+                                        </svg>
+                                        <span className="text-white/60">Lossless</span>
+                                    </button>
                                     <span>-{formatTime((track?.duration || 0) - currentTime)}</span>
                                 </div>
                             </div>
@@ -810,13 +823,16 @@ export default function FullscreenLyricsPlayer({
                                 </div>
                                 <div className="flex justify-between items-center text-white/50 text-xs mt-1">
                                     <span>{formatTime(currentTime)}</span>
-                                    {/* Audio Quality Badge - Centered */}
-                                    <div className="flex items-center gap-1 text-white/40">
-                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                                    {/* Audio Quality Badge - Desktop */}
+                                    <button
+                                        onClick={() => setShowQualityDialog(true)}
+                                        className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-white/10 transition-colors border border-transparent hover:border-white/30"
+                                    >
+                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M2 6a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm3 2v3h2V8H5zm4 0v8h2V8H9zm4 0v5h2V8h-2zm4 0v6h2V8h-2z" />
                                         </svg>
-                                        <span className="text-[10px] font-medium">Lossless</span>
-                                    </div>
+                                        <span className="text-[10px] font-medium text-white/60">Lossless</span>
+                                    </button>
                                     <span>-{formatTime((track?.duration || 0) - currentTime)}</span>
                                 </div>
                             </div>
@@ -1053,6 +1069,76 @@ export default function FullscreenLyricsPlayer({
                         onClick={() => setShowMenu(false)}
                     />
                 )}
+
+                {/* Audio Quality Dialog Modal */}
+                <AnimatePresence>
+                    {showQualityDialog && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                            onClick={() => setShowQualityDialog(false)}
+                        >
+                            {/* Backdrop */}
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+                            {/* Dialog Content */}
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="relative bg-white/10 backdrop-blur-xl rounded-2xl p-6 max-w-sm w-full border border-white/20"
+                            >
+                                {/* Header */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M2 6a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm3 2v3h2V8H5zm4 0v8h2V8H9zm4 0v5h2V8h-2zm4 0v6h2V8h-2z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-semibold text-lg">Lossless</h3>
+                                        <p className="text-white/50 text-sm">Audio Quality</p>
+                                    </div>
+                                </div>
+
+                                {/* Quality Details */}
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center py-2 border-b border-white/10">
+                                        <span className="text-white/60 text-sm">Format</span>
+                                        <span className="text-white font-medium">AAC / Opus</span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-2 border-b border-white/10">
+                                        <span className="text-white/60 text-sm">Bit Depth</span>
+                                        <span className="text-white font-medium">16-bit</span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-2 border-b border-white/10">
+                                        <span className="text-white/60 text-sm">Sample Rate</span>
+                                        <span className="text-white font-medium">48 kHz</span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-2 border-b border-white/10">
+                                        <span className="text-white/60 text-sm">Bitrate</span>
+                                        <span className="text-white font-medium">256 kbps</span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-2">
+                                        <span className="text-white/60 text-sm">Source</span>
+                                        <span className="text-white font-medium">YouTube Music</span>
+                                    </div>
+                                </div>
+
+                                {/* Close Button */}
+                                <button
+                                    onClick={() => setShowQualityDialog(false)}
+                                    className="mt-6 w-full py-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white font-medium transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </motion.div>
         </AnimatePresence>
     );
