@@ -493,11 +493,19 @@ def api_guild_lyrics(guild_id: int):
                             words = []
                             if hasattr(line, 'words') and line.words:
                                 for word in line.words:
-                                    words.append({
-                                        "text": word.text,
-                                        "start_time": word.start_time,
-                                        "end_time": word.end_time
-                                    })
+                                    # Handle both dict and object formats
+                                    if isinstance(word, dict):
+                                        words.append({
+                                            "text": word.get("text", ""),
+                                            "start_time": word.get("start_time", 0),
+                                            "end_time": word.get("end_time", 0)
+                                        })
+                                    else:
+                                        words.append({
+                                            "text": getattr(word, 'text', ''),
+                                            "start_time": getattr(word, 'start_time', 0),
+                                            "end_time": getattr(word, 'end_time', 0)
+                                        })
                             
                             lines.append({
                                 "text": line.text,
