@@ -847,6 +847,13 @@ export default function GuildDetailPage() {
                 onClose={() => setLyricsOpen(false)}
                 queue={guild?.queue}
                 onControl={handleControl}
+                onQueueRemove={async (position) => {
+                    await handleQueueRemove(position);
+                }}
+                onQueueMove={async (fromPos, toPos) => {
+                    const direction = toPos < fromPos ? 'up' : 'down';
+                    await handleQueueMove(fromPos, direction);
+                }}
             />
         </div>
     );

@@ -907,6 +907,7 @@ def api_queue_move(guild_id: int):
     from_pos = data.get('from_position', 0)
     to_pos = data.get('to_position', 0)
     username = data.get('username', 'Admin')
+    user_id = data.get('user_id')
     
     try:
         queue_cog = bot.get_cog('QueueCommands')
@@ -939,8 +940,14 @@ def api_queue_move(guild_id: int):
                     return
                 
                 channel = player.message.channel
+                
+                if user_id:
+                    desc = f"↕️ Moved **{track.title}** to #{to_pos}\\nvia Admin Dashboard\\nby <@{user_id}>"
+                else:
+                    desc = f"↕️ Moved **{track.title}** to #{to_pos} via Dashboard"
+                
                 embed = discord.Embed(
-                    description=f"↕️ Moved **{track.title}** to #{to_pos} via Dashboard",
+                    description=desc,
                     color=0x7B1E3C
                 )
                 await channel.send(embed=embed, delete_after=15)

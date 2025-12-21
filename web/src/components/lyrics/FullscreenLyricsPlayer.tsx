@@ -18,6 +18,8 @@ import {
     Maximize2,
     Minimize2,
     Type,
+    ChevronUp,
+    Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import WebGLBackground from "./WebGLBackground";
@@ -67,6 +69,8 @@ interface FullscreenLyricsPlayerProps {
     onClose: () => void;
     queue?: QueueItem[];
     onControl: (action: string) => Promise<void>;
+    onQueueRemove?: (position: number) => Promise<void>;
+    onQueueMove?: (fromPosition: number, toPosition: number) => Promise<void>;
 }
 
 const API_BASE = '/api/bot';
@@ -77,6 +81,8 @@ export default function FullscreenLyricsPlayer({
     onClose,
     queue = [],
     onControl,
+    onQueueRemove,
+    onQueueMove,
 }: FullscreenLyricsPlayerProps) {
     const [track, setTrack] = useState<TrackInfo | null>(null);
     const [lyrics, setLyrics] = useState<LyricsData | null>(null);
@@ -776,7 +782,7 @@ export default function FullscreenLyricsPlayer({
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <ListMusic className="w-4 h-4" />
-                                                            <span className="text-sm">Up Next</span>
+                                                            <span className="text-sm">Queue</span>
                                                         </div>
                                                         <span className={`text-xs px-2 py-0.5 rounded-full ${showQueue ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
                                                             {showQueue ? 'ON' : 'OFF'}
@@ -1033,21 +1039,68 @@ export default function FullscreenLyricsPlayer({
                                 <div className="p-5 h-full flex flex-col">
                                     <h3 className="text-white font-semibold mb-4 flex items-center gap-2 text-lg">
                                         <ListMusic className="w-5 h-5" />
-                                        Up Next
+                                        Queue
+                                        {queue.length > 0 && (
+                                            <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/60">
+                                                {queue.length}
+                                            </span>
+                                        )}
                                     </h3>
                                     <div className="flex-1 overflow-y-auto space-y-2">
                                         {queue.length > 0 ? (
-                                            queue.map((item) => (
+                                            queue.map((item, index) => (
                                                 <div
                                                     key={item.position}
-                                                    className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                                                    className="group p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
                                                 >
-                                                    <p className="text-white text-sm font-medium truncate">
-                                                        {item.title}
-                                                    </p>
-                                                    <p className="text-white/50 text-xs truncate">
-                                                        {item.artist}
-                                                    </p>
+                                                    <div className="flex items-start gap-3">
+                                                        {/* Track number */}
+                                                        <span className="text-white/30 text-xs font-mono mt-0.5 w-4">
+                                                            {item.position}
+                                                        </span>
+                                                        {/* Track info */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-white text-sm font-medium truncate">
+                                                                {item.title}
+                                                            </p>
+                                                            <p className="text-white/50 text-xs truncate">
+                                                                {item.artist}
+                                                            </p>
+                                                        </div>
+                                                        {/* Action buttons - show on hover */}
+                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            {/* Move Up */}
+                                                            {index > 0 && onQueueMove && (
+                                                                <button
+                                                                    onClick={() => onQueueMove(item.position, item.position - 1)}
+                                                                    className="p-1.5 rounded-lg hover:bg-white/20 text-white/60 hover:text-white transition-colors"
+                                                                    title="Move up"
+                                                                >
+                                                                    <ChevronUp className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                            {/* Move Down */}
+                                                            {index < queue.length - 1 && onQueueMove && (
+                                                                <button
+                                                                    onClick={() => onQueueMove(item.position, item.position + 1)}
+                                                                    className="p-1.5 rounded-lg hover:bg-white/20 text-white/60 hover:text-white transition-colors"
+                                                                    title="Move down"
+                                                                >
+                                                                    <ChevronDown className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                            {/* Remove */}
+                                                            {onQueueRemove && (
+                                                                <button
+                                                                    onClick={() => onQueueRemove(item.position)}
+                                                                    className="p-1.5 rounded-lg hover:bg-rose-500/20 text-white/60 hover:text-rose-400 transition-colors"
+                                                                    title="Remove from queue"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             ))
                                         ) : (

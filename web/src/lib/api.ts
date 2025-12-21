@@ -179,6 +179,34 @@ class ApiClient {
   }>> {
     return this.fetch('/admin/guilds/channels');
   }
+
+  // Queue Management
+  async queueRemove(
+    guildId: number | string,
+    position: number,
+    userInfo?: { user_id: string; username: string }
+  ): Promise<{ status: string; title: string; new_queue_length: number }> {
+    return this.fetch(`/queue/${guildId}/remove/${position}`, {
+      method: 'POST',
+      body: userInfo ? JSON.stringify(userInfo) : undefined,
+    });
+  }
+
+  async queueMove(
+    guildId: number | string,
+    fromPosition: number,
+    toPosition: number,
+    userInfo?: { user_id: string; username: string }
+  ): Promise<{ status: string; title: string; from: number; to: number }> {
+    return this.fetch(`/queue/${guildId}/move`, {
+      method: 'POST',
+      body: JSON.stringify({
+        from_position: fromPosition,
+        to_position: toPosition,
+        ...userInfo,
+      }),
+    });
+  }
 }
 
 export const api = new ApiClient();
