@@ -372,15 +372,39 @@ def api_guild_lyrics(guild_id: int):
             # CHECK 1: Use pre-fetched apple_lyrics from metadata (avoids RAM spike during playback)
             if source_pref in ['applemusic', 'auto'] and hasattr(metadata, 'apple_lyrics') and metadata.apple_lyrics:
                 logger.info(f"[AppleMusic] Using PRE-FETCHED lyrics for: {metadata.title}")
-                lyrics_data = metadata.apple_lyrics
+                
+                # Convert LyricsData object to dictionary format for API response
+                am_lyrics = metadata.apple_lyrics
+                lines = []
+                for line in am_lyrics.lines:
+                    words = []
+                    if hasattr(line, 'words') and line.words:
+                        words = line.words if isinstance(line.words, list) else []
+                    
+                    lines.append({
+                        "text": line.text,
+                        "start_time": line.start_time,
+                        "end_time": line.end_time,
+                        "romanized": getattr(line, 'romanized', None),
+                        "words": words
+                    })
+                
+                lyrics_data = {
+                    "is_synced": am_lyrics.is_synced,
+                    "source": "applemusic",
+                    "offset": getattr(am_lyrics, 'offset', 0),
+                    "lines": lines,
+                    "total_lines": len(lines)
+                }
                 lyrics_source_used = "applemusic"
+                
                 # Cache it
                 _lyrics_cache[cache_key] = {
                     'data': lyrics_data,
                     'source': lyrics_source_used,
                     'timestamp': time.time()
                 }
-                logger.info(f"[Lyrics] Cached pre-fetched lyrics for: {metadata.title}")
+                logger.info(f"[Lyrics] Cached pre-fetched lyrics for: {metadata.title} ({len(lines)} lines)")
             else:
                 # Get cookies path for Apple Music (project root / cookies / apple_music_cookies.txt)
                 import os
