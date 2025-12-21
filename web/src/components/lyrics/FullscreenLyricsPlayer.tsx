@@ -917,13 +917,14 @@ export default function FullscreenLyricsPlayer({
                                                 <AnimatePresence>
                                                     {interludeInfo?.isActive && (
                                                         <motion.div
-                                                            initial={{ opacity: 0, scale: 0.8 }}
+                                                            initial={{ opacity: 0, scale: 0.3 }}
                                                             animate={{
                                                                 opacity: interludeInfo.progress >= 0.98 ? 0 : 1,
                                                                 scale: interludeInfo.progress >= 0.98 ? 0.3 : 1
                                                             }}
                                                             exit={{ opacity: 0, scale: 0.3 }}
-                                                            transition={{ duration: 0.2 }}
+                                                            transition={{ duration: 0.3, ease: 'easeOut' }}
+                                                            style={{ transformOrigin: 'center' }}
                                                             className="flex items-center justify-center gap-3 py-8"
                                                         >
                                                             {[0, 1, 2].map((dotIndex) => (
@@ -1291,13 +1292,14 @@ export default function FullscreenLyricsPlayer({
                                         <AnimatePresence>
                                             {interludeInfo?.isActive && (
                                                 <motion.div
-                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    initial={{ opacity: 0, scale: 0.3 }}
                                                     animate={{
                                                         opacity: interludeInfo.progress >= 0.98 ? 0 : 1,
                                                         scale: interludeInfo.progress >= 0.98 ? 0.3 : 1
                                                     }}
                                                     exit={{ opacity: 0, scale: 0.3 }}
-                                                    transition={{ duration: 0.2 }}
+                                                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                                                    style={{ transformOrigin: 'left center' }}
                                                     className="flex items-center justify-start gap-4 py-8 pl-1"
                                                 >
                                                     {[0, 1, 2].map((dotIndex) => (
