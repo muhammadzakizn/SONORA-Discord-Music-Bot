@@ -126,9 +126,14 @@ class ApiClient {
   }
 
   // Controls
-  async control(guildId: number, action: 'pause' | 'resume' | 'skip' | 'stop'): Promise<{ status: string }> {
+  async control(
+    guildId: number, 
+    action: 'pause' | 'resume' | 'skip' | 'stop',
+    controlledBy?: { userId: string; username: string; avatar: string | null }
+  ): Promise<{ status: string }> {
     return this.fetch(`/control/${guildId}/${action}`, {
       method: 'POST',
+      body: controlledBy ? JSON.stringify({ controlled_by: controlledBy }) : undefined,
     });
   }
 

@@ -300,6 +300,13 @@ def api_control(guild_id: int, action: str):
         if not connection or not connection.is_connected():
             return jsonify({"error": "Not connected to voice"}), 400
         
+        # Get controlled_by info from request body (optional)
+        controlled_by = None
+        if request.json:
+            controlled_by = request.json.get('controlled_by')
+        
+        result_status = None
+        
         if action == 'pause':
             if connection.connection.is_playing():
                 connection.connection.pause()
@@ -308,7 +315,7 @@ def api_control(guild_id: int, action: str):
                 if hasattr(bot, 'players') and guild_id in bot.players:
                     bot.players[guild_id].is_paused = True
                 
-                return jsonify({"status": "paused"})
+                result_status = "paused"
             else:
                 return jsonify({"error": "Not playing"}), 400
         
@@ -320,14 +327,14 @@ def api_control(guild_id: int, action: str):
                 if hasattr(bot, 'players') and guild_id in bot.players:
                     bot.players[guild_id].is_paused = False
                 
-                return jsonify({"status": "resumed"})
+                result_status = "resumed"
             else:
                 return jsonify({"error": "Not paused"}), 400
         
         elif action == 'skip':
             if connection.connection.is_playing() or connection.connection.is_paused():
                 connection.connection.stop()
-                return jsonify({"status": "skipped"})
+                result_status = "skipped"
             else:
                 return jsonify({"error": "Nothing playing"}), 400
         
@@ -336,10 +343,25 @@ def api_control(guild_id: int, action: str):
             # Run disconnect in bot's event loop
             loop = bot.loop
             asyncio.run_coroutine_threadsafe(connection.disconnect(), loop)
-            return jsonify({"status": "stopped"})
+            result_status = "stopped"
         
         else:
             return jsonify({"error": "Invalid action"}), 400
+        
+        # Emit control change event via SocketIO
+        if result_status and controlled_by:
+            control_event = {
+                "guild_id": str(guild_id),
+                "action": action,
+                "status": result_status,
+                "controlled_by": controlled_by,
+                "timestamp": time.time()
+            }
+            socketio.emit('control_change', control_event)
+            socketio.emit(f'guild_{guild_id}_control_change', control_event)
+            logger.info(f"Control change: {action} by {controlled_by.get('username', 'Unknown')} in guild {guild_id}")
+        
+        return jsonify({"status": result_status})
     
     except Exception as e:
         logger.error(f"Control action failed: {e}")

@@ -7,6 +7,7 @@ import Link from "next/link";
 import {
   Server,
   Users,
+  User,
   Music,
   Search,
   Pause,
@@ -36,15 +37,18 @@ function GuildCard({
   guild,
   onControl,
   isManaged,
+  isMember,
   userRole,
   isDark
 }: {
   guild: Guild;
   onControl: (action: string) => void;
   isManaged?: boolean;
-  userRole?: "owner" | "admin" | null;
+  isMember?: boolean;
+  userRole?: "owner" | "admin" | "member" | null;
   isDark: boolean;
 }) {
+  const canControl = isManaged || isMember;
   const [isControlling, setIsControlling] = useState(false);
 
   const handleControl = async (action: string) => {
@@ -91,6 +95,12 @@ function GuildCard({
             {userRole === "admin" && (
               <span title="Admin"><Shield className="w-4 h-4 text-[#7B1E3C] shrink-0" aria-label="Admin" /></span>
             )}
+            {userRole === "member" && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 text-xs font-medium" title="Member">
+                <User className="w-3 h-3" />
+                Member
+              </span>
+            )}
           </div>
           <div className={cn("flex items-center gap-4 mt-1 text-sm", isDark ? "text-zinc-500" : "text-gray-500")}>
             <span className="flex items-center gap-1">
@@ -132,8 +142,8 @@ function GuildCard({
             </div>
           </div>
 
-          {/* Controls - only show for managed servers */}
-          {isManaged && (
+          {/* Controls - show for managed and member servers */}
+          {canControl && (
             <div className="flex items-center justify-center gap-2 mt-4">
               <button
                 onClick={() => handleControl("resume")}
@@ -230,6 +240,7 @@ export default function GuildsPage() {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("managed");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [controlToast, setControlToast] = useState<{ message: string; username: string } | null>(null);
 
   const fetchGuilds = async () => {
     try {
@@ -255,9 +266,63 @@ export default function GuildsPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Listen for control change events via SocketIO
+  useEffect(() => {
+    const BOT_API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || 'http://localhost:5000';
+    let socket: any = null;
+
+    const connectSocket = async () => {
+      try {
+        const { io } = await import('socket.io-client');
+        socket = io(BOT_API_BASE, {
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+        });
+
+        socket.on('control_change', (data: { action: string; status: string; controlled_by: { username: string } }) => {
+          // Don't show toast for own actions
+          if (data.controlled_by?.username && data.controlled_by.username !== user?.username) {
+            const actionText = data.status === 'paused' ? 'paused' :
+              data.status === 'resumed' ? 'resumed' :
+                data.status === 'skipped' ? 'skipped to next track' :
+                  data.status === 'stopped' ? 'stopped' : data.status;
+
+            setControlToast({
+              message: `${actionText} playback`,
+              username: data.controlled_by.username
+            });
+
+            // Auto-hide toast after 4 seconds
+            setTimeout(() => setControlToast(null), 4000);
+
+            // Refresh guild data
+            fetchGuilds();
+          }
+        });
+      } catch (err) {
+        console.log('SocketIO not available for control notifications');
+      }
+    };
+
+    connectSocket();
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, [user?.username]);
+
   const handleControl = async (guildId: number, action: string) => {
     try {
-      await api.control(guildId, action as "pause" | "resume" | "skip" | "stop");
+      // Pass user info for control notification
+      const controlledBy = user ? {
+        userId: user.id,
+        username: user.username,
+        avatar: user.avatar
+      } : undefined;
+
+      await api.control(guildId, action as "pause" | "resume" | "skip" | "stop", controlledBy);
       await fetchGuilds();
     } catch (err) {
       console.error("Control failed:", err);
@@ -268,9 +333,12 @@ export default function GuildsPage() {
   const managedGuildIds = new Set(managedGuilds?.map(g => g.id) || []);
 
   // Get user role for a guild
-  const getUserRole = (guildId: string | number): "owner" | "admin" | null => {
+  const getUserRole = (guildId: string | number, isMemberServer: boolean = false): "owner" | "admin" | "member" | null => {
     const guild = managedGuilds?.find(g => g.id === String(guildId));
-    if (!guild) return null;
+    if (!guild) {
+      // If not in managedGuilds, it's a member server
+      return isMemberServer ? "member" : null;
+    }
     if (guild.owner) return "owner";
     if ((guild.permissions & 0x8) === 0x8) return "admin";
     return null;
@@ -308,6 +376,32 @@ export default function GuildsPage() {
 
   return (
     <div className="space-y-8">
+      {/* Control Change Toast Notification */}
+      <AnimatePresence>
+        {controlToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -50, x: "-50%" }}
+            className="fixed top-20 left-1/2 z-50"
+          >
+            <div className={cn(
+              "px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3",
+              isDark ? "bg-zinc-900 border-zinc-700" : "bg-white border-gray-200"
+            )}>
+              <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                <User className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div>
+                <p className={cn("text-sm font-medium", isDark ? "text-white" : "text-gray-900")}>
+                  <span className="text-cyan-400">{controlToast.username}</span> {controlToast.message}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
@@ -470,7 +564,8 @@ export default function GuildsPage() {
                 guild={guild}
                 onControl={(action) => handleControl(guild.id, action)}
                 isManaged={false}
-                userRole={null}
+                isMember={true}
+                userRole="member"
                 isDark={isDark}
               />
             ))}
