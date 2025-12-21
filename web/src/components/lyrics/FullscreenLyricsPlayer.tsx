@@ -546,7 +546,6 @@ export default function FullscreenLyricsPlayer({
                                                                     "text-2xl font-bold leading-snug transition-all duration-300",
                                                                     isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
                                                                 )}
-                                                                {/* No textShadow - just use opacity/color for brightness */}
                                                             >
                                                                 {displayText || "♪"}
                                                             </p>
