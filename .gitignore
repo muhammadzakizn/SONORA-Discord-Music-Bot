@@ -110,3 +110,4 @@ web/.git
 *.pkl
 *.opus
 downloads/playlist_cache/
+.beautiful-lyrics-study/
