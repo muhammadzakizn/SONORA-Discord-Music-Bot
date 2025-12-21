@@ -35,7 +35,14 @@ class MetadataProcessor:
         self.artwork_fetcher = ArtworkFetcher()
         self.lrclib_fetcher = LRCLIBFetcher()  # Priority 1: Best quality with duration validation
         self.genius_fetcher = GeniusLyricsFetcher()
-        self.applemusic_fetcher = AppleMusicFetcher()  # For dashboard lyrics
+        
+        # Get Apple Music cookies path (project root / cookies / apple_music_cookies.txt)
+        import os
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        apple_cookies_path = os.path.join(project_root, 'cookies', 'apple_music_cookies.txt')
+        
+        # Initialize AppleMusicFetcher with cookies for pre-fetching
+        self.applemusic_fetcher = AppleMusicFetcher(cookies_path=apple_cookies_path)
         
         # Syncedlyrics as fallback
         if SYNCEDLYRICS_AVAILABLE:
