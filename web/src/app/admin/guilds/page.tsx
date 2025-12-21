@@ -232,7 +232,7 @@ function GuildCard({
 }
 
 export default function GuildsPage() {
-  const { user, managedGuilds, isLoggedIn } = useSession();
+  const { user, managedGuilds, guilds: userGuilds, isLoggedIn } = useSession();
   const { isDark, t } = useSettings();
   const [guilds, setGuilds] = useState<Guild[]>([]);
   const [loading, setLoading] = useState(true);
@@ -354,8 +354,13 @@ export default function GuildsPage() {
     managedGuildIds.has(String(guild.id))
   );
 
+  // Member guilds = servers where:
+  // 1. User is in the server (from userGuilds/Discord OAuth)
+  // 2. User is NOT admin/owner (not in managedGuildIds)
+  // 3. Bot SONORA is in the server (exists in guilds from API)
+  const userGuildIds = new Set(userGuilds?.map(g => g.id) || []);
   const memberGuilds = searchFilteredGuilds.filter(guild =>
-    !managedGuildIds.has(String(guild.id))
+    userGuildIds.has(String(guild.id)) && !managedGuildIds.has(String(guild.id))
   );
 
   // Stats - all servers user is in
