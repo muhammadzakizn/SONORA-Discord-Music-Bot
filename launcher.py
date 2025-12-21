@@ -165,18 +165,24 @@ def run_production():
             # Make sure it's executable
             subprocess.run(['chmod', '+x', str(lyricify_binary)], capture_output=True)
             
+            # Start with stderr captured for debugging
             proc_lyricify = subprocess.Popen(
                 [str(lyricify_binary)],
                 cwd=str(lyricify_workdir),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 shell=False
             )
             time.sleep(3)
             if proc_lyricify.poll() is None:
                 print(f"{Colors.GREEN}✓ LyricifyApi started on port {LYRICIFY_API_PORT}{Colors.END}")
+                # Redirect to devnull after successful start
             else:
-                print(f"{Colors.YELLOW}⚠️  LyricifyApi failed to start{Colors.END}")
+                # Failed to start - show error
+                _, stderr = proc_lyricify.communicate(timeout=2)
+                error_msg = stderr.decode('utf-8', errors='ignore')[:500] if stderr else "Unknown error"
+                print(f"{Colors.YELLOW}⚠️  LyricifyApi failed to start:{Colors.END}")
+                print(f"{Colors.YELLOW}    {error_msg}{Colors.END}")
                 proc_lyricify = None
         except Exception as e:
             print(f"{Colors.YELLOW}⚠️  LyricifyApi error: {e}{Colors.END}")
