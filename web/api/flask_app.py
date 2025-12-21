@@ -230,17 +230,27 @@ def api_lyrics_search():
         return jsonify({"error": "Query parameter 'q' is required"}), 400
     
     try:
-        from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
+        logger.info(f"Lyrics search request: {query}")
+        
+        # Import inside try block to catch import errors
+        try:
+            from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
+        except ImportError as ie:
+            logger.error(f"Failed to import SyncedLyricsFetcher: {ie}")
+            return jsonify({"error": f"Import error: {str(ie)}"}), 503
         
         fetcher = SyncedLyricsFetcher()
         
         # Run async search in sync context
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        lyrics_data = loop.run_until_complete(fetcher.search(query))
-        loop.close()
+        try:
+            lyrics_data = loop.run_until_complete(fetcher.search(query))
+        finally:
+            loop.close()
         
         if not lyrics_data:
+            logger.info(f"No lyrics found for: {query}")
             return jsonify({"found": False, "lyrics": None})
         
         # Convert to dict
@@ -262,11 +272,10 @@ def api_lyrics_search():
             "source": str(lyrics_data.source.value) if lyrics_data.source else "unknown"
         }
         
+        logger.info(f"Found {len(lyrics_data.lines)} lines for: {query}")
         return jsonify({"found": True, "lyrics": lyrics_dict})
-    except ImportError:
-        return jsonify({"error": "Lyrics service not available"}), 503
     except Exception as e:
-        logger.error(f"Failed to search lyrics: {e}")
+        logger.error(f"Failed to search lyrics: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
