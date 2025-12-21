@@ -896,6 +896,12 @@ class YouTubeDownloader(BaseDownloader):
         url = track_info.url
         original_url = url  # Keep original for fallback
         
+        # CRITICAL: Spotify URLs cannot be downloaded (DRM protected)
+        # Always search YouTube Music for Spotify tracks
+        if url and 'spotify.com' in url:
+            logger.info(f"Spotify URL detected, searching YouTube Music instead...")
+            url = None  # Force YouTube Music search below
+        
         if url and 'youtube.com/watch' in url and 'music.youtube.com' not in url:
             url = self._convert_to_ytmusic_url(url)
         elif not url:
