@@ -84,6 +84,9 @@ void main() {
         color.a = newColor.a + color.a * (1.0 - newColor.a);
     }
     
+    // Brightness boost (35% increase)
+    color.rgb *= 1.35;
+    
     gl_FragColor = color;
 }
 `;
