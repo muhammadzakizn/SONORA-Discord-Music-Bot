@@ -947,16 +947,33 @@ class PlayCommand(commands.Cog):
             if guild_id not in queue_cog.queues:
                 queue_cog.queues[guild_id] = []
             
-            # CRITICAL: Check if bot is already playing
+            # CRITICAL: Check if bot is already playing (multiple checks for reliability)
             voice_connection = self.bot.voice_manager.connections.get(guild_id)
-            is_already_playing = (
-                voice_connection and 
-                voice_connection.is_connected() and 
-                voice_connection.is_playing()
-            )
+            
+            # Also check Discord's actual voice client state
+            discord_voice_client = interaction.guild.voice_client
+            
+            is_already_playing = False
+            
+            # Check 1: Our managed connection
+            if voice_connection and voice_connection.is_connected() and voice_connection.is_playing():
+                is_already_playing = True
+                logger.info(f"[PlayCheck] Already playing via voice_manager")
+            
+            # Check 2: Discord's actual voice client (fallback)
+            elif discord_voice_client and discord_voice_client.is_connected() and discord_voice_client.is_playing():
+                is_already_playing = True
+                logger.info(f"[PlayCheck] Already playing via Discord voice_client")
+            
+            # Check 3: Check if we have an active player
+            elif hasattr(self.bot, 'players') and guild_id in self.bot.players:
+                player = self.bot.players[guild_id]
+                if player and hasattr(player, 'is_playing') and player.is_playing:
+                    is_already_playing = True
+                    logger.info(f"[PlayCheck] Already playing via bot.players")
             
             if is_already_playing:
-                logger.info(f"Bot is already playing, will queue all tracks from new playlist")
+                logger.info(f"✓ Bot is already playing, will queue all tracks from new playlist")
             
             # SPOTIFY: Use progressive loading for faster playback
             if url_type == 'spotify':
