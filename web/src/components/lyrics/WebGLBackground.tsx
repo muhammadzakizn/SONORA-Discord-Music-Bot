@@ -246,11 +246,11 @@ export default function WebGLBackground({ artworkUrl, className = "" }: WebGLBac
         const frameInterval = 1000 / targetFPS;
 
         // Time divisor: larger = slower animation
-        // Low-power devices get slower animation for performance
-        // Mobile devices get 25% faster animation for better visual experience
-        // Check if mobile (width <= 640px following Tailwind's sm breakpoint)
+        // High-performance: 45% faster (timeDivisor = 3000 * 0.55 ≈ 1650)
+        // Low-power: 20% of normal speed (timeDivisor = 3000 * 5 = 15000)
+        // Mobile high-perf: slightly slower than desktop for smoother experience
         const isMobile = width <= 640;
-        const timeDivisor = isLowPower ? 6000 : (isMobile ? 2250 : 3000); // 2250 = 3000 * 0.75 (25% faster)
+        const timeDivisor = isLowPower ? 15000 : (isMobile ? 2000 : 1650);
 
         const animate = (time: number) => {
             animationRef.current = requestAnimationFrame(animate);

@@ -482,7 +482,7 @@ export default function FullscreenLyricsPlayer({
                     )}
 
                     {/* Dark overlay for "black accents" and better text contrast */}
-                    <div className="absolute inset-0 bg-black/50 z-[1]" />
+                    <div className="absolute inset-0 bg-black/70 z-[1]" />
 
                     {/* Fallback gradient orbs if no artwork or WebGL not supported */}
                     {!track?.artwork_url && (
