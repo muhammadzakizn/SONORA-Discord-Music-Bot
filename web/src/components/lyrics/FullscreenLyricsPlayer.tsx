@@ -540,39 +540,18 @@ export default function FullscreenLyricsPlayer({
                                                                 filter: shouldCollapse ? 'blur(4px)' : 'none',
                                                             }}
                                                         >
-                                                            {hasWords && isCurrentLine ? (
-                                                                <p className="text-2xl font-bold leading-snug">
-                                                                    {line.words.map((word, wordIdx) => {
-                                                                        const progress = getWordProgress(word);
-                                                                        return (
-                                                                            <span
-                                                                                key={wordIdx}
-                                                                                className="inline transition-colors duration-100"
-                                                                                style={{
-                                                                                    color: progress > 0
-                                                                                        ? `rgba(255, 255, 255, ${0.4 + progress * 0.6})`
-                                                                                        : 'rgba(255, 255, 255, 0.4)',
-                                                                                    textShadow: progress > 0.5 ? '0 0 20px rgba(255,255,255,0.3)' : 'none',
-                                                                                }}
-                                                                            >
-                                                                                {word.text}{wordIdx < line.words.length - 1 ? ' ' : ''}
-                                                                            </span>
-                                                                        );
-                                                                    })}
-                                                                </p>
-                                                            ) : (
-                                                                <p
-                                                                    className={cn(
-                                                                        "text-2xl font-bold leading-snug transition-all duration-300",
-                                                                        isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
-                                                                    )}
-                                                                    style={{
-                                                                        textShadow: isCurrentLine ? '0 0 30px rgba(255,255,255,0.5), 0 0 60px rgba(255,255,255,0.3)' : 'none',
-                                                                    }}
-                                                                >
-                                                                    {displayText || "♪"}
-                                                                </p>
-                                                            )}
+                                                            {/* Mobile: Always highlight full line (no per-word) for better readability */}
+                                                            <p
+                                                                className={cn(
+                                                                    "text-2xl font-bold leading-snug transition-all duration-300",
+                                                                    isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
+                                                                )}
+                                                                style={{
+                                                                    textShadow: isCurrentLine ? '0 0 30px rgba(255,255,255,0.5), 0 0 60px rgba(255,255,255,0.3)' : 'none',
+                                                                }}
+                                                            >
+                                                                {displayText || "♪"}
+                                                            </p>
                                                         </div>
                                                     );
                                                 })}
