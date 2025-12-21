@@ -221,6 +221,55 @@ def api_guild_detail(guild_id: int):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/lyrics/search')
+def api_lyrics_search():
+    """Search for lyrics by query"""
+    query = request.args.get('q', '')
+    
+    if not query:
+        return jsonify({"error": "Query parameter 'q' is required"}), 400
+    
+    try:
+        from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
+        
+        fetcher = SyncedLyricsFetcher()
+        
+        # Run async search in sync context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        lyrics_data = loop.run_until_complete(fetcher.search(query))
+        loop.close()
+        
+        if not lyrics_data:
+            return jsonify({"found": False, "lyrics": None})
+        
+        # Convert to dict
+        lyrics_dict = {
+            "lines": [
+                {
+                    "text": line.text,
+                    "start_time": line.start_time,
+                    "end_time": line.end_time,
+                    "words": [
+                        {"text": w.text, "start_time": w.start_time, "end_time": w.end_time}
+                        for w in (line.words or [])
+                    ]
+                }
+                for line in lyrics_data.lines
+            ],
+            "total_lines": len(lyrics_data.lines),
+            "is_synced": lyrics_data.is_synced,
+            "source": str(lyrics_data.source.value) if lyrics_data.source else "unknown"
+        }
+        
+        return jsonify({"found": True, "lyrics": lyrics_dict})
+    except ImportError:
+        return jsonify({"error": "Lyrics service not available"}), 503
+    except Exception as e:
+        logger.error(f"Failed to search lyrics: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/history')
 def api_history():
     """Get play history"""

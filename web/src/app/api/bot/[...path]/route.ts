@@ -14,7 +14,11 @@ export async function GET(
 ) {
   const { path } = await params;
   const targetPath = path.join('/');
-  const url = `${BOT_API_URL}/api/${targetPath}`;
+  
+  // Forward query parameters from the original request
+  const searchParams = request.nextUrl.searchParams.toString();
+  const queryString = searchParams ? `?${searchParams}` : '';
+  const url = `${BOT_API_URL}/api/${targetPath}${queryString}`;
   
   try {
     const response = await fetch(url, {

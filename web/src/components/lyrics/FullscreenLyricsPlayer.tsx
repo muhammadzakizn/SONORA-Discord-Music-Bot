@@ -584,11 +584,11 @@ export default function FullscreenLyricsPlayer({
         setSearchNoResults(false);
 
         try {
-            // Try to fetch lyrics using the search query as title/artist
-            const response = await fetch(`/api/bot/guild/${guildId}/time_sync?source=${lyricsSource}&search=${encodeURIComponent(lyricsSearchQuery)}`);
+            // Use the lyrics search endpoint
+            const response = await fetch(`/api/bot/lyrics/search?q=${encodeURIComponent(lyricsSearchQuery)}`);
             if (response.ok) {
                 const data = await response.json();
-                if (data.lyrics?.lines?.length > 0) {
+                if (data.found && data.lyrics?.lines?.length > 0) {
                     // Found lyrics, show preview
                     setPreviewLyrics(data.lyrics);
                     setShowPreviewDialog(true);
@@ -596,7 +596,8 @@ export default function FullscreenLyricsPlayer({
                     setSearchNoResults(true);
                 }
             } else {
-                setSearchError('Gagal mencari lyrics. Coba lagi.');
+                const errorData = await response.json().catch(() => ({}));
+                setSearchError(errorData.error || 'Gagal mencari lyrics. Coba lagi.');
             }
         } catch (err) {
             console.error('Lyrics search failed:', err);
