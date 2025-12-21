@@ -547,7 +547,7 @@ export default function FullscreenLyricsPlayer({
                                                                         return (
                                                                             <span
                                                                                 key={wordIdx}
-                                                                                className="inline-block transition-colors duration-100"
+                                                                                className="inline transition-colors duration-100"
                                                                                 style={{
                                                                                     color: progress > 0
                                                                                         ? `rgba(255, 255, 255, ${0.4 + progress * 0.6})`
@@ -555,8 +555,7 @@ export default function FullscreenLyricsPlayer({
                                                                                     textShadow: progress > 0.5 ? '0 0 20px rgba(255,255,255,0.3)' : 'none',
                                                                                 }}
                                                                             >
-                                                                                {word.text}
-                                                                                {wordIdx < line.words.length - 1 ? ' ' : ''}
+                                                                                {word.text}{wordIdx < line.words.length - 1 ? ' ' : ''}
                                                                             </span>
                                                                         );
                                                                     })}
