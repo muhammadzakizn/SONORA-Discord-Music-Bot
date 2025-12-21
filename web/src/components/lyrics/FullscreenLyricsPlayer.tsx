@@ -495,7 +495,7 @@ export default function FullscreenLyricsPlayer({
                                     {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
                                         <div
                                             ref={lyricsContainerRef}
-                                            className="h-full overflow-y-auto scrollbar-hide px-8 py-[30vh]"
+                                            className="h-full overflow-y-auto scrollbar-hide px-10 py-[30vh]"
                                             onScroll={() => {
                                                 if (lyricsContainerRef.current) {
                                                     setIsUserScrolling(true);
@@ -508,7 +508,7 @@ export default function FullscreenLyricsPlayer({
                                                 }
                                             }}
                                         >
-                                            <div className="space-y-6">
+                                            <div className="space-y-3">
                                                 {lyrics.lines.map((line, index) => {
                                                     const isCurrentLine = index === currentLineIndex;
                                                     const isPastLine = index < currentLineIndex;
@@ -541,7 +541,7 @@ export default function FullscreenLyricsPlayer({
                                                             }}
                                                         >
                                                             {hasWords && isCurrentLine ? (
-                                                                <p className="text-2xl font-bold leading-loose">
+                                                                <p className="text-xl font-bold leading-snug">
                                                                     {line.words.map((word, wordIdx) => {
                                                                         const progress = getWordProgress(word);
                                                                         return (
@@ -564,7 +564,7 @@ export default function FullscreenLyricsPlayer({
                                                             ) : (
                                                                 <p
                                                                     className={cn(
-                                                                        "text-2xl font-bold leading-loose transition-colors duration-300",
+                                                                        "text-xl font-bold leading-snug transition-colors duration-300",
                                                                         isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
                                                                     )}
                                                                 >
