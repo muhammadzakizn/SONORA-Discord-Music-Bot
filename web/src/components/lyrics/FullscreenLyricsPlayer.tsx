@@ -568,22 +568,39 @@ export default function FullscreenLyricsPlayer({
         setShowPreviewDialog(false);
     };
 
-    // Search lyrics
+    // Search lyrics - re-fetch with custom query
+    const [searchError, setSearchError] = useState<string | null>(null);
+    const [searchNoResults, setSearchNoResults] = useState(false);
+
     const handleSearchLyrics = async () => {
-        if (!lyricsSearchQuery.trim() || !track) return;
+        if (!lyricsSearchQuery.trim()) {
+            setSearchError('Masukkan kata kunci pencarian');
+            return;
+        }
 
         setIsSearchingLyrics(true);
         setLyricsSearchResults([]);
+        setSearchError(null);
+        setSearchNoResults(false);
 
         try {
-            // Search using current API
-            const response = await fetch(`/api/bot/lyrics/search?q=${encodeURIComponent(lyricsSearchQuery)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`);
+            // Try to fetch lyrics using the search query as title/artist
+            const response = await fetch(`/api/bot/guild/${guildId}/time_sync?source=${lyricsSource}&search=${encodeURIComponent(lyricsSearchQuery)}`);
             if (response.ok) {
                 const data = await response.json();
-                setLyricsSearchResults(data.results || []);
+                if (data.lyrics?.lines?.length > 0) {
+                    // Found lyrics, show preview
+                    setPreviewLyrics(data.lyrics);
+                    setShowPreviewDialog(true);
+                } else {
+                    setSearchNoResults(true);
+                }
+            } else {
+                setSearchError('Gagal mencari lyrics. Coba lagi.');
             }
         } catch (err) {
             console.error('Lyrics search failed:', err);
+            setSearchError('Terjadi kesalahan saat mencari lyrics.');
         } finally {
             setIsSearchingLyrics(false);
         }
@@ -1598,9 +1615,13 @@ export default function FullscreenLyricsPlayer({
                                             <input
                                                 type="text"
                                                 value={lyricsSearchQuery}
-                                                onChange={(e) => setLyricsSearchQuery(e.target.value)}
+                                                onChange={(e) => {
+                                                    setLyricsSearchQuery(e.target.value);
+                                                    setSearchError(null);
+                                                    setSearchNoResults(false);
+                                                }}
                                                 onKeyDown={(e) => e.key === 'Enter' && handleSearchLyrics()}
-                                                placeholder="Title or artist..."
+                                                placeholder="Judul atau artis..."
                                                 className="flex-1 bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-white/30"
                                             />
                                             <button
@@ -1615,6 +1636,25 @@ export default function FullscreenLyricsPlayer({
                                                 )}
                                             </button>
                                         </div>
+
+                                        {/* Search Error */}
+                                        {searchError && (
+                                            <div className="mt-2 p-2 rounded-lg bg-rose-500/20 border border-rose-500/30">
+                                                <p className="text-rose-400 text-xs flex items-center gap-1">
+                                                    <AlertTriangle className="w-3 h-3" />
+                                                    {searchError}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* No Results */}
+                                        {searchNoResults && (
+                                            <div className="mt-2 p-2 rounded-lg bg-amber-500/20 border border-amber-500/30">
+                                                <p className="text-amber-400 text-xs">
+                                                    Tidak ada lyrics ditemukan untuk "{lyricsSearchQuery}"
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {/* Search Results */}
                                         {lyricsSearchResults.length > 0 && (
