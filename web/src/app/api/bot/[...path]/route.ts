@@ -20,6 +20,8 @@ export async function GET(
   const queryString = searchParams ? `?${searchParams}` : '';
   const url = `${BOT_API_URL}/api/${targetPath}${queryString}`;
   
+  console.log(`[Proxy] GET ${url}`);
+  
   try {
     const response = await fetch(url, {
       method: 'GET',
@@ -28,12 +30,14 @@ export async function GET(
       },
     });
     
+    console.log(`[Proxy] Response status: ${response.status}`);
+    
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('[Proxy] Connection error:', error);
     return NextResponse.json(
-      { error: 'Failed to connect to backend API' },
+      { error: 'Failed to connect to backend API', details: String(error) },
       { status: 503 }
     );
   }
