@@ -36,7 +36,14 @@ class SocketClient {
   connect() {
     if (this.socket?.connected) return;
 
-    // Connect to Flask-SocketIO via proxy
+    // Socket.IO is disabled in production (Vercel cannot proxy WebSocket to Flask)
+    // Only enable in development mode
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+      console.log('[Socket] Disabled in production - using REST API polling instead');
+      return;
+    }
+
+    // Connect to Flask-SocketIO (development only)
     this.socket = io({
       path: '/socket.io',
       transports: ['websocket', 'polling'],

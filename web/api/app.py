@@ -711,24 +711,38 @@ def api_lyrics_search():
         
         # Convert to dict
         lyrics_dict = {
-            "lines": [
-                {
-                    "text": line.text,
-                    "start_time": line.start_time,
-                    "end_time": line.end_time,
-                    "romanized": getattr(line, 'romanized', None),
-                    "words": [
-                        {"text": w.text, "start_time": w.start_time, "end_time": w.end_time}
-                        for w in (line.words or [])
-                    ] if hasattr(line, 'words') and line.words else []
-                }
-                for line in lyrics_data.lines
-            ],
+            "lines": [],
             "total_lines": len(lyrics_data.lines),
             "is_synced": lyrics_data.is_synced,
             "source": str(lyrics_data.source.value) if lyrics_data.source else "unknown",
             "has_syllable_timing": getattr(lyrics_data, 'has_syllable_timing', False)
         }
+        
+        for line in lyrics_data.lines:
+            words_list = []
+            if hasattr(line, 'words') and line.words:
+                for w in line.words:
+                    # Handle both dict and object formats
+                    if isinstance(w, dict):
+                        words_list.append({
+                            "text": w.get("text", ""),
+                            "start_time": w.get("start_time", 0),
+                            "end_time": w.get("end_time", 0)
+                        })
+                    else:
+                        words_list.append({
+                            "text": getattr(w, 'text', ''),
+                            "start_time": getattr(w, 'start_time', 0),
+                            "end_time": getattr(w, 'end_time', 0)
+                        })
+            
+            lyrics_dict["lines"].append({
+                "text": line.text,
+                "start_time": line.start_time,
+                "end_time": line.end_time,
+                "romanized": getattr(line, 'romanized', None),
+                "words": words_list
+            })
         
         logger.info(f"Found {len(lyrics_data.lines)} lines for: {query}")
         return jsonify({"found": True, "lyrics": lyrics_dict})
