@@ -75,6 +75,64 @@ interface FullscreenLyricsPlayerProps {
 
 const API_BASE = '/api/bot';
 
+// Marquee component for scrolling long text
+function MarqueeText({ text, className }: { text: string; className?: string }) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const textRef = useRef<HTMLSpanElement>(null);
+    const [shouldScroll, setShouldScroll] = useState(false);
+    const [scrollDuration, setScrollDuration] = useState(10);
+
+    useEffect(() => {
+        const checkOverflow = () => {
+            if (containerRef.current && textRef.current) {
+                const containerWidth = containerRef.current.offsetWidth;
+                const textWidth = textRef.current.scrollWidth;
+                setShouldScroll(textWidth > containerWidth);
+                // Calculate duration based on text length (slower for longer text, then speed up)
+                const baseDuration = Math.max(8, (textWidth - containerWidth) / 30);
+                setScrollDuration(baseDuration);
+            }
+        };
+
+        checkOverflow();
+        window.addEventListener('resize', checkOverflow);
+        return () => window.removeEventListener('resize', checkOverflow);
+    }, [text]);
+
+    if (!shouldScroll) {
+        return (
+            <div ref={containerRef} className={cn("overflow-hidden", className)}>
+                <span ref={textRef} className="whitespace-nowrap">{text}</span>
+            </div>
+        );
+    }
+
+    return (
+        <div ref={containerRef} className={cn("overflow-hidden relative", className)}>
+            <style jsx>{`
+                @keyframes marquee {
+                    0% { transform: translateX(0); }
+                    10% { transform: translateX(0); }
+                    15% { transform: translateX(-5%); }
+                    85% { transform: translateX(-100%); }
+                    90% { transform: translateX(-100%); }
+                    100% { transform: translateX(0); }
+                }
+                .marquee-text {
+                    animation: marquee ${scrollDuration}s ease-in-out infinite;
+                    animation-delay: 3s;
+                }
+            `}</style>
+            <span
+                ref={textRef}
+                className="marquee-text inline-block whitespace-nowrap pr-12"
+            >
+                {text}
+            </span>
+        </div>
+    );
+}
+
 export default function FullscreenLyricsPlayer({
     guildId,
     isOpen,
@@ -606,9 +664,10 @@ export default function FullscreenLyricsPlayer({
                                             <MoreHorizontal className="w-5 h-5" />
                                         </button>
                                     </div>
-                                    <p className="text-white/60 text-sm truncate">
-                                        {track?.artist || "Unknown Artist"} — {track?.album || "Unknown Album"}
-                                    </p>
+                                    <MarqueeText
+                                        text={`${track?.artist || "Unknown Artist"} — ${track?.album || "Unknown Album"}`}
+                                        className="text-white/60 text-sm"
+                                    />
                                 </div>
                             </div>
                         )}
@@ -812,9 +871,10 @@ export default function FullscreenLyricsPlayer({
                                         )}
                                     </div>
                                 </div>
-                                <p className="text-white/60 text-sm truncate -mt-0.5">
-                                    {track?.artist || "Unknown Artist"} — {track?.album || "Unknown Album"}
-                                </p>
+                                <MarqueeText
+                                    text={`${track?.artist || "Unknown Artist"} — ${track?.album || "Unknown Album"}`}
+                                    className="text-white/60 text-sm -mt-0.5"
+                                />
                             </div>
 
                             {/* Progress Bar */}
