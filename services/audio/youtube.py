@@ -269,13 +269,14 @@ class YouTubeDownloader(BaseDownloader):
     
     async def _search_ytmusic_with_matching(self, query: str) -> Optional[TrackInfo]:
         """
-        Search YouTube Music using ytmusicapi with title matching.
+        Search YouTube Music using ytmusicapi with improved title/artist matching.
         
-        Fetches multiple results and picks the best match based on title similarity.
-        This prevents returning wrong songs from the same artist.
+        Parses query to extract title and artist, then scores results based on:
+        - Title match (how well the result title matches query title)
+        - Artist match (if query contains artist, verify result artist matches)
         
         Args:
-            query: Search query (title or "artist title")
+            query: Search query (e.g., "Faded", "Faded Alan Walker", "Alan Walker Faded")
             
         Returns:
             TrackInfo if found, None otherwise
@@ -284,47 +285,83 @@ class YouTubeDownloader(BaseDownloader):
             return None
         
         try:
-            # Search on YouTube Music - get 5 results for better matching
+            # Search on YouTube Music - get 10 results for better matching
             results = await asyncio.to_thread(
                 self.ytmusic.search,
                 query,
                 filter='songs',
-                limit=5
+                limit=10
             )
             
             if not results:
                 return None
             
-            # Normalize query for comparison
-            query_normalized = self._normalize_title(query)
+            # Parse query into potential title and artist parts
+            query_words = self._normalize_title(query).split()
             
-            # Score each result by title similarity
+            # Log all results for debugging
+            logger.info(f"🔍 Query: '{query}' - Found {len(results)} results")
+            for i, r in enumerate(results[:5]):
+                r_title = r.get('title', '')
+                r_artist = r['artists'][0]['name'] if r.get('artists') else ''
+                logger.debug(f"  {i+1}. '{r_title}' by '{r_artist}'")
+            
+            # Score each result
             best_match = None
             best_score = 0.0
+            best_details = ""
             
             for result in results:
                 result_title = result.get('title', '')
                 result_artist = result['artists'][0]['name'] if result.get('artists') else ''
                 
-                # Calculate title similarity score
-                result_title_normalized = self._normalize_title(result_title)
-                title_score = self._calculate_similarity(query_normalized, result_title_normalized)
+                # Normalize for comparison
+                title_normalized = self._normalize_title(result_title)
+                artist_normalized = self._normalize_title(result_artist)
                 
-                # Also check with artist + title combination
-                full_result = f"{result_artist} {result_title}"
-                full_result_normalized = self._normalize_title(full_result)
-                full_score = self._calculate_similarity(query_normalized, full_result_normalized)
+                # Split into words
+                title_words = set(title_normalized.split())
+                artist_words = set(artist_normalized.split())
+                all_result_words = title_words | artist_words
                 
-                # Use the better score
-                final_score = max(title_score, full_score)
+                # Calculate how many query words are found in result
+                query_words_set = set(query_words)
+                matches_in_title = query_words_set & title_words
+                matches_in_artist = query_words_set & artist_words
+                matches_total = query_words_set & all_result_words
                 
-                logger.debug(f"Match score {final_score:.2f}: '{result_title}' by '{result_artist}'")
+                # Score based on coverage
+                if not query_words_set:
+                    continue
+                    
+                title_coverage = len(matches_in_title) / len(query_words_set)
+                total_coverage = len(matches_total) / len(query_words_set)
+                
+                # Bonus for exact title match or containment
+                title_bonus = 0.0
+                query_as_phrase = self._normalize_title(query)
+                if title_normalized == query_as_phrase:
+                    title_bonus = 0.5  # Exact match
+                elif query_as_phrase in title_normalized or title_normalized in query_as_phrase:
+                    title_bonus = 0.3  # Containment
+                
+                # Calculate final score
+                # Prioritize: title word matches + coverage + title bonus
+                final_score = (title_coverage * 0.5) + (total_coverage * 0.3) + title_bonus
+                
+                # Penalize if artist words found but title words not in result title
+                if matches_in_artist and not matches_in_title:
+                    final_score *= 0.5  # Reduce score - probably wrong song same artist
+                
+                details = f"title_cov={title_coverage:.2f}, total_cov={total_coverage:.2f}, bonus={title_bonus:.2f}"
+                logger.debug(f"Score {final_score:.2f} ({details}): '{result_title}' by '{result_artist}'")
                 
                 if final_score > best_score:
                     best_score = final_score
                     best_match = result
+                    best_details = details
             
-            # Only return if we have a reasonable match (>0.4 similarity)
+            # Only return if we have a good match (score >= 0.4)
             if best_match and best_score >= 0.4:
                 title = best_match.get('title', query)
                 artist = best_match['artists'][0]['name'] if best_match.get('artists') else 'Unknown'
@@ -335,11 +372,14 @@ class YouTubeDownloader(BaseDownloader):
                 # Parse duration string (e.g., "3:45" -> 225 seconds)
                 duration = 0
                 if duration_str:
-                    parts = duration_str.split(':')
-                    if len(parts) == 2:
-                        duration = int(parts[0]) * 60 + int(parts[1])
-                    elif len(parts) == 3:
-                        duration = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                    try:
+                        parts = duration_str.split(':')
+                        if len(parts) == 2:
+                            duration = int(parts[0]) * 60 + int(parts[1])
+                        elif len(parts) == 3:
+                            duration = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                    except ValueError:
+                        pass
                 
                 # Get thumbnail
                 thumbnails = best_match.get('thumbnails', [])
@@ -359,11 +399,11 @@ class YouTubeDownloader(BaseDownloader):
                     thumbnail_url=thumbnail
                 )
             else:
-                logger.warning(f"⚠️ No good title match found (best score: {best_score:.2f})")
+                logger.warning(f"⚠️ No good match found for '{query}' (best score: {best_score:.2f})")
                 return None
                 
         except Exception as e:
-            logger.debug(f"YTMusicAPI search error: {e}")
+            logger.warning(f"YTMusicAPI search error: {e}")
             return None
     
     def _normalize_title(self, title: str) -> str:
