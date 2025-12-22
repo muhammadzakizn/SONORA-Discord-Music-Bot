@@ -1453,11 +1453,11 @@ export default function FullscreenLyricsPlayer({
                                                                 }
 
                                                                 // Text shadow glow intensity
-                                                                const glowBlur = 4 + (6 * glowAlpha);
-                                                                const glowOpacity = glowAlpha * 0.8;
+                                                                const glowBlur = 4 + (8 * glowAlpha);
+                                                                const glowOpacity = glowAlpha * 0.7;
 
-                                                                // Gradient progress for wipe effect (percentage)
-                                                                const gradientProgress = -20 + (120 * progress);
+                                                                // Brightness based on progress (dim -> bright)
+                                                                const brightness = progress > 0 ? 0.4 + (0.6 * progress) : 0.35;
 
                                                                 return (
                                                                     <span
@@ -1467,21 +1467,13 @@ export default function FullscreenLyricsPlayer({
                                                                             display: "inline-block",
                                                                             marginRight: "0.15em",
                                                                             transform: `translateY(${yOffset}px) scale(${scale})`,
-                                                                            transition: "transform 0.08s ease-out",
-                                                                            // Gradient wipe effect
-                                                                            background: `linear-gradient(90deg, 
-                                                                                rgba(255,255,255,1) 0%, 
-                                                                                rgba(255,255,255,1) ${gradientProgress}%, 
-                                                                                rgba(255,255,255,0.35) ${gradientProgress + 20}%, 
-                                                                                rgba(255,255,255,0.35) 100%)`,
-                                                                            WebkitBackgroundClip: "text",
-                                                                            WebkitTextFillColor: "transparent",
-                                                                            backgroundClip: "text",
-                                                                            // Glow effect
+                                                                            transition: "transform 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                                                                            // Simple color transition instead of gradient
+                                                                            color: `rgba(255, 255, 255, ${brightness})`,
+                                                                            // Glow effect for active words
                                                                             textShadow: glowAlpha > 0.1
-                                                                                ? `0 0 ${glowBlur}px rgba(255,255,255,${glowOpacity}), 0 0 ${glowBlur * 2}px rgba(255,255,255,${glowOpacity * 0.5})`
+                                                                                ? `0 0 ${glowBlur}px rgba(255,255,255,${glowOpacity})`
                                                                                 : 'none',
-                                                                            filter: glowAlpha > 0.1 ? `drop-shadow(0 0 ${glowBlur}px rgba(255,255,255,${glowOpacity * 0.6}))` : 'none',
                                                                         }}
                                                                     >
                                                                         {word.text}
