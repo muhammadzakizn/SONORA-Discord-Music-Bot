@@ -480,7 +480,10 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
             <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>
-            <Footer />
+            {/* Footer with negative margin to extend to edges */}
+            <div className="-mx-4 md:-mx-6 -mb-4 md:-mb-6">
+              <Footer />
+            </div>
           </main>
         </div>
       </div>
