@@ -13,8 +13,8 @@ export function Footer() {
     };
 
     return (
-        <footer className={`mt-24 md:mt-32 py-10 md:py-16 px-4 border-t ${isDark ? 'border-zinc-800 bg-black' : 'border-gray-200 bg-white'}`}>
-            <div className="max-w-6xl mx-auto">
+        <footer className={`mt-24 md:mt-32 py-10 md:py-16 border-t ${isDark ? 'border-zinc-800 bg-black' : 'border-gray-200 bg-white'}`}>
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Main Footer Content */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
                     {/* Brand Section */}
