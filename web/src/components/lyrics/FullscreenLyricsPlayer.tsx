@@ -430,10 +430,13 @@ export default function FullscreenLyricsPlayer({
     }, [currentLineIndex, isUserScrolling]);
 
     // Handle user scroll - show all lyrics temporarily
-    // Only trigger if it's actually a user scroll, not auto-scroll or programmatic apply
-    const handleLyricsScroll = useCallback(() => {
-        // Ignore scroll events caused by auto-scroll or lyrics apply
-        if (isAutoScrollingRef.current || isApplyingLyricsRef.current) return;
+    // Use wheel and touch events instead of scroll events to avoid auto-scroll triggers
+    const handleUserScrollStart = useCallback((e: WheelEvent | TouchEvent) => {
+        // Ignore if currently applying lyrics
+        if (isApplyingLyricsRef.current) return;
+
+        // For wheel events, check if there's actual movement
+        if (e instanceof WheelEvent && Math.abs(e.deltaY) < 5) return;
 
         setIsUserScrolling(true);
 
@@ -447,6 +450,23 @@ export default function FullscreenLyricsPlayer({
             setIsUserScrolling(false);
         }, 3000);
     }, []);
+
+    // Attach wheel and touch listeners to lyrics container
+    useEffect(() => {
+        const container = lyricsContainerRef.current;
+        if (!container) return;
+
+        const handleWheel = (e: WheelEvent) => handleUserScrollStart(e);
+        const handleTouchStart = (e: TouchEvent) => handleUserScrollStart(e);
+
+        container.addEventListener('wheel', handleWheel, { passive: true });
+        container.addEventListener('touchmove', handleTouchStart, { passive: true });
+
+        return () => {
+            container.removeEventListener('wheel', handleWheel);
+            container.removeEventListener('touchmove', handleTouchStart);
+        };
+    }, [handleUserScrollStart]);
 
     // Cleanup scroll timeout on unmount
     useEffect(() => {
@@ -1357,7 +1377,6 @@ export default function FullscreenLyricsPlayer({
                             <div
                                 ref={lyricsContainerRef}
                                 className="overflow-y-auto scrollbar-hide px-8 lg:px-12 py-[40vh] max-h-full"
-                                onScroll={handleLyricsScroll}
                             >
                                 {lyrics?.lines.length ? (
                                     <div className="space-y-6">
