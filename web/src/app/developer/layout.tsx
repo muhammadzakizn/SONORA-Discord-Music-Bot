@@ -35,6 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SessionProvider, useSession, getAvatarUrl } from "@/contexts/SessionContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Footer } from "@/components/Footer";
 
 interface NavItem {
   label: string;
@@ -540,6 +541,7 @@ function DeveloperLayoutContent({ children }: { children: ReactNode }) {
           <div className="max-w-7xl mx-auto w-full">
             {children}
           </div>
+          <Footer />
         </main>
       </div>
     </div>

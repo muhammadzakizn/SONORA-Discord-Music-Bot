@@ -9,6 +9,7 @@ import {
     ChevronRight, Terminal, Globe, Sparkles
 } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Footer } from "@/components/Footer";
 
 export default function DocumentationPage() {
     const { isDark } = useSettings();
@@ -221,6 +222,7 @@ export default function DocumentationPage() {
                     </Section>
                 </div>
             </motion.main>
+            <Footer />
         </div>
     );
 }
@@ -237,8 +239,8 @@ function QuickStartCard({ icon: Icon, title, description, href, isDark }: {
         <a
             href={href}
             className={`block p-6 rounded-2xl transition-all group ${isDark
-                    ? 'bg-white/5 hover:bg-white/10 border border-white/10'
-                    : 'bg-white hover:bg-gray-50 border border-gray-200'
+                ? 'bg-white/5 hover:bg-white/10 border border-white/10'
+                : 'bg-white hover:bg-gray-50 border border-gray-200'
                 }`}
         >
             <Icon className="w-8 h-8 text-[#7B1E3C] mb-3" />

@@ -29,6 +29,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Footer } from "@/components/Footer";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { FloatingProfileButton, DashboardButton } from "@/components/FloatingProfile";
 
@@ -904,121 +905,6 @@ function CTASection({ isDark, t }: { isDark: boolean; t: (key: string) => string
   );
 }
 
-// Footer
-function Footer({ isDark, t }: { isDark: boolean; t: (key: string) => string }) {
-  return (
-    <footer className={`py-10 md:py-16 px-4 border-t ${isDark ? 'border-zinc-800 bg-black' : 'border-gray-200 bg-white'}`}>
-      <div className="max-w-6xl mx-auto">
-        {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          {/* Brand Section */}
-          <div className="md:col-span-1">
-            <Image
-              src="/sonora-logo.png"
-              alt="SONORA"
-              width={150}
-              height={60}
-              className="h-10 w-auto logo-adaptive mb-4"
-            />
-            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {t('hero.description')}
-            </p>
-          </div>
-
-          {/* Navigation Links */}
-          <div>
-            <h4 className={`font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {t('nav.explore') || 'Navigation'}
-            </h4>
-            <ul className={`space-y-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              <li>
-                <Link href="/" className="hover:text-[#7B1E3C] transition-colors">
-                  {t('nav.home')}
-                </Link>
-              </li>
-              <li>
-                <Link href="/login" className="hover:text-[#7B1E3C] transition-colors">
-                  {t('nav.dashboard')}
-                </Link>
-              </li>
-              <li>
-                <a
-                  href="https://discord.com/oauth2/authorize?client_id=1091025686553034804&permissions=3147776&scope=bot%20applications.commands"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-[#7B1E3C] transition-colors"
-                >
-                  {t('hero.addBot')}
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Legal Links */}
-          <div>
-            <h4 className={`font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {t('footer.legal') || 'Legal'}
-            </h4>
-            <ul className={`space-y-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              <li>
-                <Link href="/terms" className="hover:text-[#7B1E3C] transition-colors">
-                  {t('legal.terms')}
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy" className="hover:text-[#7B1E3C] transition-colors">
-                  {t('legal.privacy')}
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Resources Links */}
-          <div>
-            <h4 className={`font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {t('footer.resources') || 'Resources'}
-            </h4>
-            <ul className={`space-y-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              <li>
-                <Link href="/docs" className="hover:text-[#7B1E3C] transition-colors">
-                  {t('docs.title')}
-                </Link>
-              </li>
-              <li>
-                <Link href="/support" className="hover:text-[#7B1E3C] transition-colors">
-                  {t('support.title')}
-                </Link>
-              </li>
-              <li>
-                <a
-                  href="https://github.com/muhammadzakizn/SONORA-Discord-Music-Bot"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-[#7B1E3C] transition-colors"
-                >
-                  GitHub
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className={`border-t ${isDark ? 'border-zinc-800' : 'border-gray-200'} pt-6`}>
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-              © 2024-2026 SONORA Bot. {t('footer.rights') || 'All rights reserved.'}
-            </p>
-            <div className={`flex gap-4 text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-              <span>{t('footer.createdBy') || 'Created by'} Muhammad Zaky</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
 // Main Page Component
 function HomeContent() {
   const { isDark, t } = useSettings();
@@ -1031,7 +917,7 @@ function HomeContent() {
       <SourcesSection isDark={isDark} t={t} />
       <PlayerPreviewSection isDark={isDark} t={t} />
       <CTASection isDark={isDark} t={t} />
-      <Footer isDark={isDark} t={t} />
+      <Footer />
     </main>
   );
 }

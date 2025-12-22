@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ArrowLeft, Sparkles, Calendar, Tag, ChevronRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Footer } from '@/components/Footer';
 
 interface ChangelogEntry {
     id: string;
@@ -234,9 +235,7 @@ export default function ChangelogPage() {
                 )}
 
                 {/* Footer */}
-                <div className="text-center mt-12 text-zinc-500 text-sm">
-                    <p>SONORA © 2025 • Dibuat dengan ❤️</p>
-                </div>
+                <Footer />
             </div>
         </div>
     );

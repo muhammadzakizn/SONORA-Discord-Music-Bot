@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, Shield, Calendar, Database, Eye, Trash2, Lock } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Footer } from "@/components/Footer";
 
 export default function PrivacyPolicyPage() {
     const { isDark } = useSettings();
@@ -219,6 +220,7 @@ export default function PrivacyPolicyPage() {
                     </Section>
                 </div>
             </motion.main>
+            <Footer />
         </div>
     );
 }

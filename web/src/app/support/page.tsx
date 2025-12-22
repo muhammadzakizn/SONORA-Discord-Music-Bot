@@ -9,6 +9,7 @@ import {
     ExternalLink, Mail, Phone, Music, Zap, Shield, Clock
 } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Footer } from "@/components/Footer";
 
 // Discord Icon
 const DiscordIcon = () => (
@@ -174,6 +175,7 @@ export default function SupportPage() {
                     </div>
                 </section>
             </motion.main>
+            <Footer />
         </div>
     );
 }
@@ -194,8 +196,8 @@ function ContactCard({ icon, platform, handle, description, href, color, isDark 
             target="_blank"
             rel="noopener noreferrer"
             className={`block p-6 rounded-2xl transition-all group ${isDark
-                    ? 'bg-white/5 hover:bg-white/10 border border-white/10'
-                    : 'bg-white hover:bg-gray-50 border border-gray-200 shadow-sm'
+                ? 'bg-white/5 hover:bg-white/10 border border-white/10'
+                : 'bg-white hover:bg-gray-50 border border-gray-200 shadow-sm'
                 }`}
         >
             <div className="flex items-start gap-4">
@@ -276,8 +278,8 @@ function QuickLink({ href, title, description, isDark }: {
         <Link
             href={href}
             className={`block p-4 rounded-xl transition-all ${isDark
-                    ? 'bg-white/5 hover:bg-white/10 border border-white/10'
-                    : 'bg-white hover:bg-gray-50 border border-gray-200'
+                ? 'bg-white/5 hover:bg-white/10 border border-white/10'
+                : 'bg-white hover:bg-gray-50 border border-gray-200'
                 }`}
         >
             <h3 className="font-medium mb-1">{title}</h3>

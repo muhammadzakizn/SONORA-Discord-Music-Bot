@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
 import NavLiquidGlass from "@/components/NavLiquidGlass";
+import { Footer } from "@/components/Footer";
 
 interface SystemStatus {
     status: "operational" | "degraded" | "outage" | "unknown" | "maintenance";
@@ -560,6 +561,9 @@ export default function StatusPage() {
                     </Link>
                 </div>
             </div>
+
+            {/* Footer */}
+            <Footer />
 
             {/* Navigation */}
             <NavLiquidGlass />

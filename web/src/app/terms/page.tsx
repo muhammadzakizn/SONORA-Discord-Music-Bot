@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, FileText, Calendar } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Footer } from "@/components/Footer";
 
 export default function TermsOfServicePage() {
     const { isDark, t } = useSettings();
@@ -196,6 +197,7 @@ export default function TermsOfServicePage() {
                     </Section>
                 </div>
             </motion.main>
+            <Footer />
         </div>
     );
 }

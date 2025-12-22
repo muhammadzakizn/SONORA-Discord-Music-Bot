@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { SessionProvider, useSession, getAvatarUrl } from "@/contexts/SessionContext";
 import { TutorialOverlay, useTutorial } from "@/components/TutorialOverlay";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Footer } from "@/components/Footer";
 
 interface NavItem {
   labelKey: string;
@@ -479,6 +480,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
             <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>
+            <Footer />
           </main>
         </div>
       </div>
