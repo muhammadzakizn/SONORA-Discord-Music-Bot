@@ -2,7 +2,7 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.26.0";
+export const WEB_VERSION = "3.27.0";
 export const BOT_VERSION = "3.13.0";
 
 export interface ChangelogEntry {
@@ -17,6 +17,38 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.27.0",
+    date: "2025-12-23",
+    title: "Dynamic Time-Based Welcome Message",
+    highlights: [
+      "Personalized greetings based on local time",
+      "Animated SVG illustrations for each time period",
+      "5 time periods: Morning, Afternoon, Evening, Night, Midnight",
+      "Random greeting messages for variety"
+    ],
+    changes: [
+      {
+        category: "New Components",
+        items: [
+          "TimeBasedGreeting component with animated illustrations",
+          "Morning: Rising sun with floating clouds",
+          "Afternoon: Bright sun with radiating rays",
+          "Evening: Sunset with flying birds",
+          "Night: Crescent moon with twinkling stars",
+          "Midnight: Full moon with shooting star animation"
+        ]
+      },
+      {
+        category: "Admin Dashboard",
+        items: [
+          "Replaced static welcome message with dynamic TimeBasedGreeting",
+          "Greeting updates based on user's local device time",
+          "SSR-safe with hydration handling"
+        ]
+      }
+    ]
+  },
   {
     version: "3.26.0",
     date: "2025-12-22",

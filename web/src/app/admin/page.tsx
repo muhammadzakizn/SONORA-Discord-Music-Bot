@@ -29,6 +29,7 @@ import { api, BotStatus, Guild, HealthStatus, ActivityStats } from "@/lib/api";
 import { formatUptime, formatNumber, cn } from "@/lib/utils";
 import { useSession, getServerIconUrl, UserGuild } from "@/contexts/SessionContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { TimeBasedGreeting } from "@/components/admin/TimeBasedGreeting";
 
 // Stats Card Component - Theme Aware
 function StatsCard({
@@ -434,18 +435,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Welcome Message */}
+      {/* Dynamic Time-Based Welcome Message */}
       {user && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-6 rounded-2xl bg-gradient-to-r from-[#7B1E3C]/20 to-[#C4314B]/20 border border-[#7B1E3C]/30"
-        >
-          <h2 className={cn("text-2xl font-bold mb-1", isDark ? "text-white" : "text-gray-900")}>{t('dashboard.welcome')}, {user.username}!</h2>
-          <p className={isDark ? "text-zinc-400" : "text-gray-600"}>
-            {t('dashboard.accessInfo').replace('{count}', managedGuilds.length.toString())}
-          </p>
-        </motion.div>
+        <TimeBasedGreeting
+          displayName={user.username}
+          isDark={isDark}
+        />
       )}
 
       {/* Connection Status */}
