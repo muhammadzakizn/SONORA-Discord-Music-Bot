@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
+import { Edit3, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type TimePeriod = "morning" | "afternoon" | "evening" | "night" | "midnight";
@@ -9,6 +10,7 @@ type TimePeriod = "morning" | "afternoon" | "evening" | "night" | "midnight";
 interface TimeBasedGreetingProps {
     displayName: string;
     isDark: boolean;
+    onDisplayNameChange?: (newName: string) => void;
 }
 
 // Greeting messages pool for each time period
@@ -256,9 +258,12 @@ function TimeIllustration({ period }: { period: TimePeriod }) {
     }
 }
 
-export function TimeBasedGreeting({ displayName, isDark }: TimeBasedGreetingProps) {
+export function TimeBasedGreeting({ displayName, isDark, onDisplayNameChange }: TimeBasedGreetingProps) {
     const [mounted, setMounted] = useState(false);
     const [currentHour, setCurrentHour] = useState(new Date().getHours());
+    const [isEditing, setIsEditing] = useState(false);
+    const [editValue, setEditValue] = useState(displayName);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Only run on client to avoid hydration mismatch
     useEffect(() => {
@@ -273,6 +278,19 @@ export function TimeBasedGreeting({ displayName, isDark }: TimeBasedGreetingProp
         return () => clearInterval(interval);
     }, []);
 
+    // Sync edit value with displayName
+    useEffect(() => {
+        setEditValue(displayName);
+    }, [displayName]);
+
+    // Focus input when editing starts
+    useEffect(() => {
+        if (isEditing && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [isEditing]);
+
     const timePeriod = useMemo(() => getTimePeriod(currentHour), [currentHour]);
 
     // Get greeting only once per mount to avoid constant changes
@@ -281,15 +299,35 @@ export function TimeBasedGreeting({ displayName, isDark }: TimeBasedGreetingProp
         return getRandomGreeting(timePeriod);
     }, [mounted, timePeriod]);
 
+    const handleSave = () => {
+        if (editValue.trim() && onDisplayNameChange) {
+            onDisplayNameChange(editValue.trim());
+        }
+        setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+        setEditValue(displayName);
+        setIsEditing(false);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSave();
+        } else if (e.key === 'Escape') {
+            handleCancel();
+        }
+    };
+
     if (!mounted) {
         // SSR fallback
         return (
             <div className="flex items-center justify-between py-2">
                 <div>
-                    <p className={cn("text-sm", isDark ? "text-zinc-400" : "text-gray-500")}>
+                    <p className={cn("text-xs md:text-sm", isDark ? "text-zinc-500" : "text-gray-400")}>
                         Welcome!
                     </p>
-                    <h2 className={cn("text-2xl md:text-3xl font-bold", isDark ? "text-white" : "text-gray-900")}>
+                    <h2 className={cn("text-3xl md:text-4xl font-bold", isDark ? "text-white" : "text-gray-900")}>
                         {displayName}
                     </h2>
                 </div>
@@ -306,23 +344,78 @@ export function TimeBasedGreeting({ displayName, isDark }: TimeBasedGreetingProp
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.1 }}
                     className={cn(
-                        "text-base md:text-lg font-medium",
-                        isDark ? "text-zinc-300" : "text-gray-600"
+                        "text-xs md:text-sm font-medium",
+                        isDark ? "text-zinc-500" : "text-gray-400"
                     )}
                 >
                     {greeting}
                 </motion.p>
-                <motion.h2
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className={cn(
-                        "text-2xl md:text-3xl font-bold mt-1",
-                        isDark ? "text-white" : "text-gray-900"
-                    )}
-                >
-                    {displayName}
-                </motion.h2>
+
+                {isEditing ? (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex items-center gap-2 mt-0.5"
+                    >
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            maxLength={32}
+                            className={cn(
+                                "text-3xl md:text-4xl font-bold bg-transparent border-b-2 outline-none py-1 w-full max-w-[300px]",
+                                isDark
+                                    ? "text-white border-[#7B1E3C] focus:border-[#C4314B]"
+                                    : "text-gray-900 border-[#7B1E3C] focus:border-[#C4314B]"
+                            )}
+                        />
+                        <button
+                            onClick={handleSave}
+                            className="p-1.5 rounded-lg bg-green-600 hover:bg-green-700 transition-colors"
+                        >
+                            <Check className="w-4 h-4 text-white" />
+                        </button>
+                        <button
+                            onClick={handleCancel}
+                            className={cn(
+                                "p-1.5 rounded-lg transition-colors",
+                                isDark ? "bg-zinc-700 hover:bg-zinc-600" : "bg-gray-200 hover:bg-gray-300"
+                            )}
+                        >
+                            <X className={cn("w-4 h-4", isDark ? "text-white" : "text-gray-700")} />
+                        </button>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="flex items-center gap-2 mt-0.5 group"
+                    >
+                        <h2 className={cn(
+                            "text-3xl md:text-4xl font-bold",
+                            isDark ? "text-white" : "text-gray-900"
+                        )}>
+                            {displayName}
+                        </h2>
+                        {onDisplayNameChange && (
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className={cn(
+                                    "p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all",
+                                    isDark
+                                        ? "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                        : "text-gray-400 hover:text-gray-900 hover:bg-gray-100"
+                                )}
+                                title="Edit display name"
+                            >
+                                <Edit3 className="w-4 h-4" />
+                            </button>
+                        )}
+                    </motion.div>
+                )}
             </div>
 
             {/* Illustration */}
@@ -337,4 +430,5 @@ export function TimeBasedGreeting({ displayName, isDark }: TimeBasedGreetingProp
         </div>
     );
 }
+
 

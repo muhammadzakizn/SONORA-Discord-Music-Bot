@@ -371,7 +371,7 @@ function TopTracks({ activity, isDark }: { activity: ActivityStats | null; isDar
 }
 
 export default function AdminDashboard() {
-  const { user, managedGuilds } = useSession();
+  const { user, managedGuilds, displayName, setDisplayName } = useSession();
   const { t, isDark } = useSettings();
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [guilds, setGuilds] = useState<Guild[]>([]);
@@ -438,8 +438,9 @@ export default function AdminDashboard() {
       {/* Dynamic Time-Based Welcome Message */}
       {user && (
         <TimeBasedGreeting
-          displayName={user.username}
+          displayName={displayName || user.username}
           isDark={isDark}
+          onDisplayNameChange={setDisplayName}
         />
       )}
 
