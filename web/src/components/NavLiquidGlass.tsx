@@ -378,7 +378,7 @@ export default function NavLiquidGlass() {
                                     isDark
                                         ? "bg-white/12"
                                         : "bg-black/8",
-                                    "rounded-[14px] sm:rounded-[16px]"
+                                    "rounded-full" // Full capsule shape like Apple Music
                                 )}
                                 initial={false}
                                 animate={{
