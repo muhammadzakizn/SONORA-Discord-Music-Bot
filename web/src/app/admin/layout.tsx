@@ -240,20 +240,21 @@ function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick:
 
   return (
     <header className={cn(
-      "h-14 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30 transition-all duration-300 relative",
+      "h-14 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-40 transition-all duration-300",
       isDark ? "text-white" : "text-gray-900"
     )}>
-      {/* Extended gradient overlay when scrolled */}
+      {/* Extended gradient overlay when scrolled - positioned to extend below header */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: isScrolled ? 1 : 0 }}
         transition={{ duration: 0.3 }}
         className={cn(
-          "absolute inset-x-0 top-0 h-24 -z-10 pointer-events-none",
+          "absolute inset-x-0 -top-1 h-28 pointer-events-none",
           isDark
-            ? "bg-gradient-to-b from-black via-black/60 to-transparent"
-            : "bg-gradient-to-b from-white via-white/60 to-transparent"
+            ? "bg-gradient-to-b from-black via-black/70 to-transparent"
+            : "bg-gradient-to-b from-white via-white/70 to-transparent"
         )}
+        style={{ zIndex: -1 }}
       />
       {/* Left - Menu button and Logo */}
       <div className="flex items-center gap-3">
@@ -545,7 +546,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
             isDark={isDark}
             isScrolled={isScrolled}
           />
-          <main ref={mainRef} className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar relative z-10">
+          <main ref={mainRef} className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar relative z-0 -mt-14 pt-14">
             <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>
