@@ -285,33 +285,22 @@ function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick:
         </motion.h1>
       </div>
 
-      {/* Center - Title pill when scrolled (absolute positioned) */}
-      <motion.div
+      {/* Center - Title when scrolled (just bold text, no pill) */}
+      <motion.span
         initial={{ opacity: 0, y: -10 }}
         animate={{
           opacity: isScrolled ? 1 : 0,
           y: isScrolled ? 0 : -10,
         }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.25 }}
         className={cn(
-          "absolute left-1/2 -translate-x-1/2 flex items-center justify-center",
+          "absolute left-1/2 -translate-x-1/2 text-base font-bold",
+          isDark ? "text-white" : "text-gray-900",
           !isScrolled && "pointer-events-none"
         )}
       >
-        <div className={cn(
-          "px-4 py-1.5 rounded-full backdrop-blur-md",
-          isDark
-            ? "bg-white/[0.1] border border-white/[0.15]"
-            : "bg-black/[0.08] border border-black/[0.1]"
-        )}>
-          <span className={cn(
-            "text-sm font-semibold",
-            isDark ? "text-white" : "text-gray-900"
-          )}>
-            {t('admin.title')}
-          </span>
-        </div>
-      </motion.div>
+        {t('admin.title')}
+      </motion.span>
 
       {/* Right - Notifications & Profile (stays in place) */}
       <div className="flex items-center gap-2">
