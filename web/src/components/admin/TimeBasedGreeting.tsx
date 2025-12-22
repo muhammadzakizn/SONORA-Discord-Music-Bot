@@ -413,20 +413,9 @@ export function TimeBasedGreeting({ displayName, isDark, onDisplayNameChange }: 
                             >
                                 <Edit3 className="w-4 h-4" />
                             </button>
-                        )}
-                    </motion.div>
+                        )}\n                    </motion.div>
                 )}
             </div>
-
-            {/* Illustration */}
-            <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3, type: "spring", damping: 15 }}
-                className="flex-shrink-0 ml-4"
-            >
-                <TimeIllustration period={timePeriod} />
-            </motion.div>
         </div>
     );
 }
