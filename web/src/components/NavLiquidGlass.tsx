@@ -62,11 +62,19 @@ type PopupType = "explore" | "profile" | "settings" | null;
 
 // Helper function to get the active nav index for sliding indicator
 const getActiveNavIndex = (pathname: string, activePopup: PopupType): number => {
+    // When popup is active, show indicator on that nav item
     if (activePopup === "explore") return 1;
     if (activePopup === "settings") return 2;
     if (activePopup === "profile") return 3;
-    // Default to home when no popup is active
-    if (pathname === "/" || pathname.startsWith("/")) return 0;
+
+    // Check pathname for Explore section pages
+    const explorePages = ["/terms", "/privacy", "/support", "/docs", "/changelog", "/status"];
+    if (explorePages.some(page => pathname.startsWith(page))) return 1;
+
+    // Check pathname for Profile section pages (admin, developer dashboards)
+    if (pathname.startsWith("/admin") || pathname.startsWith("/developer")) return 3;
+
+    // Default to home for homepage and other pages
     return 0;
 };
 
