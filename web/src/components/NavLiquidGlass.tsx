@@ -86,6 +86,7 @@ export default function NavLiquidGlass() {
     const [isNavHidden, setIsNavHidden] = useState(false);
     const lastScrollY = useRef(0);
     const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+    const inactivityTimeout = useRef<NodeJS.Timeout | null>(null);
 
     // Detect scroll for auto-hide nav and scroll-to-top button
     useEffect(() => {
@@ -95,18 +96,20 @@ export default function NavLiquidGlass() {
             // Show scroll-to-top after 300px
             setShowScrollTop(currentScrollY > 300);
 
-            // Auto-hide nav on scroll down, show on scroll up
-            if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-                // Scrolling down - hide nav after a delay
+            // Any scroll activity - hide nav immediately
+            if (Math.abs(currentScrollY - lastScrollY.current) > 5) {
+                // Clear any existing timeouts
                 if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-                scrollTimeout.current = setTimeout(() => {
-                    setIsNavHidden(true);
-                    setActivePopup(null); // Close any open popup
-                }, 150);
-            } else if (currentScrollY < lastScrollY.current) {
-                // Scrolling up - show nav immediately
-                if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-                setIsNavHidden(false);
+                if (inactivityTimeout.current) clearTimeout(inactivityTimeout.current);
+
+                // Hide nav on scroll
+                setIsNavHidden(true);
+                setActivePopup(null); // Close any open popup
+
+                // Start inactivity timer - show nav after 7 seconds of no scroll
+                inactivityTimeout.current = setTimeout(() => {
+                    setIsNavHidden(false);
+                }, 7000);
             }
 
             lastScrollY.current = currentScrollY;
@@ -116,6 +119,7 @@ export default function NavLiquidGlass() {
         return () => {
             window.removeEventListener("scroll", handleScroll);
             if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+            if (inactivityTimeout.current) clearTimeout(inactivityTimeout.current);
         };
     }, []);
 
