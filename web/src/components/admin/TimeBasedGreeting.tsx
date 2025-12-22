@@ -413,7 +413,8 @@ export function TimeBasedGreeting({ displayName, isDark, onDisplayNameChange }: 
                             >
                                 <Edit3 className="w-4 h-4" />
                             </button>
-                        )}\n                    </motion.div>
+                        )}
+                    </motion.div>
                 )}
             </div>
         </div>
