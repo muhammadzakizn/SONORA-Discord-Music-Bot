@@ -240,17 +240,16 @@ function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick:
 
   return (
     <header className={cn(
-      "h-14 px-4 lg:px-6 flex items-center sticky top-0 z-30 transition-all duration-300",
+      "h-14 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30 transition-all duration-300",
       isDark ? "text-white" : "text-gray-900",
-      // Blur background when scrolled
+      // Gradient blur background when scrolled
       isScrolled && "backdrop-blur-xl",
-      isScrolled && (isDark ? "bg-black/60" : "bg-white/60")
+      isScrolled && (isDark
+        ? "bg-gradient-to-b from-black/80 via-black/60 to-transparent"
+        : "bg-gradient-to-b from-white/80 via-white/60 to-transparent")
     )}>
-      {/* Left - Menu button */}
-      <div className={cn(
-        "flex items-center gap-3 transition-all duration-300",
-        isScrolled ? "flex-shrink-0" : "flex-1"
-      )}>
+      {/* Left - Menu button and Logo */}
+      <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
           className={cn(
@@ -269,24 +268,24 @@ function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick:
             <PanelLeft className="w-5 h-5" />
           )}
         </button>
-        {/* Title on left when not scrolled */}
+
+        {/* Title - animates position */}
         <motion.h1
           animate={{
             opacity: isScrolled ? 0 : 1,
-            x: isScrolled ? -20 : 0,
+            scale: isScrolled ? 0.9 : 1,
           }}
           transition={{ duration: 0.2 }}
           className={cn(
             "text-base font-semibold whitespace-nowrap",
-            isDark ? "text-white/90" : "text-gray-900",
-            isScrolled && "pointer-events-none absolute"
+            isDark ? "text-white/90" : "text-gray-900"
           )}
         >
           {t('admin.title')}
         </motion.h1>
       </div>
 
-      {/* Center - Title when scrolled */}
+      {/* Center - Title pill when scrolled (absolute positioned) */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{
@@ -300,25 +299,22 @@ function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick:
         )}
       >
         <div className={cn(
-          "px-4 py-1.5 rounded-full",
+          "px-4 py-1.5 rounded-full backdrop-blur-md",
           isDark
-            ? "bg-white/[0.08] border border-white/[0.1]"
-            : "bg-black/[0.05] border border-black/[0.08]"
+            ? "bg-white/[0.1] border border-white/[0.15]"
+            : "bg-black/[0.08] border border-black/[0.1]"
         )}>
           <span className={cn(
             "text-sm font-semibold",
-            isDark ? "text-white/90" : "text-gray-900"
+            isDark ? "text-white" : "text-gray-900"
           )}>
             {t('admin.title')}
           </span>
         </div>
       </motion.div>
 
-      {/* Right */}
-      <div className={cn(
-        "flex items-center gap-2 transition-all duration-300",
-        isScrolled ? "flex-shrink-0" : ""
-      )}>
+      {/* Right - Notifications & Profile (stays in place) */}
+      <div className="flex items-center gap-2">
         {/* Notifications */}
         <button className={cn(
           "relative p-2 rounded-xl transition-colors",
