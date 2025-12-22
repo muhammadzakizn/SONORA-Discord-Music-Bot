@@ -1415,39 +1415,73 @@ export default function FullscreenLyricsPlayer({
                                                                 if (adjustedTime >= word.end_time) {
                                                                     progress = 1;
                                                                 } else if (adjustedTime >= word.start_time) {
-                                                                    progress = (adjustedTime - word.start_time) / (word.end_time - word.start_time);
+                                                                    const rawProgress = (adjustedTime - word.start_time) / (word.end_time - word.start_time);
+                                                                    // Apply ease-out for smoother animation
+                                                                    progress = 1 - Math.pow(1 - rawProgress, 2);
                                                                 }
 
-                                                                // Beautiful-lyrics style glow curve:
-                                                                // 0-15%: ramp up to full glow
-                                                                // 15-60%: sustain full glow
-                                                                // 60-100%: fade out
+                                                                // Beautiful-lyrics style glow curve
                                                                 let glowAlpha = 0;
                                                                 if (progress < 0.15) {
-                                                                    glowAlpha = progress / 0.15; // Quick ramp up
+                                                                    glowAlpha = progress / 0.15;
                                                                 } else if (progress < 0.6) {
-                                                                    glowAlpha = 1; // Sustain
+                                                                    glowAlpha = 1;
                                                                 } else {
-                                                                    glowAlpha = 1 - ((progress - 0.6) / 0.4); // Fade out
+                                                                    glowAlpha = 1 - ((progress - 0.6) / 0.4);
                                                                 }
 
-                                                                // Brightness: starts dim, lights up as sung
-                                                                const brightness = progress > 0 ? 0.5 + (progress * 0.5) : 0.35;
+                                                                // Y-offset: subtle bounce up at start, settle back
+                                                                let yOffset = 0;
+                                                                if (progress > 0 && progress < 0.9) {
+                                                                    // Peak at 0.7 progress, then settle
+                                                                    const bounceProgress = progress < 0.7
+                                                                        ? progress / 0.7
+                                                                        : 1 - ((progress - 0.7) / 0.3);
+                                                                    yOffset = -2 * bounceProgress; // Move up by 2px at peak
+                                                                }
 
-                                                                // Scale: subtle pop effect at start
-                                                                const scale = progress > 0 && progress < 0.3
-                                                                    ? 1 + (0.02 * (1 - progress / 0.3))
-                                                                    : 1;
+                                                                // Scale: pop effect with spring-like decay
+                                                                let scale = 1;
+                                                                if (progress > 0 && progress < 0.7) {
+                                                                    const scaleProgress = progress / 0.7;
+                                                                    // Start at 0.95, peak at 1.025, settle at 1
+                                                                    if (scaleProgress < 0.5) {
+                                                                        scale = 0.95 + (0.075 * (scaleProgress / 0.5));
+                                                                    } else {
+                                                                        scale = 1.025 - (0.025 * ((scaleProgress - 0.5) / 0.5));
+                                                                    }
+                                                                }
+
+                                                                // Text shadow glow intensity
+                                                                const glowBlur = 4 + (6 * glowAlpha);
+                                                                const glowOpacity = glowAlpha * 0.8;
+
+                                                                // Gradient progress for wipe effect (percentage)
+                                                                const gradientProgress = -20 + (120 * progress);
 
                                                                 return (
                                                                     <span
                                                                         key={wordIndex}
+                                                                        className="syllable-word"
                                                                         style={{
-                                                                            color: `rgba(255, 255, 255, ${brightness})`,
-                                                                            marginRight: "0.25em",
                                                                             display: "inline-block",
-                                                                            transform: `scale(${scale})`,
-                                                                            transition: "transform 0.1s ease-out",
+                                                                            marginRight: "0.15em",
+                                                                            transform: `translateY(${yOffset}px) scale(${scale})`,
+                                                                            transition: "transform 0.08s ease-out",
+                                                                            // Gradient wipe effect
+                                                                            background: `linear-gradient(90deg, 
+                                                                                rgba(255,255,255,1) 0%, 
+                                                                                rgba(255,255,255,1) ${gradientProgress}%, 
+                                                                                rgba(255,255,255,0.35) ${gradientProgress + 20}%, 
+                                                                                rgba(255,255,255,0.35) 100%)`,
+                                                                            WebkitBackgroundClip: "text",
+                                                                            WebkitTextFillColor: "transparent",
+                                                                            backgroundClip: "text",
+                                                                            // Glow effect
+                                                                            textShadow: glowAlpha > 0.1
+                                                                                ? `0 0 ${glowBlur}px rgba(255,255,255,${glowOpacity}), 0 0 ${glowBlur * 2}px rgba(255,255,255,${glowOpacity * 0.5})`
+                                                                                : 'none',
+                                                                            filter: glowAlpha > 0.1 ? `drop-shadow(0 0 ${glowBlur}px rgba(255,255,255,${glowOpacity * 0.6}))` : 'none',
                                                                         }}
                                                                     >
                                                                         {word.text}
