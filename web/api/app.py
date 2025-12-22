@@ -369,17 +369,39 @@ def api_guild_lyrics(guild_id: int):
             lyrics_data = cache_entry['data']
             lyrics_source_used = cache_entry['source']
         else:
-            # CHECK 1: Use pre-fetched apple_lyrics from metadata (avoids RAM spike during playback)
-            if source_pref in ['applemusic', 'auto'] and hasattr(metadata, 'apple_lyrics') and metadata.apple_lyrics:
-                logger.info(f"[AppleMusic] Using PRE-FETCHED lyrics for: {metadata.title}")
+            # CHECK 1: Use pre-fetched smart lyrics from metadata (avoids RAM spike during playback)
+            # This uses Lyricify first with Apple Music fallback (set in processor.py)
+            if source_pref in ['applemusic', 'auto', 'lyricify'] and hasattr(metadata, 'apple_lyrics') and metadata.apple_lyrics:
+                smart_lyrics = metadata.apple_lyrics
+                
+                # Determine actual source from pre-fetched lyrics
+                actual_source = "unknown"
+                if hasattr(smart_lyrics, 'source'):
+                    if hasattr(smart_lyrics.source, 'value'):
+                        actual_source = smart_lyrics.source.value
+                    else:
+                        actual_source = str(smart_lyrics.source)
+                
+                logger.info(f"[{actual_source.upper()}] Using PRE-FETCHED lyrics for: {metadata.title}")
                 
                 # Convert LyricsData object to dictionary format for API response
-                am_lyrics = metadata.apple_lyrics
                 lines = []
-                for line in am_lyrics.lines:
+                for line in smart_lyrics.lines:
                     words = []
                     if hasattr(line, 'words') and line.words:
-                        words = line.words if isinstance(line.words, list) else []
+                        for word in line.words:
+                            if isinstance(word, dict):
+                                words.append({
+                                    "text": word.get("text", ""),
+                                    "start_time": word.get("start_time", 0),
+                                    "end_time": word.get("end_time", 0)
+                                })
+                            else:
+                                words.append({
+                                    "text": getattr(word, 'text', ''),
+                                    "start_time": getattr(word, 'start_time', 0),
+                                    "end_time": getattr(word, 'end_time', 0)
+                                })
                     
                     lines.append({
                         "text": line.text,
@@ -390,13 +412,14 @@ def api_guild_lyrics(guild_id: int):
                     })
                 
                 lyrics_data = {
-                    "is_synced": am_lyrics.is_synced,
-                    "source": "applemusic",
-                    "offset": getattr(am_lyrics, 'offset', 0),
+                    "is_synced": smart_lyrics.is_synced,
+                    "source": actual_source,
+                    "offset": getattr(smart_lyrics, 'offset', 0),
                     "lines": lines,
-                    "total_lines": len(lines)
+                    "total_lines": len(lines),
+                    "has_syllable_timing": getattr(smart_lyrics, 'has_syllable_timing', False)
                 }
-                lyrics_source_used = "applemusic"
+                lyrics_source_used = actual_source
                 
                 # Cache it
                 _lyrics_cache[cache_key] = {
