@@ -240,9 +240,9 @@ function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick:
 
   return (
     <header className={cn(
-      "h-14 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-40 transition-all duration-300",
+      "h-14 px-4 lg:px-6 flex items-center justify-between relative transition-all duration-300",
       isDark ? "text-white" : "text-gray-900",
-      isScrolled && (isDark ? "backdrop-blur-xl bg-black/60" : "backdrop-blur-xl bg-white/60")
+      isScrolled && (isDark ? "backdrop-blur-xl bg-black/50" : "backdrop-blur-xl bg-white/50")
     )}>
       {/* Extended gradient fade below header when scrolled */}
       <motion.div
@@ -540,19 +540,27 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           {/* Immersive Time Ambient Background */}
           <TimeAmbientBackground className="z-0" />
 
-          <Header
-            onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-            sidebarOpen={sidebarOpen}
-            isDark={isDark}
-            isScrolled={isScrolled}
-          />
-          <main ref={mainRef} className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar relative z-10">
-            <div className="max-w-7xl mx-auto w-full">
-              {children}
+          {/* Scrollable container with header inside */}
+          <main ref={mainRef} className="flex-1 overflow-y-auto custom-scrollbar relative">
+            {/* Sticky Header - stays at top while content scrolls behind */}
+            <div className="sticky top-0 z-40">
+              <Header
+                onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+                sidebarOpen={sidebarOpen}
+                isDark={isDark}
+                isScrolled={isScrolled}
+              />
             </div>
-            {/* Footer with negative margin to extend to edges */}
-            <div className="-mx-4 md:-mx-6 -mb-4 md:-mb-6">
-              <Footer />
+
+            {/* Content with padding */}
+            <div className="p-4 md:p-6 relative z-10">
+              <div className="max-w-7xl mx-auto w-full">
+                {children}
+              </div>
+              {/* Footer with negative margin to extend to edges */}
+              <div className="-mx-4 md:-mx-6 -mb-4 md:-mb-6">
+                <Footer />
+              </div>
             </div>
           </main>
         </div>
