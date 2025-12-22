@@ -84,9 +84,11 @@ export default function NavLiquidGlass() {
     const [showScrollTop, setShowScrollTop] = useState(false);
     const [showLanguageModal, setShowLanguageModal] = useState(false);
     const [isNavHidden, setIsNavHidden] = useState(false);
+    const [showDoubleTapHint, setShowDoubleTapHint] = useState(false);
     const lastScrollY = useRef(0);
     const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
     const inactivityTimeout = useRef<NodeJS.Timeout | null>(null);
+    const lastTapTime = useRef(0);
 
     // Detect scroll for auto-hide nav and scroll-to-top button
     useEffect(() => {
@@ -171,6 +173,36 @@ export default function NavLiquidGlass() {
     const toggleNavVisibility = () => {
         setIsNavHidden(!isNavHidden);
     };
+
+    // Handle double-tap on scroll-top button to show nav
+    const handleScrollTopClick = () => {
+        const now = Date.now();
+        const timeSinceLastTap = now - lastTapTime.current;
+
+        if (isNavHidden && timeSinceLastTap < 400) {
+            // Double tap detected - show nav
+            setIsNavHidden(false);
+            setShowDoubleTapHint(false);
+            if (inactivityTimeout.current) clearTimeout(inactivityTimeout.current);
+        } else if (showScrollTop && !isNavHidden) {
+            // Single tap - scroll to top (only if nav is visible)
+            scrollToTop();
+        }
+
+        lastTapTime.current = now;
+    };
+
+    // Show double-tap hint when nav is hidden
+    useEffect(() => {
+        if (isNavHidden) {
+            const hintTimer = setTimeout(() => {
+                setShowDoubleTapHint(true);
+            }, 1500); // Show hint after 1.5s of nav being hidden
+            return () => clearTimeout(hintTimer);
+        } else {
+            setShowDoubleTapHint(false);
+        }
+    }, [isNavHidden]);
 
     const isDeveloper = (user ? DEVELOPER_IDS.includes(user.id) : false) || isDevLoggedIn;
 
@@ -318,33 +350,71 @@ export default function NavLiquidGlass() {
                 </AnimatePresence>
 
                 {/* Scroll to Top - Always visible beside nav/menu button */}
-                <motion.button
-                    initial={{ y: 100, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.3, type: "spring", damping: 20 }}
-                    whileHover={showScrollTop ? { scale: 1.05 } : {}}
-                    whileTap={showScrollTop ? { scale: 0.95 } : {}}
-                    onClick={showScrollTop ? scrollToTop : undefined}
-                    disabled={!showScrollTop}
-                    className={cn(
-                        "scroll-top-btn",
-                        "backdrop-blur-[40px] border transition-all",
-                        isDark
-                            ? "bg-white/10 border-white/30"
-                            : "bg-black/10 border-black/20",
-                        "shadow-[0_8px_40px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.3)]",
-                        !showScrollTop && "cursor-default"
-                    )}
-                    aria-label="Scroll to top"
-                    aria-disabled={!showScrollTop}
-                >
-                    <ArrowUp className={cn(
-                        "scroll-top-icon transition-colors",
-                        showScrollTop
-                            ? isDark ? "text-white" : "text-gray-900"
-                            : isDark ? "text-white/30" : "text-gray-400"
-                    )} />
-                </motion.button>
+                <div className="relative">
+                    {/* Double-tap hint tooltip */}
+                    <AnimatePresence>
+                        {isNavHidden && showDoubleTapHint && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                                className={cn(
+                                    "absolute bottom-full mb-2 left-1/2 -translate-x-1/2",
+                                    "px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap",
+                                    "backdrop-blur-xl border",
+                                    isDark
+                                        ? "bg-white/15 border-white/20 text-white"
+                                        : "bg-black/10 border-black/10 text-gray-800"
+                                )}
+                            >
+                                <span className="flex items-center gap-1.5">
+                                    <span className="animate-pulse">👆👆</span>
+                                    {t('nav.doubleTapHint') || 'Tap 2x to show menu'}
+                                </span>
+                                {/* Arrow pointer */}
+                                <div className={cn(
+                                    "absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 -mt-1",
+                                    isDark ? "bg-white/15 border-r border-b border-white/20" : "bg-black/10 border-r border-b border-black/10"
+                                )} />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <motion.button
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{
+                            y: 0,
+                            opacity: 1,
+                            boxShadow: isNavHidden
+                                ? "0 0 20px rgba(123,30,60,0.5), 0 0 40px rgba(123,30,60,0.3)"
+                                : "0_8px_40px_rgba(0,0,0,0.15)"
+                        }}
+                        transition={{ delay: 0.3, type: "spring", damping: 20 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleScrollTopClick}
+                        className={cn(
+                            "scroll-top-btn",
+                            "backdrop-blur-[40px] border transition-all",
+                            isNavHidden
+                                ? "bg-[#7B1E3C]/20 border-[#7B1E3C]/40 animate-pulse"
+                                : isDark
+                                    ? "bg-white/10 border-white/30"
+                                    : "bg-black/10 border-black/20",
+                            "shadow-[0_8px_40px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.3)]"
+                        )}
+                        aria-label={isNavHidden ? "Double tap to show menu" : "Scroll to top"}
+                    >
+                        <ArrowUp className={cn(
+                            "scroll-top-icon transition-colors",
+                            isNavHidden
+                                ? "text-[#7B1E3C]"
+                                : showScrollTop
+                                    ? isDark ? "text-white" : "text-gray-900"
+                                    : isDark ? "text-white/30" : "text-gray-400"
+                        )} />
+                    </motion.button>
+                </div>
             </div>
         </>
     );
