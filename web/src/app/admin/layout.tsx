@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -233,19 +233,24 @@ function Sidebar({
   );
 }
 
-function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void; sidebarOpen: boolean; isDark: boolean }) {
+function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick: () => void; sidebarOpen: boolean; isDark: boolean; isScrolled: boolean }) {
   const [showProfile, setShowProfile] = useState(false);
   const { user, displayName, logout, customAvatar } = useSession();
   const { t } = useSettings();
 
   return (
     <header className={cn(
-      "h-14 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30",
-      // Transparent - no background, no border
-      isDark ? "text-white" : "text-gray-900"
+      "h-14 px-4 lg:px-6 flex items-center sticky top-0 z-30 transition-all duration-300",
+      isDark ? "text-white" : "text-gray-900",
+      // Blur background when scrolled
+      isScrolled && "backdrop-blur-xl",
+      isScrolled && (isDark ? "bg-black/60" : "bg-white/60")
     )}>
-      {/* Left */}
-      <div className="flex items-center gap-3">
+      {/* Left - Menu button */}
+      <div className={cn(
+        "flex items-center gap-3 transition-all duration-300",
+        isScrolled ? "flex-shrink-0" : "flex-1"
+      )}>
         <button
           onClick={onMenuClick}
           className={cn(
@@ -264,14 +269,56 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
             <PanelLeft className="w-5 h-5" />
           )}
         </button>
-        <h1 className={cn(
-          "text-base font-semibold",
-          isDark ? "text-white/90" : "text-gray-900"
-        )}>{t('admin.title')}</h1>
+        {/* Title on left when not scrolled */}
+        <motion.h1
+          animate={{
+            opacity: isScrolled ? 0 : 1,
+            x: isScrolled ? -20 : 0,
+          }}
+          transition={{ duration: 0.2 }}
+          className={cn(
+            "text-base font-semibold whitespace-nowrap",
+            isDark ? "text-white/90" : "text-gray-900",
+            isScrolled && "pointer-events-none absolute"
+          )}
+        >
+          {t('admin.title')}
+        </motion.h1>
       </div>
 
+      {/* Center - Title when scrolled */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{
+          opacity: isScrolled ? 1 : 0,
+          y: isScrolled ? 0 : -10,
+        }}
+        transition={{ duration: 0.2 }}
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 flex items-center justify-center",
+          !isScrolled && "pointer-events-none"
+        )}
+      >
+        <div className={cn(
+          "px-4 py-1.5 rounded-full",
+          isDark
+            ? "bg-white/[0.08] border border-white/[0.1]"
+            : "bg-black/[0.05] border border-black/[0.08]"
+        )}>
+          <span className={cn(
+            "text-sm font-semibold",
+            isDark ? "text-white/90" : "text-gray-900"
+          )}>
+            {t('admin.title')}
+          </span>
+        </div>
+      </motion.div>
+
       {/* Right */}
-      <div className="flex items-center gap-2">
+      <div className={cn(
+        "flex items-center gap-2 transition-all duration-300",
+        isScrolled ? "flex-shrink-0" : ""
+      )}>
         {/* Notifications */}
         <button className={cn(
           "relative p-2 rounded-xl transition-colors",
@@ -381,9 +428,12 @@ function Header({ onMenuClick, sidebarOpen, isDark }: { onMenuClick: () => void;
   );
 }
 
+
 function AdminLayoutContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
   const { isLoggedIn, isLoading } = useSession();
   const router = useRouter();
   const { t, isDark } = useSettings();
@@ -406,6 +456,19 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Scroll detection for header animation
+  useEffect(() => {
+    const mainElement = mainRef.current;
+    if (!mainElement) return;
+
+    const handleScroll = () => {
+      setIsScrolled(mainElement.scrollTop > 50);
+    };
+
+    mainElement.addEventListener('scroll', handleScroll);
+    return () => mainElement.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Check for MFA verified cookie
@@ -479,8 +542,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
             onMenuClick={() => setSidebarOpen(!sidebarOpen)}
             sidebarOpen={sidebarOpen}
             isDark={isDark}
+            isScrolled={isScrolled}
           />
-          <main className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar relative z-10">
+          <main ref={mainRef} className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar relative z-10">
             <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>
