@@ -13,7 +13,7 @@ export function Footer() {
     };
 
     return (
-        <footer className={`py-10 md:py-16 px-4 border-t ${isDark ? 'border-zinc-800 bg-black' : 'border-gray-200 bg-white'}`}>
+        <footer className={`mt-24 md:mt-32 py-10 md:py-16 px-4 border-t ${isDark ? 'border-zinc-800 bg-black' : 'border-gray-200 bg-white'}`}>
             <div className="max-w-6xl mx-auto">
                 {/* Main Footer Content */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
@@ -120,8 +120,8 @@ export function Footer() {
                         <button
                             onClick={scrollToTop}
                             className={`p-2 rounded-full border transition-colors ${isDark
-                                    ? 'border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800'
-                                    : 'border-gray-300 hover:border-gray-400 hover:bg-gray-100'
+                                ? 'border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800'
+                                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-100'
                                 }`}
                             aria-label="Scroll to top"
                         >
