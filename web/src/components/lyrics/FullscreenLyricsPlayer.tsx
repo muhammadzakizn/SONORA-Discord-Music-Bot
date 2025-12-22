@@ -203,6 +203,9 @@ export default function FullscreenLyricsPlayer({
     // Track change detection - prevent scroll during transition
     const trackChangingRef = useRef(false);
 
+    // Flag to prevent scroll detection during programmatic lyrics apply
+    const isApplyingLyricsRef = useRef(false);
+
     // Lyrics timing offset - negative value delays highlighting to match audio
     // This compensates for server time being ahead of actual audio playback
     const LYRICS_OFFSET = -0.3; // seconds
@@ -427,10 +430,10 @@ export default function FullscreenLyricsPlayer({
     }, [currentLineIndex, isUserScrolling]);
 
     // Handle user scroll - show all lyrics temporarily
-    // Only trigger if it's actually a user scroll, not auto-scroll
+    // Only trigger if it's actually a user scroll, not auto-scroll or programmatic apply
     const handleLyricsScroll = useCallback(() => {
-        // Ignore scroll events caused by auto-scroll
-        if (isAutoScrollingRef.current) return;
+        // Ignore scroll events caused by auto-scroll or lyrics apply
+        if (isAutoScrollingRef.current || isApplyingLyricsRef.current) return;
 
         setIsUserScrolling(true);
 
@@ -554,6 +557,9 @@ export default function FullscreenLyricsPlayer({
         setIsApplyingLyrics(true);
         setShowPreviewDialog(false);
 
+        // Set flag to prevent scroll detection during apply
+        isApplyingLyricsRef.current = true;
+
         // Simulate loading for UX
         setTimeout(() => {
             setCustomLyrics(previewLyrics);
@@ -561,6 +567,12 @@ export default function FullscreenLyricsPlayer({
             setPreviewLyrics(null);
             setIsApplyingLyrics(false);
             setShowLyricsPanel(false);
+            setIsUserScrolling(false); // Reset user scrolling state
+
+            // Reset flag after lyrics are applied
+            setTimeout(() => {
+                isApplyingLyricsRef.current = false;
+            }, 500);
         }, 1000);
     };
 
@@ -659,11 +671,20 @@ export default function FullscreenLyricsPlayer({
     // Apply lyrics from source preview
     const handleApplySourcePreview = () => {
         if (pendingSource && previewLyrics) {
+            // Set flag to prevent scroll detection during apply
+            isApplyingLyricsRef.current = true;
+
             setLyricsSource(pendingSource);
             setLyrics(previewLyrics);
             setPreviewLyrics(null);
             setShowPreviewDialog(false);
             setPendingSource(null);
+            setIsUserScrolling(false); // Reset user scrolling state
+
+            // Reset flag after lyrics are applied
+            setTimeout(() => {
+                isApplyingLyricsRef.current = false;
+            }, 500);
         }
     };
 
