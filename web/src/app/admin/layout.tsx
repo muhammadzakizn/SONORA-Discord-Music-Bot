@@ -240,14 +240,21 @@ function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick:
 
   return (
     <header className={cn(
-      "h-14 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30 transition-all duration-300",
-      isDark ? "text-white" : "text-gray-900",
-      // Gradient blur background when scrolled
-      isScrolled && "backdrop-blur-xl",
-      isScrolled && (isDark
-        ? "bg-gradient-to-b from-black/80 via-black/60 to-transparent"
-        : "bg-gradient-to-b from-white/80 via-white/60 to-transparent")
+      "h-14 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30 transition-all duration-300 relative",
+      isDark ? "text-white" : "text-gray-900"
     )}>
+      {/* Extended gradient overlay when scrolled */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: isScrolled ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+        className={cn(
+          "absolute inset-x-0 top-0 h-24 -z-10 pointer-events-none",
+          isDark
+            ? "bg-gradient-to-b from-black via-black/60 to-transparent"
+            : "bg-gradient-to-b from-white via-white/60 to-transparent"
+        )}
+      />
       {/* Left - Menu button and Logo */}
       <div className="flex items-center gap-3">
         <button
