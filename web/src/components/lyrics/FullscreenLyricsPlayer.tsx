@@ -433,13 +433,10 @@ export default function FullscreenLyricsPlayer({
     }, [currentLineIndex, isUserScrolling]);
 
     // Handle user scroll - show all lyrics temporarily
-    // Use wheel and touch events instead of scroll events to avoid auto-scroll triggers
-    const handleUserScrollStart = useCallback((e: WheelEvent | TouchEvent) => {
+    // Use multiple event types for better detection
+    const activateScrollMode = useCallback(() => {
         // Ignore if currently applying lyrics
         if (isApplyingLyricsRef.current) return;
-
-        // For wheel events, check if there's actual movement
-        if (e instanceof WheelEvent && Math.abs(e.deltaY) < 5) return;
 
         setIsUserScrolling(true);
 
@@ -448,28 +445,57 @@ export default function FullscreenLyricsPlayer({
             clearTimeout(scrollTimeoutRef.current);
         }
 
-        // Reset after 3 seconds of no scrolling
+        // Reset after 3 seconds of no activity
         scrollTimeoutRef.current = setTimeout(() => {
             setIsUserScrolling(false);
         }, 3000);
     }, []);
 
-    // Attach wheel and touch listeners to lyrics container
+    // Handle wheel event specifically
+    const handleWheelEvent = useCallback((e: WheelEvent) => {
+        // Ignore if currently applying lyrics
+        if (isApplyingLyricsRef.current) return;
+
+        // Any scroll direction activates scroll mode
+        if (Math.abs(e.deltaY) > 2) {
+            activateScrollMode();
+        }
+    }, [activateScrollMode]);
+
+    // Handle click/tap on lyrics area to toggle scroll mode
+    const handleLyricsAreaClick = useCallback(() => {
+        if (isApplyingLyricsRef.current) return;
+
+        // Toggle scroll mode on click/tap
+        if (!isUserScrolling) {
+            activateScrollMode();
+        }
+    }, [isUserScrolling, activateScrollMode]);
+
+    // Attach event listeners to lyrics container
     useEffect(() => {
         const container = lyricsContainerRef.current;
         if (!container) return;
 
-        const handleWheel = (e: WheelEvent) => handleUserScrollStart(e);
-        const handleTouchStart = (e: TouchEvent) => handleUserScrollStart(e);
+        const handleWheel = (e: WheelEvent) => handleWheelEvent(e);
+        const handleTouchMove = () => activateScrollMode();
+        const handleScroll = () => {
+            // Also trigger on actual scroll events (for scrollbar drag, etc.)
+            if (!isAutoScrollingRef.current && !isApplyingLyricsRef.current) {
+                activateScrollMode();
+            }
+        };
 
         container.addEventListener('wheel', handleWheel, { passive: true });
-        container.addEventListener('touchmove', handleTouchStart, { passive: true });
+        container.addEventListener('touchmove', handleTouchMove, { passive: true });
+        container.addEventListener('scroll', handleScroll, { passive: true });
 
         return () => {
             container.removeEventListener('wheel', handleWheel);
-            container.removeEventListener('touchmove', handleTouchStart);
+            container.removeEventListener('touchmove', handleTouchMove);
+            container.removeEventListener('scroll', handleScroll);
         };
-    }, [handleUserScrollStart]);
+    }, [handleWheelEvent, activateScrollMode]);
 
     // Cleanup scroll timeout on unmount
     useEffect(() => {
@@ -1403,7 +1429,8 @@ export default function FullscreenLyricsPlayer({
 
                             <div
                                 ref={lyricsContainerRef}
-                                className="overflow-y-auto scrollbar-hide px-8 lg:px-12 py-[40vh] max-h-full"
+                                onClick={handleLyricsAreaClick}
+                                className="overflow-y-auto scrollbar-hide px-8 lg:px-12 py-[40vh] max-h-full cursor-pointer"
                             >
                                 {lyrics?.lines?.length ? (
                                     <div className="space-y-6">
