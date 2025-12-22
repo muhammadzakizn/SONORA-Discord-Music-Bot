@@ -456,8 +456,8 @@ export default function FullscreenLyricsPlayer({
         // Ignore if currently applying lyrics
         if (isApplyingLyricsRef.current) return;
 
-        // Any scroll direction activates scroll mode
-        if (Math.abs(e.deltaY) > 2) {
+        // Any scroll direction activates scroll mode (very low threshold for trackpad)
+        if (Math.abs(e.deltaY) > 0.5 || Math.abs(e.deltaX) > 0.5) {
             activateScrollMode();
         }
     }, [activateScrollMode]);
@@ -479,21 +479,32 @@ export default function FullscreenLyricsPlayer({
 
         const handleWheel = (e: WheelEvent) => handleWheelEvent(e);
         const handleTouchMove = () => activateScrollMode();
+        const handleTouchStart = () => activateScrollMode(); // Also on touch start
         const handleScroll = () => {
             // Also trigger on actual scroll events (for scrollbar drag, etc.)
             if (!isAutoScrollingRef.current && !isApplyingLyricsRef.current) {
                 activateScrollMode();
             }
         };
+        // Pointer events for better cross-device support
+        const handlePointerDown = (e: PointerEvent) => {
+            if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+                activateScrollMode();
+            }
+        };
 
         container.addEventListener('wheel', handleWheel, { passive: true });
         container.addEventListener('touchmove', handleTouchMove, { passive: true });
+        container.addEventListener('touchstart', handleTouchStart, { passive: true });
         container.addEventListener('scroll', handleScroll, { passive: true });
+        container.addEventListener('pointerdown', handlePointerDown, { passive: true });
 
         return () => {
             container.removeEventListener('wheel', handleWheel);
             container.removeEventListener('touchmove', handleTouchMove);
+            container.removeEventListener('touchstart', handleTouchStart);
             container.removeEventListener('scroll', handleScroll);
+            container.removeEventListener('pointerdown', handlePointerDown);
         };
     }, [handleWheelEvent, activateScrollMode]);
 
