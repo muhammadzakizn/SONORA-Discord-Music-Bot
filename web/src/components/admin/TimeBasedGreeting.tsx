@@ -284,74 +284,57 @@ export function TimeBasedGreeting({ displayName, isDark }: TimeBasedGreetingProp
     if (!mounted) {
         // SSR fallback
         return (
-            <div className={cn(
-                "p-6 rounded-2xl bg-gradient-to-r border",
-                isDark
-                    ? "from-[#7B1E3C]/20 to-[#C4314B]/20 border-[#7B1E3C]/30"
-                    : "from-[#7B1E3C]/10 to-[#C4314B]/10 border-[#7B1E3C]/20"
-            )}>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className={cn("text-sm", isDark ? "text-zinc-400" : "text-gray-500")}>
-                            Welcome!
-                        </p>
-                        <h2 className={cn("text-2xl md:text-3xl font-bold", isDark ? "text-white" : "text-gray-900")}>
-                            {displayName}
-                        </h2>
-                    </div>
+            <div className="flex items-center justify-between py-2">
+                <div>
+                    <p className={cn("text-sm", isDark ? "text-zinc-400" : "text-gray-500")}>
+                        Welcome!
+                    </p>
+                    <h2 className={cn("text-2xl md:text-3xl font-bold", isDark ? "text-white" : "text-gray-900")}>
+                        {displayName}
+                    </h2>
                 </div>
             </div>
         );
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={cn(
-                "p-6 rounded-2xl bg-gradient-to-r border overflow-hidden relative",
-                isDark
-                    ? "from-[#7B1E3C]/20 to-[#C4314B]/20 border-[#7B1E3C]/30"
-                    : "from-[#7B1E3C]/10 to-[#C4314B]/10 border-[#7B1E3C]/20"
-            )}
-        >
-            <div className="flex items-center justify-between">
-                {/* Text content */}
-                <div className="flex-1">
-                    <motion.p
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className={cn(
-                            "text-base md:text-lg font-medium",
-                            isDark ? "text-zinc-300" : "text-gray-600"
-                        )}
-                    >
-                        {greeting}
-                    </motion.p>
-                    <motion.h2
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className={cn(
-                            "text-2xl md:text-3xl font-bold mt-1",
-                            isDark ? "text-white" : "text-gray-900"
-                        )}
-                    >
-                        {displayName}
-                    </motion.h2>
-                </div>
-
-                {/* Illustration */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3, type: "spring", damping: 15 }}
-                    className="flex-shrink-0 ml-4"
+        <div className="flex items-center justify-between py-2">
+            {/* Text content */}
+            <div className="flex-1">
+                <motion.p
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className={cn(
+                        "text-base md:text-lg font-medium",
+                        isDark ? "text-zinc-300" : "text-gray-600"
+                    )}
                 >
-                    <TimeIllustration period={timePeriod} />
-                </motion.div>
+                    {greeting}
+                </motion.p>
+                <motion.h2
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className={cn(
+                        "text-2xl md:text-3xl font-bold mt-1",
+                        isDark ? "text-white" : "text-gray-900"
+                    )}
+                >
+                    {displayName}
+                </motion.h2>
             </div>
-        </motion.div>
+
+            {/* Illustration */}
+            <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3, type: "spring", damping: 15 }}
+                className="flex-shrink-0 ml-4"
+            >
+                <TimeIllustration period={timePeriod} />
+            </motion.div>
+        </div>
     );
 }
+
