@@ -90,11 +90,20 @@ export default function NavLiquidGlass() {
 
     // Detect scroll for auto-hide nav and scroll-to-top button
     useEffect(() => {
-        const handleScroll = () => {
-            const currentScrollY = window.scrollY;
+        const handleScroll = (e?: Event) => {
+            // Get scroll position from either window or scrollable container
+            let currentScrollY = window.scrollY;
+
+            // If event target is a scrollable element (not window), get its scrollTop
+            if (e?.target && e.target !== document) {
+                const target = e.target as HTMLElement;
+                if (target.scrollTop !== undefined) {
+                    currentScrollY = target.scrollTop;
+                }
+            }
 
             // Show scroll-to-top after 300px
-            setShowScrollTop(currentScrollY > 300);
+            setShowScrollTop(currentScrollY > 300 || window.scrollY > 300);
 
             // Any scroll activity - hide nav immediately
             if (Math.abs(currentScrollY - lastScrollY.current) > 5) {
@@ -115,9 +124,15 @@ export default function NavLiquidGlass() {
             lastScrollY.current = currentScrollY;
         };
 
+        // Listen to window scroll
         window.addEventListener("scroll", handleScroll, { passive: true });
+
+        // Also listen to scroll on any element with overflow (for dashboard layouts)
+        document.addEventListener("scroll", handleScroll, { passive: true, capture: true });
+
         return () => {
             window.removeEventListener("scroll", handleScroll);
+            document.removeEventListener("scroll", handleScroll, { capture: true });
             if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
             if (inactivityTimeout.current) clearTimeout(inactivityTimeout.current);
         };
