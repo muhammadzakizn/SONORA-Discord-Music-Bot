@@ -2,7 +2,7 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.11.0";
+export const WEB_VERSION = "3.26.0";
 export const BOT_VERSION = "3.13.0";
 
 export interface ChangelogEntry {
@@ -17,6 +17,28 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.26.0",
+    date: "2025-12-22",
+    title: "Apple Music Liquid Glass Navigation",
+    highlights: [
+      "Sliding active indicator dengan animasi spring",
+      "Background 20% lebih transparan",
+      "Bentuk kapsul lebih compact",
+      "Responsive indicator sizing"
+    ],
+    changes: [
+      {
+        category: "UI Improvements",
+        items: [
+          "NavLiquidGlass sliding indicator untuk nav item aktif",
+          "Transparansi ditingkatkan (bg-white/8)",
+          "Tinggi nav dikurangi 10%",
+          "Border radius lebih besar untuk bentuk kapsul"
+        ]
+      }
+    ]
+  },
   {
     version: "3.8.0",
     date: "2025-12-17",

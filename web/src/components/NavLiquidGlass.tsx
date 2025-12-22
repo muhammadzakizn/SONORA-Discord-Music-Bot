@@ -60,6 +60,26 @@ const DiscordIcon = () => (
 
 type PopupType = "explore" | "profile" | "settings" | null;
 
+// Helper function to get the active nav index for sliding indicator
+const getActiveNavIndex = (pathname: string, activePopup: PopupType): number => {
+    if (activePopup === "explore") return 1;
+    if (activePopup === "settings") return 2;
+    if (activePopup === "profile") return 3;
+    // Default to home when no popup is active
+    if (pathname === "/" || pathname.startsWith("/")) return 0;
+    return 0;
+};
+
+// Helper function to get nav item width for sliding indicator
+// These values should match the CSS nav-btn-container widths
+const getNavItemWidth = (): number => {
+    if (typeof window === 'undefined') return 44; // SSR fallback
+    const width = window.innerWidth;
+    if (width >= 768) return 56; // md breakpoint
+    if (width >= 640) return 52; // sm breakpoint
+    return 44; // base
+};
+
 export default function NavLiquidGlass() {
     const pathname = usePathname();
     const { user, isLoggedIn, logout, devSession, isDevLoggedIn, devLogout, customAvatar } = useSession();
@@ -291,30 +311,52 @@ export default function NavLiquidGlass() {
                             animate={{
                                 y: 0,
                                 opacity: 1,
-                                boxShadow: "0 0 40px rgba(255,255,255,0.1)"
+                                boxShadow: "0 0 40px rgba(255,255,255,0.08)"
                             }}
                             exit={{ y: 100, opacity: 0 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
                             className={cn(
                                 // Using CSS class for responsive sizing to avoid hydration issues
-                                "nav-main-container",
-                                // True Apple Liquid Glass - more transparent, subtle border
+                                "nav-main-container relative",
+                                // Apple Liquid Glass - 20% more transparent for see-through effect
                                 "backdrop-blur-[40px]",
                                 isDark
-                                    ? "bg-white/10 border border-white/10"
-                                    : "bg-black/5 border border-black/5",
+                                    ? "bg-white/8 border border-white/12"
+                                    : "bg-white/20 border border-white/30",
                                 // Subtle shadow for depth
-                                "shadow-[0_4px_30px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.15)]"
+                                "shadow-[0_4px_30px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.1)]"
                             )}
                         >
+                            {/* Sliding Active Indicator - Apple Music Style */}
+                            <motion.div
+                                className={cn(
+                                    "absolute top-1/2 -translate-y-1/2 nav-active-indicator",
+                                    isDark
+                                        ? "bg-white/12"
+                                        : "bg-black/8",
+                                    "rounded-[14px] sm:rounded-[16px]"
+                                )}
+                                initial={false}
+                                animate={{
+                                    x: getActiveNavIndex(pathname, activePopup) * getNavItemWidth(),
+                                    opacity: 1,
+                                }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 400,
+                                    damping: 30,
+                                }}
+                            />
+
                             {/* Home */}
                             <NavButton
                                 icon={Home}
                                 label={t("nav.home")}
-                                isActive={pathname === "/"}
+                                isActive={pathname === "/" && activePopup === null}
                                 onClick={() => { }}
                                 href="/"
                                 isDark={isDark}
+                                index={0}
                             />
 
                             {/* Explore */}
@@ -325,6 +367,7 @@ export default function NavLiquidGlass() {
                                 onClick={() => togglePopup("explore")}
                                 isDark={isDark}
                                 data-nav-button
+                                index={1}
                             />
 
                             {/* Settings */}
@@ -335,6 +378,7 @@ export default function NavLiquidGlass() {
                                 onClick={() => togglePopup("settings")}
                                 isDark={isDark}
                                 data-nav-button
+                                index={2}
                             />
 
                             {/* Profile */}
@@ -352,6 +396,7 @@ export default function NavLiquidGlass() {
                                 onClick={() => togglePopup("profile")}
                                 isDark={isDark}
                                 data-nav-button
+                                index={3}
                                 showBadge={isDevLoggedIn}
                                 devInitial={isDevLoggedIn && !devSession?.avatar ? (devSession?.displayName || devSession?.username || 'D').charAt(0).toUpperCase() : undefined}
                             />
@@ -439,6 +484,8 @@ function NavButton({
     href,
     isDark,
     devInitial,
+    index,
+    showBadge,
     ...props
 }: {
     icon?: React.ElementType;
@@ -449,18 +496,20 @@ function NavButton({
     href?: string;
     isDark: boolean;
     devInitial?: string;
+    index?: number;
+    showBadge?: boolean;
     [key: string]: unknown;
 }) {
     const content = (
-        <div className="nav-btn-container">
+        <div className="nav-btn-container relative z-10">
             <div
                 className={cn(
                     "nav-btn-icon-wrapper transition-all",
                     isActive
-                        ? "bg-[#7B1E3C] text-white shadow-[0_0_20px_rgba(123,30,60,0.5)]"
+                        ? "text-[#7B1E3C]"
                         : isDark
-                            ? "text-white/70 hover:text-white hover:bg-white/15"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-black/10"
+                            ? "text-white/70 hover:text-white"
+                            : "text-gray-600 hover:text-gray-900"
                 )}
             >
                 {avatarUrl ? (
@@ -482,9 +531,9 @@ function NavButton({
             </div>
             <span
                 className={cn(
-                    "nav-btn-label",
+                    "nav-btn-label transition-colors",
                     isActive
-                        ? "text-[#7B1E3C]"
+                        ? "text-[#7B1E3C] font-semibold"
                         : isDark
                             ? "text-white/60"
                             : "text-gray-500"
