@@ -412,8 +412,79 @@ def api_guild_lyrics(guild_id: int):
                 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 cookies_path = os.path.join(project_root, 'cookies', 'apple_music_cookies.txt')
                 
-                # Try Apple Music first (default) or if explicitly requested
-                if source_pref in ['applemusic', 'auto']:
+                # NEW AUTO MODE: Try Lyricify (QQ Music) first for syllable timing
+                lyricify_result = None
+                if source_pref in ['lyricify', 'auto']:
+                    logger.info(f"[Lyricify/Auto] Attempting fetch for: {metadata.title} - {metadata.artist}")
+                    try:
+                        from services.lyrics.lyricify_client import LyricifyClient
+                        from database.models import TrackInfo as TrackInfoModel
+                        
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        client = LyricifyClient()
+                        track = TrackInfoModel(
+                            title=metadata.title,
+                            artist=metadata.artist,
+                            duration=int(metadata.duration) if metadata.duration else 0
+                        )
+                        
+                        lyricify_lyrics = loop.run_until_complete(client.fetch(track))
+                        loop.close()
+                        
+                        if lyricify_lyrics and lyricify_lyrics.lines:
+                            has_syllable = getattr(lyricify_lyrics, 'has_syllable_timing', False)
+                            logger.info(f"[Lyricify] SUCCESS! Got {len(lyricify_lyrics.lines)} lines, syllable_timing={has_syllable}")
+                            
+                            # Convert to response format
+                            lines = []
+                            for line in lyricify_lyrics.lines:
+                                words = []
+                                if hasattr(line, 'words') and line.words:
+                                    for word in line.words:
+                                        if isinstance(word, dict):
+                                            words.append({
+                                                "text": word.get("text", ""),
+                                                "start_time": word.get("start_time", 0),
+                                                "end_time": word.get("end_time", 0)
+                                            })
+                                        else:
+                                            words.append({
+                                                "text": getattr(word, 'text', ''),
+                                                "start_time": getattr(word, 'start_time', 0),
+                                                "end_time": getattr(word, 'end_time', 0)
+                                            })
+                                
+                                lines.append({
+                                    "text": line.text,
+                                    "start_time": line.start_time,
+                                    "end_time": line.end_time,
+                                    "romanized": getattr(line, 'romanized', None),
+                                    "words": words
+                                })
+                            
+                            lyricify_result = {
+                                "is_synced": lyricify_lyrics.is_synced,
+                                "source": "lyricify",
+                                "offset": getattr(lyricify_lyrics, 'offset', 0),
+                                "lines": lines,
+                                "total_lines": len(lines),
+                                "has_syllable_timing": has_syllable
+                            }
+                            
+                            # If has syllable timing or explicitly requested, use directly
+                            if has_syllable or source_pref == 'lyricify':
+                                lyrics_data = lyricify_result
+                                lyrics_source_used = "lyricify"
+                                logger.info(f"[Lyricify] Using QQ Music lyrics{'with syllable timing' if has_syllable else ''}")
+                        else:
+                            logger.warning(f"[Lyricify] No lyrics found for: {metadata.title} - {metadata.artist}")
+                    except Exception as e:
+                        logger.error(f"[Lyricify] Fetch FAILED: {e}", exc_info=True)
+                
+                # Fallback to Apple Music if explicitly requested or auto mode without syllable timing
+                if source_pref == 'applemusic' or (source_pref == 'auto' and lyrics_data is None):
                     logger.info(f"[AppleMusic] Attempting fetch for: {metadata.title} - {metadata.artist}")
                     try:
                         from services.lyrics.applemusic import AppleMusicFetcher
@@ -462,71 +533,12 @@ def api_guild_lyrics(guild_id: int):
                             logger.warning(f"[AppleMusic] No lyrics found for: {metadata.title} - {metadata.artist}")
                     except Exception as e:
                         logger.error(f"[AppleMusic] Fetch FAILED: {e}", exc_info=True)
-            
-            # Try Lyricify (QQ Music) if requested
-            if source_pref == 'lyricify' and lyrics_data is None:
-                logger.info(f"[Lyricify] Attempting fetch for: {metadata.title} - {metadata.artist}")
-                try:
-                    from services.lyrics.lyricify_client import LyricifyClient
-                    from database.models import TrackInfo as TrackInfoModel
-                    
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    
-                    client = LyricifyClient()
-                    track = TrackInfoModel(
-                        title=metadata.title,
-                        artist=metadata.artist,
-                        duration=int(metadata.duration) if metadata.duration else 0
-                    )
-                    
-                    lyricify_lyrics = loop.run_until_complete(client.fetch(track))
-                    loop.close()
-                    
-                    if lyricify_lyrics and lyricify_lyrics.lines:
-                        logger.info(f"[Lyricify] SUCCESS! Got {len(lyricify_lyrics.lines)} lines with syllable timing")
-                        lyrics_source_used = "lyricify"
-                        
-                        # Convert to response format
-                        lines = []
-                        for line in lyricify_lyrics.lines:
-                            words = []
-                            if hasattr(line, 'words') and line.words:
-                                for word in line.words:
-                                    # Handle both dict and object formats
-                                    if isinstance(word, dict):
-                                        words.append({
-                                            "text": word.get("text", ""),
-                                            "start_time": word.get("start_time", 0),
-                                            "end_time": word.get("end_time", 0)
-                                        })
-                                    else:
-                                        words.append({
-                                            "text": getattr(word, 'text', ''),
-                                            "start_time": getattr(word, 'start_time', 0),
-                                            "end_time": getattr(word, 'end_time', 0)
-                                        })
-                            
-                            lines.append({
-                                "text": line.text,
-                                "start_time": line.start_time,
-                                "end_time": line.end_time,
-                                "romanized": getattr(line, 'romanized', None),
-                                "words": words
-                            })
-                        
-                        lyrics_data = {
-                            "is_synced": lyricify_lyrics.is_synced,
-                            "source": "lyricify",
-                            "offset": getattr(lyricify_lyrics, 'offset', 0),
-                            "lines": lines,
-                            "total_lines": len(lines),
-                            "has_syllable_timing": getattr(lyricify_lyrics, 'has_syllable_timing', True)
-                        }
-                    else:
-                        logger.warning(f"[Lyricify] No lyrics found for: {metadata.title} - {metadata.artist}")
-                except Exception as e:
-                    logger.error(f"[Lyricify] Fetch FAILED: {e}", exc_info=True)
+                
+                # If auto mode and still no lyrics, use Lyricify result even without syllable timing
+                if source_pref == 'auto' and lyrics_data is None and lyricify_result is not None:
+                    lyrics_data = lyricify_result
+                    lyrics_source_used = "lyricify"
+                    logger.info(f"[Lyricify] Using QQ Music lyrics (no syllable timing, but best available)")
             
             # Save to cache if we got lyrics
             if lyrics_data:

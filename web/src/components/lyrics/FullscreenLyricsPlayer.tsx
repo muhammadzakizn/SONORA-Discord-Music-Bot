@@ -159,7 +159,7 @@ export default function FullscreenLyricsPlayer({
     const [showMenu, setShowMenu] = useState(false);
     const [isControlling, setIsControlling] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [lyricsSource, setLyricsSource] = useState<'applemusic' | 'auto' | 'musixmatch' | 'lrclib' | 'lyricify'>('applemusic');
+    const [lyricsSource, setLyricsSource] = useState<'applemusic' | 'auto' | 'musixmatch' | 'lrclib' | 'lyricify'>('auto');
     const [currentSource, setCurrentSource] = useState<string>('');
     const [isFullscreen, setIsFullscreen] = useState(false);
 
