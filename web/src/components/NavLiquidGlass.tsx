@@ -110,6 +110,41 @@ export default function NavLiquidGlass() {
     const inactivityTimeout = useRef<NodeJS.Timeout | null>(null);
     const lastTapTime = useRef(0);
 
+    // Refs for sliding indicator positioning
+    const navContainerRef = useRef<HTMLElement>(null);
+    const navButtonRefs = useRef<(HTMLElement | null)[]>([null, null, null, null]);
+    const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 0, width: 44 });
+
+    // Get active nav index
+    const activeIndex = getActiveNavIndex(pathname, activePopup);
+
+    // Update indicator position when active index changes
+    useEffect(() => {
+        const updateIndicator = () => {
+            const container = navContainerRef.current;
+            const activeButton = navButtonRefs.current[activeIndex];
+            if (container && activeButton) {
+                const containerRect = container.getBoundingClientRect();
+                const buttonRect = activeButton.getBoundingClientRect();
+                setIndicatorStyle({
+                    left: buttonRect.left - containerRect.left,
+                    width: buttonRect.width,
+                });
+            }
+        };
+
+        // Update immediately and after a small delay (for layout to settle)
+        updateIndicator();
+        const timer = setTimeout(updateIndicator, 50);
+
+        // Also update on resize
+        window.addEventListener('resize', updateIndicator);
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('resize', updateIndicator);
+        };
+    }, [activeIndex, isNavHidden]);
+
     // Detect scroll for auto-hide nav and scroll-to-top button
     useEffect(() => {
         const handleScroll = (e?: Event) => {
@@ -307,6 +342,7 @@ export default function NavLiquidGlass() {
                         /* Main Nav Container - Visible */
                         <motion.nav
                             key="nav-bar"
+                            ref={navContainerRef}
                             initial={{ y: 100, opacity: 0 }}
                             animate={{
                                 y: 0,
@@ -330,7 +366,7 @@ export default function NavLiquidGlass() {
                             {/* Sliding Active Indicator - Apple Music Style */}
                             <motion.div
                                 className={cn(
-                                    "absolute top-1/2 -translate-y-1/2 nav-active-indicator",
+                                    "absolute top-1/2 -translate-y-1/2 h-[calc(100%-8px)]",
                                     isDark
                                         ? "bg-white/12"
                                         : "bg-black/8",
@@ -338,7 +374,8 @@ export default function NavLiquidGlass() {
                                 )}
                                 initial={false}
                                 animate={{
-                                    x: getActiveNavIndex(pathname, activePopup) * getNavItemWidth(),
+                                    left: indicatorStyle.left,
+                                    width: indicatorStyle.width,
                                     opacity: 1,
                                 }}
                                 transition={{
@@ -357,6 +394,7 @@ export default function NavLiquidGlass() {
                                 href="/"
                                 isDark={isDark}
                                 index={0}
+                                buttonRef={(el) => { navButtonRefs.current[0] = el; }}
                             />
 
                             {/* Explore */}
@@ -368,6 +406,7 @@ export default function NavLiquidGlass() {
                                 isDark={isDark}
                                 data-nav-button
                                 index={1}
+                                buttonRef={(el) => { navButtonRefs.current[1] = el; }}
                             />
 
                             {/* Settings */}
@@ -379,6 +418,7 @@ export default function NavLiquidGlass() {
                                 isDark={isDark}
                                 data-nav-button
                                 index={2}
+                                buttonRef={(el) => { navButtonRefs.current[2] = el; }}
                             />
 
                             {/* Profile */}
@@ -397,6 +437,7 @@ export default function NavLiquidGlass() {
                                 isDark={isDark}
                                 data-nav-button
                                 index={3}
+                                buttonRef={(el) => { navButtonRefs.current[3] = el; }}
                                 showBadge={isDevLoggedIn}
                                 devInitial={isDevLoggedIn && !devSession?.avatar ? (devSession?.displayName || devSession?.username || 'D').charAt(0).toUpperCase() : undefined}
                             />
@@ -486,6 +527,7 @@ function NavButton({
     devInitial,
     index,
     showBadge,
+    buttonRef,
     ...props
 }: {
     icon?: React.ElementType;
@@ -498,6 +540,7 @@ function NavButton({
     devInitial?: string;
     index?: number;
     showBadge?: boolean;
+    buttonRef?: (el: HTMLElement | null) => void;
     [key: string]: unknown;
 }) {
     const content = (
@@ -546,14 +589,14 @@ function NavButton({
 
     if (href) {
         return (
-            <Link href={href} className="block" {...props}>
+            <Link href={href} className="block" ref={buttonRef as React.Ref<HTMLAnchorElement>} {...props}>
                 {content}
             </Link>
         );
     }
 
     return (
-        <button onClick={onClick} className="block" {...props}>
+        <button onClick={onClick} className="block" ref={buttonRef as React.Ref<HTMLButtonElement>} {...props}>
             {content}
         </button>
     );
