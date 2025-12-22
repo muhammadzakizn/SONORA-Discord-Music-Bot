@@ -128,22 +128,57 @@ class MetadataProcessor:
         
         lyrics_task = fetch_lyrics_with_fallback()
         
-        # Fetch Apple Music lyrics in parallel (for dashboard - pre-fetched to avoid RAM spikes)
-        async def fetch_apple_lyrics():
+        # Smart lyrics pre-fetch for dashboard:
+        # 1. Try Lyricify (QQ Music) first for syllable timing
+        # 2. Fallback to Apple Music if no syllable timing
+        async def fetch_smart_lyrics():
             try:
-                logger.info(f"Pre-fetching Apple Music lyrics: {track_info}")
-                return await self.applemusic_fetcher.fetch(track_info)
+                # Try Lyricify first (QQ Music - best syllable timing)
+                from services.lyrics.lyricify_client import LyricifyClient
+                client = LyricifyClient()
+                logger.info(f"Pre-fetching Lyricify (QQ Music) lyrics: {track_info}")
+                lyricify_lyrics = await client.fetch(track_info)
+                
+                if lyricify_lyrics and lyricify_lyrics.lines:
+                    has_syllable = getattr(lyricify_lyrics, 'has_syllable_timing', False)
+                    logger.info(f"Lyricify lyrics found: {len(lyricify_lyrics.lines)} lines, syllable_timing={has_syllable}")
+                    
+                    # If has syllable timing, use Lyricify
+                    if has_syllable:
+                        return lyricify_lyrics
+                    
+                    # Otherwise try Apple Music, but keep Lyricify as backup
+                    logger.info(f"Lyricify has no syllable timing, trying Apple Music...")
+                    try:
+                        apple_lyrics = await self.applemusic_fetcher.fetch(track_info)
+                        if apple_lyrics and apple_lyrics.lines:
+                            logger.info(f"Apple Music lyrics found: {len(apple_lyrics.lines)} lines")
+                            return apple_lyrics
+                    except Exception as e:
+                        logger.warning(f"Apple Music fetch failed: {e}")
+                    
+                    # Return Lyricify anyway (better than nothing)
+                    return lyricify_lyrics
+                else:
+                    # Lyricify not found, try Apple Music
+                    logger.info(f"Lyricify not found, trying Apple Music: {track_info}")
+                    return await self.applemusic_fetcher.fetch(track_info)
+                    
             except Exception as e:
-                logger.warning(f"Apple Music lyrics pre-fetch failed: {e}")
-                return None
+                logger.warning(f"Lyricify pre-fetch failed: {e}, trying Apple Music...")
+                try:
+                    return await self.applemusic_fetcher.fetch(track_info)
+                except Exception as e2:
+                    logger.warning(f"Apple Music pre-fetch also failed: {e2}")
+                    return None
         
-        apple_lyrics_task = fetch_apple_lyrics()
+        smart_lyrics_task = fetch_smart_lyrics()
         
         # Wait for all three
-        artwork_result, lyrics_result, apple_lyrics_result = await asyncio.gather(
+        artwork_result, lyrics_result, smart_lyrics_result = await asyncio.gather(
             artwork_task,
             lyrics_task,
-            apple_lyrics_task,
+            smart_lyrics_task,
             return_exceptions=True
         )
         
@@ -156,9 +191,9 @@ class MetadataProcessor:
             logger.warning(f"Lyrics fetch failed: {lyrics_result}")
             lyrics_result = None
         
-        if isinstance(apple_lyrics_result, Exception):
-            logger.warning(f"Apple Music lyrics fetch failed: {apple_lyrics_result}")
-            apple_lyrics_result = None
+        if isinstance(smart_lyrics_result, Exception):
+            logger.warning(f"Smart lyrics fetch failed: {smart_lyrics_result}")
+            smart_lyrics_result = None
         
         # Extract artwork data
         artwork_url = None
@@ -192,7 +227,7 @@ class MetadataProcessor:
             artwork_url=artwork_url,
             artwork_source=artwork_source,
             lyrics=lyrics_result,
-            apple_lyrics=apple_lyrics_result,  # Pre-fetched for dashboard
+            apple_lyrics=smart_lyrics_result,  # Smart pre-fetched (Lyricify first, Apple Music fallback)
             release_year=track_info.release_year,
             isrc=track_info.isrc,
             requested_by=requested_by,
@@ -203,7 +238,7 @@ class MetadataProcessor:
         logger.info(
             f"✓ Metadata processed: audio={metadata.audio_source}, "
             f"artwork={metadata.artwork_source}, lyrics={metadata.lyrics.source if metadata.lyrics else 'none'}, "
-            f"apple_lyrics={'yes' if apple_lyrics_result else 'no'}"
+            f"smart_lyrics={'yes (' + smart_lyrics_result.source.value + ')' if smart_lyrics_result and hasattr(smart_lyrics_result, 'source') else 'no'}"
         )
         
         return metadata
