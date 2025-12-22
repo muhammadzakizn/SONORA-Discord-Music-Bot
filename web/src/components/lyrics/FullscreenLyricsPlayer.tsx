@@ -425,10 +425,10 @@ export default function FullscreenLyricsPlayer({
                 block: "center",
             });
 
-            // Reset flag after scroll animation completes
+            // Reset flag after scroll animation completes (extended for smooth scroll)
             setTimeout(() => {
                 isAutoScrollingRef.current = false;
-            }, 500);
+            }, 1000);
         }
     }, [currentLineIndex, isUserScrolling]);
 
@@ -481,9 +481,15 @@ export default function FullscreenLyricsPlayer({
         const handleTouchMove = () => activateScrollMode();
         const handleTouchStart = () => activateScrollMode(); // Also on touch start
         const handleScroll = () => {
-            // Also trigger on actual scroll events (for scrollbar drag, etc.)
-            if (!isAutoScrollingRef.current && !isApplyingLyricsRef.current) {
-                activateScrollMode();
+            // Only extend timer if already in scroll mode (don't activate on auto-scroll)
+            if (isUserScrolling && !isAutoScrollingRef.current && !isApplyingLyricsRef.current) {
+                // Extend the timeout when user continues scrolling
+                if (scrollTimeoutRef.current) {
+                    clearTimeout(scrollTimeoutRef.current);
+                }
+                scrollTimeoutRef.current = setTimeout(() => {
+                    setIsUserScrolling(false);
+                }, 3000);
             }
         };
         // Pointer events for better cross-device support
@@ -1441,6 +1447,12 @@ export default function FullscreenLyricsPlayer({
                             <div
                                 ref={lyricsContainerRef}
                                 onClick={handleLyricsAreaClick}
+                                onWheel={(e) => {
+                                    // Direct React handler for reliable trackpad detection
+                                    if (Math.abs(e.deltaY) > 0.5 || Math.abs(e.deltaX) > 0.5) {
+                                        activateScrollMode();
+                                    }
+                                }}
                                 className="overflow-y-auto scrollbar-hide px-8 lg:px-12 py-[40vh] max-h-full cursor-pointer"
                             >
                                 {lyrics?.lines?.length ? (
