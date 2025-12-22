@@ -1376,12 +1376,36 @@ export default function FullscreenLyricsPlayer({
 
                     {/* RIGHT PANEL - Lyrics (Desktop Only) */}
                     {showLyrics && (
-                        <div className="hidden sm:flex w-1/2 flex-col justify-center overflow-hidden">
+                        <div className="hidden sm:flex w-1/2 flex-col justify-center overflow-hidden relative">
+                            {/* Scroll Mode Indicator */}
+                            <AnimatePresence>
+                                {isUserScrolling && lyrics?.lines?.length && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1"
+                                    >
+                                        <div className="flex flex-col items-center animate-bounce">
+                                            <svg className="w-6 h-6 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                            <svg className="w-6 h-6 text-white/40 -mt-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
+                                        <span className="text-xs text-white/50 bg-black/30 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                                            Scroll Mode • 3s to reset
+                                        </span>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
                             <div
                                 ref={lyricsContainerRef}
                                 className="overflow-y-auto scrollbar-hide px-8 lg:px-12 py-[40vh] max-h-full"
                             >
-                                {lyrics?.lines.length ? (
+                                {lyrics?.lines?.length ? (
                                     <div className="space-y-6">
                                         {/* Interlude Dots Animation - Desktop */}
                                         <AnimatePresence>
