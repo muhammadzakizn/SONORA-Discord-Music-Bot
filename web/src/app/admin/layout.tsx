@@ -460,15 +460,24 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
 
   // Scroll detection for header animation
   useEffect(() => {
-    const mainElement = mainRef.current;
-    if (!mainElement) return;
+    // Use a small delay to ensure ref is attached
+    const timer = setTimeout(() => {
+      const mainElement = mainRef.current;
+      if (!mainElement) return;
 
-    const handleScroll = () => {
-      setIsScrolled(mainElement.scrollTop > 50);
-    };
+      const handleScroll = () => {
+        setIsScrolled(mainElement.scrollTop > 50);
+      };
 
-    mainElement.addEventListener('scroll', handleScroll);
-    return () => mainElement.removeEventListener('scroll', handleScroll);
+      mainElement.addEventListener('scroll', handleScroll, { passive: true });
+
+      // Initial check
+      handleScroll();
+
+      return () => mainElement.removeEventListener('scroll', handleScroll);
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Check for MFA verified cookie
