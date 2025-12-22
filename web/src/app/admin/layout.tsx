@@ -241,20 +241,32 @@ function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick:
   return (
     <header className={cn(
       "h-14 px-4 lg:px-6 flex items-center justify-between relative transition-all duration-300",
-      isDark ? "text-white" : "text-gray-900",
-      isScrolled && (isDark ? "backdrop-blur-xl bg-black/50" : "backdrop-blur-xl bg-white/50")
+      isDark ? "text-white" : "text-gray-900"
     )}>
-      {/* Extended gradient fade below header when scrolled */}
+      {/* Dark gradient overlay - dark at top, transparent at bottom */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: isScrolled ? 1 : 0 }}
         transition={{ duration: 0.3 }}
-        className={cn(
-          "absolute inset-x-0 top-full h-12 pointer-events-none",
-          isDark
-            ? "bg-gradient-to-b from-black/60 to-transparent"
-            : "bg-gradient-to-b from-white/60 to-transparent"
-        )}
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: isDark
+            ? 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 50%, transparent 100%)'
+            : 'linear-gradient(to bottom, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 50%, transparent 100%)',
+          zIndex: -1
+        }}
+      />
+      {/* Extended gradient fade below header */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: isScrolled ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+        className="absolute inset-x-0 top-full h-16 pointer-events-none"
+        style={{
+          background: isDark
+            ? 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 100%)'
+            : 'linear-gradient(to bottom, rgba(255,255,255,0.4) 0%, transparent 100%)'
+        }}
       />
       {/* Left - Menu button and Logo */}
       <div className="flex items-center gap-3">
