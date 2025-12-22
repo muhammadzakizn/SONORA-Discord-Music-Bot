@@ -367,9 +367,8 @@ export default function NavLiquidGlass() {
                                         : "bg-black/10 border-black/10 text-gray-800"
                                 )}
                             >
-                                <span className="flex items-center gap-1.5">
-                                    <span className="animate-pulse">👆👆</span>
-                                    {t('nav.doubleTapHint') || 'Tap 2x to show menu'}
+                                <span className="text-center">
+                                    Tap 2x to show menu
                                 </span>
                                 {/* Arrow pointer */}
                                 <div className={cn(
@@ -415,7 +414,7 @@ export default function NavLiquidGlass() {
                         )} />
                     </motion.button>
                 </div>
-            </div>
+            </div >
         </>
     );
 }
