@@ -546,7 +546,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
             isDark={isDark}
             isScrolled={isScrolled}
           />
-          <main ref={mainRef} className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar relative z-0 -mt-14 pt-14">
+          <main ref={mainRef} className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar relative z-10">
             <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>
