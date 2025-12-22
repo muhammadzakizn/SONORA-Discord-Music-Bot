@@ -365,7 +365,7 @@ def api_guild_lyrics(guild_id: int):
         
         # Use cached lyrics if available and not expired (10 min cache)
         if cache_entry and (time.time() - cache_entry['timestamp']) < 600:
-            logger.info(f"[Lyrics] Using cached lyrics for: {metadata.title}")
+            # Don't log cache hits to reduce console spam (polled every 2s)
             lyrics_data = cache_entry['data']
             lyrics_source_used = cache_entry['source']
         else:
