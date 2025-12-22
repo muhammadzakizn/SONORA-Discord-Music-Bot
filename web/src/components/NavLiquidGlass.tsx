@@ -192,13 +192,23 @@ export default function NavLiquidGlass() {
         lastTapTime.current = now;
     };
 
-    // Show double-tap hint when nav is hidden
+    // Show double-tap hint when nav is hidden, then hide after 5 seconds
     useEffect(() => {
         if (isNavHidden) {
-            const hintTimer = setTimeout(() => {
+            // Show hint after 1.5s of nav being hidden
+            const showTimer = setTimeout(() => {
                 setShowDoubleTapHint(true);
-            }, 1500); // Show hint after 1.5s of nav being hidden
-            return () => clearTimeout(hintTimer);
+            }, 1500);
+
+            // Hide hint after 5 seconds of being shown (total 6.5s from nav hidden)
+            const hideTimer = setTimeout(() => {
+                setShowDoubleTapHint(false);
+            }, 6500);
+
+            return () => {
+                clearTimeout(showTimer);
+                clearTimeout(hideTimer);
+            };
         } else {
             setShowDoubleTapHint(false);
         }
