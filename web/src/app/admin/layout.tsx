@@ -28,6 +28,7 @@ import { SessionProvider, useSession, getAvatarUrl } from "@/contexts/SessionCon
 import { TutorialOverlay, useTutorial } from "@/components/TutorialOverlay";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Footer } from "@/components/Footer";
+import { TimeAmbientBackground } from "@/components/admin/TimeAmbientBackground";
 
 interface NavItem {
   labelKey: string;
@@ -470,13 +471,16 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         />
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden relative">
+          {/* Immersive Time Ambient Background */}
+          <TimeAmbientBackground className="z-0" />
+
           <Header
             onMenuClick={() => setSidebarOpen(!sidebarOpen)}
             sidebarOpen={sidebarOpen}
             isDark={isDark}
           />
-          <main className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar">
+          <main className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar relative z-10">
             <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>
