@@ -135,8 +135,8 @@ export default function NavLiquidGlass() {
                 const containerRect = container.getBoundingClientRect();
                 const buttonRect = activeButton.getBoundingClientRect();
                 setIndicatorStyle({
-                    left: buttonRect.left - containerRect.left - 4, // 4px padding on left
-                    width: buttonRect.width + 8, // 8px total horizontal padding
+                    left: buttonRect.left - containerRect.left - 8, // 8px padding on left
+                    width: buttonRect.width + 16, // 16px total horizontal padding
                 });
             }
         };
