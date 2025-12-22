@@ -206,9 +206,12 @@ export default function FullscreenLyricsPlayer({
     // Flag to prevent scroll detection during programmatic lyrics apply
     const isApplyingLyricsRef = useRef(false);
 
-    // Lyrics timing offset - negative value delays highlighting to match audio
-    // This compensates for server time being ahead of actual audio playback
-    const LYRICS_OFFSET = -0.3; // seconds
+    // Lyrics timing offset - positive value advances highlighting to match audio
+    // This compensates for network latency and processing delays
+    const LYRICS_OFFSET = 0.15; // seconds - advance lyrics timing
+
+    // Syllable-specific offset for per-word highlighting (can be tuned separately)
+    const SYLLABLE_OFFSET = 0.2; // seconds - advance syllable timing slightly more
 
     // Find current line index based on time (with offset applied)
     const currentLineIndex = useMemo(() => {
@@ -1447,8 +1450,8 @@ export default function FullscreenLyricsPlayer({
                                                     {isCurrentLine && line.words && line.words.length > 0 && lyrics?.has_syllable_timing ? (
                                                         <p className="text-4xl xs:text-5xl font-bold text-left leading-tight">
                                                             {line.words.map((word: { text: string; start_time: number; end_time: number }, wordIndex: number) => {
-                                                                // Apply offset for accurate sync
-                                                                const adjustedTime = currentTime + LYRICS_OFFSET;
+                                                                // Apply syllable-specific offset for accurate sync
+                                                                const adjustedTime = currentTime + SYLLABLE_OFFSET;
 
                                                                 // Calculate word progress (0 to 1)
                                                                 let progress = 0;
