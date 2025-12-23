@@ -214,18 +214,26 @@ function TrackCard({
                 {/* Rank Number - Spotify style */}
                 <div
                     className={cn(
-                        "absolute top-2 left-2 text-3xl sm:text-4xl font-black drop-shadow-lg",
-                        track.rank === 1
-                            ? "bg-gradient-to-b from-yellow-300 via-amber-400 to-amber-600 bg-clip-text text-transparent"
-                            : track.rank === 2
-                                ? "bg-gradient-to-b from-gray-200 via-gray-300 to-gray-500 bg-clip-text text-transparent"
-                                : track.rank === 3
-                                    ? "bg-gradient-to-b from-amber-500 via-amber-600 to-amber-800 bg-clip-text text-transparent"
-                                    : "bg-gradient-to-b from-white via-gray-300 to-gray-500 bg-clip-text text-transparent"
+                        "absolute top-0 left-0 p-2 pr-4 pb-4",
+                        "bg-gradient-to-br from-black/70 via-black/40 to-transparent",
+                        "rounded-tl-xl"
                     )}
-                    style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
                 >
-                    {track.rank}
+                    <span
+                        className={cn(
+                            "text-3xl sm:text-4xl font-black",
+                            track.rank === 1
+                                ? "bg-gradient-to-b from-yellow-300 via-amber-400 to-amber-600 bg-clip-text text-transparent"
+                                : track.rank === 2
+                                    ? "bg-gradient-to-b from-gray-200 via-gray-300 to-gray-500 bg-clip-text text-transparent"
+                                    : track.rank === 3
+                                        ? "bg-gradient-to-b from-amber-500 via-amber-600 to-amber-800 bg-clip-text text-transparent"
+                                        : "bg-gradient-to-b from-white via-gray-300 to-gray-500 bg-clip-text text-transparent"
+                        )}
+                        style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.8)' }}
+                    >
+                        {track.rank}
+                    </span>
                 </div>
 
                 {/* Play count overlay */}
