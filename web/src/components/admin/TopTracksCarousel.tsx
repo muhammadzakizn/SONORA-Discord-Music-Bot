@@ -63,7 +63,8 @@ const MONTHS = [
 function ShimmerCard({ isDark }: { isDark: boolean }) {
     return (
         <div className={cn(
-            "relative flex-shrink-0 w-36 h-48 rounded-xl overflow-hidden",
+            "relative flex-shrink-0 rounded-xl overflow-hidden",
+            "w-28 h-36 sm:w-36 sm:h-48 md:w-44 md:h-56",
             isDark ? "bg-zinc-800" : "bg-gray-200"
         )}>
             <div className="absolute inset-0 shimmer-effect" />
@@ -169,7 +170,8 @@ function TrackCard({
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             className={cn(
-                "relative flex-shrink-0 w-36 rounded-xl overflow-hidden cursor-pointer group",
+                "relative flex-shrink-0 rounded-xl overflow-hidden cursor-pointer group",
+                "w-28 sm:w-36 md:w-44",
                 "transition-transform duration-200 hover:scale-105"
             )}
             onClick={onClick}
