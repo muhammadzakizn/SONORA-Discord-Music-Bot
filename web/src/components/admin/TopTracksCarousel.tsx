@@ -269,37 +269,26 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
     if (!userId) return null;
 
     return (
-        <div className={cn(
-            "rounded-2xl p-6 border",
-            isDark ? "bg-zinc-900/50 border-zinc-800" : "bg-white border-gray-200"
-        )}>
+        <div className="space-y-4">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div
-                    className="flex items-center gap-3 cursor-pointer group"
+                    className="flex items-center gap-2 cursor-pointer group"
                     onClick={() => setShowMonthSelector(!showMonthSelector)}
                 >
-                    <div className={cn(
-                        "p-2 rounded-xl",
-                        isDark ? "bg-[#7B1E3C]/20" : "bg-[#7B1E3C]/10"
+                    <h3 className={cn(
+                        "font-semibold",
+                        isDark ? "text-white" : "text-gray-900"
                     )}>
-                        <TrendingUp className="w-5 h-5 text-[#C4314B]" />
-                    </div>
-                    <div>
-                        <h3 className={cn(
-                            "font-semibold flex items-center gap-2",
-                            isDark ? "text-white" : "text-gray-900"
-                        )}>
-                            Top 10 Tracks
-                            <Calendar className="w-4 h-4 text-[#C4314B] opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </h3>
-                        <p className={cn(
-                            "text-sm",
-                            isDark ? "text-zinc-400" : "text-gray-500"
-                        )}>
-                            {topTracks?.month_name || MONTHS[selectedMonth - 1]} {selectedYear}
-                        </p>
-                    </div>
+                        Top 10 Tracks
+                    </h3>
+                    <span className={cn(
+                        "text-sm",
+                        isDark ? "text-zinc-400" : "text-gray-500"
+                    )}>
+                        · {topTracks?.month_name || MONTHS[selectedMonth - 1]} {selectedYear}
+                    </span>
+                    <Calendar className="w-4 h-4 text-[#C4314B] opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
 
                 {/* Scroll buttons */}
@@ -413,23 +402,15 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
                 )}
             </AnimatePresence>
 
-            {/* Stats */}
+            {/* Stats - simplified, no icons */}
             {topTracks && topTracks.tracks.length > 0 && (
-                <div className="flex gap-4 mb-4">
-                    <div className={cn(
-                        "flex items-center gap-2 text-sm",
-                        isDark ? "text-zinc-400" : "text-gray-500"
-                    )}>
-                        <TrendingUp className="w-4 h-4" />
-                        <span>{topTracks.total_plays} total plays</span>
-                    </div>
-                    <div className={cn(
-                        "flex items-center gap-2 text-sm",
-                        isDark ? "text-zinc-400" : "text-gray-500"
-                    )}>
-                        <Clock className="w-4 h-4" />
-                        <span>{formatDuration(topTracks.total_duration)}</span>
-                    </div>
+                <div className={cn(
+                    "flex gap-4 mb-4 text-sm",
+                    isDark ? "text-zinc-400" : "text-gray-500"
+                )}>
+                    <span>{topTracks.total_plays} plays</span>
+                    <span>·</span>
+                    <span>{formatDuration(topTracks.total_duration)}</span>
                 </div>
             )}
 
@@ -442,19 +423,19 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
                 </div>
             ) : error ? (
                 <div className={cn(
-                    "py-12 text-center",
+                    "py-8 text-center",
                     isDark ? "text-zinc-500" : "text-gray-400"
                 )}>
-                    <p>{error}</p>
+                    <p className="mb-1">Could not load top tracks</p>
+                    <p className="text-sm">Use SONORA to play music and your stats will appear here!</p>
                 </div>
             ) : !topTracks || topTracks.tracks.length === 0 ? (
                 <div className={cn(
-                    "py-12 text-center",
+                    "py-8 text-center",
                     isDark ? "text-zinc-500" : "text-gray-400"
                 )}>
-                    <Music2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No tracks played in {MONTHS[selectedMonth - 1]} {selectedYear}</p>
-                    <p className="text-sm mt-1">Play some music to see your stats!</p>
+                    <p className="mb-1">No tracks played in {MONTHS[selectedMonth - 1]} {selectedYear}</p>
+                    <p className="text-sm">Use SONORA to play music and your stats will appear here!</p>
                 </div>
             ) : (
                 <div
