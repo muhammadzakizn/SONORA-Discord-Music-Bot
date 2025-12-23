@@ -82,17 +82,17 @@ export function SeekbackNavbar({
         >
             {/* Top Row - Logos */}
             <div className="flex items-center justify-between px-4 sm:px-6 py-3">
-                {/* Left - Seekback Logo */}
-                <div className="flex items-center gap-2">
+                {/* Left - Seekback Logo + Year */}
+                <div className="flex items-center gap-1">
                     <Image
                         src="/seekback-logo.png"
                         alt="Seekback"
-                        width={28}
-                        height={28}
+                        width={42}
+                        height={42}
                         className="invert"
                     />
-                    <span className="text-white font-semibold text-lg tracking-tight">
-                        Seekback{yearShort}
+                    <span className="text-white font-semibold text-xl tracking-tight">
+                        {yearShort}
                     </span>
                 </div>
 
@@ -100,14 +100,14 @@ export function SeekbackNavbar({
                 <Image
                     src="/sonora-logo.png"
                     alt="SONORA"
-                    width={90}
-                    height={28}
-                    className="h-6 w-auto brightness-0 invert"
+                    width={100}
+                    height={32}
+                    className="h-7 w-auto brightness-0 invert"
                 />
             </div>
 
-            {/* Bottom Row - Year and Months */}
-            <div className="flex items-center px-4 sm:px-6 pb-3">
+            {/* Bottom Row - Year and Months - Centered */}
+            <div className="flex items-center justify-center px-4 sm:px-6 pb-3">
                 {/* Year */}
                 <button
                     onClick={() => onYearChange(selectedYear)}
