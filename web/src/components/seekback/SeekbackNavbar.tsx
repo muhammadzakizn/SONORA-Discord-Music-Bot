@@ -91,7 +91,7 @@ export function SeekbackNavbar({
                             alt="Seekback"
                             width={74}
                             height={74}
-                            className="invert -mr-1"
+                            className="-mr-1"
                         />
                         <span className="text-white font-medium text-lg tracking-tight">
                             {yearShort}
@@ -102,9 +102,9 @@ export function SeekbackNavbar({
                     <Image
                         src="/sonora-logo.png"
                         alt="SONORA"
-                        width={90}
-                        height={28}
-                        className="h-5 w-auto brightness-0 invert opacity-80"
+                        width={126}
+                        height={40}
+                        className="h-7 w-auto brightness-0 invert opacity-80"
                     />
                 </div>
 
