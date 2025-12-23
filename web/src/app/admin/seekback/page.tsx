@@ -208,9 +208,21 @@ export default function SeekbackPage() {
                             <ArrowLeft className="w-5 h-5" />
                             <span>Back</span>
                         </button>
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-[#C4314B] to-amber-500 bg-clip-text text-transparent">
-                            Seekback&apos;{selectedYear.toString().slice(-2)}
-                        </h1>
+                        <div className="flex items-center gap-2">
+                            <Image
+                                src="/seekback-logo.png"
+                                alt="Seekback"
+                                width={32}
+                                height={32}
+                                className={cn(
+                                    "w-8 h-8",
+                                    isDark ? "invert" : ""
+                                )}
+                            />
+                            <span className="text-xl font-bold bg-gradient-to-r from-[#C4314B] to-amber-500 bg-clip-text text-transparent">
+                                &apos;{selectedYear.toString().slice(-2)}
+                            </span>
+                        </div>
                         <div className="w-24" /> {/* Spacer */}
                     </div>
                 </div>
@@ -360,12 +372,7 @@ export default function SeekbackPage() {
                             ].map((stat, idx) => (
                                 <div
                                     key={stat.label}
-                                    className={cn(
-                                        "p-6 rounded-2xl text-center",
-                                        isDark
-                                            ? "bg-zinc-800/50 border border-zinc-700"
-                                            : "bg-white border border-gray-200 shadow-sm"
-                                    )}
+                                    className="p-6 text-center"
                                 >
                                     <stat.icon className={cn(
                                         "w-6 h-6 mx-auto mb-2",
@@ -392,12 +399,7 @@ export default function SeekbackPage() {
                                     {topArtists.map((artist, idx) => (
                                         <div
                                             key={artist.artist}
-                                            className={cn(
-                                                "flex items-center gap-4 p-4 rounded-xl",
-                                                isDark
-                                                    ? "bg-zinc-800/50 border border-zinc-700"
-                                                    : "bg-white border border-gray-200"
-                                            )}
+                                            className="flex items-center gap-4 py-3"
                                         >
                                             <span className={cn(
                                                 "text-2xl font-bold w-8",
@@ -459,12 +461,7 @@ export default function SeekbackPage() {
                                     {topTracks.slice(0, 10).map((track) => (
                                         <div
                                             key={`${track.rank}-${track.title}`}
-                                            className={cn(
-                                                "flex items-center gap-4 p-3 rounded-xl",
-                                                isDark
-                                                    ? "bg-zinc-800/50 border border-zinc-700"
-                                                    : "bg-white border border-gray-200"
-                                            )}
+                                            className="flex items-center gap-4 py-2"
                                         >
                                             <span className={cn(
                                                 "text-lg font-bold w-6 text-center",
