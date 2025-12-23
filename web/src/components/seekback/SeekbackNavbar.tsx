@@ -85,15 +85,15 @@ export function SeekbackNavbar({
                 {/* Top Row - Logos */}
                 <div className="flex items-center justify-between px-6 pt-4 pb-2">
                     {/* Left - Seekback Logo + Year */}
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 -ml-4">
                         <Image
                             src="/seekback-logo.png"
                             alt="Seekback"
                             width={148}
                             height={148}
-                            className="-mr-2"
+                            className=""
                         />
-                        <span className="text-white font-medium text-2xl tracking-tight">
+                        <span className="text-white font-medium text-2xl tracking-tight -ml-3">
                             {yearShort}
                         </span>
                     </div>
