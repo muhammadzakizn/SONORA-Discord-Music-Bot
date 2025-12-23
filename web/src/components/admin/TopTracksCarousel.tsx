@@ -100,38 +100,42 @@ function TrackCard({
     const [imageError, setImageError] = useState(false);
     const [artworkUrl, setArtworkUrl] = useState<string | null>(track.artwork_url || null);
     const [isFetching, setIsFetching] = useState(false);
+    const [hasFetched, setHasFetched] = useState(false);
 
     // Fetch artwork dynamically if not available (with 30s timeout)
     useEffect(() => {
-        if (!artworkUrl && !isFetching && !imageError) {
+        // Only fetch once if no artwork_url
+        if (!track.artwork_url && !hasFetched) {
+            setHasFetched(true);
             setIsFetching(true);
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                setImageError(true);
+                setIsFetching(false);
+            }, 30000); // 30 second timeout
 
             fetch(`/api/bot/artwork/search?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`, {
                 signal: controller.signal
             })
                 .then(res => res.json())
                 .then(data => {
+                    clearTimeout(timeoutId);
                     if (data.found && data.artwork_url) {
                         setArtworkUrl(data.artwork_url);
                     } else {
                         setImageError(true);
                     }
+                    setIsFetching(false);
                 })
-                .catch(() => setImageError(true))
-                .finally(() => {
+                .catch(() => {
                     clearTimeout(timeoutId);
+                    setImageError(true);
                     setIsFetching(false);
                 });
-
-            return () => {
-                clearTimeout(timeoutId);
-                controller.abort();
-            };
         }
-    }, [track.title, track.artist, artworkUrl, isFetching, imageError]);
+    }, [track.title, track.artist, track.artwork_url, hasFetched]);
 
     return (
         <motion.div
