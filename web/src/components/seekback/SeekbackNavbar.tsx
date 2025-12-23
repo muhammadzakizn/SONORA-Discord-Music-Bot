@@ -109,32 +109,32 @@ export function SeekbackNavbar({
                 </div>
 
                 {/* Bottom Row - Year and Months */}
-                <div className="flex items-center px-6 pb-4 gap-6">
+                <div className="flex items-center px-6 pb-4 gap-4">
                     {/* Year */}
                     <button
                         onClick={() => onYearChange(selectedYear)}
-                        className="text-amber-400 font-bold text-sm shrink-0"
+                        className="text-amber-400 font-bold text-base shrink-0"
                     >
                         {selectedYear}
                     </button>
 
                     {/* Months Row */}
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-2 flex-1 overflow-hidden">
                         {/* Left Chevron - only show when can scroll */}
                         <button
                             onClick={() => scrollMonths("left")}
                             className={cn(
-                                "p-0.5 shrink-0 transition-opacity",
+                                "p-1 shrink-0 transition-opacity",
                                 canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
                             )}
                         >
-                            <ChevronLeft className="w-4 h-4 text-white/50" />
+                            <ChevronLeft className="w-5 h-5 text-white/60" />
                         </button>
 
                         {/* Months */}
                         <div
                             ref={monthsContainerRef}
-                            className="flex items-center gap-6 overflow-x-auto scrollbar-hide"
+                            className="flex items-center gap-10 overflow-x-auto scrollbar-hide"
                             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                         >
                             {MONTHS.map((month, index) => {
@@ -145,7 +145,7 @@ export function SeekbackNavbar({
                                     <button
                                         key={month.short}
                                         onClick={() => onMonthChange(monthNum)}
-                                        className="relative px-3 py-1 shrink-0"
+                                        className="relative px-4 py-1.5 shrink-0"
                                     >
                                         {/* Active indicator pill */}
                                         {isSelected && (
@@ -161,7 +161,7 @@ export function SeekbackNavbar({
                                         )}
                                         <span
                                             className={cn(
-                                                "relative z-10 text-sm font-medium transition-colors",
+                                                "relative z-10 text-base font-medium transition-colors",
                                                 isSelected ? "text-white" : "text-white/50 hover:text-white/70"
                                             )}
                                         >
@@ -176,11 +176,11 @@ export function SeekbackNavbar({
                         <button
                             onClick={() => scrollMonths("right")}
                             className={cn(
-                                "p-0.5 shrink-0 transition-opacity",
+                                "p-1 shrink-0 transition-opacity",
                                 canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
                             )}
                         >
-                            <ChevronRight className="w-4 h-4 text-white/50" />
+                            <ChevronRight className="w-5 h-5 text-white/60" />
                         </button>
                     </div>
                 </div>
