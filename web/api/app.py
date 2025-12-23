@@ -861,6 +861,284 @@ def api_guild_stats(guild_id: int):
         return jsonify({"error": str(e)}), 500
 
 
+# ==================== TOP TRACKS API ====================
+
+@app.route('/api/top-tracks/monthly')
+def api_monthly_top_tracks():
+    """Get user's monthly top tracks"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+        limit = request.args.get('limit', 10, type=int)
+        
+        if not all([user_id, year, month]):
+            return jsonify({"error": "user_id, year, and month are required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        tracks = loop.run_until_complete(
+            db.get_monthly_top_tracks(user_id, year, month, limit)
+        )
+        loop.close()
+        
+        # Get month name
+        import calendar
+        month_name = calendar.month_name[month]
+        
+        # Get total stats for the month
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        total_plays = loop.run_until_complete(
+            db.db.execute("""
+                SELECT COUNT(*), SUM(duration)
+                FROM play_history
+                WHERE user_id = ?
+                    AND strftime('%Y', played_at) = ?
+                    AND strftime('%m', played_at) = ?
+            """, (user_id, str(year), str(month).zfill(2)))
+        )
+        row = loop.run_until_complete(total_plays.fetchone())
+        loop.close()
+        
+        return jsonify({
+            "year": year,
+            "month": month,
+            "month_name": month_name,
+            "total_plays": row[0] if row else 0,
+            "total_duration": row[1] or 0 if row else 0,
+            "tracks": tracks
+        })
+    except Exception as e:
+        logger.error(f"Failed to get monthly top tracks: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/top-tracks/yearly')
+def api_yearly_top_tracks():
+    """Get user's yearly top tracks"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        year = request.args.get('year', type=int)
+        limit = request.args.get('limit', 10, type=int)
+        
+        if not all([user_id, year]):
+            return jsonify({"error": "user_id and year are required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        tracks = loop.run_until_complete(
+            db.get_yearly_top_tracks(user_id, year, limit)
+        )
+        loop.close()
+        
+        # Get total stats for the year
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        total_plays = loop.run_until_complete(
+            db.db.execute("""
+                SELECT COUNT(*), SUM(duration)
+                FROM play_history
+                WHERE user_id = ?
+                    AND strftime('%Y', played_at) = ?
+            """, (user_id, str(year)))
+        )
+        row = loop.run_until_complete(total_plays.fetchone())
+        loop.close()
+        
+        return jsonify({
+            "year": year,
+            "total_plays": row[0] if row else 0,
+            "total_duration": row[1] or 0 if row else 0,
+            "tracks": tracks
+        })
+    except Exception as e:
+        logger.error(f"Failed to get yearly top tracks: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/history/months')
+def api_history_months():
+    """Get list of months with history data for a user"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        months = loop.run_until_complete(
+            db.get_available_history_months(user_id)
+        )
+        loop.close()
+        
+        return jsonify({"months": months})
+    except Exception as e:
+        logger.error(f"Failed to get history months: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/history/summary')
+def api_history_summary():
+    """Get user's listening history summary"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        summary = loop.run_until_complete(
+            db.get_history_summary(user_id)
+        )
+        loop.close()
+        
+        return jsonify(summary)
+    except Exception as e:
+        logger.error(f"Failed to get history summary: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/history/delete', methods=['DELETE'])
+def api_history_delete_track():
+    """Delete a specific track from history"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        track_id = request.args.get('track_id', type=int)
+        
+        if not all([user_id, track_id]):
+            return jsonify({"error": "user_id and track_id are required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        deleted = loop.run_until_complete(
+            db.delete_track_from_history(user_id, track_id)
+        )
+        loop.close()
+        
+        if deleted:
+            return jsonify({"status": "deleted", "track_id": track_id})
+        else:
+            return jsonify({"error": "Track not found"}), 404
+    except Exception as e:
+        logger.error(f"Failed to delete track: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/history/delete-month', methods=['DELETE'])
+def api_history_delete_month():
+    """Delete all history for a specific month"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+        
+        if not all([user_id, year, month]):
+            return jsonify({"error": "user_id, year, and month are required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        count = loop.run_until_complete(
+            db.delete_monthly_history(user_id, year, month)
+        )
+        loop.close()
+        
+        return jsonify({
+            "status": "deleted",
+            "year": year, 
+            "month": month,
+            "deleted_count": count
+        })
+    except Exception as e:
+        logger.error(f"Failed to delete monthly history: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/history/delete-year', methods=['DELETE'])
+def api_history_delete_year():
+    """Delete all history for a specific year"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        year = request.args.get('year', type=int)
+        
+        if not all([user_id, year]):
+            return jsonify({"error": "user_id and year are required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        count = loop.run_until_complete(
+            db.delete_yearly_history(user_id, year)
+        )
+        loop.close()
+        
+        return jsonify({
+            "status": "deleted",
+            "year": year,
+            "deleted_count": count
+        })
+    except Exception as e:
+        logger.error(f"Failed to delete yearly history: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/artwork/search')
+def api_artwork_search():
+    """Search for album artwork using existing ArtworkFetcher"""
+    try:
+        title = request.args.get('title', '')
+        artist = request.args.get('artist', '')
+        
+        if not title:
+            return jsonify({"error": "title is required"}), 400
+        
+        # Use existing ArtworkFetcher service
+        from services.metadata.artwork import ArtworkFetcher
+        from database.models import TrackInfo
+        
+        track = TrackInfo(
+            title=title,
+            artist=artist or "Unknown",
+            album=None,
+            url=None,
+            track_id=None
+        )
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        fetcher = ArtworkFetcher()
+        result = loop.run_until_complete(fetcher.fetch(track))
+        loop.close()
+        
+        if result:
+            artwork_url, source = result
+            return jsonify({
+                "found": True,
+                "artwork_url": artwork_url,
+                "source": str(source.value) if hasattr(source, 'value') else str(source)
+            })
+        else:
+            return jsonify({"found": False, "artwork_url": None})
+    except Exception as e:
+        logger.error(f"Failed to search artwork: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/control/<int:guild_id>/<action>', methods=['POST'])
 def api_control(guild_id: int, action: str):
     """Control playback with Discord notification - requires user to be in voice channel"""

@@ -2,8 +2,8 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.27.0";
-export const BOT_VERSION = "3.13.0";
+export const WEB_VERSION = "3.28.0";
+export const BOT_VERSION = "3.20.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -17,6 +17,35 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.28.0",
+    date: "2025-12-23",
+    title: "Top 10 Tracks Feature",
+    highlights: [
+      "Monthly Top 10 tracks carousel on Dashboard",
+      "Listening history management in Settings",
+      "Album artwork display with rank badges",
+      "Privacy-compliant annual auto-cleanup"
+    ],
+    changes: [
+      {
+        category: "New Components",
+        items: [
+          "TopTracksCarousel with shimmer loading",
+          "Month/Year navigation selector",
+          "ListeningHistorySection in Settings"
+        ]
+      },
+      {
+        category: "Database & API",
+        items: [
+          "artwork_url column in play_history",
+          "Monthly/yearly top tracks APIs",
+          "History management delete endpoints"
+        ]
+      }
+    ]
+  },
   {
     version: "3.27.0",
     date: "2025-12-23",

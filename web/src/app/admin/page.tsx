@@ -30,6 +30,7 @@ import { formatUptime, formatNumber, cn } from "@/lib/utils";
 import { useSession, getServerIconUrl, UserGuild } from "@/contexts/SessionContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { TimeBasedGreeting } from "@/components/admin/TimeBasedGreeting";
+import TopTracksCarousel from "@/components/admin/TopTracksCarousel";
 
 // Stats Card Component - Theme Aware
 function StatsCard({
@@ -442,6 +443,11 @@ export default function AdminDashboard() {
           isDark={isDark}
           onDisplayNameChange={setDisplayName}
         />
+      )}
+
+      {/* Top 10 Tracks */}
+      {user && (
+        <TopTracksCarousel userId={user.id} />
       )}
 
       {/* Connection Status */}

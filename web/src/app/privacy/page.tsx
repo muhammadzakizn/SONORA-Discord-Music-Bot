@@ -142,6 +142,19 @@ export default function PrivacyPolicyPage() {
                             <li>Your account is associated with active bot usage</li>
                             <li>Required by applicable laws or regulations</li>
                         </ul>
+
+                        <SubSection title="5.1 Listening History & Top Tracks" isDark={isDark}>
+                            <div className={`p-4 rounded-xl border ${isDark ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-cyan-50 border-cyan-200'}`}>
+                                <p className="font-semibold text-cyan-500 mb-2">🎵 TOP TRACKS FEATURE</p>
+                                <ul>
+                                    <li><strong>Data Collected:</strong> Track title, artist, album art URL, play timestamp, and duration</li>
+                                    <li><strong>Purpose:</strong> Display your personal "Top 10 Tracks" statistics in the dashboard</li>
+                                    <li><strong>Auto-Cleanup:</strong> Data older than 1 year is <strong>automatically deleted on January 1st</strong></li>
+                                    <li><strong>Manual Deletion:</strong> You can delete individual tracks, months, or years from Settings anytime</li>
+                                </ul>
+                            </div>
+                        </SubSection>
+
                         <p>
                             Inactive data may be automatically purged after 12 months of no activity.
                         </p>

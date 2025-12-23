@@ -606,6 +606,7 @@ class SynchronizedMediaPlayer:
                 duration=duration_float,  # Use converted float
                 source=str(self.metadata.audio_source),
                 album=self.metadata.album,
+                artwork_url=getattr(self.metadata, 'artwork_url', None),
                 completed=completed
             )
             

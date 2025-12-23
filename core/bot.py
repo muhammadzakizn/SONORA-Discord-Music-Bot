@@ -561,8 +561,33 @@ class MusicBot(commands.Bot):
         # Connect to database
         await self.db_manager.connect()
         
+        # Run annual history cleanup (deletes data older than 1 year)
+        await self._annual_history_cleanup()
+        
         # Load commands
         await self.load_commands()
+    
+    async def _annual_history_cleanup(self) -> None:
+        """
+        Check if annual history cleanup is needed (runs on January 1st).
+        Deletes play history older than 1 year to comply with privacy policy.
+        """
+        try:
+            from datetime import datetime
+            
+            # Only run intensive cleanup if it's January
+            today = datetime.now()
+            if today.month == 1:
+                logger.info("📅 January detected - checking for annual history cleanup...")
+                deleted = await self.db_manager.cleanup_old_history(years_to_keep=1)
+                if deleted > 0:
+                    logger.info(f"🧹 Annual cleanup: Deleted {deleted} old history entries")
+                else:
+                    logger.info("🧹 Annual cleanup: No old history to delete")
+            else:
+                logger.debug("Annual cleanup skipped - not January")
+        except Exception as e:
+            logger.warning(f"Annual history cleanup failed: {e}")
     
     async def _startup_cleanup(self) -> None:
         """

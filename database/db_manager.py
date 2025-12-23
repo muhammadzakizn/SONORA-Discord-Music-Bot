@@ -86,12 +86,21 @@ class DatabaseManager:
                 title TEXT NOT NULL,
                 artist TEXT NOT NULL,
                 album TEXT,
+                artwork_url TEXT,
                 duration REAL NOT NULL,
                 source TEXT NOT NULL,
                 played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 completed BOOLEAN DEFAULT 1
             )
         """)
+        
+        # Try to add artwork_url column if not exists (for existing databases)
+        try:
+            await self.db.execute("ALTER TABLE play_history ADD COLUMN artwork_url TEXT")
+            await self.db.commit()
+            logger.info("✓ Added artwork_url column to play_history")
+        except Exception:
+            pass  # Column already exists
         
         # User preferences table
         await self.db.execute("""
@@ -175,6 +184,7 @@ class DatabaseManager:
         duration: float,
         source: str,
         album: Optional[str] = None,
+        artwork_url: Optional[str] = None,
         completed: bool = True
     ) -> int:
         """
@@ -189,6 +199,7 @@ class DatabaseManager:
             duration: Track duration in seconds
             source: Audio source (Spotify, YouTube, etc)
             album: Album name (optional)
+            artwork_url: Album artwork URL (optional)
             completed: Whether track was played to completion
         
         Returns:
@@ -196,9 +207,9 @@ class DatabaseManager:
         """
         cursor = await self.db.execute("""
             INSERT INTO play_history 
-            (guild_id, user_id, username, title, artist, album, duration, source, completed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (guild_id, user_id, username, title, artist, album, duration, source, completed))
+            (guild_id, user_id, username, title, artist, album, artwork_url, duration, source, completed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (guild_id, user_id, username, title, artist, album, artwork_url, duration, source, completed))
         
         await self.db.commit()
         logger.debug(f"Added play history: {title} by {artist}")
@@ -605,6 +616,258 @@ class DatabaseManager:
             "peak_hours": peak_hours,
             "period_days": days
         }
+    
+    # ==================== TOP TRACKS ====================
+    
+    async def get_monthly_top_tracks(
+        self,
+        user_id: int,
+        year: int,
+        month: int,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Get user's top tracks for a specific month
+        
+        Args:
+            user_id: User ID
+            year: Year (e.g., 2024)
+            month: Month (1-12)
+            limit: Maximum tracks to return
+        
+        Returns:
+            List of top tracks with play counts and artwork
+        """
+        async with self.db.execute("""
+            SELECT 
+                title, 
+                artist, 
+                album,
+                artwork_url,
+                COUNT(*) as play_count,
+                SUM(duration) as total_duration
+            FROM play_history
+            WHERE user_id = ? 
+                AND strftime('%Y', played_at) = ?
+                AND strftime('%m', played_at) = ?
+            GROUP BY title, artist
+            ORDER BY play_count DESC, total_duration DESC
+            LIMIT ?
+        """, (user_id, str(year), str(month).zfill(2), limit)) as cursor:
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "rank": idx + 1,
+                    "title": row[0],
+                    "artist": row[1],
+                    "album": row[2],
+                    "artwork_url": row[3],
+                    "play_count": row[4],
+                    "total_duration": row[5] or 0
+                }
+                for idx, row in enumerate(rows)
+            ]
+    
+    async def get_yearly_top_tracks(
+        self,
+        user_id: int,
+        year: int,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Get user's top tracks for a specific year
+        
+        Args:
+            user_id: User ID
+            year: Year (e.g., 2024)
+            limit: Maximum tracks to return
+        
+        Returns:
+            List of top tracks with play counts
+        """
+        async with self.db.execute("""
+            SELECT 
+                title, 
+                artist, 
+                album,
+                artwork_url,
+                COUNT(*) as play_count,
+                SUM(duration) as total_duration
+            FROM play_history
+            WHERE user_id = ? 
+                AND strftime('%Y', played_at) = ?
+            GROUP BY title, artist
+            ORDER BY play_count DESC, total_duration DESC
+            LIMIT ?
+        """, (user_id, str(year), limit)) as cursor:
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "rank": idx + 1,
+                    "title": row[0],
+                    "artist": row[1],
+                    "album": row[2],
+                    "artwork_url": row[3],
+                    "play_count": row[4],
+                    "total_duration": row[5] or 0
+                }
+                for idx, row in enumerate(rows)
+            ]
+    
+    async def get_available_history_months(self, user_id: int) -> List[Dict[str, Any]]:
+        """
+        Get list of months with play history data for a user
+        
+        Args:
+            user_id: User ID
+        
+        Returns:
+            List of {year, month, track_count} dicts
+        """
+        async with self.db.execute("""
+            SELECT 
+                CAST(strftime('%Y', played_at) AS INTEGER) as year,
+                CAST(strftime('%m', played_at) AS INTEGER) as month,
+                COUNT(*) as track_count
+            FROM play_history
+            WHERE user_id = ?
+            GROUP BY year, month
+            ORDER BY year DESC, month DESC
+        """, (user_id,)) as cursor:
+            rows = await cursor.fetchall()
+            return [
+                {"year": row[0], "month": row[1], "track_count": row[2]}
+                for row in rows
+            ]
+    
+    async def get_history_summary(self, user_id: int) -> Dict[str, Any]:
+        """
+        Get summary of user's listening history
+        
+        Args:
+            user_id: User ID
+        
+        Returns:
+            Summary with total tracks, months, listening time
+        """
+        # Total tracks and duration
+        async with self.db.execute("""
+            SELECT COUNT(*), SUM(duration)
+            FROM play_history WHERE user_id = ?
+        """, (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            total_tracks = row[0] or 0
+            total_duration = row[1] or 0
+        
+        # Unique months
+        async with self.db.execute("""
+            SELECT COUNT(DISTINCT strftime('%Y-%m', played_at))
+            FROM play_history WHERE user_id = ?
+        """, (user_id,)) as cursor:
+            unique_months = (await cursor.fetchone())[0] or 0
+        
+        # First and last play dates
+        async with self.db.execute("""
+            SELECT MIN(played_at), MAX(played_at)
+            FROM play_history WHERE user_id = ?
+        """, (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            first_play = row[0]
+            last_play = row[1]
+        
+        return {
+            "total_tracks": total_tracks,
+            "total_duration": total_duration,
+            "unique_months": unique_months,
+            "first_play": first_play,
+            "last_play": last_play
+        }
+    
+    # ==================== HISTORY MANAGEMENT ====================
+    
+    async def delete_track_from_history(self, user_id: int, track_id: int) -> bool:
+        """
+        Delete a specific track from history
+        
+        Args:
+            user_id: User ID
+            track_id: Track entry ID
+        
+        Returns:
+            True if deleted, False if not found
+        """
+        cursor = await self.db.execute("""
+            DELETE FROM play_history 
+            WHERE id = ? AND user_id = ?
+        """, (track_id, user_id))
+        await self.db.commit()
+        deleted = cursor.rowcount > 0
+        if deleted:
+            logger.info(f"Deleted track {track_id} from user {user_id} history")
+        return deleted
+    
+    async def delete_monthly_history(self, user_id: int, year: int, month: int) -> int:
+        """
+        Delete all history for a specific month
+        
+        Args:
+            user_id: User ID
+            year: Year
+            month: Month (1-12)
+        
+        Returns:
+            Number of deleted entries
+        """
+        cursor = await self.db.execute("""
+            DELETE FROM play_history 
+            WHERE user_id = ?
+                AND strftime('%Y', played_at) = ?
+                AND strftime('%m', played_at) = ?
+        """, (user_id, str(year), str(month).zfill(2)))
+        await self.db.commit()
+        logger.info(f"Deleted {cursor.rowcount} tracks from {year}-{month:02d} for user {user_id}")
+        return cursor.rowcount
+    
+    async def delete_yearly_history(self, user_id: int, year: int) -> int:
+        """
+        Delete all history for a specific year
+        
+        Args:
+            user_id: User ID
+            year: Year
+        
+        Returns:
+            Number of deleted entries
+        """
+        cursor = await self.db.execute("""
+            DELETE FROM play_history 
+            WHERE user_id = ?
+                AND strftime('%Y', played_at) = ?
+        """, (user_id, str(year)))
+        await self.db.commit()
+        logger.info(f"Deleted {cursor.rowcount} tracks from {year} for user {user_id}")
+        return cursor.rowcount
+    
+    async def cleanup_old_history(self, years_to_keep: int = 1) -> int:
+        """
+        Auto-cleanup history older than specified years
+        Called on bot startup if Jan 1st passed
+        
+        Args:
+            years_to_keep: Number of years to keep (default 1)
+        
+        Returns:
+            Number of deleted entries
+        """
+        cursor = await self.db.execute("""
+            DELETE FROM play_history 
+            WHERE played_at < datetime('now', '-' || ? || ' years')
+        """, (years_to_keep,))
+        await self.db.commit()
+        deleted = cursor.rowcount
+        if deleted > 0:
+            logger.info(f"Cleaned up {deleted} old history entries (older than {years_to_keep} year(s))")
+        return deleted
 
 
 # Singleton instance
@@ -617,3 +880,4 @@ def get_db_manager() -> DatabaseManager:
     if _db_manager is None:
         _db_manager = DatabaseManager()
     return _db_manager
+

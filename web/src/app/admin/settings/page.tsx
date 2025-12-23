@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,10 +15,323 @@ import {
   Shield,
   Check,
   ExternalLink,
+  Music2,
+  Trash2,
+  Clock,
+  Calendar,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession, getServerIconUrl } from "@/contexts/SessionContext";
 import { useSettings } from "@/contexts/SettingsContext";
+
+// Types for history summary
+interface HistorySummary {
+  total_tracks: number;
+  total_duration: number;
+  unique_months: number;
+  first_play: string | null;
+  last_play: string | null;
+}
+
+interface HistoryMonth {
+  year: number;
+  month: number;
+  track_count: number;
+}
+
+// Format duration
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+// Listening History Section Component
+function ListeningHistorySection({
+  isDark,
+  userId
+}: {
+  isDark: boolean;
+  userId?: string;
+}) {
+  const [summary, setSummary] = useState<HistorySummary | null>(null);
+  const [months, setMonths] = useState<HistoryMonth[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{
+    type: 'month' | 'year' | 'all';
+    year?: number;
+    month?: number;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Fetch summary and months
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchData = async () => {
+      try {
+        const [summaryRes, monthsRes] = await Promise.all([
+          fetch(`/api/bot/history/summary?user_id=${userId}`),
+          fetch(`/api/bot/history/months?user_id=${userId}`)
+        ]);
+
+        if (summaryRes.ok) {
+          setSummary(await summaryRes.json());
+        }
+        if (monthsRes.ok) {
+          const data = await monthsRes.json();
+          setMonths(data.months || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch history data:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [userId]);
+
+  // Delete handler
+  const handleDelete = async () => {
+    if (!showDeleteConfirm || !userId) return;
+
+    setIsDeleting(true);
+    try {
+      let url = '';
+      if (showDeleteConfirm.type === 'month') {
+        url = `/api/bot/history/delete-month?user_id=${userId}&year=${showDeleteConfirm.year}&month=${showDeleteConfirm.month}`;
+      } else if (showDeleteConfirm.type === 'year') {
+        url = `/api/bot/history/delete-year?user_id=${userId}&year=${showDeleteConfirm.year}`;
+      }
+
+      const res = await fetch(url, { method: 'DELETE' });
+
+      if (res.ok) {
+        // Refresh data
+        const [summaryRes, monthsRes] = await Promise.all([
+          fetch(`/api/bot/history/summary?user_id=${userId}`),
+          fetch(`/api/bot/history/months?user_id=${userId}`)
+        ]);
+        if (summaryRes.ok) setSummary(await summaryRes.json());
+        if (monthsRes.ok) {
+          const data = await monthsRes.json();
+          setMonths(data.months || []);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete:", err);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(null);
+    }
+  };
+
+  // Get unique years
+  const years = [...new Set(months.map(m => m.year))].sort((a, b) => b - a);
+
+  const MONTH_NAMES = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  ];
+
+  if (!userId) return null;
+
+  return (
+    <div className={cn(
+      "p-6 rounded-2xl border",
+      isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
+    )}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className={cn(
+          "p-3 rounded-xl",
+          isDark ? "bg-zinc-800" : "bg-gray-100"
+        )}>
+          <Music2 className="w-5 h-5 text-[#C4314B]" />
+        </div>
+        <div>
+          <h3 className={cn("font-semibold text-lg", isDark ? "text-white" : "text-gray-900")}>
+            Listening History
+          </h3>
+          <p className={cn("text-sm", isDark ? "text-zinc-500" : "text-gray-500")}>
+            Manage your playback history data
+          </p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className={cn(
+          "py-8 text-center",
+          isDark ? "text-zinc-500" : "text-gray-400"
+        )}>
+          Loading...
+        </div>
+      ) : !summary || summary.total_tracks === 0 ? (
+        <div className={cn(
+          "py-8 text-center",
+          isDark ? "text-zinc-500" : "text-gray-400"
+        )}>
+          <Music2 className="w-10 h-10 mx-auto mb-2 opacity-50" />
+          <p>No listening history yet</p>
+          <p className="text-sm mt-1">Play some music to see your stats!</p>
+        </div>
+      ) : (
+        <>
+          {/* Summary Stats */}
+          <div className={cn(
+            "grid grid-cols-3 gap-4 p-4 rounded-xl mb-4",
+            isDark ? "bg-zinc-800" : "bg-gray-100"
+          )}>
+            <div className="text-center">
+              <p className={cn("text-2xl font-bold", isDark ? "text-white" : "text-gray-900")}>
+                {summary.total_tracks}
+              </p>
+              <p className={cn("text-xs", isDark ? "text-zinc-400" : "text-gray-500")}>
+                Tracks
+              </p>
+            </div>
+            <div className="text-center">
+              <p className={cn("text-2xl font-bold", isDark ? "text-white" : "text-gray-900")}>
+                {formatDuration(summary.total_duration)}
+              </p>
+              <p className={cn("text-xs", isDark ? "text-zinc-400" : "text-gray-500")}>
+                Time
+              </p>
+            </div>
+            <div className="text-center">
+              <p className={cn("text-2xl font-bold", isDark ? "text-white" : "text-gray-900")}>
+                {summary.unique_months}
+              </p>
+              <p className={cn("text-xs", isDark ? "text-zinc-400" : "text-gray-500")}>
+                Months
+              </p>
+            </div>
+          </div>
+
+          {/* Delete by Month/Year */}
+          {years.length > 0 && (
+            <div className="space-y-3">
+              <p className={cn("text-sm font-medium", isDark ? "text-zinc-400" : "text-gray-600")}>
+                Delete History:
+              </p>
+
+              {years.slice(0, 2).map(year => {
+                const yearMonths = months.filter(m => m.year === year);
+                return (
+                  <div key={year} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className={cn(
+                        "text-sm font-medium",
+                        isDark ? "text-white" : "text-gray-900"
+                      )}>
+                        {year}
+                      </span>
+                      <button
+                        onClick={() => setShowDeleteConfirm({ type: 'year', year })}
+                        className={cn(
+                          "text-xs px-2 py-1 rounded-lg flex items-center gap-1",
+                          isDark
+                            ? "bg-rose-500/20 text-rose-400 hover:bg-rose-500/30"
+                            : "bg-rose-100 text-rose-600 hover:bg-rose-200"
+                        )}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Delete Year
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {yearMonths.map(m => (
+                        <button
+                          key={`${m.year}-${m.month}`}
+                          onClick={() => setShowDeleteConfirm({
+                            type: 'month',
+                            year: m.year,
+                            month: m.month
+                          })}
+                          className={cn(
+                            "px-2 py-1 rounded text-xs flex items-center gap-1",
+                            isDark
+                              ? "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          )}
+                        >
+                          {MONTH_NAMES[m.month - 1]}
+                          <span className="opacity-50">({m.track_count})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Auto-cleanup notice */}
+          <div className={cn(
+            "mt-4 p-3 rounded-lg flex items-start gap-2",
+            isDark ? "bg-amber-500/10" : "bg-amber-50"
+          )}>
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className={cn("text-xs", isDark ? "text-amber-400" : "text-amber-700")}>
+              History older than 1 year is automatically deleted on January 1st.
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={cn(
+              "p-6 rounded-2xl max-w-sm w-full mx-4",
+              isDark ? "bg-zinc-900" : "bg-white"
+            )}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-rose-500/20">
+                <Trash2 className="w-5 h-5 text-rose-500" />
+              </div>
+              <h4 className={cn("font-semibold", isDark ? "text-white" : "text-gray-900")}>
+                Confirm Delete
+              </h4>
+            </div>
+            <p className={cn("text-sm mb-4", isDark ? "text-zinc-400" : "text-gray-600")}>
+              {showDeleteConfirm.type === 'month'
+                ? `Delete all history from ${MONTH_NAMES[(showDeleteConfirm.month || 1) - 1]} ${showDeleteConfirm.year}?`
+                : `Delete all history from ${showDeleteConfirm.year}?`}
+              <br />
+              <strong>This action cannot be undone.</strong>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                disabled={isDeleting}
+                className={cn(
+                  "flex-1 py-2 rounded-lg",
+                  isDark ? "bg-zinc-800 text-white" : "bg-gray-100 text-gray-900"
+                )}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 py-2 rounded-lg bg-rose-500 text-white hover:bg-rose-600"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Toggle({
   enabled,
@@ -190,6 +503,9 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+
+          {/* Listening History */}
+          <ListeningHistorySection isDark={isDark} userId={user?.id} />
 
           {/* Info */}
           <div className="p-4 rounded-xl bg-[#7B1E3C]/10 border border-[#7B1E3C]/30">
