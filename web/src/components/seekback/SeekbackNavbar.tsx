@@ -113,7 +113,7 @@ export function SeekbackNavbar({
                     {/* Year */}
                     <button
                         onClick={() => onYearChange(selectedYear)}
-                        className="text-amber-400 font-bold text-base shrink-0"
+                        className="text-[#7B1E3C] font-bold text-base shrink-0"
                     >
                         {selectedYear}
                     </button>
