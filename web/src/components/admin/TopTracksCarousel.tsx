@@ -98,14 +98,32 @@ function TrackCard({
 }) {
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
-    const [artworkUrl, setArtworkUrl] = useState<string | null>(track.artwork_url || null);
     const [isFetching, setIsFetching] = useState(false);
     const [hasFetched, setHasFetched] = useState(false);
 
+    // Generate cache key for localStorage
+    const cacheKey = `artwork_${track.title}_${track.artist}`.replace(/[^a-zA-Z0-9]/g, '_');
+
+    // Check localStorage cache first, then use track.artwork_url, or fetch
+    const [artworkUrl, setArtworkUrl] = useState<string | null>(() => {
+        if (track.artwork_url) return track.artwork_url;
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const { url, timestamp } = JSON.parse(cached);
+                // Cache valid for 7 days
+                if (Date.now() - timestamp < 7 * 24 * 60 * 60 * 1000) {
+                    return url;
+                }
+            }
+        }
+        return null;
+    });
+
     // Fetch artwork dynamically if not available (with 30s timeout)
     useEffect(() => {
-        // Only fetch once if no artwork_url
-        if (!track.artwork_url && !hasFetched) {
+        // Only fetch once if no artwork_url and not in cache
+        if (!artworkUrl && !hasFetched && !imageError) {
             setHasFetched(true);
             setIsFetching(true);
 
@@ -124,6 +142,15 @@ function TrackCard({
                     clearTimeout(timeoutId);
                     if (data.found && data.artwork_url) {
                         setArtworkUrl(data.artwork_url);
+                        // Save to localStorage cache
+                        try {
+                            localStorage.setItem(cacheKey, JSON.stringify({
+                                url: data.artwork_url,
+                                timestamp: Date.now()
+                            }));
+                        } catch (e) {
+                            // localStorage might be full
+                        }
                     } else {
                         setImageError(true);
                     }
@@ -135,7 +162,7 @@ function TrackCard({
                     setIsFetching(false);
                 });
         }
-    }, [track.title, track.artist, track.artwork_url, hasFetched]);
+    }, [track.title, track.artist, artworkUrl, hasFetched, imageError, cacheKey]);
 
     return (
         <motion.div
@@ -314,7 +341,7 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
     return (
         <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 mb-4">
                 <div
                     className="flex items-center gap-2 cursor-pointer group"
                     onClick={() => setShowMonthSelector(!showMonthSelector)}
@@ -333,34 +360,6 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
                     </span>
                     <Calendar className="w-4 h-4 text-[#C4314B] opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-
-                {/* Scroll buttons */}
-                {topTracks && topTracks.tracks.length > 3 && (
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => scroll('left')}
-                            className={cn(
-                                "p-2 rounded-lg transition-colors",
-                                isDark
-                                    ? "bg-zinc-800 hover:bg-zinc-700 text-white"
-                                    : "bg-gray-100 hover:bg-gray-200 text-gray-900"
-                            )}
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => scroll('right')}
-                            className={cn(
-                                "p-2 rounded-lg transition-colors",
-                                isDark
-                                    ? "bg-zinc-800 hover:bg-zinc-700 text-white"
-                                    : "bg-gray-100 hover:bg-gray-200 text-gray-900"
-                            )}
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* Month/Year Selector */}
@@ -481,18 +480,51 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
                     <p className="text-sm">Use SONORA to play music and your stats will appear here!</p>
                 </div>
             ) : (
-                <div
-                    ref={scrollRef}
-                    className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                >
-                    {topTracks.tracks.map(track => (
-                        <TrackCard
-                            key={`${track.rank}-${track.title}`}
-                            track={track}
-                            isDark={isDark}
-                        />
-                    ))}
+                <div className="relative group/carousel">
+                    {/* Left scroll button */}
+                    <button
+                        onClick={() => scroll('left')}
+                        className={cn(
+                            "absolute left-0 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full shadow-lg",
+                            "opacity-0 group-hover/carousel:opacity-100 transition-opacity",
+                            "hover:scale-110 transition-transform",
+                            isDark
+                                ? "bg-zinc-800/90 hover:bg-zinc-700 text-white"
+                                : "bg-white/90 hover:bg-gray-100 text-gray-900"
+                        )}
+                    >
+                        <ChevronLeft className="w-5 h-5" />
+                    </button>
+
+                    {/* Carousel */}
+                    <div
+                        ref={scrollRef}
+                        className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide px-1"
+                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
+                        {topTracks.tracks.map(track => (
+                            <TrackCard
+                                key={`${track.rank}-${track.title}`}
+                                track={track}
+                                isDark={isDark}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Right scroll button */}
+                    <button
+                        onClick={() => scroll('right')}
+                        className={cn(
+                            "absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full shadow-lg",
+                            "opacity-0 group-hover/carousel:opacity-100 transition-opacity",
+                            "hover:scale-110 transition-transform",
+                            isDark
+                                ? "bg-zinc-800/90 hover:bg-zinc-700 text-white"
+                                : "bg-white/90 hover:bg-gray-100 text-gray-900"
+                        )}
+                    >
+                        <ChevronRight className="w-5 h-5" />
+                    </button>
                 </div>
             )}
         </div>
