@@ -331,7 +331,7 @@ export function TimeAmbientBackground({ className }: TimeAmbientBackgroundProps)
     if (!mounted) return null;
 
     return (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className || ''}`}>
+        <div className={`fixed inset-0 overflow-hidden pointer-events-none ${className || ''}`}>
             {timePeriod === "morning" && <MorningAmbient />}
             {timePeriod === "afternoon" && <AfternoonAmbient />}
             {timePeriod === "evening" && <EveningAmbient />}
