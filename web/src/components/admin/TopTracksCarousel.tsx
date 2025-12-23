@@ -101,11 +101,17 @@ function TrackCard({
     const [artworkUrl, setArtworkUrl] = useState<string | null>(track.artwork_url || null);
     const [isFetching, setIsFetching] = useState(false);
 
-    // Fetch artwork dynamically if not available
+    // Fetch artwork dynamically if not available (with 30s timeout)
     useEffect(() => {
         if (!artworkUrl && !isFetching && !imageError) {
             setIsFetching(true);
-            fetch(`/api/bot/artwork/search?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`)
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+            fetch(`/api/bot/artwork/search?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`, {
+                signal: controller.signal
+            })
                 .then(res => res.json())
                 .then(data => {
                     if (data.found && data.artwork_url) {
@@ -115,7 +121,15 @@ function TrackCard({
                     }
                 })
                 .catch(() => setImageError(true))
-                .finally(() => setIsFetching(false));
+                .finally(() => {
+                    clearTimeout(timeoutId);
+                    setIsFetching(false);
+                });
+
+            return () => {
+                clearTimeout(timeoutId);
+                controller.abort();
+            };
         }
     }, [track.title, track.artist, artworkUrl, isFetching, imageError]);
 
