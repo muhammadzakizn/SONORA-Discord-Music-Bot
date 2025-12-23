@@ -883,6 +883,186 @@ class DatabaseManager:
         await self.db.commit()
         return cursor.rowcount
 
+    # ==================== SEEKBACK (RECAP) METHODS ====================
+    
+    async def get_top_artists(self, user_id: int, year: int, month: Optional[int] = None, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get top artists by total listening duration
+        
+        Args:
+            user_id: User ID
+            year: Year to filter
+            month: Optional month (1-12), if None returns yearly data
+            limit: Max number of artists to return
+            
+        Returns:
+            List of artists with play count and duration
+        """
+        if month:
+            query = """
+                SELECT artist, 
+                       COUNT(*) as play_count,
+                       SUM(duration) as total_duration,
+                       MAX(artwork_url) as sample_artwork
+                FROM play_history 
+                WHERE user_id = ?
+                    AND strftime('%Y', played_at) = ?
+                    AND strftime('%m', played_at) = ?
+                    AND completed = 1
+                GROUP BY artist
+                ORDER BY total_duration DESC
+                LIMIT ?
+            """
+            params = (user_id, str(year), str(month).zfill(2), limit)
+        else:
+            query = """
+                SELECT artist, 
+                       COUNT(*) as play_count,
+                       SUM(duration) as total_duration,
+                       MAX(artwork_url) as sample_artwork
+                FROM play_history 
+                WHERE user_id = ?
+                    AND strftime('%Y', played_at) = ?
+                    AND completed = 1
+                GROUP BY artist
+                ORDER BY total_duration DESC
+                LIMIT ?
+            """
+            params = (user_id, str(year), limit)
+        
+        async with self.db.execute(query, params) as cursor:
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "rank": idx + 1,
+                    "artist": row[0],
+                    "play_count": row[1],
+                    "total_duration": row[2] or 0,
+                    "sample_artwork": row[3]
+                }
+                for idx, row in enumerate(rows)
+            ]
+    
+    async def get_top_albums(self, user_id: int, year: int, month: Optional[int] = None, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get top albums by play count
+        
+        Args:
+            user_id: User ID
+            year: Year to filter
+            month: Optional month (1-12)
+            limit: Max albums to return
+            
+        Returns:
+            List of albums with artist, play count and duration
+        """
+        if month:
+            query = """
+                SELECT album, artist,
+                       COUNT(*) as play_count,
+                       SUM(duration) as total_duration,
+                       MAX(artwork_url) as artwork_url
+                FROM play_history 
+                WHERE user_id = ?
+                    AND strftime('%Y', played_at) = ?
+                    AND strftime('%m', played_at) = ?
+                    AND completed = 1
+                    AND album IS NOT NULL AND album != ''
+                GROUP BY album, artist
+                ORDER BY play_count DESC
+                LIMIT ?
+            """
+            params = (user_id, str(year), str(month).zfill(2), limit)
+        else:
+            query = """
+                SELECT album, artist,
+                       COUNT(*) as play_count,
+                       SUM(duration) as total_duration,
+                       MAX(artwork_url) as artwork_url
+                FROM play_history 
+                WHERE user_id = ?
+                    AND strftime('%Y', played_at) = ?
+                    AND completed = 1
+                    AND album IS NOT NULL AND album != ''
+                GROUP BY album, artist
+                ORDER BY play_count DESC
+                LIMIT ?
+            """
+            params = (user_id, str(year), limit)
+        
+        async with self.db.execute(query, params) as cursor:
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "rank": idx + 1,
+                    "album": row[0],
+                    "artist": row[1],
+                    "play_count": row[2],
+                    "total_duration": row[3] or 0,
+                    "artwork_url": row[4]
+                }
+                for idx, row in enumerate(rows)
+            ]
+    
+    async def get_seekback_stats(self, user_id: int, year: int, month: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Get comprehensive Seekback stats for a user
+        
+        Args:
+            user_id: User ID
+            year: Year
+            month: Optional month (1-12)
+            
+        Returns:
+            Dict with total_duration, total_plays, unique_artists, unique_albums, unique_songs
+        """
+        if month:
+            query = """
+                SELECT 
+                    COUNT(*) as total_plays,
+                    COALESCE(SUM(duration), 0) as total_duration,
+                    COUNT(DISTINCT artist) as unique_artists,
+                    COUNT(DISTINCT album) as unique_albums,
+                    COUNT(DISTINCT title) as unique_songs
+                FROM play_history 
+                WHERE user_id = ?
+                    AND strftime('%Y', played_at) = ?
+                    AND strftime('%m', played_at) = ?
+                    AND completed = 1
+            """
+            params = (user_id, str(year), str(month).zfill(2))
+        else:
+            query = """
+                SELECT 
+                    COUNT(*) as total_plays,
+                    COALESCE(SUM(duration), 0) as total_duration,
+                    COUNT(DISTINCT artist) as unique_artists,
+                    COUNT(DISTINCT album) as unique_albums,
+                    COUNT(DISTINCT title) as unique_songs
+                FROM play_history 
+                WHERE user_id = ?
+                    AND strftime('%Y', played_at) = ?
+                    AND completed = 1
+            """
+            params = (user_id, str(year))
+        
+        async with self.db.execute(query, params) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return {
+                    "total_plays": row[0],
+                    "total_duration": row[1],
+                    "unique_artists": row[2],
+                    "unique_albums": row[3],
+                    "unique_songs": row[4],
+                    "year": year,
+                    "month": month
+                }
+            return {
+                "total_plays": 0, "total_duration": 0, "unique_artists": 0,
+                "unique_albums": 0, "unique_songs": 0, "year": year, "month": month
+            }
+
     async def cleanup_old_history(self, years_to_keep: int = 1) -> int:
         """
         Auto-cleanup history older than specified years

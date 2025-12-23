@@ -1009,6 +1009,88 @@ def api_history_summary():
         return jsonify({"error": str(e)}), 500
 
 
+# ==================== SEEKBACK (RECAP) ENDPOINTS ====================
+
+@app.route('/api/seekback/stats')
+def api_seekback_stats():
+    """Get comprehensive Seekback stats for a user"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)  # Optional
+        
+        if not user_id or not year:
+            return jsonify({"error": "user_id and year are required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        stats = loop.run_until_complete(
+            db.get_seekback_stats(user_id, year, month)
+        )
+        loop.close()
+        
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Failed to get seekback stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/seekback/top-artists')
+def api_seekback_top_artists():
+    """Get top artists for Seekback"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)  # Optional
+        limit = request.args.get('limit', 10, type=int)
+        
+        if not user_id or not year:
+            return jsonify({"error": "user_id and year are required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        artists = loop.run_until_complete(
+            db.get_top_artists(user_id, year, month, limit)
+        )
+        loop.close()
+        
+        return jsonify({"artists": artists, "year": year, "month": month})
+    except Exception as e:
+        logger.error(f"Failed to get top artists: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/seekback/top-albums')
+def api_seekback_top_albums():
+    """Get top albums for Seekback"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)  # Optional
+        limit = request.args.get('limit', 10, type=int)
+        
+        if not user_id or not year:
+            return jsonify({"error": "user_id and year are required"}), 400
+        
+        db = get_db_manager()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        albums = loop.run_until_complete(
+            db.get_top_albums(user_id, year, month, limit)
+        )
+        loop.close()
+        
+        return jsonify({"albums": albums, "year": year, "month": month})
+    except Exception as e:
+        logger.error(f"Failed to get top albums: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/history/delete', methods=['DELETE'])
 def api_history_delete_track():
     """Delete a specific track from history"""

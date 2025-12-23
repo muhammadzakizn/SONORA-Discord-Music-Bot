@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import {
@@ -271,6 +272,7 @@ function TrackCard({
 
 export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
     const { isDark } = useSettings();
+    const router = useRouter();
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const [isLoading, setIsLoading] = useState(true);
@@ -355,7 +357,7 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
             <div className="flex items-center gap-2 mb-4">
                 <div
                     className="flex items-center gap-2 cursor-pointer group"
-                    onClick={() => setShowMonthSelector(!showMonthSelector)}
+                    onClick={() => router.push(`/admin/seekback?year=${selectedYear}&month=${selectedMonth}`)}
                 >
                     <h3 className={cn(
                         "font-semibold",
@@ -369,7 +371,7 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
                     )}>
                         · {topTracks?.month_name || MONTHS[selectedMonth - 1]} {selectedYear}
                     </span>
-                    <Calendar className="w-4 h-4 text-[#C4314B] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ChevronRight className="w-4 h-4 text-[#C4314B] opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
             </div>
 
