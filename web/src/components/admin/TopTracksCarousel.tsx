@@ -211,18 +211,20 @@ function TrackCard({
                     </div>
                 )}
 
-                {/* Rank Badge */}
-                <div className={cn(
-                    "absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center",
-                    "font-bold text-sm shadow-lg",
-                    track.rank === 1
-                        ? "bg-gradient-to-br from-yellow-400 to-amber-500 text-black"
-                        : track.rank === 2
-                            ? "bg-gradient-to-br from-gray-300 to-gray-400 text-black"
-                            : track.rank === 3
-                                ? "bg-gradient-to-br from-amber-600 to-amber-700 text-white"
-                                : "bg-black/60 backdrop-blur-sm text-white"
-                )}>
+                {/* Rank Number - Spotify style */}
+                <div
+                    className={cn(
+                        "absolute top-2 left-2 text-3xl sm:text-4xl font-black drop-shadow-lg",
+                        track.rank === 1
+                            ? "bg-gradient-to-b from-yellow-300 via-amber-400 to-amber-600 bg-clip-text text-transparent"
+                            : track.rank === 2
+                                ? "bg-gradient-to-b from-gray-200 via-gray-300 to-gray-500 bg-clip-text text-transparent"
+                                : track.rank === 3
+                                    ? "bg-gradient-to-b from-amber-500 via-amber-600 to-amber-800 bg-clip-text text-transparent"
+                                    : "bg-gradient-to-b from-white via-gray-300 to-gray-500 bg-clip-text text-transparent"
+                    )}
+                    style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
+                >
                     {track.rank}
                 </div>
 
