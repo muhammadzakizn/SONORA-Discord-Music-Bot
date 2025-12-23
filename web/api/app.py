@@ -1139,6 +1139,82 @@ def api_artwork_search():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/artwork/backfill', methods=['POST'])
+def api_artwork_backfill():
+    """Backfill artwork for tracks that don't have artwork_url"""
+    try:
+        limit = request.args.get('limit', 20, type=int)
+        
+        db = get_db_manager()
+        
+        # Get tracks without artwork
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        tracks = loop.run_until_complete(db.get_tracks_without_artwork(limit))
+        loop.close()
+        
+        if not tracks:
+            return jsonify({
+                "status": "complete",
+                "message": "All tracks already have artwork",
+                "updated": 0,
+                "remaining": 0
+            })
+        
+        # Use ArtworkFetcher to get artwork for each track
+        from services.metadata.artwork import ArtworkFetcher
+        from database.models import TrackInfo
+        
+        fetcher = ArtworkFetcher()
+        updated_count = 0
+        
+        for track in tracks:
+            try:
+                track_info = TrackInfo(
+                    title=track['title'],
+                    artist=track['artist'],
+                    album=None,
+                    url=None,
+                    track_id=None
+                )
+                
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(fetcher.fetch(track_info))
+                loop.close()
+                
+                if result:
+                    artwork_url, _ = result
+                    # Update all tracks with same title/artist
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    count = loop.run_until_complete(
+                        db.update_track_artwork(track['title'], track['artist'], artwork_url)
+                    )
+                    loop.close()
+                    updated_count += count
+                    
+            except Exception as e:
+                logger.warning(f"Failed to fetch artwork for {track['title']}: {e}")
+                continue
+        
+        # Check remaining
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        remaining = loop.run_until_complete(db.get_tracks_without_artwork(1))
+        loop.close()
+        
+        return jsonify({
+            "status": "success",
+            "updated": updated_count,
+            "remaining": len(remaining)
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to backfill artwork: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/control/<int:guild_id>/<action>', methods=['POST'])
 def api_control(guild_id: int, action: str):
     """Control playback with Discord notification - requires user to be in voice channel"""

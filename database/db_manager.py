@@ -848,6 +848,41 @@ class DatabaseManager:
         logger.info(f"Deleted {cursor.rowcount} tracks from {year} for user {user_id}")
         return cursor.rowcount
     
+    async def get_tracks_without_artwork(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Get tracks that don't have artwork_url
+        Used for backfilling artwork
+        
+        Returns:
+            List of tracks with id, title, artist
+        """
+        async with self.db.execute("""
+            SELECT DISTINCT id, title, artist 
+            FROM play_history 
+            WHERE artwork_url IS NULL OR artwork_url = ''
+            LIMIT ?
+        """, (limit,)) as cursor:
+            rows = await cursor.fetchall()
+            return [
+                {"id": row[0], "title": row[1], "artist": row[2]}
+                for row in rows
+            ]
+    
+    async def update_track_artwork(self, title: str, artist: str, artwork_url: str) -> int:
+        """
+        Update artwork_url for all tracks matching title and artist
+        
+        Returns:
+            Number of updated rows
+        """
+        cursor = await self.db.execute("""
+            UPDATE play_history 
+            SET artwork_url = ?
+            WHERE title = ? AND artist = ? AND (artwork_url IS NULL OR artwork_url = '')
+        """, (artwork_url, title, artist))
+        await self.db.commit()
+        return cursor.rowcount
+
     async def cleanup_old_history(self, years_to_keep: int = 1) -> int:
         """
         Auto-cleanup history older than specified years
