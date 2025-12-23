@@ -85,15 +85,15 @@ export function SeekbackNavbar({
                 {/* Top Row - Logos */}
                 <div className="flex items-center justify-between px-6 pt-4 pb-2">
                     {/* Left - Seekback Logo + Year */}
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex items-center gap-1">
                         <Image
                             src="/seekback-logo.png"
                             alt="Seekback"
-                            width={74}
-                            height={74}
-                            className="-mr-1"
+                            width={148}
+                            height={148}
+                            className="-mr-2"
                         />
-                        <span className="text-white font-medium text-lg tracking-tight">
+                        <span className="text-white font-medium text-2xl tracking-tight">
                             {yearShort}
                         </span>
                     </div>
@@ -102,9 +102,9 @@ export function SeekbackNavbar({
                     <Image
                         src="/sonora-logo.png"
                         alt="SONORA"
-                        width={126}
-                        height={40}
-                        className="h-7 w-auto brightness-0 invert opacity-80"
+                        width={252}
+                        height={80}
+                        className="h-14 w-auto brightness-0 invert opacity-80"
                     />
                 </div>
 
