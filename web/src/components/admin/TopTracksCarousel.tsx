@@ -171,8 +171,7 @@ function TrackCard({
             animate={{ opacity: 1, scale: 1 }}
             className={cn(
                 "relative flex-shrink-0 rounded-xl overflow-hidden cursor-pointer group",
-                "w-28 sm:w-36 md:w-44",
-                "transition-transform duration-200 hover:scale-105"
+                "w-28 sm:w-36 md:w-44"
             )}
             onClick={onClick}
         >
