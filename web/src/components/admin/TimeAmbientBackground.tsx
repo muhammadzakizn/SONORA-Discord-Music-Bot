@@ -100,45 +100,88 @@ function AfternoonAmbient() {
     );
 }
 
-// Evening Ambient - Sunset colors with birds
+// Evening Ambient - Full-page sunset gradient with clouds
 function EveningAmbient() {
     return (
         <>
-            {/* Sunset gradient - smaller and more subtle */}
-            <div className="absolute top-0 right-0 w-[400px] h-[250px] bg-gradient-to-bl from-orange-500/15 via-rose-400/10 to-transparent rounded-bl-full" />
+            {/* Full-page sunset gradient background */}
+            <div
+                className="absolute inset-0"
+                style={{
+                    background: `
+                        radial-gradient(ellipse 120% 80% at 80% 20%, rgba(251, 146, 60, 0.25) 0%, transparent 50%),
+                        radial-gradient(ellipse 100% 60% at 60% 10%, rgba(239, 68, 68, 0.2) 0%, transparent 40%),
+                        radial-gradient(ellipse 80% 50% at 90% 30%, rgba(234, 179, 8, 0.15) 0%, transparent 35%),
+                        linear-gradient(180deg, 
+                            rgba(234, 88, 12, 0.12) 0%, 
+                            rgba(220, 38, 38, 0.08) 20%,
+                            rgba(0, 0, 0, 0) 50%
+                        )
+                    `
+                }}
+            />
 
-            {/* Setting sun glow - positioned inside viewport */}
+            {/* Large sun glow in top-right */}
             <motion.div
-                animate={{ y: [0, 3, 0], opacity: [0.6, 0.8, 0.6] }}
+                animate={{
+                    scale: [1, 1.05, 1],
+                    opacity: [0.6, 0.8, 0.6]
+                }}
                 transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-16 right-16 w-36 h-36 rounded-full bg-gradient-to-br from-orange-400/25 via-rose-500/20 to-purple-500/15 blur-3xl"
+                className="absolute -top-20 -right-20 w-[500px] h-[500px] rounded-full"
+                style={{
+                    background: 'radial-gradient(circle, rgba(251, 146, 60, 0.4) 0%, rgba(239, 68, 68, 0.2) 40%, transparent 70%)'
+                }}
             />
 
-            {/* Secondary glow for depth */}
+            {/* Secondary warm glow */}
             <motion.div
-                animate={{ scale: [1, 1.05, 1] }}
+                animate={{ scale: [1, 1.08, 1] }}
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-8 right-8 w-24 h-24 rounded-full bg-orange-400/20 blur-2xl"
+                className="absolute top-10 right-40 w-64 h-64 rounded-full"
+                style={{
+                    background: 'radial-gradient(circle, rgba(234, 179, 8, 0.25) 0%, transparent 70%)'
+                }}
             />
 
-            {/* Pink/orange clouds */}
+            {/* Scattered wispy clouds across page */}
             <motion.div
-                animate={{ x: [0, 15, 0] }}
-                transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-8 right-[20%] w-32 h-8 bg-gradient-to-r from-orange-300/15 to-rose-300/10 rounded-full blur-xl"
+                animate={{ x: [0, 30, 0] }}
+                transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-[5%] left-[10%] w-[300px] h-16 bg-gradient-to-r from-orange-300/10 via-white/8 to-transparent rounded-full blur-2xl"
             />
             <motion.div
-                animate={{ x: [0, -12, 0] }}
-                transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-20 right-[35%] w-24 h-6 bg-gradient-to-r from-rose-300/10 to-purple-300/8 rounded-full blur-xl"
+                animate={{ x: [0, -20, 0] }}
+                transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-[8%] right-[30%] w-[250px] h-12 bg-gradient-to-r from-rose-300/8 via-white/6 to-transparent rounded-full blur-2xl"
+            />
+            <motion.div
+                animate={{ x: [0, 25, 0] }}
+                transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-[15%] left-[25%] w-[200px] h-10 bg-gradient-to-r from-amber-200/8 via-white/5 to-transparent rounded-full blur-xl"
+            />
+            <motion.div
+                animate={{ x: [0, -15, 0] }}
+                transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-[12%] right-[15%] w-[180px] h-8 bg-gradient-to-r from-orange-200/10 to-transparent rounded-full blur-xl"
+            />
+            <motion.div
+                animate={{ x: [0, 20, 0] }}
+                transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-[20%] left-[50%] w-[220px] h-10 bg-white/5 rounded-full blur-2xl"
+            />
+            <motion.div
+                animate={{ x: [0, -25, 0] }}
+                transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-[25%] right-[40%] w-[160px] h-8 bg-rose-200/6 rounded-full blur-xl"
             />
 
             {/* Flying birds */}
             <motion.svg
                 initial={{ x: 80, opacity: 0 }}
-                animate={{ x: [-30, -150], opacity: [0, 1, 1, 0] }}
-                transition={{ duration: 12, repeat: Infinity, repeatDelay: 10 }}
-                className="absolute top-12 right-[30%] w-6 h-3 text-gray-600/30"
+                animate={{ x: [-30, -200], opacity: [0, 1, 1, 0] }}
+                transition={{ duration: 15, repeat: Infinity, repeatDelay: 12 }}
+                className="absolute top-[10%] right-[30%] w-6 h-3 text-gray-700/30"
                 viewBox="0 0 24 12"
                 fill="none"
                 stroke="currentColor"
@@ -148,9 +191,9 @@ function EveningAmbient() {
             </motion.svg>
             <motion.svg
                 initial={{ x: 60, opacity: 0 }}
-                animate={{ x: [-20, -120], opacity: [0, 1, 1, 0] }}
-                transition={{ duration: 10, repeat: Infinity, repeatDelay: 14, delay: 3 }}
-                className="absolute top-20 right-[25%] w-5 h-2.5 text-gray-600/25"
+                animate={{ x: [-20, -180], opacity: [0, 1, 1, 0] }}
+                transition={{ duration: 12, repeat: Infinity, repeatDelay: 18, delay: 5 }}
+                className="absolute top-[15%] right-[25%] w-5 h-2.5 text-gray-700/25"
                 viewBox="0 0 24 12"
                 fill="none"
                 stroke="currentColor"
