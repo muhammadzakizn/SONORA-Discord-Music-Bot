@@ -215,7 +215,7 @@ function TrackCard({
                 {/* Rank Number - Spotify style */}
                 <span
                     className={cn(
-                        "absolute top-2 left-2 text-3xl sm:text-4xl font-black",
+                        "absolute top-2 left-2 text-3xl sm:text-4xl font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]",
                         track.rank === 1
                             ? "bg-gradient-to-b from-yellow-300 via-amber-400 to-amber-600 bg-clip-text text-transparent"
                             : track.rank === 2
@@ -225,8 +225,7 @@ function TrackCard({
                                     : "bg-gradient-to-b from-white via-gray-300 to-gray-500 bg-clip-text text-transparent"
                     )}
                     style={{
-                        textShadow: '0 2px 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.7), 2px 2px 4px rgba(0,0,0,1)',
-                        WebkitTextStroke: '1px rgba(0,0,0,0.3)'
+                        WebkitTextStroke: '0.5px rgba(0,0,0,0.5)'
                     }}
                 >
                     {track.rank}
