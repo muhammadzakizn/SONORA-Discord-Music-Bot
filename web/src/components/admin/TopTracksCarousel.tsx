@@ -446,18 +446,6 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
                 )}
             </AnimatePresence>
 
-            {/* Stats - simplified, no icons */}
-            {topTracks && topTracks.tracks.length > 0 && (
-                <div className={cn(
-                    "flex gap-4 mb-4 text-sm",
-                    isDark ? "text-zinc-400" : "text-gray-500"
-                )}>
-                    <span>{topTracks.total_plays} plays</span>
-                    <span>·</span>
-                    <span>{formatDuration(topTracks.total_duration)}</span>
-                </div>
-            )}
-
             {/* Tracks carousel */}
             {isLoading ? (
                 <div className="flex gap-4 overflow-hidden">
