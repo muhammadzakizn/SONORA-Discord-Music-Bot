@@ -76,108 +76,114 @@ export function SeekbackNavbar({
             className={cn(
                 "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
                 isScrolled
-                    ? "bg-black/60 backdrop-blur-xl border-b border-white/10"
+                    ? "bg-black/70 backdrop-blur-xl border-b border-white/10"
                     : "bg-transparent"
             )}
         >
-            {/* Top Row - Logos */}
-            <div className="flex items-center justify-between px-4 sm:px-6 py-3">
-                {/* Left - Seekback Logo + Year */}
-                <div className="flex items-center gap-1">
+            {/* Container with max width for large screens */}
+            <div className="max-w-6xl mx-auto">
+                {/* Top Row - Logos */}
+                <div className="flex items-center justify-between px-6 pt-4 pb-2">
+                    {/* Left - Seekback Logo + Year */}
+                    <div className="flex items-center gap-0.5">
+                        <Image
+                            src="/seekback-logo.png"
+                            alt="Seekback"
+                            width={74}
+                            height={74}
+                            className="invert -mr-1"
+                        />
+                        <span className="text-white font-medium text-lg tracking-tight">
+                            {yearShort}
+                        </span>
+                    </div>
+
+                    {/* Right - SONORA Logo */}
                     <Image
-                        src="/seekback-logo.png"
-                        alt="Seekback"
-                        width={42}
-                        height={42}
-                        className="invert"
+                        src="/sonora-logo.png"
+                        alt="SONORA"
+                        width={90}
+                        height={28}
+                        className="h-5 w-auto brightness-0 invert opacity-80"
                     />
-                    <span className="text-white font-semibold text-xl tracking-tight">
-                        {yearShort}
-                    </span>
                 </div>
 
-                {/* Right - SONORA Logo */}
-                <Image
-                    src="/sonora-logo.png"
-                    alt="SONORA"
-                    width={100}
-                    height={32}
-                    className="h-7 w-auto brightness-0 invert"
-                />
-            </div>
+                {/* Bottom Row - Year and Months */}
+                <div className="flex items-center px-6 pb-4 gap-6">
+                    {/* Year */}
+                    <button
+                        onClick={() => onYearChange(selectedYear)}
+                        className="text-amber-400 font-bold text-sm shrink-0"
+                    >
+                        {selectedYear}
+                    </button>
 
-            {/* Bottom Row - Year and Months - Centered */}
-            <div className="flex items-center justify-center px-4 sm:px-6 pb-3">
-                {/* Year */}
-                <button
-                    onClick={() => onYearChange(selectedYear)}
-                    className="flex items-center gap-1 text-amber-400 font-bold text-sm mr-2 shrink-0"
-                >
-                    {selectedYear}
-                </button>
+                    {/* Months Row */}
+                    <div className="flex items-center gap-2 flex-1">
+                        {/* Left Chevron - only show when can scroll */}
+                        <button
+                            onClick={() => scrollMonths("left")}
+                            className={cn(
+                                "p-0.5 shrink-0 transition-opacity",
+                                canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
+                            )}
+                        >
+                            <ChevronLeft className="w-4 h-4 text-white/50" />
+                        </button>
 
-                {/* Left Chevron */}
-                <button
-                    onClick={() => scrollMonths("left")}
-                    className={cn(
-                        "p-1 shrink-0 transition-opacity",
-                        canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
-                    )}
-                >
-                    <ChevronLeft className="w-4 h-4 text-white/60" />
-                </button>
+                        {/* Months */}
+                        <div
+                            ref={monthsContainerRef}
+                            className="flex items-center gap-6 overflow-x-auto scrollbar-hide"
+                            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                        >
+                            {MONTHS.map((month, index) => {
+                                const monthNum = index + 1;
+                                const isSelected = selectedMonth === monthNum;
 
-                {/* Months */}
-                <div
-                    ref={monthsContainerRef}
-                    className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 px-1"
-                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                >
-                    {MONTHS.map((month, index) => {
-                        const monthNum = index + 1;
-                        const isSelected = selectedMonth === monthNum;
+                                return (
+                                    <button
+                                        key={month.short}
+                                        onClick={() => onMonthChange(monthNum)}
+                                        className="relative px-3 py-1 shrink-0"
+                                    >
+                                        {/* Active indicator pill */}
+                                        {isSelected && (
+                                            <motion.div
+                                                layoutId="month-indicator"
+                                                className="absolute inset-0 bg-[#7B1E3C] rounded-full"
+                                                transition={{
+                                                    type: "spring",
+                                                    stiffness: 400,
+                                                    damping: 30,
+                                                }}
+                                            />
+                                        )}
+                                        <span
+                                            className={cn(
+                                                "relative z-10 text-sm font-medium transition-colors",
+                                                isSelected ? "text-white" : "text-white/50 hover:text-white/70"
+                                            )}
+                                        >
+                                            {month.short}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
 
-                        return (
-                            <button
-                                key={month.short}
-                                onClick={() => onMonthChange(monthNum)}
-                                className="relative px-3 py-1.5 shrink-0"
-                            >
-                                {/* Active indicator pill */}
-                                {isSelected && (
-                                    <motion.div
-                                        layoutId="month-indicator"
-                                        className="absolute inset-0 bg-[#7B1E3C] rounded-full"
-                                        transition={{
-                                            type: "spring",
-                                            stiffness: 400,
-                                            damping: 30,
-                                        }}
-                                    />
-                                )}
-                                <span
-                                    className={cn(
-                                        "relative z-10 text-sm font-medium transition-colors",
-                                        isSelected ? "text-white" : "text-white/60 hover:text-white/80"
-                                    )}
-                                >
-                                    {month.short}
-                                </span>
-                            </button>
-                        );
-                    })}
+                        {/* Right Chevron */}
+                        <button
+                            onClick={() => scrollMonths("right")}
+                            className={cn(
+                                "p-0.5 shrink-0 transition-opacity",
+                                canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
+                            )}
+                        >
+                            <ChevronRight className="w-4 h-4 text-white/50" />
+                        </button>
+                    </div>
                 </div>
-
-                {/* Right Chevron */}
-                <button
-                    onClick={() => scrollMonths("right")}
-                    className={cn(
-                        "p-1 shrink-0 transition-opacity",
-                        canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
-                    )}
-                >
-                    <ChevronRight className="w-4 h-4 text-white/60" />
-                </button>
             </div>
         </nav>
     );
