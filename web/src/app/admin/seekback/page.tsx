@@ -148,7 +148,7 @@ export default function SeekbackPage() {
 
     return (
         <div className="min-h-screen bg-black text-white overflow-x-hidden">
-            {/* Header */}
+            {/* Simple Header */}
             <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl">
                 <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
                     <button
@@ -171,58 +171,8 @@ export default function SeekbackPage() {
                 </div>
             </div>
 
-            {/* Month Selector */}
-            <div className="fixed top-[52px] left-0 right-0 z-40 bg-black/60 backdrop-blur-xl border-b border-zinc-800/50">
-                <div className="max-w-7xl mx-auto px-4 py-2">
-                    <div className="flex items-center gap-3">
-                        <span className="text-amber-500 font-bold text-sm">{selectedYear}</span>
-                        <button
-                            onClick={() => monthScrollRef.current?.scrollBy({ left: -150, behavior: 'smooth' })}
-                            className="text-zinc-500 hover:text-white"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <div
-                            ref={monthScrollRef}
-                            className="flex gap-2 overflow-x-auto scrollbar-hide flex-1"
-                            style={{ scrollbarWidth: 'none' }}
-                        >
-                            {MONTHS.map((month, idx) => {
-                                const monthNum = idx + 1;
-                                const isAvailable = availableMonths.includes(monthNum);
-                                const isSelected = selectedMonth === monthNum;
-
-                                return (
-                                    <button
-                                        key={month}
-                                        onClick={() => isAvailable && setSelectedMonth(monthNum)}
-                                        disabled={!isAvailable}
-                                        className={cn(
-                                            "px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-all",
-                                            isSelected
-                                                ? "bg-white text-black font-semibold"
-                                                : isAvailable
-                                                    ? "text-zinc-400 hover:text-white"
-                                                    : "text-zinc-700 cursor-not-allowed"
-                                        )}
-                                    >
-                                        {month.slice(0, 3)}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <button
-                            onClick={() => monthScrollRef.current?.scrollBy({ left: 150, behavior: 'smooth' })}
-                            className="text-zinc-500 hover:text-white"
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             {/* Main Content */}
-            <div className="pt-28 pb-32">
+            <div className="pt-16 pb-32">
                 {isLoading ? (
                     <div className="flex justify-center py-40">
                         <div className="w-10 h-10 border-4 border-[#C4314B] border-t-transparent rounded-full animate-spin" />
@@ -230,12 +180,60 @@ export default function SeekbackPage() {
                 ) : (
                     <>
                         {/* Hero Section with Floating Artworks */}
-                        <section className="relative min-h-[70vh] flex flex-col justify-center px-4 overflow-hidden">
+                        <section className="relative min-h-[80vh] flex flex-col px-4 overflow-hidden">
+                            {/* Month Selector - Inside Hero */}
+                            <div className="relative z-20 max-w-4xl mx-auto w-full pt-4 pb-8">
+                                <div className="flex items-center justify-center gap-3">
+                                    <span className="text-amber-500 font-bold text-sm">{selectedYear}</span>
+                                    <button
+                                        onClick={() => monthScrollRef.current?.scrollBy({ left: -150, behavior: 'smooth' })}
+                                        className="text-zinc-500 hover:text-white"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <div
+                                        ref={monthScrollRef}
+                                        className="flex gap-4 overflow-x-auto scrollbar-hide"
+                                        style={{ scrollbarWidth: 'none' }}
+                                    >
+                                        {MONTHS.map((month, idx) => {
+                                            const monthNum = idx + 1;
+                                            const isAvailable = availableMonths.includes(monthNum);
+                                            const isSelected = selectedMonth === monthNum;
+
+                                            return (
+                                                <button
+                                                    key={month}
+                                                    onClick={() => isAvailable && setSelectedMonth(monthNum)}
+                                                    disabled={!isAvailable}
+                                                    className={cn(
+                                                        "px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-all",
+                                                        isSelected
+                                                            ? "bg-white text-black font-semibold"
+                                                            : isAvailable
+                                                                ? "text-zinc-400 hover:text-white"
+                                                                : "text-zinc-700 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    {month.slice(0, 3)}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <button
+                                        onClick={() => monthScrollRef.current?.scrollBy({ left: 150, behavior: 'smooth' })}
+                                        className="text-zinc-500 hover:text-white"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+
                             {/* Glow Effect */}
                             <div
                                 className="absolute inset-0 pointer-events-none"
                                 style={{
-                                    background: 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(251, 191, 36, 0.15) 0%, transparent 70%)'
+                                    background: 'radial-gradient(ellipse 80% 50% at 50% 50%, rgba(251, 191, 36, 0.18) 0%, transparent 70%)'
                                 }}
                             />
 
