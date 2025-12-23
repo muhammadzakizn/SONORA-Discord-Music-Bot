@@ -349,10 +349,7 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
         <div className="space-y-4">
             {/* Header */}
             <div className="flex items-center gap-2 mb-4">
-                <div
-                    className="flex items-center gap-2 cursor-pointer group"
-                    onClick={() => router.push(`/admin/seekback?year=${selectedYear}&month=${selectedMonth}`)}
-                >
+                <div className="flex items-center gap-2">
                     <h3 className={cn(
                         "font-semibold",
                         isDark ? "text-white" : "text-gray-900"
@@ -365,7 +362,6 @@ export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
                     )}>
                         · {topTracks?.month_name || MONTHS[selectedMonth - 1]} {selectedYear}
                     </span>
-                    <ChevronRight className="w-4 h-4 text-[#C4314B] opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
             </div>
 
