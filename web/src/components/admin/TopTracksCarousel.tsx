@@ -98,6 +98,26 @@ function TrackCard({
 }) {
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
+    const [artworkUrl, setArtworkUrl] = useState<string | null>(track.artwork_url || null);
+    const [isFetching, setIsFetching] = useState(false);
+
+    // Fetch artwork dynamically if not available
+    useEffect(() => {
+        if (!artworkUrl && !isFetching && !imageError) {
+            setIsFetching(true);
+            fetch(`/api/bot/artwork/search?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.found && data.artwork_url) {
+                        setArtworkUrl(data.artwork_url);
+                    } else {
+                        setImageError(true);
+                    }
+                })
+                .catch(() => setImageError(true))
+                .finally(() => setIsFetching(false));
+        }
+    }, [track.title, track.artist, artworkUrl, isFetching, imageError]);
 
     return (
         <motion.div
@@ -111,23 +131,27 @@ function TrackCard({
         >
             {/* Album Art */}
             <div className="relative aspect-square rounded-xl overflow-hidden">
-                {track.artwork_url && !imageError ? (
-                    <>
-                        {!imageLoaded && <ShimmerCard isDark={isDark} />}
-                        <Image
-                            src={track.artwork_url}
-                            alt={track.title}
-                            fill
-                            className={cn(
-                                "object-cover transition-opacity duration-300",
-                                imageLoaded ? "opacity-100" : "opacity-0"
-                            )}
-                            onLoad={() => setImageLoaded(true)}
-                            onError={() => setImageError(true)}
-                            sizes="144px"
-                        />
-                    </>
-                ) : (
+                {/* Shimmer while loading or fetching */}
+                {(isFetching || (artworkUrl && !imageLoaded && !imageError)) && (
+                    <div className="absolute inset-0">
+                        <ShimmerCard isDark={isDark} />
+                    </div>
+                )}
+
+                {artworkUrl && !imageError ? (
+                    <Image
+                        src={artworkUrl}
+                        alt={track.title}
+                        fill
+                        className={cn(
+                            "object-cover transition-opacity duration-300",
+                            imageLoaded ? "opacity-100" : "opacity-0"
+                        )}
+                        onLoad={() => setImageLoaded(true)}
+                        onError={() => setImageError(true)}
+                        sizes="144px"
+                    />
+                ) : !isFetching && (
                     <div className={cn(
                         "w-full h-full flex items-center justify-center",
                         isDark
@@ -187,6 +211,7 @@ function TrackCard({
         </motion.div>
     );
 }
+
 
 export default function TopTracksCarousel({ userId }: TopTracksCarouselProps) {
     const { isDark } = useSettings();
