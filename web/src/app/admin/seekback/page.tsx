@@ -18,8 +18,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useAuth } from "@/contexts/AuthContext";
-import NavLiquidGlass from "@/components/nav/NavLiquidGlass";
+import { useSession } from "@/contexts/SessionContext";
+import NavLiquidGlass from "@/components/NavLiquidGlass";
 
 const MONTHS = [
     "January", "February", "March", "April", "May", "June",
@@ -86,7 +86,7 @@ function formatHeroDuration(seconds: number): { value: string; unit: string } {
 
 export default function SeekbackPage() {
     const { isDark } = useSettings();
-    const { user } = useAuth();
+    const { user } = useSession();
     const router = useRouter();
     const searchParams = useSearchParams();
     const monthScrollRef = useRef<HTMLDivElement>(null);
@@ -110,13 +110,13 @@ export default function SeekbackPage() {
 
     // Fetch all data
     useEffect(() => {
-        if (!user?.discord_id) return;
+        if (!user?.id) return;
 
         const fetchData = async () => {
             setIsLoading(true);
             try {
                 const params = new URLSearchParams({
-                    user_id: user.discord_id,
+                    user_id: user.id,
                     year: selectedYear.toString()
                 });
                 if (selectedMonth) {
@@ -146,7 +146,7 @@ export default function SeekbackPage() {
 
                 // Fetch top tracks (reuse existing endpoint)
                 const tracksParams = new URLSearchParams({
-                    user_id: user.discord_id,
+                    user_id: user.id,
                     year: selectedYear.toString(),
                     month: selectedMonth?.toString() || currentMonth.toString()
                 });
@@ -157,7 +157,7 @@ export default function SeekbackPage() {
                 }
 
                 // Fetch available months
-                const monthsRes = await fetch(`/api/bot/history/months?user_id=${user.discord_id}`);
+                const monthsRes = await fetch(`/api/bot/history/months?user_id=${user.id}`);
                 if (monthsRes.ok) {
                     const data = await monthsRes.json();
                     const yearMonths = (data.months || [])
@@ -173,7 +173,7 @@ export default function SeekbackPage() {
         };
 
         fetchData();
-    }, [user?.discord_id, selectedYear, selectedMonth, currentMonth]);
+    }, [user?.id, selectedYear, selectedMonth, currentMonth]);
 
     const duration = formatHeroDuration(stats?.total_duration || 0);
     const periodLabel = selectedMonth
