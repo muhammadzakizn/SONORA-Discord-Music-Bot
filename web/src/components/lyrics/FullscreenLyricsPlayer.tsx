@@ -886,16 +886,16 @@ export default function FullscreenLyricsPlayer({
                     <div className="absolute inset-0 overflow-hidden bg-black">
                         <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-black to-zinc-900" />
 
-                        {/* WebGL Animated Background - Only when track is playing (not ended) */}
-                        {track?.artwork_url && !trackEnded && (
+                        {/* WebGL Animated Background - Show when track playing or queue exists */}
+                        {track?.artwork_url && (!trackEnded || queue.length > 0) && (
                             <WebGLBackground artworkUrl={track.artwork_url} />
                         )}
 
                         {/* Dark overlay for "black accents" and better text contrast */}
                         <div className="absolute inset-0 bg-black/70 z-[1]" />
 
-                        {/* Fallback gradient orbs - Only when no track and not ended state */}
-                        {(!track?.artwork_url && !trackEnded) && (
+                        {/* Fallback gradient orbs - Show when no artwork and not in empty state */}
+                        {(!track?.artwork_url && (!trackEnded || queue.length > 0)) && (
                             <>
                                 <div
                                     className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-60 animate-orb-1"
@@ -967,9 +967,9 @@ export default function FullscreenLyricsPlayer({
                         ) : null}
                     </AnimatePresence>
 
-                    {/* Empty State - No Track Playing */}
+                    {/* Empty State - Only show when NO queue and track ended or no track */}
                     <AnimatePresence>
-                        {((trackEnded || !track) && !isTransitioning && !lyricsLoading) && (
+                        {((trackEnded || !track) && queue.length === 0 && !isTransitioning && !lyricsLoading) && (
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
@@ -1000,8 +1000,8 @@ export default function FullscreenLyricsPlayer({
                         )}
                     </AnimatePresence>
 
-                    {/* Content - Hidden when empty state is showing */}
-                    {(!trackEnded && track) && (
+                    {/* Content - Hidden when empty state is showing (no track AND no queue) */}
+                    {(track || queue.length > 0) && !trackEnded && (
                         <div className={cn(
                             "relative z-10 flex h-full w-full",
                             // Mobile: vertical layout, Desktop: horizontal layout
