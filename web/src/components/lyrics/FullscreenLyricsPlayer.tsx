@@ -886,16 +886,16 @@ export default function FullscreenLyricsPlayer({
                     <div className="absolute inset-0 overflow-hidden bg-black">
                         <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-black to-zinc-900" />
 
-                        {/* WebGL Animated Background with rotating circles */}
-                        {track?.artwork_url && (
+                        {/* WebGL Animated Background - Only when track is playing (not ended) */}
+                        {track?.artwork_url && !trackEnded && (
                             <WebGLBackground artworkUrl={track.artwork_url} />
                         )}
 
                         {/* Dark overlay for "black accents" and better text contrast */}
                         <div className="absolute inset-0 bg-black/70 z-[1]" />
 
-                        {/* Fallback gradient orbs if no artwork or WebGL not supported */}
-                        {!track?.artwork_url && (
+                        {/* Fallback gradient orbs - Only when no track and not ended state */}
+                        {(!track?.artwork_url && !trackEnded) && (
                             <>
                                 <div
                                     className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-60 animate-orb-1"
@@ -1000,52 +1000,307 @@ export default function FullscreenLyricsPlayer({
                         )}
                     </AnimatePresence>
 
-                    {/* Content */}
-                    <div className={cn(
-                        "relative z-10 flex h-full w-full",
-                        // Mobile: vertical layout, Desktop: horizontal layout
-                        "flex-col sm:flex-row",
-                        !showLyrics && "sm:justify-center"
-                    )}>
-                        {/* Close button */}
-                        <button
-                            onClick={onClose}
-                            className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-                        >
-                            <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                        </button>
+                    {/* Content - Hidden when empty state is showing */}
+                    {(!trackEnded && track) && (
+                        <div className={cn(
+                            "relative z-10 flex h-full w-full",
+                            // Mobile: vertical layout, Desktop: horizontal layout
+                            "flex-col sm:flex-row",
+                            !showLyrics && "sm:justify-center"
+                        )}>
+                            {/* Close button */}
+                            <button
+                                onClick={onClose}
+                                className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                            >
+                                <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                            </button>
 
-                        {/* ========== MOBILE LAYOUT ========== */}
-                        <div className="sm:hidden flex flex-col h-full">
-                            {showLyrics ? (
-                                <>
-                                    {/* Mobile Header: Album Art + Title + Menu */}
-                                    <div className="shrink-0 px-4 pt-14 pb-2">
-                                        <div className="flex items-center gap-3">
-                                            {/* Album Art (small) */}
-                                            <div className="w-14 h-14 shrink-0">
-                                                {track?.artwork_url ? (
-                                                    <img
-                                                        src={track.artwork_url}
-                                                        alt={track.title}
-                                                        className="w-full h-full rounded-lg shadow-lg object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full rounded-lg bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center">
-                                                        <Music className="w-6 h-6 text-white/80" />
-                                                    </div>
-                                                )}
+                            {/* ========== MOBILE LAYOUT ========== */}
+                            <div className="sm:hidden flex flex-col h-full">
+                                {showLyrics ? (
+                                    <>
+                                        {/* Mobile Header: Album Art + Title + Menu */}
+                                        <div className="shrink-0 px-4 pt-14 pb-2">
+                                            <div className="flex items-center gap-3">
+                                                {/* Album Art (small) */}
+                                                <div className="w-14 h-14 shrink-0">
+                                                    {track?.artwork_url ? (
+                                                        <img
+                                                            src={track.artwork_url}
+                                                            alt={track.title}
+                                                            className="w-full h-full rounded-lg shadow-lg object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full rounded-lg bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center">
+                                                            <Music className="w-6 h-6 text-white/80" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {/* Track Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <h2 className="text-white text-base font-semibold truncate">
+                                                        {track?.title || "Unknown Track"}
+                                                    </h2>
+                                                    <p className="text-white/60 text-sm truncate">
+                                                        {track?.artist || "Unknown Artist"}
+                                                    </p>
+                                                </div>
+                                                {/* Menu Button */}
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setShowMenu(!showMenu);
+                                                        }}
+                                                        className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all"
+                                                    >
+                                                        <MoreHorizontal className="w-5 h-5" />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            {/* Track Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <h2 className="text-white text-base font-semibold truncate">
+                                        </div>
+
+                                        {/* Mobile Lyrics Area (scrollable, takes remaining space) */}
+                                        <div className="flex-1 overflow-hidden">
+                                            {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
+                                                <div
+                                                    ref={lyricsContainerRef}
+                                                    className="h-full overflow-y-auto scrollbar-hide px-12 py-[30vh]"
+                                                    onScroll={() => {
+                                                        if (lyricsContainerRef.current) {
+                                                            setIsUserScrolling(true);
+                                                            if (scrollTimeoutRef.current) {
+                                                                clearTimeout(scrollTimeoutRef.current);
+                                                            }
+                                                            scrollTimeoutRef.current = setTimeout(() => {
+                                                                setIsUserScrolling(false);
+                                                            }, 3000);
+                                                        }
+                                                    }}
+                                                >
+                                                    <div className="space-y-3">
+                                                        {/* Interlude Dots Animation */}
+                                                        <AnimatePresence>
+                                                            {interludeInfo?.isActive && (
+                                                                <motion.div
+                                                                    initial={{ opacity: 0, scale: 0.3 }}
+                                                                    animate={{
+                                                                        opacity: interludeInfo.progress >= 0.98 ? 0 : 1,
+                                                                        scale: interludeInfo.progress >= 0.98 ? 0.3 : 1
+                                                                    }}
+                                                                    exit={{ opacity: 0, scale: 0.3 }}
+                                                                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                                                                    style={{ transformOrigin: 'center' }}
+                                                                    className="flex items-center justify-center gap-3 py-8"
+                                                                >
+                                                                    {[0, 1, 2].map((dotIndex) => (
+                                                                        <motion.div
+                                                                            key={dotIndex}
+                                                                            className="w-3 h-3 rounded-full bg-white"
+                                                                            style={{ opacity: dotOpacities[dotIndex] }}
+                                                                            animate={{
+                                                                                scale: dotOpacities[dotIndex] > 0.8 ? [1, 1.2, 1] : 1
+                                                                            }}
+                                                                            transition={{
+                                                                                scale: {
+                                                                                    duration: 0.3,
+                                                                                    repeat: dotOpacities[dotIndex] > 0.8 ? Infinity : 0,
+                                                                                    repeatDelay: 0.5
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                    ))}
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
+
+                                                        {lyrics.lines.map((line, index) => {
+                                                            const isCurrentLine = index === currentLineIndex;
+                                                            const isPastLine = index < currentLineIndex;
+                                                            const isFutureLine = index > currentLineIndex;
+                                                            const hasWords = line.words && line.words.length > 0;
+                                                            const displayText = showRomanization && line.romanized ? line.romanized : line.text;
+
+                                                            // Only collapse past lines when not scrolling
+                                                            const shouldCollapse = isPastLine && !isUserScrolling;
+
+                                                            return (
+                                                                <div
+                                                                    key={index}
+                                                                    ref={isCurrentLine ? currentLineRef : null}
+                                                                    data-lyric-index={index}
+                                                                    className={cn(
+                                                                        "transition-all duration-500 ease-out overflow-hidden",
+                                                                        // When scrolling: show all lines normally
+                                                                        isUserScrolling && "opacity-100",
+                                                                        // Past lines: fade, blur, and collapse
+                                                                        shouldCollapse && "max-h-0 opacity-0 blur-sm my-0",
+                                                                        // Future lines: grayed out
+                                                                        isFutureLine && !isUserScrolling && "opacity-50"
+                                                                    )}
+                                                                    style={{
+                                                                        maxHeight: shouldCollapse ? 0 : '200px',
+                                                                        marginTop: shouldCollapse ? 0 : undefined,
+                                                                        marginBottom: shouldCollapse ? 0 : undefined,
+                                                                        filter: shouldCollapse ? 'blur(4px)' : 'none',
+                                                                    }}
+                                                                >
+                                                                    {/* Mobile: Always highlight full line (no per-word) for better readability */}
+                                                                    <p
+                                                                        className={cn(
+                                                                            "text-2xl font-bold leading-snug transition-all duration-300",
+                                                                            isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
+                                                                        )}
+                                                                    >
+                                                                        {displayText || "♪"}
+                                                                    </p>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="h-full flex items-center justify-center">
+                                                    <div className="text-center text-white/40">
+                                                        <Music className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                        <p className="text-sm">{lyricsLoading ? "Loading lyrics..." : "No lyrics available"}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    /* Mobile No-Lyrics View: Centered Album Art */
+                                    <div className="flex-1 flex flex-col items-center justify-center px-8">
+                                        {/* Large Album Art */}
+                                        <div className="w-full max-w-[280px] mb-6">
+                                            {track?.artwork_url ? (
+                                                <img
+                                                    src={track.artwork_url}
+                                                    alt={track.title}
+                                                    className="w-full aspect-square rounded-xl shadow-2xl object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center shadow-2xl">
+                                                    <Music className="w-20 h-20 text-white/80" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Track Info */}
+                                        <div className="w-full max-w-[280px] mb-4">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <h2 className="text-white text-xl font-semibold truncate flex-1">
                                                     {track?.title || "Unknown Track"}
                                                 </h2>
-                                                <p className="text-white/60 text-sm truncate">
-                                                    {track?.artist || "Unknown Artist"}
-                                                </p>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setShowMenu(!showMenu);
+                                                    }}
+                                                    className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all shrink-0"
+                                                >
+                                                    <MoreHorizontal className="w-5 h-5" />
+                                                </button>
                                             </div>
-                                            {/* Menu Button */}
+                                            <MarqueeText
+                                                text={`${track?.artist || "Unknown Artist"} — ${track?.album || "Unknown Album"}`}
+                                                className="text-white/60 text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Mobile Controls (bottom fixed) */}
+                                <div className="shrink-0 px-4 pb-6 pt-2">
+                                    {/* Progress Bar */}
+                                    <div className="mb-3">
+                                        <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+                                            <motion.div
+                                                className="h-full bg-white rounded-full"
+                                                style={{
+                                                    width: `${track?.duration ? (currentTime / track.duration) * 100 : 0}%`,
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between items-center text-white/50 text-xs mt-1">
+                                            <span>{formatTime(currentTime)}</span>
+                                            {/* Audio Quality Badge */}
+                                            <button
+                                                onClick={() => setShowQualityDialog(true)}
+                                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-white/10 transition-colors border border-transparent hover:border-white/30"
+                                            >
+                                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M2 6a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm3 2v3h2V8H5zm4 0v8h2V8H9zm4 0v5h2V8h-2zm4 0v6h2V8h-2z" />
+                                                </svg>
+                                                <span className="text-white/60">Lossless</span>
+                                            </button>
+                                            <span>-{formatTime((track?.duration || 0) - currentTime)}</span>
+                                        </div>
+                                    </div>
+                                    {/* Control Buttons */}
+                                    <div className="flex items-center justify-center gap-8">
+                                        <button
+                                            onClick={() => handleControl(isPaused ? "resume" : "pause")}
+                                            disabled={isControlling}
+                                            className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
+                                        >
+                                            {isPaused ? (
+                                                <Play className="w-10 h-10 text-white" fill="white" />
+                                            ) : (
+                                                <Pause className="w-10 h-10 text-white" fill="white" />
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => handleControl("skip")}
+                                            disabled={isControlling}
+                                            className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
+                                        >
+                                            <SkipForward className="w-8 h-8 text-white" fill="white" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleControl("stop")}
+                                            disabled={isControlling}
+                                            className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
+                                        >
+                                            <Square className="w-7 h-7 text-white" fill="white" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ========== DESKTOP LAYOUT ========== */}
+                            {/* LEFT PANEL - Album Art + Controls (Desktop Only) */}
+                            <div className={cn(
+                                "hidden sm:flex flex-col items-center justify-center py-8 transition-all duration-300",
+                                showLyrics ? "w-1/2 px-16" : "w-full max-w-[450px] px-12"
+                            )}>
+                                {/* Content wrapper with max-width for the album art */}
+                                <div className={cn(
+                                    "w-full",
+                                    showLyrics && "max-w-[320px]"
+                                )}>
+                                    {/* Album Art */}
+                                    <div className="mb-2">
+                                        {track?.artwork_url ? (
+                                            <img
+                                                src={track.artwork_url}
+                                                alt={track.title}
+                                                className="w-full aspect-square rounded-xl shadow-2xl object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center shadow-2xl">
+                                                <Music className="w-24 h-24 text-white/80" />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Track Info - Apple Music Style (Compact) */}
+                                    <div className="mb-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <h2 className="text-white text-xl font-semibold truncate flex-1">
+                                                {track?.title || "Unknown Track"}
+                                            </h2>
                                             <div className="relative">
                                                 <button
                                                     onClick={(e) => {
@@ -1056,725 +1311,472 @@ export default function FullscreenLyricsPlayer({
                                                 >
                                                     <MoreHorizontal className="w-5 h-5" />
                                                 </button>
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    {/* Mobile Lyrics Area (scrollable, takes remaining space) */}
-                                    <div className="flex-1 overflow-hidden">
-                                        {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
-                                            <div
-                                                ref={lyricsContainerRef}
-                                                className="h-full overflow-y-auto scrollbar-hide px-12 py-[30vh]"
-                                                onScroll={() => {
-                                                    if (lyricsContainerRef.current) {
-                                                        setIsUserScrolling(true);
-                                                        if (scrollTimeoutRef.current) {
-                                                            clearTimeout(scrollTimeoutRef.current);
-                                                        }
-                                                        scrollTimeoutRef.current = setTimeout(() => {
-                                                            setIsUserScrolling(false);
-                                                        }, 3000);
-                                                    }
-                                                }}
-                                            >
-                                                <div className="space-y-3">
-                                                    {/* Interlude Dots Animation */}
-                                                    <AnimatePresence>
-                                                        {interludeInfo?.isActive && (
-                                                            <motion.div
-                                                                initial={{ opacity: 0, scale: 0.3 }}
-                                                                animate={{
-                                                                    opacity: interludeInfo.progress >= 0.98 ? 0 : 1,
-                                                                    scale: interludeInfo.progress >= 0.98 ? 0.3 : 1
+                                                {/* Dropdown Menu - Using Portal to fix click issues */}
+                                                {showMenu && typeof document !== 'undefined' && createPortal(
+                                                    <div className="fixed inset-0 z-[9999]">
+                                                        {/* Backdrop */}
+                                                        <div
+                                                            className="absolute inset-0 bg-black/20"
+                                                            onClick={() => setShowMenu(false)}
+                                                        />
+                                                        {/* Menu */}
+                                                        <div
+                                                            className="absolute left-1/2 bottom-[20%] -translate-x-1/2 w-64 py-2 bg-zinc-900/98 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 pointer-events-auto"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            {/* Lyrics Section - Opens Panel */}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setShowLyricsPanel(true);
+                                                                    setShowMenu(false);
                                                                 }}
-                                                                exit={{ opacity: 0, scale: 0.3 }}
-                                                                transition={{ duration: 0.3, ease: 'easeOut' }}
-                                                                style={{ transformOrigin: 'center' }}
-                                                                className="flex items-center justify-center gap-3 py-8"
+                                                                className="w-full px-4 py-2.5 flex items-center justify-between text-white/80 hover:bg-white/5 transition-colors"
                                                             >
-                                                                {[0, 1, 2].map((dotIndex) => (
-                                                                    <motion.div
-                                                                        key={dotIndex}
-                                                                        className="w-3 h-3 rounded-full bg-white"
-                                                                        style={{ opacity: dotOpacities[dotIndex] }}
-                                                                        animate={{
-                                                                            scale: dotOpacities[dotIndex] > 0.8 ? [1, 1.2, 1] : 1
-                                                                        }}
-                                                                        transition={{
-                                                                            scale: {
-                                                                                duration: 0.3,
-                                                                                repeat: dotOpacities[dotIndex] > 0.8 ? Infinity : 0,
-                                                                                repeatDelay: 0.5
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                ))}
-                                                            </motion.div>
-                                                        )}
-                                                    </AnimatePresence>
+                                                                <div className="flex items-center gap-3">
+                                                                    <Type className="w-4 h-4" />
+                                                                    <span className="text-sm">Lyrics</span>
+                                                                </div>
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${showLyrics ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
+                                                                    {showLyrics ? 'ON' : 'OFF'}
+                                                                </span>
+                                                            </button>
 
-                                                    {lyrics.lines.map((line, index) => {
-                                                        const isCurrentLine = index === currentLineIndex;
-                                                        const isPastLine = index < currentLineIndex;
-                                                        const isFutureLine = index > currentLineIndex;
-                                                        const hasWords = line.words && line.words.length > 0;
-                                                        const displayText = showRomanization && line.romanized ? line.romanized : line.text;
-
-                                                        // Only collapse past lines when not scrolling
-                                                        const shouldCollapse = isPastLine && !isUserScrolling;
-
-                                                        return (
-                                                            <div
-                                                                key={index}
-                                                                ref={isCurrentLine ? currentLineRef : null}
-                                                                data-lyric-index={index}
-                                                                className={cn(
-                                                                    "transition-all duration-500 ease-out overflow-hidden",
-                                                                    // When scrolling: show all lines normally
-                                                                    isUserScrolling && "opacity-100",
-                                                                    // Past lines: fade, blur, and collapse
-                                                                    shouldCollapse && "max-h-0 opacity-0 blur-sm my-0",
-                                                                    // Future lines: grayed out
-                                                                    isFutureLine && !isUserScrolling && "opacity-50"
-                                                                )}
-                                                                style={{
-                                                                    maxHeight: shouldCollapse ? 0 : '200px',
-                                                                    marginTop: shouldCollapse ? 0 : undefined,
-                                                                    marginBottom: shouldCollapse ? 0 : undefined,
-                                                                    filter: shouldCollapse ? 'blur(4px)' : 'none',
+                                                            {/* Queue Toggle */}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setShowQueue(!showQueue);
+                                                                    setShowMenu(false);
                                                                 }}
+                                                                className="w-full px-4 py-2.5 flex items-center justify-between text-white/80 hover:bg-white/5 transition-colors"
                                                             >
-                                                                {/* Mobile: Always highlight full line (no per-word) for better readability */}
-                                                                <p
-                                                                    className={cn(
-                                                                        "text-2xl font-bold leading-snug transition-all duration-300",
-                                                                        isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
-                                                                    )}
-                                                                >
-                                                                    {displayText || "♪"}
-                                                                </p>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <ListMusic className="w-4 h-4" />
+                                                                    <span className="text-sm">Queue</span>
+                                                                </div>
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${showQueue ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
+                                                                    {showQueue ? 'ON' : 'OFF'}
+                                                                </span>
+                                                            </button>
+
+                                                            {/* Fullscreen Toggle */}
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (document.fullscreenElement) {
+                                                                        document.exitFullscreen();
+                                                                        setIsFullscreen(false);
+                                                                    } else {
+                                                                        document.documentElement.requestFullscreen();
+                                                                        setIsFullscreen(true);
+                                                                    }
+                                                                    setShowMenu(false);
+                                                                }}
+                                                                className="w-full px-4 py-2.5 flex items-center gap-3 text-white/80 hover:bg-white/5 transition-colors border-t border-white/10 mt-1"
+                                                            >
+                                                                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                                                                <span className="text-sm">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>,
+                                                    document.body
+                                                )}
                                             </div>
-                                        ) : (
-                                            <div className="h-full flex items-center justify-center">
-                                                <div className="text-center text-white/40">
-                                                    <Music className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                                    <p className="text-sm">{lyricsLoading ? "Loading lyrics..." : "No lyrics available"}</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
-                            ) : (
-                                /* Mobile No-Lyrics View: Centered Album Art */
-                                <div className="flex-1 flex flex-col items-center justify-center px-8">
-                                    {/* Large Album Art */}
-                                    <div className="w-full max-w-[280px] mb-6">
-                                        {track?.artwork_url ? (
-                                            <img
-                                                src={track.artwork_url}
-                                                alt={track.title}
-                                                className="w-full aspect-square rounded-xl shadow-2xl object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center shadow-2xl">
-                                                <Music className="w-20 h-20 text-white/80" />
-                                            </div>
-                                        )}
-                                    </div>
-                                    {/* Track Info */}
-                                    <div className="w-full max-w-[280px] mb-4">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <h2 className="text-white text-xl font-semibold truncate flex-1">
-                                                {track?.title || "Unknown Track"}
-                                            </h2>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowMenu(!showMenu);
-                                                }}
-                                                className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all shrink-0"
-                                            >
-                                                <MoreHorizontal className="w-5 h-5" />
-                                            </button>
                                         </div>
                                         <MarqueeText
                                             text={`${track?.artist || "Unknown Artist"} — ${track?.album || "Unknown Album"}`}
-                                            className="text-white/60 text-sm"
+                                            className="text-white/60 text-sm -mt-0.5"
                                         />
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="mb-1">
+                                        <div className="h-1 bg-white/20 rounded-full overflow-hidden cursor-pointer hover:h-1.5 transition-all">
+                                            <motion.div
+                                                className="h-full bg-white rounded-full"
+                                                style={{
+                                                    width: `${track?.duration ? (currentTime / track.duration) * 100 : 0}%`,
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between items-center text-white/50 text-xs mt-1">
+                                            <span>{formatTime(currentTime)}</span>
+                                            {/* Audio Quality Badge - Desktop */}
+                                            <button
+                                                onClick={() => setShowQualityDialog(true)}
+                                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-white/10 transition-colors border border-transparent hover:border-white/30"
+                                            >
+                                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M2 6a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm3 2v3h2V8H5zm4 0v8h2V8H9zm4 0v5h2V8h-2zm4 0v6h2V8h-2z" />
+                                                </svg>
+                                                <span className="text-[10px] font-medium text-white/60">Lossless</span>
+                                            </button>
+                                            <span>-{formatTime((track?.duration || 0) - currentTime)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Controls - Apple Music Style */}
+                                    <div className="flex items-center justify-center gap-6 mt-4">
+                                        <button
+                                            onClick={() => handleControl(isPaused ? "resume" : "pause")}
+                                            disabled={isControlling}
+                                            className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
+                                        >
+                                            {isPaused ? (
+                                                <Play className="w-8 h-8 text-white" fill="white" />
+                                            ) : (
+                                                <Pause className="w-8 h-8 text-white" fill="white" />
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => handleControl("skip")}
+                                            disabled={isControlling}
+                                            className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
+                                        >
+                                            <SkipForward className="w-8 h-8 text-white" fill="white" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleControl("stop")}
+                                            disabled={isControlling}
+                                            className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
+                                        >
+                                            <Square className="w-7 h-7 text-white" fill="white" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* RIGHT PANEL - Lyrics (Desktop Only) */}
+                            {showLyrics && (
+                                <div className="hidden sm:flex w-1/2 flex-col justify-center overflow-hidden relative">
+                                    {/* Scroll Mode Indicator */}
+                                    <AnimatePresence>
+                                        {isUserScrolling && lyrics?.lines?.length && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1"
+                                            >
+                                                <div className="flex flex-col items-center animate-bounce">
+                                                    <svg className="w-6 h-6 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                    <svg className="w-6 h-6 text-white/40 -mt-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </div>
+                                                <span className="text-xs text-white/50 bg-black/30 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                                                    Scroll Mode • 3s to reset
+                                                </span>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    <div
+                                        ref={lyricsContainerRef}
+                                        onClick={handleLyricsAreaClick}
+                                        onWheel={(e) => {
+                                            // Direct React handler for reliable trackpad detection
+                                            if (Math.abs(e.deltaY) > 0.5 || Math.abs(e.deltaX) > 0.5) {
+                                                activateScrollMode();
+                                            }
+                                        }}
+                                        className="overflow-y-auto scrollbar-hide px-8 lg:px-12 py-[40vh] max-h-full cursor-pointer"
+                                    >
+                                        {lyrics?.lines?.length ? (
+                                            <div className="space-y-6">
+                                                {/* Interlude Dots Animation - Desktop */}
+                                                <AnimatePresence>
+                                                    {interludeInfo?.isActive && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, scale: 0.3 }}
+                                                            animate={{
+                                                                opacity: interludeInfo.progress >= 0.98 ? 0 : 1,
+                                                                scale: interludeInfo.progress >= 0.98 ? 0.3 : 1
+                                                            }}
+                                                            exit={{ opacity: 0, scale: 0.3 }}
+                                                            transition={{ duration: 0.3, ease: 'easeOut' }}
+                                                            style={{ transformOrigin: 'left center' }}
+                                                            className="flex items-center justify-start gap-4 py-8 pl-1"
+                                                        >
+                                                            {[0, 1, 2].map((dotIndex) => (
+                                                                <motion.div
+                                                                    key={dotIndex}
+                                                                    className="w-4 h-4 rounded-full bg-white"
+                                                                    style={{ opacity: dotOpacities[dotIndex] }}
+                                                                    animate={{
+                                                                        scale: dotOpacities[dotIndex] > 0.8 ? [1, 1.2, 1] : 1
+                                                                    }}
+                                                                    transition={{
+                                                                        scale: {
+                                                                            duration: 0.3,
+                                                                            repeat: dotOpacities[dotIndex] > 0.8 ? Infinity : 0,
+                                                                            repeatDelay: 0.5
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+
+                                                {lyrics.lines.map((line, index) => {
+                                                    const isCurrentLine = index === currentLineIndex;
+                                                    const isPastLine = index < currentLineIndex;
+                                                    const isFutureLine = index > currentLineIndex;
+
+                                                    // Only collapse past lines when not scrolling
+                                                    const shouldCollapse = isPastLine && !isUserScrolling;
+
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            ref={isCurrentLine ? currentLineRef : null}
+                                                            className={cn(
+                                                                "transition-all duration-500 ease-out overflow-hidden",
+                                                                // When scrolling: show all lines normally
+                                                                isUserScrolling && "opacity-100",
+                                                                // Past lines: fade, blur, and collapse
+                                                                shouldCollapse && "max-h-0 opacity-0 blur-sm my-0",
+                                                                // Future lines: grayed out
+                                                                isFutureLine && !isUserScrolling && "opacity-50"
+                                                            )}
+                                                            style={{
+                                                                maxHeight: shouldCollapse ? 0 : '200px',
+                                                                marginTop: shouldCollapse ? 0 : undefined,
+                                                                marginBottom: shouldCollapse ? 0 : undefined,
+                                                                filter: shouldCollapse ? 'blur(4px)' : 'none',
+                                                            }}
+                                                        >
+                                                            {/* Current line with per-word highlighting (only when real syllable timing exists) */}
+                                                            {isCurrentLine && line.words && line.words.length > 0 && lyrics?.has_syllable_timing ? (
+                                                                <p className="text-4xl xs:text-5xl font-bold text-left leading-tight">
+                                                                    {line.words.map((word: { text: string; start_time: number; end_time: number }, wordIndex: number) => {
+                                                                        // Apply syllable-specific offset for accurate sync
+                                                                        const adjustedTime = currentTime + SYLLABLE_OFFSET;
+
+                                                                        // Calculate word progress (0 to 1)
+                                                                        let progress = 0;
+                                                                        if (adjustedTime >= word.end_time) {
+                                                                            progress = 1;
+                                                                        } else if (adjustedTime >= word.start_time) {
+                                                                            const rawProgress = (adjustedTime - word.start_time) / (word.end_time - word.start_time);
+                                                                            // Apply ease-out for smoother animation
+                                                                            progress = 1 - Math.pow(1 - rawProgress, 2);
+                                                                        }
+
+                                                                        // Beautiful-lyrics style glow curve
+                                                                        let glowAlpha = 0;
+                                                                        if (progress < 0.15) {
+                                                                            glowAlpha = progress / 0.15;
+                                                                        } else if (progress < 0.6) {
+                                                                            glowAlpha = 1;
+                                                                        } else {
+                                                                            glowAlpha = 1 - ((progress - 0.6) / 0.4);
+                                                                        }
+
+                                                                        // Y-offset: subtle bounce up at start, settle back
+                                                                        let yOffset = 0;
+                                                                        if (progress > 0 && progress < 0.9) {
+                                                                            // Peak at 0.7 progress, then settle
+                                                                            const bounceProgress = progress < 0.7
+                                                                                ? progress / 0.7
+                                                                                : 1 - ((progress - 0.7) / 0.3);
+                                                                            yOffset = -2 * bounceProgress; // Move up by 2px at peak
+                                                                        }
+
+                                                                        // Scale: pop effect with spring-like decay
+                                                                        let scale = 1;
+                                                                        if (progress > 0 && progress < 0.7) {
+                                                                            const scaleProgress = progress / 0.7;
+                                                                            // Start at 0.95, peak at 1.025, settle at 1
+                                                                            if (scaleProgress < 0.5) {
+                                                                                scale = 0.95 + (0.075 * (scaleProgress / 0.5));
+                                                                            } else {
+                                                                                scale = 1.025 - (0.025 * ((scaleProgress - 0.5) / 0.5));
+                                                                            }
+                                                                        }
+
+                                                                        // Text shadow glow intensity
+                                                                        const glowBlur = 4 + (8 * glowAlpha);
+                                                                        const glowOpacity = glowAlpha * 0.7;
+
+                                                                        // Brightness based on progress (dim -> bright)
+                                                                        const brightness = progress > 0 ? 0.4 + (0.6 * progress) : 0.35;
+
+                                                                        return (
+                                                                            <span
+                                                                                key={wordIndex}
+                                                                                className="syllable-word"
+                                                                                style={{
+                                                                                    display: "inline-block",
+                                                                                    marginRight: "0.15em",
+                                                                                    transform: `translateY(${yOffset}px) scale(${scale})`,
+                                                                                    transition: "transform 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                                                                                    // Simple color transition instead of gradient
+                                                                                    color: `rgba(255, 255, 255, ${brightness})`,
+                                                                                    // Glow effect for active words
+                                                                                    textShadow: glowAlpha > 0.1
+                                                                                        ? `0 0 ${glowBlur}px rgba(255,255,255,${glowOpacity})`
+                                                                                        : 'none',
+                                                                                }}
+                                                                            >
+                                                                                {word.text}
+                                                                            </span>
+                                                                        );
+                                                                    })}
+                                                                </p>
+                                                            ) : (
+                                                                <p
+                                                                    className={cn(
+                                                                        "text-left leading-tight font-semibold transition-all duration-300",
+                                                                        isCurrentLine
+                                                                            ? "text-4xl xs:text-5xl text-white"
+                                                                            : "text-3xl lg:text-4xl text-white"
+                                                                    )}
+                                                                    style={undefined}
+                                                                >
+                                                                    {line.text || "• • •"}
+                                                                </p>
+                                                            )}
+
+                                                            {/* Romanization */}
+                                                            {showRomanization && line.romanized && (
+                                                                <p
+                                                                    className={cn(
+                                                                        "text-left italic mt-1",
+                                                                        isCurrentLine
+                                                                            ? "text-base text-white/50"
+                                                                            : "text-sm text-white/30"
+                                                                    )}
+                                                                >
+                                                                    {line.romanized}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-start justify-center h-full">
+                                                {lyricsLoading ? (
+                                                    <>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                            <p className="text-white/50 text-xl font-medium">Loading lyrics...</p>
+                                                        </div>
+                                                    </>
+                                                ) : lyricsFailed ? (
+                                                    <>
+                                                        <p className="text-white/40 text-3xl font-semibold">• • •</p>
+                                                        <p className="text-white/30 text-lg mt-2">
+                                                            Lyrics unavailable for this track
+                                                        </p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-white/40 text-3xl font-semibold">• • •</p>
+                                                        <p className="text-white/30 text-lg mt-2">
+                                                            {error || "Lyrics will appear here when available"}
+                                                        </p>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
-                            {/* Mobile Controls (bottom fixed) */}
-                            <div className="shrink-0 px-4 pb-6 pt-2">
-                                {/* Progress Bar */}
-                                <div className="mb-3">
-                                    <div className="h-1 bg-white/20 rounded-full overflow-hidden">
-                                        <motion.div
-                                            className="h-full bg-white rounded-full"
-                                            style={{
-                                                width: `${track?.duration ? (currentTime / track.duration) * 100 : 0}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="flex justify-between items-center text-white/50 text-xs mt-1">
-                                        <span>{formatTime(currentTime)}</span>
-                                        {/* Audio Quality Badge */}
-                                        <button
-                                            onClick={() => setShowQualityDialog(true)}
-                                            className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-white/10 transition-colors border border-transparent hover:border-white/30"
-                                        >
-                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M2 6a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm3 2v3h2V8H5zm4 0v8h2V8H9zm4 0v5h2V8h-2zm4 0v6h2V8h-2z" />
-                                            </svg>
-                                            <span className="text-white/60">Lossless</span>
-                                        </button>
-                                        <span>-{formatTime((track?.duration || 0) - currentTime)}</span>
-                                    </div>
-                                </div>
-                                {/* Control Buttons */}
-                                <div className="flex items-center justify-center gap-8">
-                                    <button
-                                        onClick={() => handleControl(isPaused ? "resume" : "pause")}
-                                        disabled={isControlling}
-                                        className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
+                            {/* Album Only Mode - Left panel already handles centered display when !showLyrics */}
+
+                            {/* Queue Panel */}
+                            <AnimatePresence>
+                                {showQueue && (
+                                    <motion.div
+                                        initial={{ width: 0, opacity: 0 }}
+                                        animate={{ width: 300, opacity: 1 }}
+                                        exit={{ width: 0, opacity: 0 }}
+                                        className="flex-shrink-0 bg-black/60 backdrop-blur-xl overflow-hidden border-l border-white/10"
                                     >
-                                        {isPaused ? (
-                                            <Play className="w-10 h-10 text-white" fill="white" />
-                                        ) : (
-                                            <Pause className="w-10 h-10 text-white" fill="white" />
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={() => handleControl("skip")}
-                                        disabled={isControlling}
-                                        className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
-                                    >
-                                        <SkipForward className="w-8 h-8 text-white" fill="white" />
-                                    </button>
-                                    <button
-                                        onClick={() => handleControl("stop")}
-                                        disabled={isControlling}
-                                        className="p-3 hover:scale-110 transition-transform disabled:opacity-50"
-                                    >
-                                        <Square className="w-7 h-7 text-white" fill="white" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ========== DESKTOP LAYOUT ========== */}
-                        {/* LEFT PANEL - Album Art + Controls (Desktop Only) */}
-                        <div className={cn(
-                            "hidden sm:flex flex-col items-center justify-center py-8 transition-all duration-300",
-                            showLyrics ? "w-1/2 px-16" : "w-full max-w-[450px] px-12"
-                        )}>
-                            {/* Content wrapper with max-width for the album art */}
-                            <div className={cn(
-                                "w-full",
-                                showLyrics && "max-w-[320px]"
-                            )}>
-                                {/* Album Art */}
-                                <div className="mb-2">
-                                    {track?.artwork_url ? (
-                                        <img
-                                            src={track.artwork_url}
-                                            alt={track.title}
-                                            className="w-full aspect-square rounded-xl shadow-2xl object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-[#7B1E3C] to-[#C4314B] flex items-center justify-center shadow-2xl">
-                                            <Music className="w-24 h-24 text-white/80" />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Track Info - Apple Music Style (Compact) */}
-                                <div className="mb-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <h2 className="text-white text-xl font-semibold truncate flex-1">
-                                            {track?.title || "Unknown Track"}
-                                        </h2>
-                                        <div className="relative">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowMenu(!showMenu);
-                                                }}
-                                                className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all"
-                                            >
-                                                <MoreHorizontal className="w-5 h-5" />
-                                            </button>
-
-                                            {/* Dropdown Menu - Using Portal to fix click issues */}
-                                            {showMenu && typeof document !== 'undefined' && createPortal(
-                                                <div className="fixed inset-0 z-[9999]">
-                                                    {/* Backdrop */}
-                                                    <div
-                                                        className="absolute inset-0 bg-black/20"
-                                                        onClick={() => setShowMenu(false)}
-                                                    />
-                                                    {/* Menu */}
-                                                    <div
-                                                        className="absolute left-1/2 bottom-[20%] -translate-x-1/2 w-64 py-2 bg-zinc-900/98 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 pointer-events-auto"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        {/* Lyrics Section - Opens Panel */}
-                                                        <button
-                                                            onClick={() => {
-                                                                setShowLyricsPanel(true);
-                                                                setShowMenu(false);
-                                                            }}
-                                                            className="w-full px-4 py-2.5 flex items-center justify-between text-white/80 hover:bg-white/5 transition-colors"
-                                                        >
-                                                            <div className="flex items-center gap-3">
-                                                                <Type className="w-4 h-4" />
-                                                                <span className="text-sm">Lyrics</span>
-                                                            </div>
-                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${showLyrics ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
-                                                                {showLyrics ? 'ON' : 'OFF'}
-                                                            </span>
-                                                        </button>
-
-                                                        {/* Queue Toggle */}
-                                                        <button
-                                                            onClick={() => {
-                                                                setShowQueue(!showQueue);
-                                                                setShowMenu(false);
-                                                            }}
-                                                            className="w-full px-4 py-2.5 flex items-center justify-between text-white/80 hover:bg-white/5 transition-colors"
-                                                        >
-                                                            <div className="flex items-center gap-3">
-                                                                <ListMusic className="w-4 h-4" />
-                                                                <span className="text-sm">Queue</span>
-                                                            </div>
-                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${showQueue ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50'}`}>
-                                                                {showQueue ? 'ON' : 'OFF'}
-                                                            </span>
-                                                        </button>
-
-                                                        {/* Fullscreen Toggle */}
-                                                        <button
-                                                            onClick={() => {
-                                                                if (document.fullscreenElement) {
-                                                                    document.exitFullscreen();
-                                                                    setIsFullscreen(false);
-                                                                } else {
-                                                                    document.documentElement.requestFullscreen();
-                                                                    setIsFullscreen(true);
-                                                                }
-                                                                setShowMenu(false);
-                                                            }}
-                                                            className="w-full px-4 py-2.5 flex items-center gap-3 text-white/80 hover:bg-white/5 transition-colors border-t border-white/10 mt-1"
-                                                        >
-                                                            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                                                            <span className="text-sm">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
-                                                        </button>
-                                                    </div>
-                                                </div>,
-                                                document.body
-                                            )}
-                                        </div>
-                                    </div>
-                                    <MarqueeText
-                                        text={`${track?.artist || "Unknown Artist"} — ${track?.album || "Unknown Album"}`}
-                                        className="text-white/60 text-sm -mt-0.5"
-                                    />
-                                </div>
-
-                                {/* Progress Bar */}
-                                <div className="mb-1">
-                                    <div className="h-1 bg-white/20 rounded-full overflow-hidden cursor-pointer hover:h-1.5 transition-all">
-                                        <motion.div
-                                            className="h-full bg-white rounded-full"
-                                            style={{
-                                                width: `${track?.duration ? (currentTime / track.duration) * 100 : 0}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="flex justify-between items-center text-white/50 text-xs mt-1">
-                                        <span>{formatTime(currentTime)}</span>
-                                        {/* Audio Quality Badge - Desktop */}
-                                        <button
-                                            onClick={() => setShowQualityDialog(true)}
-                                            className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-white/10 transition-colors border border-transparent hover:border-white/30"
-                                        >
-                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M2 6a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm3 2v3h2V8H5zm4 0v8h2V8H9zm4 0v5h2V8h-2zm4 0v6h2V8h-2z" />
-                                            </svg>
-                                            <span className="text-[10px] font-medium text-white/60">Lossless</span>
-                                        </button>
-                                        <span>-{formatTime((track?.duration || 0) - currentTime)}</span>
-                                    </div>
-                                </div>
-
-                                {/* Controls - Apple Music Style */}
-                                <div className="flex items-center justify-center gap-6 mt-4">
-                                    <button
-                                        onClick={() => handleControl(isPaused ? "resume" : "pause")}
-                                        disabled={isControlling}
-                                        className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
-                                    >
-                                        {isPaused ? (
-                                            <Play className="w-8 h-8 text-white" fill="white" />
-                                        ) : (
-                                            <Pause className="w-8 h-8 text-white" fill="white" />
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={() => handleControl("skip")}
-                                        disabled={isControlling}
-                                        className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
-                                    >
-                                        <SkipForward className="w-8 h-8 text-white" fill="white" />
-                                    </button>
-                                    <button
-                                        onClick={() => handleControl("stop")}
-                                        disabled={isControlling}
-                                        className="p-2 hover:scale-110 transition-transform disabled:opacity-50"
-                                    >
-                                        <Square className="w-7 h-7 text-white" fill="white" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* RIGHT PANEL - Lyrics (Desktop Only) */}
-                        {showLyrics && (
-                            <div className="hidden sm:flex w-1/2 flex-col justify-center overflow-hidden relative">
-                                {/* Scroll Mode Indicator */}
-                                <AnimatePresence>
-                                    {isUserScrolling && lyrics?.lines?.length && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: -10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -10 }}
-                                            className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1"
-                                        >
-                                            <div className="flex flex-col items-center animate-bounce">
-                                                <svg className="w-6 h-6 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                                <svg className="w-6 h-6 text-white/40 -mt-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </div>
-                                            <span className="text-xs text-white/50 bg-black/30 px-2 py-0.5 rounded-full backdrop-blur-sm">
-                                                Scroll Mode • 3s to reset
-                                            </span>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-
-                                <div
-                                    ref={lyricsContainerRef}
-                                    onClick={handleLyricsAreaClick}
-                                    onWheel={(e) => {
-                                        // Direct React handler for reliable trackpad detection
-                                        if (Math.abs(e.deltaY) > 0.5 || Math.abs(e.deltaX) > 0.5) {
-                                            activateScrollMode();
-                                        }
-                                    }}
-                                    className="overflow-y-auto scrollbar-hide px-8 lg:px-12 py-[40vh] max-h-full cursor-pointer"
-                                >
-                                    {lyrics?.lines?.length ? (
-                                        <div className="space-y-6">
-                                            {/* Interlude Dots Animation - Desktop */}
-                                            <AnimatePresence>
-                                                {interludeInfo?.isActive && (
-                                                    <motion.div
-                                                        initial={{ opacity: 0, scale: 0.3 }}
-                                                        animate={{
-                                                            opacity: interludeInfo.progress >= 0.98 ? 0 : 1,
-                                                            scale: interludeInfo.progress >= 0.98 ? 0.3 : 1
-                                                        }}
-                                                        exit={{ opacity: 0, scale: 0.3 }}
-                                                        transition={{ duration: 0.3, ease: 'easeOut' }}
-                                                        style={{ transformOrigin: 'left center' }}
-                                                        className="flex items-center justify-start gap-4 py-8 pl-1"
-                                                    >
-                                                        {[0, 1, 2].map((dotIndex) => (
-                                                            <motion.div
-                                                                key={dotIndex}
-                                                                className="w-4 h-4 rounded-full bg-white"
-                                                                style={{ opacity: dotOpacities[dotIndex] }}
-                                                                animate={{
-                                                                    scale: dotOpacities[dotIndex] > 0.8 ? [1, 1.2, 1] : 1
-                                                                }}
-                                                                transition={{
-                                                                    scale: {
-                                                                        duration: 0.3,
-                                                                        repeat: dotOpacities[dotIndex] > 0.8 ? Infinity : 0,
-                                                                        repeatDelay: 0.5
-                                                                    }
-                                                                }}
-                                                            />
-                                                        ))}
-                                                    </motion.div>
+                                        <div className="p-5 h-full flex flex-col">
+                                            <h3 className="text-white font-semibold mb-4 flex items-center gap-2 text-lg">
+                                                <ListMusic className="w-5 h-5" />
+                                                Queue
+                                                {queue.length > 0 && (
+                                                    <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/60">
+                                                        {queue.length}
+                                                    </span>
                                                 )}
-                                            </AnimatePresence>
-
-                                            {lyrics.lines.map((line, index) => {
-                                                const isCurrentLine = index === currentLineIndex;
-                                                const isPastLine = index < currentLineIndex;
-                                                const isFutureLine = index > currentLineIndex;
-
-                                                // Only collapse past lines when not scrolling
-                                                const shouldCollapse = isPastLine && !isUserScrolling;
-
-                                                return (
-                                                    <div
-                                                        key={index}
-                                                        ref={isCurrentLine ? currentLineRef : null}
-                                                        className={cn(
-                                                            "transition-all duration-500 ease-out overflow-hidden",
-                                                            // When scrolling: show all lines normally
-                                                            isUserScrolling && "opacity-100",
-                                                            // Past lines: fade, blur, and collapse
-                                                            shouldCollapse && "max-h-0 opacity-0 blur-sm my-0",
-                                                            // Future lines: grayed out
-                                                            isFutureLine && !isUserScrolling && "opacity-50"
-                                                        )}
-                                                        style={{
-                                                            maxHeight: shouldCollapse ? 0 : '200px',
-                                                            marginTop: shouldCollapse ? 0 : undefined,
-                                                            marginBottom: shouldCollapse ? 0 : undefined,
-                                                            filter: shouldCollapse ? 'blur(4px)' : 'none',
-                                                        }}
-                                                    >
-                                                        {/* Current line with per-word highlighting (only when real syllable timing exists) */}
-                                                        {isCurrentLine && line.words && line.words.length > 0 && lyrics?.has_syllable_timing ? (
-                                                            <p className="text-4xl xs:text-5xl font-bold text-left leading-tight">
-                                                                {line.words.map((word: { text: string; start_time: number; end_time: number }, wordIndex: number) => {
-                                                                    // Apply syllable-specific offset for accurate sync
-                                                                    const adjustedTime = currentTime + SYLLABLE_OFFSET;
-
-                                                                    // Calculate word progress (0 to 1)
-                                                                    let progress = 0;
-                                                                    if (adjustedTime >= word.end_time) {
-                                                                        progress = 1;
-                                                                    } else if (adjustedTime >= word.start_time) {
-                                                                        const rawProgress = (adjustedTime - word.start_time) / (word.end_time - word.start_time);
-                                                                        // Apply ease-out for smoother animation
-                                                                        progress = 1 - Math.pow(1 - rawProgress, 2);
-                                                                    }
-
-                                                                    // Beautiful-lyrics style glow curve
-                                                                    let glowAlpha = 0;
-                                                                    if (progress < 0.15) {
-                                                                        glowAlpha = progress / 0.15;
-                                                                    } else if (progress < 0.6) {
-                                                                        glowAlpha = 1;
-                                                                    } else {
-                                                                        glowAlpha = 1 - ((progress - 0.6) / 0.4);
-                                                                    }
-
-                                                                    // Y-offset: subtle bounce up at start, settle back
-                                                                    let yOffset = 0;
-                                                                    if (progress > 0 && progress < 0.9) {
-                                                                        // Peak at 0.7 progress, then settle
-                                                                        const bounceProgress = progress < 0.7
-                                                                            ? progress / 0.7
-                                                                            : 1 - ((progress - 0.7) / 0.3);
-                                                                        yOffset = -2 * bounceProgress; // Move up by 2px at peak
-                                                                    }
-
-                                                                    // Scale: pop effect with spring-like decay
-                                                                    let scale = 1;
-                                                                    if (progress > 0 && progress < 0.7) {
-                                                                        const scaleProgress = progress / 0.7;
-                                                                        // Start at 0.95, peak at 1.025, settle at 1
-                                                                        if (scaleProgress < 0.5) {
-                                                                            scale = 0.95 + (0.075 * (scaleProgress / 0.5));
-                                                                        } else {
-                                                                            scale = 1.025 - (0.025 * ((scaleProgress - 0.5) / 0.5));
-                                                                        }
-                                                                    }
-
-                                                                    // Text shadow glow intensity
-                                                                    const glowBlur = 4 + (8 * glowAlpha);
-                                                                    const glowOpacity = glowAlpha * 0.7;
-
-                                                                    // Brightness based on progress (dim -> bright)
-                                                                    const brightness = progress > 0 ? 0.4 + (0.6 * progress) : 0.35;
-
-                                                                    return (
-                                                                        <span
-                                                                            key={wordIndex}
-                                                                            className="syllable-word"
-                                                                            style={{
-                                                                                display: "inline-block",
-                                                                                marginRight: "0.15em",
-                                                                                transform: `translateY(${yOffset}px) scale(${scale})`,
-                                                                                transition: "transform 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-                                                                                // Simple color transition instead of gradient
-                                                                                color: `rgba(255, 255, 255, ${brightness})`,
-                                                                                // Glow effect for active words
-                                                                                textShadow: glowAlpha > 0.1
-                                                                                    ? `0 0 ${glowBlur}px rgba(255,255,255,${glowOpacity})`
-                                                                                    : 'none',
-                                                                            }}
+                                            </h3>
+                                            <div className="flex-1 overflow-y-auto space-y-2">
+                                                {queue.length > 0 ? (
+                                                    queue.map((item, index) => (
+                                                        <div
+                                                            key={item.position}
+                                                            className="group p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                {/* Track number */}
+                                                                <span className="text-white/30 text-xs font-mono mt-0.5 w-4">
+                                                                    {item.position}
+                                                                </span>
+                                                                {/* Track info */}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-white text-sm font-medium truncate">
+                                                                        {item.title}
+                                                                    </p>
+                                                                    <p className="text-white/50 text-xs truncate">
+                                                                        {item.artist}
+                                                                    </p>
+                                                                </div>
+                                                                {/* Action buttons - show on hover */}
+                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    {/* Move Up */}
+                                                                    {index > 0 && onQueueMove && (
+                                                                        <button
+                                                                            onClick={() => onQueueMove(item.position, item.position - 1)}
+                                                                            className="p-1.5 rounded-lg hover:bg-white/20 text-white/60 hover:text-white transition-colors"
+                                                                            title="Move up"
                                                                         >
-                                                                            {word.text}
-                                                                        </span>
-                                                                    );
-                                                                })}
-                                                            </p>
-                                                        ) : (
-                                                            <p
-                                                                className={cn(
-                                                                    "text-left leading-tight font-semibold transition-all duration-300",
-                                                                    isCurrentLine
-                                                                        ? "text-4xl xs:text-5xl text-white"
-                                                                        : "text-3xl lg:text-4xl text-white"
-                                                                )}
-                                                                style={undefined}
-                                                            >
-                                                                {line.text || "• • •"}
-                                                            </p>
-                                                        )}
-
-                                                        {/* Romanization */}
-                                                        {showRomanization && line.romanized && (
-                                                            <p
-                                                                className={cn(
-                                                                    "text-left italic mt-1",
-                                                                    isCurrentLine
-                                                                        ? "text-base text-white/50"
-                                                                        : "text-sm text-white/30"
-                                                                )}
-                                                            >
-                                                                {line.romanized}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-start justify-center h-full">
-                                            {lyricsLoading ? (
-                                                <>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                                        <p className="text-white/50 text-xl font-medium">Loading lyrics...</p>
-                                                    </div>
-                                                </>
-                                            ) : lyricsFailed ? (
-                                                <>
-                                                    <p className="text-white/40 text-3xl font-semibold">• • •</p>
-                                                    <p className="text-white/30 text-lg mt-2">
-                                                        Lyrics unavailable for this track
-                                                    </p>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <p className="text-white/40 text-3xl font-semibold">• • •</p>
-                                                    <p className="text-white/30 text-lg mt-2">
-                                                        {error || "Lyrics will appear here when available"}
-                                                    </p>
-                                                </>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Album Only Mode - Left panel already handles centered display when !showLyrics */}
-
-                        {/* Queue Panel */}
-                        <AnimatePresence>
-                            {showQueue && (
-                                <motion.div
-                                    initial={{ width: 0, opacity: 0 }}
-                                    animate={{ width: 300, opacity: 1 }}
-                                    exit={{ width: 0, opacity: 0 }}
-                                    className="flex-shrink-0 bg-black/60 backdrop-blur-xl overflow-hidden border-l border-white/10"
-                                >
-                                    <div className="p-5 h-full flex flex-col">
-                                        <h3 className="text-white font-semibold mb-4 flex items-center gap-2 text-lg">
-                                            <ListMusic className="w-5 h-5" />
-                                            Queue
-                                            {queue.length > 0 && (
-                                                <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/60">
-                                                    {queue.length}
-                                                </span>
-                                            )}
-                                        </h3>
-                                        <div className="flex-1 overflow-y-auto space-y-2">
-                                            {queue.length > 0 ? (
-                                                queue.map((item, index) => (
-                                                    <div
-                                                        key={item.position}
-                                                        className="group p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-                                                    >
-                                                        <div className="flex items-start gap-3">
-                                                            {/* Track number */}
-                                                            <span className="text-white/30 text-xs font-mono mt-0.5 w-4">
-                                                                {item.position}
-                                                            </span>
-                                                            {/* Track info */}
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-white text-sm font-medium truncate">
-                                                                    {item.title}
-                                                                </p>
-                                                                <p className="text-white/50 text-xs truncate">
-                                                                    {item.artist}
-                                                                </p>
-                                                            </div>
-                                                            {/* Action buttons - show on hover */}
-                                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                {/* Move Up */}
-                                                                {index > 0 && onQueueMove && (
-                                                                    <button
-                                                                        onClick={() => onQueueMove(item.position, item.position - 1)}
-                                                                        className="p-1.5 rounded-lg hover:bg-white/20 text-white/60 hover:text-white transition-colors"
-                                                                        title="Move up"
-                                                                    >
-                                                                        <ChevronUp className="w-4 h-4" />
-                                                                    </button>
-                                                                )}
-                                                                {/* Move Down */}
-                                                                {index < queue.length - 1 && onQueueMove && (
-                                                                    <button
-                                                                        onClick={() => onQueueMove(item.position, item.position + 1)}
-                                                                        className="p-1.5 rounded-lg hover:bg-white/20 text-white/60 hover:text-white transition-colors"
-                                                                        title="Move down"
-                                                                    >
-                                                                        <ChevronDown className="w-4 h-4" />
-                                                                    </button>
-                                                                )}
-                                                                {/* Remove */}
-                                                                {onQueueRemove && (
-                                                                    <button
-                                                                        onClick={() => onQueueRemove(item.position)}
-                                                                        className="p-1.5 rounded-lg hover:bg-rose-500/20 text-white/60 hover:text-rose-400 transition-colors"
-                                                                        title="Remove from queue"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
-                                                                )}
+                                                                            <ChevronUp className="w-4 h-4" />
+                                                                        </button>
+                                                                    )}
+                                                                    {/* Move Down */}
+                                                                    {index < queue.length - 1 && onQueueMove && (
+                                                                        <button
+                                                                            onClick={() => onQueueMove(item.position, item.position + 1)}
+                                                                            className="p-1.5 rounded-lg hover:bg-white/20 text-white/60 hover:text-white transition-colors"
+                                                                            title="Move down"
+                                                                        >
+                                                                            <ChevronDown className="w-4 h-4" />
+                                                                        </button>
+                                                                    )}
+                                                                    {/* Remove */}
+                                                                    {onQueueRemove && (
+                                                                        <button
+                                                                            onClick={() => onQueueRemove(item.position)}
+                                                                            className="p-1.5 rounded-lg hover:bg-rose-500/20 text-white/60 hover:text-rose-400 transition-colors"
+                                                                            title="Remove from queue"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <p className="text-white/40 text-sm text-center py-8">
-                                                    Queue is empty
-                                                </p>
-                                            )}
+                                                    ))
+                                                ) : (
+                                                    <p className="text-white/40 text-sm text-center py-8">
+                                                        Queue is empty
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
 
                     {/* Click outside to close menu */}
                     {showMenu && (
