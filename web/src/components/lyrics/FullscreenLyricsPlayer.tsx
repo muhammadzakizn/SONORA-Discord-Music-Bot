@@ -1066,7 +1066,7 @@ export default function FullscreenLyricsPlayer({
                                             {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
                                                 <div
                                                     ref={lyricsContainerRef}
-                                                    className="h-full overflow-y-auto scrollbar-hide px-3 py-[30vh]"
+                                                    className="h-full overflow-y-auto scrollbar-hide px-1 py-[30vh]"
                                                     onScroll={() => {
                                                         if (lyricsContainerRef.current) {
                                                             setIsUserScrolling(true);
@@ -1146,15 +1146,57 @@ export default function FullscreenLyricsPlayer({
                                                                         filter: shouldCollapse ? 'blur(4px)' : 'none',
                                                                     }}
                                                                 >
-                                                                    {/* Mobile: Always highlight full line (no per-word) for better readability */}
-                                                                    <p
-                                                                        className={cn(
-                                                                            "text-2xl font-bold leading-snug transition-all duration-300",
-                                                                            isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
-                                                                        )}
-                                                                    >
-                                                                        {displayText || "♪"}
-                                                                    </p>
+                                                                    {/* Mobile: Per-word highlighting (same as desktop) */}
+                                                                    {isCurrentLine && line.words && line.words.length > 0 && lyrics?.has_syllable_timing ? (
+                                                                        <p className="text-4xl font-bold leading-snug">
+                                                                            {line.words.map((word: { text: string; start_time: number; end_time: number }, wordIndex: number) => {
+                                                                                const adjustedTime = currentTime + SYLLABLE_OFFSET;
+                                                                                let progress = 0;
+                                                                                if (adjustedTime >= word.end_time) {
+                                                                                    progress = 1;
+                                                                                } else if (adjustedTime >= word.start_time) {
+                                                                                    const rawProgress = (adjustedTime - word.start_time) / (word.end_time - word.start_time);
+                                                                                    progress = 1 - Math.pow(1 - rawProgress, 2);
+                                                                                }
+                                                                                let glowAlpha = 0;
+                                                                                if (progress < 0.15) {
+                                                                                    glowAlpha = progress / 0.15;
+                                                                                } else if (progress < 0.6) {
+                                                                                    glowAlpha = 1;
+                                                                                } else {
+                                                                                    glowAlpha = 1 - ((progress - 0.6) / 0.4);
+                                                                                }
+                                                                                const glowBlur = 4 + (8 * glowAlpha);
+                                                                                const glowOpacity = glowAlpha * 0.7;
+                                                                                const brightness = progress > 0 ? 0.4 + (0.6 * progress) : 0.35;
+                                                                                return (
+                                                                                    <span
+                                                                                        key={wordIndex}
+                                                                                        style={{
+                                                                                            display: "inline-block",
+                                                                                            marginRight: "0.15em",
+                                                                                            color: `rgba(255, 255, 255, ${brightness})`,
+                                                                                            textShadow: glowAlpha > 0.1
+                                                                                                ? `0 0 ${glowBlur}px rgba(255,255,255,${glowOpacity})`
+                                                                                                : "none",
+                                                                                            transition: "color 0.15s ease-out, text-shadow 0.15s ease-out",
+                                                                                        }}
+                                                                                    >
+                                                                                        {word.text}
+                                                                                    </span>
+                                                                                );
+                                                                            })}
+                                                                        </p>
+                                                                    ) : (
+                                                                        <p
+                                                                            className={cn(
+                                                                                "text-4xl font-bold leading-snug transition-all duration-300",
+                                                                                isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
+                                                                            )}
+                                                                        >
+                                                                            {displayText || "♪"}
+                                                                        </p>
+                                                                    )}
                                                                 </div>
                                                             );
                                                         })}
