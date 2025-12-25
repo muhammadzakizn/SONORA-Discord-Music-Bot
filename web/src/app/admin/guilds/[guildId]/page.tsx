@@ -25,7 +25,7 @@ import {
     GripVertical,
     ChevronUp,
     ChevronDown,
-    Mic2,
+    Maximize2,
     X,
     MoreVertical,
 } from "lucide-react";
@@ -557,7 +557,7 @@ export default function GuildDetailPage() {
                                     )}
                                     title="Show Lyrics"
                                 >
-                                    <Mic2 className={cn("w-5 h-5 sm:w-6 sm:h-6", isDark ? "text-white" : "text-gray-700")} />
+                                    <Maximize2 className={cn("w-5 h-5 sm:w-6 sm:h-6", isDark ? "text-white" : "text-gray-700")} />
                                 </button>
                             </div>
 
