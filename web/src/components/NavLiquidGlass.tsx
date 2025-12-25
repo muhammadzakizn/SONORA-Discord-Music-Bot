@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { useSession, getAvatarUrl, DiscordUser } from "@/contexts/SessionContext";
 import { useSettings, LANGUAGES, Language } from "@/contexts/SettingsContext";
+import { useFullscreenLyrics } from "@/contexts/FullscreenLyricsContext";
 import { cn } from "@/lib/utils";
 import { WEB_VERSION } from "@/constants/version";
 import { useUpdate } from "@/contexts/UpdateContext";
@@ -107,6 +108,9 @@ export default function NavLiquidGlass() {
         dyslexicFont,
         setDyslexicFont,
     } = useSettings();
+
+    // Check if fullscreen lyrics is open - hide entire nav
+    const { isFullscreenLyricsOpen } = useFullscreenLyrics();
 
     const [activePopup, setActivePopup] = useState<PopupType>(null);
     const [showScrollTop, setShowScrollTop] = useState(false);
@@ -278,6 +282,11 @@ export default function NavLiquidGlass() {
     }, [isNavHidden]);
 
     const isDeveloper = (user ? DEVELOPER_IDS.includes(user.id) : false) || isDevLoggedIn;
+
+    // Hide entire navigation when fullscreen lyrics is open
+    if (isFullscreenLyricsOpen) {
+        return null;
+    }
 
     return (
         <>

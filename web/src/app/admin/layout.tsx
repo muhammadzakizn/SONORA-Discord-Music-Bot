@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { SessionProvider, useSession, getAvatarUrl } from "@/contexts/SessionContext";
 import { TutorialOverlay, useTutorial } from "@/components/TutorialOverlay";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useFullscreenLyrics } from "@/contexts/FullscreenLyricsContext";
 import { Footer } from "@/components/Footer";
 import { TimeAmbientBackground } from "@/components/admin/TimeAmbientBackground";
 
@@ -432,6 +433,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { t, isDark } = useSettings();
 
+  // Check if fullscreen lyrics is open - hide layout chrome
+  const { isFullscreenLyricsOpen } = useFullscreenLyrics();
+
   const { showTutorial, completeTutorial, skipTutorial } = useTutorial();
 
   // Detect mobile
@@ -519,22 +523,26 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <TutorialOverlay
-        isOpen={showTutorial}
-        onComplete={completeTutorial}
-        onSkip={skipTutorial}
-      />
+      {!isFullscreenLyricsOpen && (
+        <TutorialOverlay
+          isOpen={showTutorial}
+          onComplete={completeTutorial}
+          onSkip={skipTutorial}
+        />
+      )}
       <div className={cn(
         "h-screen flex overflow-hidden transition-colors duration-300",
         isDark ? "bg-black text-white" : "bg-gray-50 text-gray-900"
       )}>
-        {/* Sidebar */}
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          isDark={isDark}
-          isMobile={isMobile}
-        />
+        {/* Sidebar - Hidden when fullscreen lyrics is open */}
+        {!isFullscreenLyricsOpen && (
+          <Sidebar
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            isDark={isDark}
+            isMobile={isMobile}
+          />
+        )}
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden relative">
@@ -543,25 +551,34 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
 
           {/* Scrollable container with header inside */}
           <main ref={mainRef} className="flex-1 overflow-y-auto custom-scrollbar relative">
-            {/* Sticky Header - stays at top while content scrolls behind */}
-            <div className="sticky top-0 z-40">
-              <Header
-                onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-                sidebarOpen={sidebarOpen}
-                isDark={isDark}
-                isScrolled={isScrolled}
-              />
-            </div>
+            {/* Sticky Header - Hidden when fullscreen lyrics is open */}
+            {!isFullscreenLyricsOpen && (
+              <div className="sticky top-0 z-40">
+                <Header
+                  onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+                  sidebarOpen={sidebarOpen}
+                  isDark={isDark}
+                  isScrolled={isScrolled}
+                />
+              </div>
+            )}
 
             {/* Content with padding */}
-            <div className="p-4 md:p-6 relative z-10">
-              <div className="max-w-7xl mx-auto w-full">
+            <div className={cn(
+              "relative z-10",
+              isFullscreenLyricsOpen ? "p-0" : "p-4 md:p-6"
+            )}>
+              <div className={cn(
+                isFullscreenLyricsOpen ? "" : "max-w-7xl mx-auto w-full"
+              )}>
                 {children}
               </div>
-              {/* Footer with negative margin to extend to edges */}
-              <div className="-mx-4 md:-mx-6 -mb-4 md:-mb-6">
-                <Footer />
-              </div>
+              {/* Footer with negative margin to extend to edges - Hidden when fullscreen lyrics is open */}
+              {!isFullscreenLyricsOpen && (
+                <div className="-mx-4 md:-mx-6 -mb-4 md:-mb-6">
+                  <Footer />
+                </div>
+              )}
             </div>
           </main>
         </div>

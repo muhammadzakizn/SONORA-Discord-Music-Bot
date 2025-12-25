@@ -28,6 +28,7 @@ import {
     FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFullscreenLyrics } from "@/contexts/FullscreenLyricsContext";
 import WebGLBackground from "./WebGLBackground";
 
 interface LyricWord {
@@ -148,6 +149,18 @@ export default function FullscreenLyricsPlayer({
     onQueueRemove,
     onQueueMove,
 }: FullscreenLyricsPlayerProps) {
+    // Context to hide/show layout chrome when fullscreen lyrics is open
+    const { setFullscreenLyricsOpen } = useFullscreenLyrics();
+
+    // Sync isOpen state with context for layout to respond
+    useEffect(() => {
+        setFullscreenLyricsOpen(isOpen);
+        return () => {
+            // Ensure state is reset when component unmounts
+            setFullscreenLyricsOpen(false);
+        };
+    }, [isOpen, setFullscreenLyricsOpen]);
+
     const [track, setTrack] = useState<TrackInfo | null>(null);
     const [lyrics, setLyrics] = useState<LyricsData | null>(null);
     const [currentTime, setCurrentTime] = useState(0);
