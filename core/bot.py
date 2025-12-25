@@ -136,13 +136,13 @@ class MusicBot(commands.Bot):
                                 inline=False
                             )
                             
-                            embed.set_footer(text="🔗 Pantau status di: bit.ly/SONORAbotSTATUS")
+                            embed.set_footer(text="🔗 Pantau status di: sonora.muhammadzakizn.com/status")
                             
                             # Create buttons
                             view = discord.ui.View()
                             view.add_item(discord.ui.Button(
                                 label="Status Page",
-                                url="https://bit.ly/SONORAbotSTATUS",
+                                url="https://sonora.muhammadzakizn.com/status",
                                 style=discord.ButtonStyle.link,
                                 emoji="📊"
                             ))
@@ -223,13 +223,13 @@ class MusicBot(commands.Bot):
                                 ),
                                 color=0xE53935
                             )
-                            embed.set_footer(text="SONORA Support: https://s.id/SONORAbotSUPPORT")
+                            embed.set_footer(text="SONORA Support: https://sonora.muhammadzakizn.com/support")
                             
                             # Add support button
                             view = discord.ui.View()
                             view.add_item(discord.ui.Button(
                                 label="Contact Support",
-                                url="https://s.id/SONORAbotSUPPORT",
+                                url="https://sonora.muhammadzakizn.com/support",
                                 style=discord.ButtonStyle.link,
                                 emoji="💬"
                             ))
@@ -262,13 +262,13 @@ class MusicBot(commands.Bot):
                                     ),
                                     color=0xE53935
                                 )
-                                embed.set_footer(text="SONORA Support: https://s.id/SONORAbotSUPPORT")
+                                embed.set_footer(text="SONORA Support: https://sonora.muhammadzakizn.com/support")
                                 
                                 # Add support button
                                 view = discord.ui.View()
                                 view.add_item(discord.ui.Button(
                                     label="Contact Support",
-                                    url="https://s.id/SONORAbotSUPPORT",
+                                    url="https://sonora.muhammadzakizn.com/support",
                                     style=discord.ButtonStyle.link,
                                     emoji="💬"
                                 ))
@@ -477,12 +477,12 @@ class MusicBot(commands.Bot):
                                 ),
                                 color=0xE53935
                             )
-                            embed.set_footer(text="SONORA Support: https://s.id/SONORAbotSUPPORT")
+                            embed.set_footer(text="SONORA Support: https://sonora.muhammadzakizn.com/support")
                             
                             view = discord.ui.View()
                             view.add_item(discord.ui.Button(
                                 label="Contact Support",
-                                url="https://s.id/SONORAbotSUPPORT",
+                                url="https://sonora.muhammadzakizn.com/support",
                                 style=discord.ButtonStyle.link,
                                 emoji="💬"
                             ))

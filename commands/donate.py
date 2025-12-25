@@ -26,7 +26,7 @@ class DonateView(discord.ui.View):
         ))
         self.add_item(discord.ui.Button(
             label="🌐 Website",
-            url="https://s.id/SONORAbotHOME",
+            url="https://sonora.muhammadzakizn.com",
             style=discord.ButtonStyle.link
         ))
 

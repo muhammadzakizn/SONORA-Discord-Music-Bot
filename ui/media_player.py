@@ -854,7 +854,7 @@ class SynchronizedMediaPlayer:
                                 ))
                                 self.add_item(discord.ui.Button(
                                     label="🌐 Website",
-                                    url="https://s.id/SONORAbot",
+                                    url="https://sonora.muhammadzakizn.com",
                                     style=discord.ButtonStyle.link
                                 ))
                         

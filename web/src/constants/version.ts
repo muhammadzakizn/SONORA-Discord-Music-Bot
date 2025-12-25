@@ -2,8 +2,8 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.28.0";
-export const BOT_VERSION = "3.20.0";
+export const WEB_VERSION = "3.29.0";
+export const BOT_VERSION = "3.25.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -17,6 +17,39 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.29.0",
+    date: "2025-12-26",
+    title: "Official Domain URLs",
+    highlights: [
+      "Semua shortlinks diganti ke domain resmi",
+      "Link support sekarang ke sonora.muhammadzakizn.com/support",
+      "Link docs sekarang ke sonora.muhammadzakizn.com/docs",
+      "Link status sekarang ke sonora.muhammadzakizn.com/status"
+    ],
+    changes: [
+      {
+        category: "Link Updates",
+        items: [
+          "s.id/SONORAbot → sonora.muhammadzakizn.com",
+          "bit.ly/SONORAbotSTATUS → sonora.muhammadzakizn.com/status",
+          "s.id/SONORAbotSUPPORT → sonora.muhammadzakizn.com/support",
+          "s.id/SONORAbotDOCS → sonora.muhammadzakizn.com/docs",
+          "s.id/SONORAbotPRIVACY → sonora.muhammadzakizn.com/privacy",
+          "s.id/SONORAbotTERMS → sonora.muhammadzakizn.com/terms"
+        ]
+      },
+      {
+        category: "Files Updated",
+        items: [
+          "Bot: commands/info.py, commands/donate.py, core/bot.py",
+          "UI: ui/welcome.py, ui/menu_view.py, ui/media_player.py",
+          "Web: web/api/app.py, terms/page.tsx, bans/page.tsx",
+          "Docs: sonora_spec.md, changelog files"
+        ]
+      }
+    ]
+  },
   {
     version: "3.28.0",
     date: "2025-12-23",

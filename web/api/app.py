@@ -4397,13 +4397,13 @@ def api_admin_guild_leave(guild_id):
                         value="This server has been banned. Re-inviting the bot will result in automatic removal.",
                         inline=False
                     )
-                embed.set_footer(text="SONORA Support: https://s.id/SONORAbotSUPPORT")
+                embed.set_footer(text="SONORA Support: https://sonora.muhammadzakizn.com/support")
                 
                 # Create view with support button
                 view = discord.ui.View()
                 view.add_item(discord.ui.Button(
                     label="Contact Support",
-                    url="https://s.id/SONORAbotSUPPORT",
+                    url="https://sonora.muhammadzakizn.com/support",
                     style=discord.ButtonStyle.link,
                     emoji="💬"
                 ))

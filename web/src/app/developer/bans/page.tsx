@@ -559,7 +559,7 @@ export default function BansPage() {
                                 "text-xs mt-4",
                                 isDark ? "text-white/40" : "text-gray-500"
                             )}>
-                                Banned users/servers will receive a message with the reason and link to support: https://s.id/SONORAbotSUPPORT
+                                Banned users/servers will receive a message with the reason and link to support: https://sonora.muhammadzakizn.com/support
                             </p>
 
                             <div className="flex gap-3 mt-6">

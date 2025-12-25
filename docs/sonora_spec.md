@@ -792,7 +792,7 @@ Ulangi cycle ini sampai confidence level = 100% bahwa sistem akan berjalan smoot
   - Block semua commands dari banned user
   - Block user dari invite bot ke server lain
   - Required field: Reason untuk ban
-  - Include link ke support: https://s.id/SONORAbotSUPPORT
+  - Include link ke support: https://sonora.muhammadzakizn.com/support
 - **Ban Management:**
   - List semua banned users
   - Search/filter banned users
@@ -817,7 +817,7 @@ Ulangi cycle ini sampai confidence level = 100% bahwa sistem akan berjalan smoot
   - Send message ke server owner dengan:
     - Informasi bahwa server di-ban
     - Reason untuk ban
-    - Link ke support: https://s.id/SONORAbotSUPPORT
+    - Link ke support: https://sonora.muhammadzakizn.com/support
 - **Ban Management:**
   - List semua banned servers/channels
   - Search/filter
@@ -926,7 +926,7 @@ Ulangi cycle ini sampai confidence level = 100% bahwa sistem akan berjalan smoot
   - "What happens to my attachments?" → "Permanently deleted dengan ticket data"
   - "Can I export my ticket data?" → "Yes, you can export anytime before deletion"
 - **Contact Information:**
-  - Support link: https://s.id/SONORAbotSUPPORT
+  - Support link: https://sonora.muhammadzakizn.com/support
   - Alternative contact methods
   - Emergency contact (for critical issues)
 

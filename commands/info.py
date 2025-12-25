@@ -16,12 +16,12 @@ class WebsiteView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(
             label="🌐 Kunjungi Website",
-            url="https://s.id/SONORAbot",
+            url="https://sonora.muhammadzakizn.com",
             style=discord.ButtonStyle.link
         ))
         self.add_item(discord.ui.Button(
             label="📊 Dashboard",
-            url="https://s.id/SONORAbotHOME",
+            url="https://sonora.muhammadzakizn.com",
             style=discord.ButtonStyle.link
         ))
 
@@ -33,17 +33,17 @@ class HelpView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(
             label="📖 Dokumentasi",
-            url="https://s.id/SONORAbotDOCS",
+            url="https://sonora.muhammadzakizn.com/docs",
             style=discord.ButtonStyle.link
         ))
         self.add_item(discord.ui.Button(
             label="💬 Support Server",
-            url="https://s.id/SONORAbotSUPPORT",
+            url="https://sonora.muhammadzakizn.com/support",
             style=discord.ButtonStyle.link
         ))
         self.add_item(discord.ui.Button(
             label="🌐 Website",
-            url="https://s.id/SONORAbot",
+            url="https://sonora.muhammadzakizn.com",
             style=discord.ButtonStyle.link
         ))
 

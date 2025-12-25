@@ -495,7 +495,7 @@ class MediaPlayerView(discord.ui.View):
                         super().__init__(timeout=None)
                         self.add_item(discord.ui.Button(
                             label="🌐 Kunjungi Website",
-                            url="https://s.id/SONORAbot",
+                            url="https://sonora.muhammadzakizn.com",
                             style=discord.ButtonStyle.link
                         ))
                 
@@ -524,7 +524,7 @@ class MediaPlayerView(discord.ui.View):
                         super().__init__(timeout=None)
                         self.add_item(discord.ui.Button(
                             label="📖 Dokumentasi",
-                            url="https://s.id/SONORAbotDOCS",
+                            url="https://sonora.muhammadzakizn.com/docs",
                             style=discord.ButtonStyle.link
                         ))
                 

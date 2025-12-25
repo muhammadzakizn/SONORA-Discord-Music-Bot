@@ -171,8 +171,8 @@ export default function TermsOfServicePage() {
                         <h3 className={`font-semibold mt-4 mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>8.3 Appeal Process</h3>
                         <p>
                             Banned users may appeal their ban by contacting support at{' '}
-                            <a href="https://s.id/SONORAbotSUPPORT" target="_blank" rel="noopener noreferrer" className="text-[#7B1E3C] hover:underline">
-                                https://s.id/SONORAbotSUPPORT
+                            <a href="https://sonora.muhammadzakizn.com/support" target="_blank" rel="noopener noreferrer" className="text-[#7B1E3C] hover:underline">
+                                https://sonora.muhammadzakizn.com/support
                             </a>. Appeals are reviewed within 7 business days.
                         </p>
                     </Section>
