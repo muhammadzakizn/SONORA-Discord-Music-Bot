@@ -1021,7 +1021,7 @@ export default function FullscreenLyricsPlayer({
                                 {showLyrics ? (
                                     <>
                                         {/* Mobile Header: Album Art + Title + Menu */}
-                                        <div className="shrink-0 px-4 pt-14 pb-2">
+                                        <div className="shrink-0 px-3 pt-14 pb-2">
                                             <div className="flex items-center gap-3">
                                                 {/* Album Art (small) */}
                                                 <div className="w-14 h-14 shrink-0">
@@ -1066,7 +1066,7 @@ export default function FullscreenLyricsPlayer({
                                             {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
                                                 <div
                                                     ref={lyricsContainerRef}
-                                                    className="h-full overflow-y-auto scrollbar-hide px-12 py-[30vh]"
+                                                    className="h-full overflow-y-auto scrollbar-hide px-3 py-[30vh]"
                                                     onScroll={() => {
                                                         if (lyricsContainerRef.current) {
                                                             setIsUserScrolling(true);
@@ -1212,7 +1212,7 @@ export default function FullscreenLyricsPlayer({
                                 )}
 
                                 {/* Mobile Controls (bottom fixed) */}
-                                <div className="shrink-0 px-4 pb-6 pt-2">
+                                <div className="shrink-0 px-3 pb-6 pt-2">
                                     {/* Progress Bar */}
                                     <div className="mb-3">
                                         <div className="h-1 bg-white/20 rounded-full overflow-hidden">
