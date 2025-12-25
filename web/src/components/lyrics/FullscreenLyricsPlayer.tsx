@@ -408,6 +408,14 @@ export default function FullscreenLyricsPlayer({
         };
     }, [isOpen, isPlaying, isPaused]);
 
+    // Client-side track end detection - when time exceeds duration with no queue
+    useEffect(() => {
+        if (track && currentTime >= track.duration && queue.length === 0 && !trackEnded) {
+            console.log('[Lyrics] Track ended (time exceeded duration, no queue)');
+            setTrackEnded(true);
+        }
+    }, [currentTime, track, queue.length, trackEnded]);
+
     // Initial fetch and time sync polling
     useEffect(() => {
         if (!isOpen) return;
