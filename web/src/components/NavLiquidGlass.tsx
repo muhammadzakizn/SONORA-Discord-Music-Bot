@@ -260,8 +260,8 @@ export default function NavLiquidGlass() {
             setIsNavHidden(false);
             setShowDoubleTapHint(false);
             if (inactivityTimeout.current) clearTimeout(inactivityTimeout.current);
-        } else if (showScrollTop && !isNavHidden) {
-            // Single tap - scroll to top (only if nav is visible)
+        } else {
+            // Single tap - always scroll to top (works even when nav is hidden)
             scrollToTop();
         }
 
