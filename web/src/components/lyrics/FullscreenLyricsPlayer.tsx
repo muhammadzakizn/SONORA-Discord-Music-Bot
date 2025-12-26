@@ -1066,7 +1066,7 @@ export default function FullscreenLyricsPlayer({
                                             {showLyrics && lyrics && lyrics.lines?.length > 0 ? (
                                                 <div
                                                     ref={lyricsContainerRef}
-                                                    className="h-full overflow-y-auto scrollbar-hide px-1 py-[30vh]"
+                                                    className="h-full overflow-y-auto scrollbar-hide px-6 py-[12vh]"
                                                     onScroll={() => {
                                                         if (lyricsContainerRef.current) {
                                                             setIsUserScrolling(true);
@@ -1079,7 +1079,7 @@ export default function FullscreenLyricsPlayer({
                                                         }
                                                     }}
                                                 >
-                                                    <div className="space-y-3">
+                                                    <div className="space-y-6">
                                                         {/* Interlude Dots Animation */}
                                                         <AnimatePresence>
                                                             {interludeInfo?.isActive && (
@@ -1148,7 +1148,7 @@ export default function FullscreenLyricsPlayer({
                                                                 >
                                                                     {/* Mobile: Per-word highlighting (same as desktop) */}
                                                                     {isCurrentLine && line.words && line.words.length > 0 && lyrics?.has_syllable_timing ? (
-                                                                        <p className="text-4xl font-bold leading-snug">
+                                                                        <p className="text-3xl font-bold leading-relaxed">
                                                                             {line.words.map((word: { text: string; start_time: number; end_time: number }, wordIndex: number) => {
                                                                                 const adjustedTime = currentTime + SYLLABLE_OFFSET;
                                                                                 let progress = 0;
@@ -1190,7 +1190,7 @@ export default function FullscreenLyricsPlayer({
                                                                     ) : (
                                                                         <p
                                                                             className={cn(
-                                                                                "text-4xl font-bold leading-snug transition-all duration-300",
+                                                                                "text-3xl font-bold leading-relaxed transition-all duration-300",
                                                                                 isCurrentLine ? "text-white" : isPastLine ? "text-white/30" : "text-white/40"
                                                                             )}
                                                                         >
