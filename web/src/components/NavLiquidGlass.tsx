@@ -240,6 +240,15 @@ export default function NavLiquidGlass() {
         window.scrollTo({ top: 0, behavior: "smooth" });
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0; // For Safari
+
+        // Also scroll any scrollable containers (for dashboard layouts)
+        // Find main content containers that might have overflow
+        const scrollableContainers = document.querySelectorAll('[class*="overflow-y-auto"], [class*="overflow-auto"], main, [role="main"]');
+        scrollableContainers.forEach((container) => {
+            if (container instanceof HTMLElement && container.scrollTop > 0) {
+                container.scrollTo({ top: 0, behavior: "smooth" });
+            }
+        });
     };
 
     const togglePopup = (popup: PopupType) => {
