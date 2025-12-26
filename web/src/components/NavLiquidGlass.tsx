@@ -160,6 +160,15 @@ export default function NavLiquidGlass() {
     // Detect scroll for auto-hide nav and scroll-to-top button
     useEffect(() => {
         const handleScroll = (e?: Event) => {
+            // Ignore scroll events from within nav popups (Settings, Profile, etc)
+            if (e?.target && e.target !== document && e.target !== window) {
+                const target = e.target as HTMLElement;
+                // Check if scroll is from a popup menu (has data-nav-popup parent)
+                if (target.closest?.('[data-nav-popup]')) {
+                    return; // Don't hide nav when scrolling inside popups
+                }
+            }
+
             // Get scroll position from either window or scrollable container
             let currentScrollY = window.scrollY;
 
