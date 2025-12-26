@@ -363,11 +363,12 @@ export default function GuildsPage() {
     userGuildIds.has(String(guild.id)) && !managedGuildIds.has(String(guild.id))
   );
 
-  // Stats - all servers user is in
+  // Stats - user's servers (managed + member) that have SONORA
+  const userServersWithSonora = [...managerGuilds, ...memberGuilds];
   const stats = {
-    total: guilds.length,
-    playing: guilds.filter(g => g.is_playing).length,
-    members: guilds.reduce((sum, g) => sum + (g.member_count || 0), 0),
+    total: userServersWithSonora.length,
+    playing: userServersWithSonora.filter(g => g.is_playing).length,
+    members: userServersWithSonora.reduce((sum, g) => sum + (g.member_count || 0), 0),
     managed: managerGuilds.length,
   };
 
@@ -449,14 +450,15 @@ export default function GuildsPage() {
             onClick={handleRefresh}
             disabled={isRefreshing}
             className={cn(
-              "p-3 rounded-xl border transition-colors",
+              "flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-colors w-full sm:w-auto",
               isDark
-                ? "bg-zinc-900 border-zinc-800 hover:bg-zinc-800"
-                : "bg-white border-gray-200 hover:bg-gray-100"
+                ? "bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-white"
+                : "bg-white border-gray-200 hover:bg-gray-100 text-gray-700"
             )}
             title={t('servers.refresh')}
           >
             <RefreshCw className={cn("w-5 h-5", isRefreshing && "animate-spin")} />
+            <span className="font-medium">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
         </div>
       </div>
