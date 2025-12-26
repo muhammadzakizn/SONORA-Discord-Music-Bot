@@ -1068,6 +1068,9 @@ export default function FullscreenLyricsPlayer({
                                                     ref={lyricsContainerRef}
                                                     className="h-full overflow-y-auto scrollbar-hide px-6 py-[8vh]"
                                                     onScroll={() => {
+                                                        // Ignore auto-scroll events
+                                                        if (isAutoScrollingRef.current) return;
+
                                                         if (lyricsContainerRef.current) {
                                                             setIsUserScrolling(true);
                                                             if (scrollTimeoutRef.current) {
