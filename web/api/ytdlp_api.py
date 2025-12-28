@@ -311,11 +311,25 @@ async def api_ytdlp_stream():
         
         # Create or search for track
         if url:
-            track_info = TrackInfo(
-                title=title or "Unknown",
-                artist=artist or "Unknown",
-                url=url
-            )
+            # If title/artist are Unknown/empty, search to get proper metadata
+            if not title or title == "Unknown" or not artist or artist == "Unknown":
+                # Try to get metadata from URL
+                search_result = await downloader.search(url)
+                if search_result:
+                    track_info = search_result
+                    logger.info(f"[YTDLP API] Got metadata from URL: {track_info.title} - {track_info.artist}")
+                else:
+                    track_info = TrackInfo(
+                        title=title or "Unknown",
+                        artist=artist or "Unknown",
+                        url=url
+                    )
+            else:
+                track_info = TrackInfo(
+                    title=title,
+                    artist=artist,
+                    url=url
+                )
         else:
             # Search first
             search_result = await downloader.search(f"{artist} {title}")
