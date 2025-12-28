@@ -1115,8 +1115,114 @@ class YouTubeDownloader(BaseDownloader):
                     sample_rate=Settings.AUDIO_SAMPLE_RATE
                 )
         
+        # Third attempt failed, try with android_vr client
+        # This client often bypasses authentication requirements
+        logger.warning(f"tv_embedded failed, trying android_vr fallback...")
+        
+        command_fallback3 = [
+            'yt-dlp',
+            '--remote-components', 'ejs:github',
+            url,
+            '-I', '1',
+            '-f', 'bestaudio/best',
+            '-x',
+            '--audio-format', 'opus',
+            '-o', output_template,
+            '--no-playlist',
+            '--geo-bypass',
+            '--no-check-certificate',
+            # android_vr is known to bypass many restrictions
+            '--extractor-args', 'youtube:player_client=android_vr',
+        ]
+        # NOT adding cookies - android_vr works better without auth
+        
+        stdout, stderr, returncode = await self._run_command(command_fallback3, timeout=300)
+        
+        if returncode == 0:
+            await asyncio.sleep(1.0)
+            
+            audio_extensions = ['*.opus', '*.m4a', '*.webm', '*.mp3', '*.ogg', '*.aac']
+            possible_files = []
+            
+            for ext in audio_extensions:
+                matches = list(self.download_dir.glob(ext))
+                possible_files.extend(matches)
+            
+            if possible_files:
+                possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                output_path = possible_files[0]
+                actual_format = output_path.suffix.lstrip('.')
+                
+                # Check file size limit (100MB)
+                self._check_file_size(output_path)
+                
+                logger.info(f"✓ Downloaded (android_vr): {output_path.name}")
+                
+                return AudioResult(
+                    file_path=output_path,
+                    title=track_info.title,
+                    artist=track_info.artist,
+                    duration=track_info.duration,
+                    source=AudioSource.YOUTUBE_MUSIC,
+                    bitrate=Settings.AUDIO_BITRATE,
+                    format=actual_format,
+                    sample_rate=Settings.AUDIO_SAMPLE_RATE
+                )
+        
+        # Fourth attempt failed, try with android_sdkless client (last resort)
+        logger.warning(f"android_vr failed, trying android_sdkless (final fallback)...")
+        
+        command_fallback4 = [
+            'yt-dlp',
+            '--remote-components', 'ejs:github',
+            url,
+            '-I', '1',
+            '-f', 'bestaudio/best',
+            '-x',
+            '--audio-format', 'opus',
+            '-o', output_template,
+            '--no-playlist',
+            '--geo-bypass',
+            '--no-check-certificate',
+            # android_sdkless - minimal client, often works when others fail
+            '--extractor-args', 'youtube:player_client=android_sdkless',
+        ]
+        
+        stdout, stderr, returncode = await self._run_command(command_fallback4, timeout=300)
+        
+        if returncode == 0:
+            await asyncio.sleep(1.0)
+            
+            audio_extensions = ['*.opus', '*.m4a', '*.webm', '*.mp3', '*.ogg', '*.aac']
+            possible_files = []
+            
+            for ext in audio_extensions:
+                matches = list(self.download_dir.glob(ext))
+                possible_files.extend(matches)
+            
+            if possible_files:
+                possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                output_path = possible_files[0]
+                actual_format = output_path.suffix.lstrip('.')
+                
+                # Check file size limit (100MB)
+                self._check_file_size(output_path)
+                
+                logger.info(f"✓ Downloaded (android_sdkless): {output_path.name}")
+                
+                return AudioResult(
+                    file_path=output_path,
+                    title=track_info.title,
+                    artist=track_info.artist,
+                    duration=track_info.duration,
+                    source=AudioSource.YOUTUBE_MUSIC,
+                    bitrate=Settings.AUDIO_BITRATE,
+                    format=actual_format,
+                    sample_rate=Settings.AUDIO_SAMPLE_RATE
+                )
+        
         # All attempts failed
-        last_error = f"yt-dlp failed after 3 attempts: {stderr[:200] if stderr else 'unknown error'}"
+        last_error = f"yt-dlp failed after 5 attempts (ios→web→tv_embedded→android_vr→android_sdkless): {stderr[:200] if stderr else 'unknown error'}"
         logger.error(last_error)
         raise Exception(last_error)
 
