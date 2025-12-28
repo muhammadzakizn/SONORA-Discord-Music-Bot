@@ -1221,8 +1221,66 @@ class YouTubeDownloader(BaseDownloader):
                     sample_rate=Settings.AUDIO_SAMPLE_RATE
                 )
         
+        # ========================================
+        # FINAL FALLBACK: Try with proxy if configured
+        # This handles 403 Forbidden when server IP is blocked
+        # ========================================
+        if Settings.YOUTUBE_PROXY:
+            logger.warning(f"All clients failed, trying with proxy: {Settings.YOUTUBE_PROXY}")
+            
+            command_proxy = [
+                'yt-dlp',
+                '--proxy', Settings.YOUTUBE_PROXY,
+                '--remote-components', 'ejs:github',
+                url,
+                '-I', '1',
+                '-f', 'bestaudio/best',
+                '-x',
+                '--audio-format', 'opus',
+                '-o', output_template,
+                '--no-playlist',
+                '--geo-bypass',
+                '--no-check-certificate',
+                '--extractor-args', 'youtube:player_client=android_sdkless',
+            ]
+            
+            stdout, stderr, returncode = await self._run_command(command_proxy, timeout=300)
+            
+            if returncode == 0:
+                await asyncio.sleep(1.0)
+                
+                audio_extensions = ['*.opus', '*.m4a', '*.webm', '*.mp3', '*.ogg', '*.aac']
+                possible_files = []
+                
+                for ext in audio_extensions:
+                    matches = list(self.download_dir.glob(ext))
+                    possible_files.extend(matches)
+                
+                if possible_files:
+                    possible_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                    output_path = possible_files[0]
+                    actual_format = output_path.suffix.lstrip('.')
+                    
+                    # Check file size limit (100MB)
+                    self._check_file_size(output_path)
+                    
+                    logger.info(f"✓ Downloaded (via proxy): {output_path.name}")
+                    
+                    return AudioResult(
+                        file_path=output_path,
+                        title=track_info.title,
+                        artist=track_info.artist,
+                        duration=track_info.duration,
+                        source=AudioSource.YOUTUBE_MUSIC,
+                        bitrate=Settings.AUDIO_BITRATE,
+                        format=actual_format,
+                        sample_rate=Settings.AUDIO_SAMPLE_RATE
+                    )
+            else:
+                logger.error(f"Proxy download also failed: {stderr[:100] if stderr else 'unknown'}")
+        
         # All attempts failed
-        last_error = f"yt-dlp failed after 5 attempts (ios→web→tv_embedded→android_vr→android_sdkless): {stderr[:200] if stderr else 'unknown error'}"
+        last_error = f"yt-dlp failed after all attempts (5 clients + proxy): {stderr[:200] if stderr else 'unknown error'}"
         logger.error(last_error)
         raise Exception(last_error)
 

@@ -128,6 +128,11 @@ class Settings:
     # Useful for limited resources or slow connections
     ONE_TRACK_ONE_PROCESS: bool = os.getenv('ONE_TRACK_ONE_PROCESS', 'false').lower() == 'true'
     
+    # YouTube Proxy - fallback proxy when YouTube blocks server IP (403)
+    # Supports HTTP proxy (http://host:port) or SOCKS5 (socks5://host:port)
+    # Example: http://bore.pub:31909 (via bore tunnel from local machine)
+    YOUTUBE_PROXY: str = os.getenv('YOUTUBE_PROXY', '')
+    
     @classmethod
     def validate(cls) -> bool:
         """Validate that all required settings are present"""
