@@ -666,6 +666,8 @@ class MusicBot(commands.Bot):
             await self.load_extension('commands.stats')
             await self.load_extension('commands.admin')
             await self.load_extension('commands.lyrics')
+            await self.load_extension('commands.info')
+            await self.load_extension('commands.donate')
             
             logger.info("Commands loaded successfully")
         
