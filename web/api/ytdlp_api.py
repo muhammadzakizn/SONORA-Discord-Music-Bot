@@ -144,13 +144,21 @@ async def api_ytdlp_stream_url():
         # Get fresh stream URL
         stream_url = await downloader.get_stream_url(track_info)
         
+        # If stream URL failed (403), try with proxy
+        used_proxy = False
+        if not stream_url and Settings.YOUTUBE_PROXY:
+            logger.info(f"[YTDLP API] Stream URL failed, trying with proxy")
+            stream_url = await downloader.get_stream_url_with_proxy(track_info, Settings.YOUTUBE_PROXY)
+            used_proxy = True
+        
         if stream_url:
             return jsonify({
                 "success": True,
                 "stream_url": stream_url,
                 "format": "audio/webm",  # Usually webm or m4a
                 "expires_in": 21600,  # ~6 hours (YouTube default)
-                "fetched_at": int(time.time())
+                "fetched_at": int(time.time()),
+                "used_proxy": used_proxy
             })
         else:
             return jsonify({
@@ -379,9 +387,19 @@ async def api_ytdlp_stream():
         # 6 seconds = ~96KB of pre-buffer
         PREBUFFER_SIZE = 16 * 1024 * BUFFER_SECONDS  # ~96KB
         
+        # Setup proxy for requests if configured
+        proxies = None
+        if Settings.YOUTUBE_PROXY:
+            proxy_url = Settings.YOUTUBE_PROXY
+            proxies = {
+                'http': proxy_url,
+                'https': proxy_url
+            }
+            logger.info(f"[YTDLP API] Using proxy for stream: {proxy_url}")
+        
         def generate():
             try:
-                with requests.get(stream_url, stream=True, timeout=30) as r:
+                with requests.get(stream_url, stream=True, timeout=30, proxies=proxies) as r:
                     r.raise_for_status()
                     
                     # Pre-buffer: collect initial chunks before streaming
@@ -411,7 +429,8 @@ async def api_ytdlp_stream():
                 'Content-Disposition': f'inline; filename="{track_info.title}.webm"',
                 'Accept-Ranges': 'bytes',
                 'Cache-Control': 'no-cache',
-                'X-Prebuffer-Seconds': str(BUFFER_SECONDS)
+                'X-Prebuffer-Seconds': str(BUFFER_SECONDS),
+                'X-Proxy-Used': 'true' if proxies else 'false'
             }
         )
             

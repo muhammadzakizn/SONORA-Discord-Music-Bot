@@ -581,6 +581,60 @@ class YouTubeDownloader(BaseDownloader):
             # If test fails, assume URL might work
             return True
     
+    async def get_stream_url_with_proxy(self, track_info: TrackInfo, proxy: str) -> Optional[str]:
+        """
+        Get stream URL using proxy (for when direct access returns 403).
+        
+        Args:
+            track_info: Track information with URL
+            proxy: Proxy URL (http://host:port or socks5://host:port)
+            
+        Returns:
+            Direct audio stream URL or None if failed
+        """
+        logger.info(f"Getting stream URL via proxy: {track_info.title}")
+        
+        try:
+            # Build URL for yt-dlp
+            url = track_info.url
+            if not url:
+                clean_query = self._clean_search_query(track_info.artist, track_info.title)
+                url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}"
+            
+            # Build command with proxy
+            command = [
+                'yt-dlp',
+                '--proxy', proxy,
+                url,
+                '-I', '1',
+                '--get-url',
+                '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
+                '--no-playlist',
+                '--geo-bypass',
+                '--socket-timeout', '15',
+                '--no-check-certificate',
+                '--extractor-args', 'youtube:player_client=android_sdkless',
+            ]
+            
+            stdout, stderr, returncode = await self._run_command(command, timeout=30)
+            
+            if returncode != 0:
+                logger.warning(f"Failed to get stream URL via proxy: {stderr}")
+                return None
+            
+            stream_url = stdout.strip()
+            
+            if stream_url and stream_url.startswith('http'):
+                logger.info(f"✓ Got stream URL via proxy: {track_info.title}")
+                return stream_url
+            else:
+                logger.warning(f"Invalid stream URL from proxy: {stream_url[:100] if stream_url else 'empty'}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to get stream URL via proxy: {e}")
+            return None
+    
     async def _upload_to_ftp_cache(self, file_path: Path, artist: str, title: str) -> None:
         """
         Upload downloaded file to FTP cache.
