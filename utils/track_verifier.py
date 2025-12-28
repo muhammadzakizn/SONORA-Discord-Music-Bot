@@ -155,8 +155,9 @@ class TrackVerifier:
             
             duration = float(data.get('format', {}).get('duration', 0))
             
-            # If no metadata, fallback to filename
-            if not title and not artist:
+            # If no metadata or if Unknown, fallback to filename
+            # This handles cases where yt-dlp downloads with proper filename but no embedded metadata
+            if not title or not artist or title.lower() == 'unknown' or artist.lower() == 'unknown':
                 return cls._parse_filename(file_path)
             
             return {
