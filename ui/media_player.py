@@ -1229,9 +1229,10 @@ class SynchronizedMediaPlayer:
             # Update metadata
             self.metadata = next_metadata
             
-            # Update player reference
-            if hasattr(self.bot, 'players'):
-                self.bot.players[self.guild_id] = self
+            # Update player reference - CRITICAL: always set this for lyrics/API to work
+            if not hasattr(self.bot, 'players'):
+                self.bot.players = {}
+            self.bot.players[self.guild_id] = self
             
             # Update voice channel status
             await self._update_voice_channel_status(
