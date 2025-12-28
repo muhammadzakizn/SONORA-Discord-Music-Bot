@@ -133,6 +133,20 @@ class SynchronizedMediaPlayer:
         try:
             logger.info(f"Starting stream playback: {self.metadata.title}")
             
+            # Check if we need to use proxy for playback
+            # When YOUTUBE_PROXY is set, YouTube blocks direct access to googlevideo.com
+            # So we route through our local YTDLP API which proxies the audio
+            from config.settings import Settings
+            from urllib.parse import quote
+            
+            actual_stream_url = stream_url
+            if Settings.YOUTUBE_PROXY and 'googlevideo.com' in stream_url:
+                # Use our YTDLP API to proxy the stream 
+                # This routes through the configured proxy (bore tunnel)
+                proxy_api_url = f"http://localhost:9072/api/ytdlp/stream?title={quote(self.metadata.title)}&artist={quote(self.metadata.artist)}&url={quote(self.metadata.stream_url or '')}"
+                logger.info(f"Using proxy API for playback (googlevideo blocked)")
+                actual_stream_url = proxy_api_url
+            
             # Create audio source from URL with volume control
             # FFmpeg will handle streaming from URL
             ffmpeg_options = {
@@ -141,7 +155,7 @@ class SynchronizedMediaPlayer:
             }
             
             audio_source = discord.FFmpegPCMAudio(
-                stream_url,
+                actual_stream_url,
                 **ffmpeg_options
             )
             
