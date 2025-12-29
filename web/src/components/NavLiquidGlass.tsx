@@ -44,6 +44,7 @@ import { WEB_VERSION } from "@/constants/version";
 import { useUpdate } from "@/contexts/UpdateContext";
 import { UpdateDialog } from "@/components/UpdateDialog";
 import { ElementInspector } from "@/components/ElementInspector";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 // SONORA Brand Colors
 const BRAND = {
@@ -487,6 +488,20 @@ export default function NavLiquidGlass() {
                         </motion.nav>
                     ) : null}
                 </AnimatePresence>
+
+                {/* Notification Bell - Always visible when logged in */}
+                {isLoggedIn && (
+                    <div className={cn(
+                        "rounded-full px-1",
+                        "backdrop-blur-[40px]",
+                        isDark
+                            ? "bg-white/8 border border-white/12"
+                            : "bg-white/20 border border-white/30",
+                        "shadow-[0_4px_30px_rgba(0,0,0,0.08)]"
+                    )}>
+                        <NotificationCenter isDark={isDark} />
+                    </div>
+                )}
 
                 {/* Scroll to Top - Always visible beside nav/menu button */}
                 <div className="relative">

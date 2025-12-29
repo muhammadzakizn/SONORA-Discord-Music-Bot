@@ -20,12 +20,15 @@ import {
     generateNotificationId,
 } from '@/lib/notifications';
 
-// Sound files paths
-const SOUND_FILES: Record<NotificationSound, string | null> = {
-    default: '/sounds/notification-default.mp3',
-    changelog: '/sounds/notification-changelog.mp3',
-    urgent: '/sounds/notification-urgent.mp3',
-    none: null,
+// Sound file path - single unified notification sound
+const SOUND_FILE = '/sounds/notification.mp3';
+
+// Map sound types to whether they should play
+const SOUND_ENABLED: Record<NotificationSound, boolean> = {
+    default: true,
+    changelog: true,
+    urgent: true,
+    none: false,
 };
 
 interface NotificationContextType {
@@ -94,10 +97,7 @@ export function NotificationProvider({ children, userId }: NotificationProviderP
 
     // Play notification sound
     const playSound = useCallback((sound: NotificationSound) => {
-        if (!settings.soundEnabled || sound === 'none') return;
-
-        const soundFile = SOUND_FILES[sound];
-        if (!soundFile) return;
+        if (!settings.soundEnabled || !SOUND_ENABLED[sound]) return;
 
         try {
             // Create audio element if not exists
@@ -105,7 +105,7 @@ export function NotificationProvider({ children, userId }: NotificationProviderP
                 audioRef.current = new Audio();
             }
 
-            audioRef.current.src = soundFile;
+            audioRef.current.src = SOUND_FILE;
             audioRef.current.volume = 0.5;
             audioRef.current.play().catch(err => {
                 console.warn('Could not play notification sound:', err);
