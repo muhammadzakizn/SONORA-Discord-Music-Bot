@@ -1,92 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Mock user data - in production, this would come from database
-// Each user has their notification subscription status
-const mockUsers = [
-    {
-        id: "123456789012345678",
-        username: "musiclover",
-        displayName: "Music Lover",
-        avatar: null,
-        notificationStatus: "allowed" as const,
-    },
-    {
-        id: "234567890123456789",
-        username: "djmaster",
-        displayName: "DJ Master",
-        avatar: null,
-        notificationStatus: "allowed" as const,
-    },
-    {
-        id: "345678901234567890",
-        username: "audiofile",
-        displayName: "Audiofile",
-        avatar: null,
-        notificationStatus: "disabled" as const,
-    },
-    {
-        id: "456789012345678901",
-        username: "beatmaker",
-        displayName: "Beat Maker",
-        avatar: null,
-        notificationStatus: "denied" as const,
-    },
-    {
-        id: "567890123456789012",
-        username: "soundwave",
-        displayName: "Sound Wave",
-        avatar: null,
-        notificationStatus: "never_granted" as const,
-    },
-    {
-        id: "678901234567890123",
-        username: "vibecheck",
-        displayName: "Vibe Check",
-        avatar: null,
-        notificationStatus: "allowed" as const,
-    },
-];
+// Notification status types
+type NotificationStatus = 'allowed' | 'denied' | 'disabled' | 'never_granted';
+
+// User interface from auth database
+interface AuthUser {
+    id: number;
+    discord_id: string;
+    username: string;
+    avatar_url?: string;
+    status: string;
+    role: string;
+    mfa_enabled?: boolean;
+    created_at?: string;
+    last_login?: string;
+}
+
+// Transform user for notification targeting
+function transformUser(user: AuthUser) {
+    return {
+        id: user.discord_id,
+        username: user.username,
+        displayName: user.username,
+        avatar: user.avatar_url || null,
+        // For now, all users are "never_granted" since we don't track push subscriptions yet
+        // In production, this would check if user has a push subscription
+        notificationStatus: 'never_granted' as NotificationStatus,
+    };
+}
 
 export async function GET(request: NextRequest) {
     try {
-        // In production, fetch from database with notification subscription status
-        // For now, try to get from bot API and merge with notification settings
-        
-        const botResponse = await fetch(`${process.env.BOT_API_URL || 'http://localhost:5000'}/api/users`, {
-            headers: { 'X-API-Key': process.env.BOT_API_KEY || '' },
-        }).catch(() => null);
+        // Get query params
+        const { searchParams } = new URL(request.url);
+        const limit = parseInt(searchParams.get('limit') || '100');
+        const offset = parseInt(searchParams.get('offset') || '0');
 
-        if (botResponse?.ok) {
-            const botData = await botResponse.json();
-            // Transform and add notification status from stored settings
-            const users = (botData.users || []).map((u: {
-                id: string;
-                username?: string;
-                displayName?: string;
-                avatar?: string;
-            }) => ({
-                id: u.id,
-                username: u.username || `User ${u.id}`,
-                displayName: u.displayName || u.username || `User ${u.id}`,
-                avatar: u.avatar,
-                // In production, look up notification subscription status from database
-                notificationStatus: 'never_granted',
-            }));
+        // Fetch users from bot's auth API
+        const botApiUrl = process.env.BOT_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${botApiUrl}/api/auth/users?limit=${limit}&offset=${offset}`, {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            cache: 'no-store',
+        });
 
-            return NextResponse.json({ users, total: users.length });
+        if (response.ok) {
+            const data = await response.json();
+            const users = (data.users || []).map(transformUser);
+
+            return NextResponse.json({
+                users,
+                total: data.total || users.length,
+                source: 'database',
+            });
         }
 
-        // Fallback to mock data for development
-        return NextResponse.json({ 
-            users: mockUsers, 
-            total: mockUsers.length 
+        // Fallback if bot API not available
+        console.warn('Bot API not available, returning empty user list');
+        return NextResponse.json({
+            users: [],
+            total: 0,
+            source: 'fallback',
+            message: 'Bot API not available',
         });
+
     } catch (error) {
-        console.error("Error fetching users:", error);
-        // Return mock data on error
-        return NextResponse.json({ 
-            users: mockUsers, 
-            total: mockUsers.length 
-        });
+        console.error('Error fetching users:', error);
+        return NextResponse.json({
+            users: [],
+            total: 0,
+            source: 'error',
+            error: 'Failed to fetch users',
+        }, { status: 500 });
     }
 }
