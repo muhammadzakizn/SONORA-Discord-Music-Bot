@@ -33,13 +33,33 @@ import {
 } from "@/lib/notifications";
 
 // Types
+type NotificationStatus = 'allowed' | 'denied' | 'disabled' | 'never_granted';
+
 interface User {
     id: string;
     username: string;
     displayName: string;
     avatar?: string;
-    notificationsEnabled: boolean;
+    notificationStatus: NotificationStatus;
 }
+
+// Helper to check if user can receive notifications
+const canReceiveNotifications = (status: NotificationStatus) => status === 'allowed';
+
+// Get status badge color and text
+const getStatusBadge = (status: NotificationStatus) => {
+    switch (status) {
+        case 'allowed':
+            return { color: 'bg-green-500/20 text-green-400', text: 'Enabled' };
+        case 'denied':
+            return { color: 'bg-red-500/20 text-red-400', text: 'Blocked' };
+        case 'disabled':
+            return { color: 'bg-yellow-500/20 text-yellow-500', text: 'Disabled' };
+        case 'never_granted':
+        default:
+            return { color: 'bg-gray-500/20 text-gray-400', text: 'Not Set' };
+    }
+};
 
 interface SentNotification {
     id: string;
@@ -93,21 +113,25 @@ export default function NotificationsPage() {
     const fetchUsers = async () => {
         setIsLoadingUsers(true);
         try {
-            // Try to fetch from bot API
-            const response = await fetch("/api/bot/users");
+            // Fetch users with notification status from API
+            const response = await fetch("/api/push/users");
             if (response.ok) {
                 const data = await response.json();
-                // Transform bot API response to our format
-                const formattedUsers: User[] = (data.users || []).map((u: { id: string; username?: string; displayName?: string; avatar?: string }) => ({
+                const formattedUsers: User[] = (data.users || []).map((u: {
+                    id: string;
+                    username?: string;
+                    displayName?: string;
+                    avatar?: string;
+                    notificationStatus?: NotificationStatus;
+                }) => ({
                     id: u.id,
                     username: u.username || `User ${u.id}`,
                     displayName: u.displayName || u.username || `User ${u.id}`,
                     avatar: u.avatar,
-                    notificationsEnabled: true, // Default, would come from settings
+                    notificationStatus: u.notificationStatus || 'never_granted',
                 }));
                 setUsers(formattedUsers);
             } else {
-                // Fallback: empty or mock data
                 setUsers([]);
             }
         } catch (error) {
@@ -133,17 +157,28 @@ export default function NotificationsPage() {
         }
     };
 
-    // Filtered users
+    // Filtered users - sort by notification status (available first)
     const filteredUsers = useMemo(() => {
-        return users.filter((user) => {
+        const filtered = users.filter((user) => {
             const matchesSearch = userSearch === "" ||
                 user.username.toLowerCase().includes(userSearch.toLowerCase()) ||
                 user.displayName.toLowerCase().includes(userSearch.toLowerCase());
 
-            const matchesFilter = userFilterEnabled === null ||
-                user.notificationsEnabled === userFilterEnabled;
+            if (userFilterEnabled === true) {
+                return matchesSearch && canReceiveNotifications(user.notificationStatus);
+            } else if (userFilterEnabled === false) {
+                return matchesSearch && !canReceiveNotifications(user.notificationStatus);
+            }
+            return matchesSearch;
+        });
 
-            return matchesSearch && matchesFilter;
+        // Sort: allowed first, then others
+        return filtered.sort((a, b) => {
+            const aAvailable = canReceiveNotifications(a.notificationStatus);
+            const bAvailable = canReceiveNotifications(b.notificationStatus);
+            if (aAvailable && !bAvailable) return -1;
+            if (!aAvailable && bAvailable) return 1;
+            return 0;
         });
     }, [users, userSearch, userFilterEnabled]);
 
@@ -517,53 +552,64 @@ export default function NotificationsPage() {
                                                     No users found
                                                 </div>
                                             ) : (
-                                                filteredUsers.map((user) => (
-                                                    <label
-                                                        key={user.id}
-                                                        className={cn(
-                                                            "flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors",
-                                                            selectedUsers.includes(user.id)
-                                                                ? isDark ? "bg-pink-500/10" : "bg-pink-50"
-                                                                : isDark ? "hover:bg-white/5" : "hover:bg-gray-50"
-                                                        )}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedUsers.includes(user.id)}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) {
-                                                                    setSelectedUsers([...selectedUsers, user.id]);
-                                                                } else {
+                                                filteredUsers.map((user) => {
+                                                    const isAvailable = canReceiveNotifications(user.notificationStatus);
+                                                    const badge = getStatusBadge(user.notificationStatus);
+
+                                                    return (
+                                                        <div
+                                                            key={user.id}
+                                                            className={cn(
+                                                                "flex items-center gap-3 px-3 py-2 transition-colors",
+                                                                !isAvailable && "opacity-50 cursor-not-allowed",
+                                                                isAvailable && "cursor-pointer",
+                                                                isAvailable && selectedUsers.includes(user.id)
+                                                                    ? isDark ? "bg-pink-500/10" : "bg-pink-50"
+                                                                    : isAvailable ? (isDark ? "hover:bg-white/5" : "hover:bg-gray-50") : ""
+                                                            )}
+                                                            onClick={() => {
+                                                                if (!isAvailable) return;
+                                                                if (selectedUsers.includes(user.id)) {
                                                                     setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                                                                } else {
+                                                                    setSelectedUsers([...selectedUsers, user.id]);
                                                                 }
                                                             }}
-                                                            className="rounded border-gray-300 text-pink-500 focus:ring-pink-500"
-                                                        />
-                                                        <div className={cn(
-                                                            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-                                                            isDark ? "bg-white/10 text-white" : "bg-gray-200 text-gray-600"
-                                                        )}>
-                                                            {user.avatar ? (
-                                                                <img src={user.avatar} alt="" className="w-8 h-8 rounded-full" />
-                                                            ) : (
-                                                                user.displayName.charAt(0).toUpperCase()
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className={cn("text-sm font-medium truncate", isDark ? "text-white" : "text-gray-900")}>
-                                                                {user.displayName}
-                                                            </p>
-                                                            <p className={cn("text-xs truncate", isDark ? "text-white/50" : "text-gray-500")}>
-                                                                @{user.username}
-                                                            </p>
-                                                        </div>
-                                                        {!user.notificationsEnabled && (
-                                                            <span className="text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-500">
-                                                                Disabled
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedUsers.includes(user.id)}
+                                                                disabled={!isAvailable}
+                                                                onChange={() => { }}
+                                                                className={cn(
+                                                                    "rounded border-gray-300 text-pink-500 focus:ring-pink-500",
+                                                                    !isAvailable && "opacity-50"
+                                                                )}
+                                                            />
+                                                            <div className={cn(
+                                                                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
+                                                                isDark ? "bg-white/10 text-white" : "bg-gray-200 text-gray-600"
+                                                            )}>
+                                                                {user.avatar ? (
+                                                                    <img src={user.avatar} alt="" className="w-8 h-8 rounded-full" />
+                                                                ) : (
+                                                                    user.displayName.charAt(0).toUpperCase()
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className={cn("text-sm font-medium truncate", isDark ? "text-white" : "text-gray-900")}>
+                                                                    {user.displayName}
+                                                                </p>
+                                                                <p className={cn("text-xs truncate", isDark ? "text-white/50" : "text-gray-500")}>
+                                                                    @{user.username}
+                                                                </p>
+                                                            </div>
+                                                            <span className={cn("text-xs px-2 py-0.5 rounded", badge.color)}>
+                                                                {badge.text}
                                                             </span>
-                                                        )}
-                                                    </label>
-                                                ))
+                                                        </div>
+                                                    );
+                                                })
                                             )}
                                         </div>
                                     </motion.div>
