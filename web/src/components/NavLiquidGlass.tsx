@@ -33,6 +33,8 @@ import {
     Download,
     Sparkles,
     ExternalLink,
+    MousePointer2,
+    Code,
 } from "lucide-react";
 import { useSession, getAvatarUrl, DiscordUser } from "@/contexts/SessionContext";
 import { useSettings, LANGUAGES, Language } from "@/contexts/SettingsContext";
@@ -41,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { WEB_VERSION } from "@/constants/version";
 import { useUpdate } from "@/contexts/UpdateContext";
 import { UpdateDialog } from "@/components/UpdateDialog";
+import { ElementInspector } from "@/components/ElementInspector";
 
 // SONORA Brand Colors
 const BRAND = {
@@ -1311,6 +1314,22 @@ function SettingsMenu({
                     </div>
                 </div>
 
+                {/* Developer Tools Section */}
+                <div>
+                    <label
+                        className={cn(
+                            "flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-2 px-1",
+                            isDark ? "text-white/50" : "text-gray-400"
+                        )}
+                    >
+                        <Code className="w-3.5 h-3.5" />
+                        Developer
+                    </label>
+                    <div className="space-y-2">
+                        <ElementInspectorButton isDark={isDark} onClose={onClose} />
+                    </div>
+                </div>
+
                 {/* About Section */}
                 <div>
                     <label
@@ -1438,6 +1457,41 @@ function AboutButton({ isDark }: { isDark: boolean }) {
                 isOpen={showUpdateDialog && updateAvailable}
                 onClose={() => setShowUpdateDialog(false)}
             />
+        </>
+    );
+}
+
+// Element Inspector Button with inline inspector
+function ElementInspectorButton({ isDark, onClose }: { isDark: boolean; onClose: () => void }) {
+    const [isActive, setIsActive] = useState(false);
+
+    const handleClick = () => {
+        onClose(); // Close the settings menu first
+        setTimeout(() => setIsActive(true), 300); // Short delay to let menu close
+    };
+
+    return (
+        <>
+            <button
+                onClick={handleClick}
+                className={cn(
+                    "w-full p-3 rounded-xl flex items-center gap-3 transition-all group",
+                    isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"
+                )}
+            >
+                <MousePointer2 className={cn("w-4 h-4", isDark ? "text-pink-400" : "text-pink-600")} />
+                <div className="flex-1 min-w-0 text-left">
+                    <p className={cn("text-sm font-medium", isDark ? "text-white" : "text-gray-900")}>
+                        Element Inspector
+                    </p>
+                    <p className={cn("text-xs truncate", isDark ? "text-white/50" : "text-gray-500")}>
+                        Click elements to copy info for AI
+                    </p>
+                </div>
+                <Code className={cn("w-4 h-4", isDark ? "text-white/30" : "text-gray-300")} />
+            </button>
+
+            <ElementInspector isActive={isActive} onClose={() => setIsActive(false)} />
         </>
     );
 }
