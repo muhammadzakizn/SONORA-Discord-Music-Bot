@@ -24,6 +24,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useSession, getServerIconUrl } from "@/contexts/SessionContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useNotificationsOptional } from "@/contexts/NotificationContext";
+import { requestNotificationPermission, areNotificationsBlocked } from "@/lib/permissions";
 
 // Types for history summary
 interface HistorySummary {
@@ -372,6 +374,149 @@ function Toggle({
   );
 }
 
+// Web Push Notification Settings Section
+function WebPushNotificationSection({ isDark, t }: { isDark: boolean; t: (key: string) => string }) {
+  const notifications = useNotificationsOptional();
+  const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'default'>('default');
+  const [isRequesting, setIsRequesting] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPermissionStatus(Notification.permission as 'granted' | 'denied' | 'default');
+    }
+  }, []);
+
+  const handleRequestPermission = async () => {
+    setIsRequesting(true);
+    const granted = await requestNotificationPermission();
+    setPermissionStatus(granted ? 'granted' : 'denied');
+    setIsRequesting(false);
+  };
+
+  const handleTestNotification = () => {
+    if (notifications) {
+      notifications.addNotification({
+        title: 'Test Notification',
+        body: 'This is a test notification from SONORA!',
+        type: 'general',
+        priority: 'normal',
+        sound: 'default',
+      });
+    }
+  };
+
+  if (!notifications) return null;
+
+  const { settings, updateSettings } = notifications;
+
+  return (
+    <div className={cn(
+      "p-6 rounded-2xl border",
+      isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-gray-200"
+    )}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className={cn(
+          "p-3 rounded-xl",
+          isDark ? "bg-zinc-800" : "bg-gray-100"
+        )}>
+          <Bell className="w-5 h-5 text-pink-400" />
+        </div>
+        <div className="flex-1">
+          <h3 className={cn("font-semibold text-lg", isDark ? "text-white" : "text-gray-900")}>
+            Web Push Notifications
+          </h3>
+          <p className={cn("text-sm", isDark ? "text-zinc-500" : "text-gray-500")}>
+            Receive notifications in your browser
+          </p>
+        </div>
+        {/* Permission Status Badge */}
+        <div className={cn(
+          "px-3 py-1 rounded-full text-xs font-medium",
+          permissionStatus === 'granted'
+            ? "bg-green-500/20 text-green-400"
+            : permissionStatus === 'denied'
+              ? "bg-red-500/20 text-red-400"
+              : "bg-yellow-500/20 text-yellow-400"
+        )}>
+          {permissionStatus === 'granted' ? 'Allowed' : permissionStatus === 'denied' ? 'Blocked' : 'Not set'}
+        </div>
+      </div>
+
+      {/* Permission Request / Test buttons */}
+      <div className="flex gap-2 mb-4">
+        {permissionStatus !== 'granted' && !areNotificationsBlocked() && (
+          <button
+            onClick={handleRequestPermission}
+            disabled={isRequesting}
+            className={cn(
+              "flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-colors",
+              "bg-pink-600 hover:bg-pink-700 text-white",
+              isRequesting && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            {isRequesting ? 'Requesting...' : 'Enable Browser Notifications'}
+          </button>
+        )}
+        {permissionStatus === 'granted' && (
+          <button
+            onClick={handleTestNotification}
+            className={cn(
+              "flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-colors",
+              isDark
+                ? "bg-white/10 hover:bg-white/20 text-white"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+            )}
+          >
+            Test Notification
+          </button>
+        )}
+      </div>
+
+      {areNotificationsBlocked() && (
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 mb-4">
+          <p className="text-sm text-red-400">
+            Notifications are blocked. Please enable them in your browser settings.
+          </p>
+        </div>
+      )}
+
+      <div className={cn(
+        "divide-y",
+        isDark ? "divide-zinc-800" : "divide-gray-200"
+      )}>
+        <Toggle
+          enabled={settings.enabled}
+          onChange={(v) => updateSettings({ enabled: v })}
+          label="Enable Notifications"
+          description="Receive push notifications from SONORA"
+          isDark={isDark}
+        />
+        <Toggle
+          enabled={settings.soundEnabled}
+          onChange={(v) => updateSettings({ soundEnabled: v })}
+          label="Notification Sound"
+          description="Play a sound when notifications arrive"
+          isDark={isDark}
+        />
+        <Toggle
+          enabled={settings.changelogEnabled}
+          onChange={(v) => updateSettings({ changelogEnabled: v })}
+          label="Changelog Notifications"
+          description="Get notified about new updates and features"
+          isDark={isDark}
+        />
+        <Toggle
+          enabled={settings.urgentOnly}
+          onChange={(v) => updateSettings({ urgentOnly: v })}
+          label="Urgent Only Mode"
+          description="Only show urgent/important notifications"
+          isDark={isDark}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user, managedGuilds } = useSession();
   const { isDark, t } = useSettings();
@@ -461,6 +606,9 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+
+          {/* Web Push Notifications */}
+          <WebPushNotificationSection isDark={isDark} t={t} />
 
           {/* Dashboard Preferences */}
           <div className={cn(

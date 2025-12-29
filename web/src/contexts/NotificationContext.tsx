@@ -21,7 +21,7 @@ import {
 } from '@/lib/notifications';
 
 // Sound file path - single unified notification sound
-const SOUND_FILE = '/sounds/notification.mp3';
+const SOUND_FILE = '/sounds/notification.ogg';
 
 // Map sound types to whether they should play
 const SOUND_ENABLED: Record<NotificationSound, boolean> = {

@@ -30,6 +30,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useFullscreenLyrics } from "@/contexts/FullscreenLyricsContext";
 import { Footer } from "@/components/Footer";
 import { TimeAmbientBackground } from "@/components/admin/TimeAmbientBackground";
+import { PermissionReminder } from "@/components/PermissionReminder";
 
 interface NavItem {
   labelKey: string;
@@ -583,6 +584,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
+
+      {/* Permission Reminder for returning users */}
+      <PermissionReminder isDark={isDark} />
     </>
   );
 }
