@@ -120,6 +120,7 @@ export default function NavLiquidGlass() {
     const [showLanguageModal, setShowLanguageModal] = useState(false);
     const [isNavHidden, setIsNavHidden] = useState(false);
     const [showDoubleTapHint, setShowDoubleTapHint] = useState(false);
+    const [inspectorActive, setInspectorActive] = useState(false);
     const lastScrollY = useRef(0);
     const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
     const inactivityTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -367,6 +368,10 @@ export default function NavLiquidGlass() {
                                 dyslexicFont={dyslexicFont}
                                 setDyslexicFont={setDyslexicFont}
                                 onClose={() => setActivePopup(null)}
+                                onActivateInspector={() => {
+                                    setActivePopup(null); // Close menu first
+                                    setTimeout(() => setInspectorActive(true), 300);
+                                }}
                             />
                         )}
                     </motion.div>
@@ -549,6 +554,9 @@ export default function NavLiquidGlass() {
                     </motion.button>
                 </div>
             </div >
+
+            {/* Element Inspector - rendered at top level so it persists when menu closes */}
+            <ElementInspector isActive={inspectorActive} onClose={() => setInspectorActive(false)} />
         </>
     );
 }
@@ -1069,6 +1077,7 @@ function SettingsMenu({
     dyslexicFont,
     setDyslexicFont,
     onClose,
+    onActivateInspector,
 }: {
     isDark: boolean;
     t: (key: string) => string;
@@ -1085,6 +1094,7 @@ function SettingsMenu({
     dyslexicFont: boolean;
     setDyslexicFont: (value: boolean) => void;
     onClose: () => void;
+    onActivateInspector: () => void;
 }) {
     const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
@@ -1326,7 +1336,7 @@ function SettingsMenu({
                         Developer
                     </label>
                     <div className="space-y-2">
-                        <ElementInspectorButton isDark={isDark} onClose={onClose} />
+                        <ElementInspectorButton isDark={isDark} onActivate={onActivateInspector} />
                     </div>
                 </div>
 
@@ -1461,37 +1471,26 @@ function AboutButton({ isDark }: { isDark: boolean }) {
     );
 }
 
-// Element Inspector Button with inline inspector
-function ElementInspectorButton({ isDark, onClose }: { isDark: boolean; onClose: () => void }) {
-    const [isActive, setIsActive] = useState(false);
-
-    const handleClick = () => {
-        onClose(); // Close the settings menu first
-        setTimeout(() => setIsActive(true), 300); // Short delay to let menu close
-    };
-
+// Element Inspector Button - just triggers the callback
+function ElementInspectorButton({ isDark, onActivate }: { isDark: boolean; onActivate: () => void }) {
     return (
-        <>
-            <button
-                onClick={handleClick}
-                className={cn(
-                    "w-full p-3 rounded-xl flex items-center gap-3 transition-all group",
-                    isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"
-                )}
-            >
-                <MousePointer2 className={cn("w-4 h-4", isDark ? "text-pink-400" : "text-pink-600")} />
-                <div className="flex-1 min-w-0 text-left">
-                    <p className={cn("text-sm font-medium", isDark ? "text-white" : "text-gray-900")}>
-                        Element Inspector
-                    </p>
-                    <p className={cn("text-xs truncate", isDark ? "text-white/50" : "text-gray-500")}>
-                        Click elements to copy info for AI
-                    </p>
-                </div>
-                <Code className={cn("w-4 h-4", isDark ? "text-white/30" : "text-gray-300")} />
-            </button>
-
-            <ElementInspector isActive={isActive} onClose={() => setIsActive(false)} />
-        </>
+        <button
+            onClick={onActivate}
+            className={cn(
+                "w-full p-3 rounded-xl flex items-center gap-3 transition-all group",
+                isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"
+            )}
+        >
+            <MousePointer2 className={cn("w-4 h-4", isDark ? "text-pink-400" : "text-pink-600")} />
+            <div className="flex-1 min-w-0 text-left">
+                <p className={cn("text-sm font-medium", isDark ? "text-white" : "text-gray-900")}>
+                    Element Inspector
+                </p>
+                <p className={cn("text-xs truncate", isDark ? "text-white/50" : "text-gray-500")}>
+                    Click elements to copy info for AI
+                </p>
+            </div>
+            <Code className={cn("w-4 h-4", isDark ? "text-white/30" : "text-gray-300")} />
+        </button>
     );
 }
