@@ -47,6 +47,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/developer", icon: Gauge },
   { label: "Console", href: "/developer/console", icon: Terminal },
+  { label: "Notifications", href: "/developer/notifications", icon: Bell },
   { label: "Servers", href: "/developer/servers", icon: Server },
   { label: "Monitoring", href: "/developer/monitoring", icon: Activity },
   { label: "Controls", href: "/developer/controls", icon: Power },

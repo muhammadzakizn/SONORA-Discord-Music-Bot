@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { NotificationPriority, NotificationType, NotificationSound } from '@/lib/notifications';
 
 // Simple in-memory notification history (use database in production)
 const notificationHistory: NotificationRecord[] = [];
@@ -7,6 +8,9 @@ interface NotificationRecord {
   id: string;
   title: string;
   body: string;
+  type: NotificationType;
+  priority: NotificationPriority;
+  sound: NotificationSound;
   image?: string;
   url?: string;
   sentAt: string;
@@ -21,7 +25,17 @@ interface NotificationRecord {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, body: notifBody, image, url, targetType, targetUsers } = body;
+    const { 
+      title, 
+      body: notifBody, 
+      type = 'general',
+      priority = 'normal',
+      sound = 'default',
+      image, 
+      url, 
+      targetType, 
+      targetUsers 
+    } = body;
 
     if (!title || !notifBody) {
       return NextResponse.json(
@@ -35,13 +49,16 @@ export async function POST(request: NextRequest) {
       id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title,
       body: notifBody,
+      type,
+      priority,
+      sound,
       image,
       url: url || '/',
       sentAt: new Date().toISOString(),
       sentBy: 'admin', // Would get from session
       targetType: targetType || 'all',
       targetUsers,
-      recipientCount: 0,
+      recipientCount: targetType === 'all' ? 0 : (targetUsers?.length || 0),
       clickCount: 0,
     };
 
@@ -58,6 +75,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       notificationId: notification.id,
+      notification,
       message: 'Notification queued for sending',
     });
   } catch (error) {
@@ -74,12 +92,26 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const limit = parseInt(searchParams.get('limit') || '20');
   const offset = parseInt(searchParams.get('offset') || '0');
+  const type = searchParams.get('type');
+  const priority = searchParams.get('priority');
 
-  const notifications = notificationHistory.slice(offset, offset + limit);
+  let filtered = notificationHistory;
+  
+  // Filter by type
+  if (type) {
+    filtered = filtered.filter(n => n.type === type);
+  }
+  
+  // Filter by priority
+  if (priority) {
+    filtered = filtered.filter(n => n.priority === priority);
+  }
+
+  const notifications = filtered.slice(offset, offset + limit);
 
   return NextResponse.json({
     notifications,
-    total: notificationHistory.length,
-    hasMore: offset + limit < notificationHistory.length,
+    total: filtered.length,
+    hasMore: offset + limit < filtered.length,
   });
 }

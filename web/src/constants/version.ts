@@ -2,7 +2,7 @@
  * Version and Changelog Constants for SONORA Web Dashboard
  */
 
-export const WEB_VERSION = "3.29.0";
+export const WEB_VERSION = "3.30.0";
 export const BOT_VERSION = "3.25.0";
 
 export interface ChangelogEntry {
@@ -17,6 +17,44 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "3.30.0",
+    date: "2025-12-29",
+    title: "Notification System",
+    highlights: [
+      "Sistem notifikasi lengkap dengan Dev Dashboard",
+      "Push notifications dengan priority levels",
+      "Custom notification sounds",
+      "Notification history per user"
+    ],
+    changes: [
+      {
+        category: "Dev Dashboard",
+        items: [
+          "Halaman Notifications untuk kirim notifikasi",
+          "Target: semua user atau user spesifik",
+          "Priority: Urgent, Important, Normal, Low",
+          "Sound: Default, Changelog, Urgent, Silent",
+          "History notifikasi yang terkirim"
+        ]
+      },
+      {
+        category: "Components",
+        items: [
+          "NotificationCenter - Bell icon dengan dropdown",
+          "NotificationToast - Toast animasi dengan progress bar",
+          "PermissionReminder - Bottom sheet untuk ijin notifikasi",
+          "NotificationContext - State management"
+        ]
+      },
+      {
+        category: "Bug Fixes",
+        items: [
+          "Fixed Element Inspector crash pada SVG elements"
+        ]
+      }
+    ]
+  },
   {
     version: "3.29.0",
     date: "2025-12-26",
