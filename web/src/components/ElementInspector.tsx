@@ -97,10 +97,14 @@ export function ElementInspector({ isActive, onClose }: ElementInspectorProps) {
                 dataAttributes[attr.name] = attr.value;
             }
         });
+        // className can be SVGAnimatedString for SVG elements, so convert to string
+        const classNameStr = typeof element.className === 'string'
+            ? element.className
+            : ((element.className as unknown as { baseVal?: string })?.baseVal || element.getAttribute('class') || '');
 
         return {
             tagName: element.tagName.toLowerCase(),
-            className: element.className,
+            className: classNameStr,
             id: element.id,
             textContent: element.textContent?.slice(0, 100) || "",
             rect,
@@ -247,7 +251,12 @@ export function ElementInspector({ isActive, onClose }: ElementInspectorProps) {
                 >
                     <div className="absolute -top-6 left-0 bg-pink-500 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
                         {`<${hoveredElement.tagName.toLowerCase()}>`}
-                        {hoveredElement.className && ` .${hoveredElement.className.split(" ")[0]}`}
+                        {(() => {
+                            const cn = typeof hoveredElement.className === 'string'
+                                ? hoveredElement.className
+                                : ((hoveredElement.className as unknown as { baseVal?: string })?.baseVal || '');
+                            return cn ? ` .${cn.split(" ")[0]}` : '';
+                        })()}
                     </div>
                 </div>
             )}
