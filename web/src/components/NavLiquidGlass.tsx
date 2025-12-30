@@ -893,7 +893,13 @@ function ProfileMenu({
                                         exit={{ opacity: 0 }}
                                         transition={{ duration: 0.25, ease: "easeOut" }}
                                         className="fixed inset-0 bg-black/30 z-[9999]"
-                                        onClick={() => setShowNotifications(false)}
+                                        onMouseDown={() => setShowNotifications(false)}
+                                        onTouchEnd={(e) => {
+                                            // Only close if the touch ended on the backdrop itself
+                                            if (e.target === e.currentTarget) {
+                                                setShowNotifications(false);
+                                            }
+                                        }}
                                     />
                                     {/* Dialog - Ultra Transparent Liquid Glass like macOS */}
                                     <motion.div
@@ -915,6 +921,8 @@ function ProfileMenu({
                                         }}
                                         onTouchStart={(e) => e.stopPropagation()}
                                         onTouchMove={(e) => e.stopPropagation()}
+                                        onTouchEnd={(e) => e.stopPropagation()}
+                                        onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         {/* Safe area for notch */}
@@ -1566,7 +1574,13 @@ function ProfileMenu({
                                     exit={{ opacity: 0 }}
                                     transition={{ duration: 0.25, ease: "easeOut" }}
                                     className="fixed inset-0 bg-black/30 z-[9999]"
-                                    onClick={() => setShowNotifications(false)}
+                                    onMouseDown={() => setShowNotifications(false)}
+                                    onTouchEnd={(e) => {
+                                        // Only close if the touch ended on the backdrop itself
+                                        if (e.target === e.currentTarget) {
+                                            setShowNotifications(false);
+                                        }
+                                    }}
                                 />
                                 {/* Dialog - Ultra Transparent Liquid Glass like macOS */}
                                 <motion.div
@@ -1588,6 +1602,8 @@ function ProfileMenu({
                                     }}
                                     onTouchStart={(e) => e.stopPropagation()}
                                     onTouchMove={(e) => e.stopPropagation()}
+                                    onTouchEnd={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     {/* Safe area for notch */}
