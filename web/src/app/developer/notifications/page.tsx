@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Bell,
@@ -21,6 +21,8 @@ import {
     ChevronDown,
     RefreshCw,
     Loader2,
+    Upload,
+    Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -97,6 +99,119 @@ export default function NotificationsPage() {
     const [userSearch, setUserSearch] = useState("");
     const [showUserFilter, setShowUserFilter] = useState(false);
     const [userFilterEnabled, setUserFilterEnabled] = useState<boolean | null>(null);
+
+    // Image upload state
+    const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Supported image formats
+    const SUPPORTED_FORMATS = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
+    const MAX_SIZE_MB = 25;
+    const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
+    // Convert image to JPEG and compress
+    const convertToJpeg = async (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        reject(new Error('Could not get canvas context'));
+                        return;
+                    }
+
+                    // Draw white background for transparency
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0);
+
+                    // Convert to JPEG with quality 0.85
+                    const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    resolve(jpegDataUrl);
+                };
+                img.onerror = () => reject(new Error('Failed to load image'));
+                img.src = e.target?.result as string;
+            };
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+        });
+    };
+
+    // Handle file upload
+    const handleFileUpload = async (file: File) => {
+        setUploadError(null);
+
+        // Validate format
+        if (!SUPPORTED_FORMATS.includes(file.type)) {
+            setUploadError(`Unsupported format. Use: JPG, PNG, GIF, WebP, BMP`);
+            return;
+        }
+
+        // Validate size
+        if (file.size > MAX_SIZE_BYTES) {
+            setUploadError(`File too large. Max size: ${MAX_SIZE_MB}MB`);
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            const jpegDataUrl = await convertToJpeg(file);
+            setUploadedImage(jpegDataUrl);
+            setImageUrl(''); // Clear URL if file uploaded
+        } catch (error) {
+            setUploadError('Failed to process image');
+            console.error('Image conversion error:', error);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // Handle drag events
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            handleFileUpload(file);
+        }
+    };
+
+    // Handle file input change
+    const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            handleFileUpload(file);
+        }
+    };
+
+    // Clear uploaded image
+    const clearUploadedImage = () => {
+        setUploadedImage(null);
+        setUploadError(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
 
     // Data state
     const [users, setUsers] = useState<User[]>([]);
@@ -197,6 +312,9 @@ export default function NotificationsPage() {
         setIsSending(true);
         setSendResult(null);
 
+        // Use uploaded image if available, otherwise use URL
+        const finalImage = uploadedImage || imageUrl || undefined;
+
         try {
             const response = await fetch("/api/push/send", {
                 method: "POST",
@@ -204,7 +322,7 @@ export default function NotificationsPage() {
                 body: JSON.stringify({
                     title,
                     body,
-                    image: imageUrl || undefined,
+                    image: finalImage,
                     url: linkUrl || undefined,
                     type,
                     priority,
@@ -222,11 +340,16 @@ export default function NotificationsPage() {
                 setTitle("");
                 setBody("");
                 setImageUrl("");
+                setUploadedImage(null);
+                setUploadError(null);
                 setLinkUrl("");
                 setType("general");
                 setPriority("normal");
                 setSound("default");
                 setSelectedUsers([]);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
                 // Refresh history
                 fetchHistory();
             } else {
@@ -413,24 +536,113 @@ export default function NotificationsPage() {
                             </div>
                         </div>
 
-                        {/* Image URL */}
+                        {/* Image Upload + URL */}
                         <div>
                             <label className={cn("block text-sm font-medium mb-1.5", isDark ? "text-white/70" : "text-gray-700")}>
                                 <ImageIcon className="w-4 h-4 inline mr-1" />
-                                Image URL (optional)
+                                Image (optional)
                             </label>
-                            <input
-                                type="url"
-                                value={imageUrl}
-                                onChange={(e) => setImageUrl(e.target.value)}
-                                placeholder="https://example.com/image.png"
-                                className={cn(
-                                    "w-full px-4 py-2.5 rounded-lg border transition-colors",
-                                    isDark
-                                        ? "bg-white/5 border-white/10 text-white placeholder:text-white/30"
-                                        : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
-                                )}
-                            />
+
+                            {/* Uploaded image preview */}
+                            {uploadedImage ? (
+                                <div className="relative mb-3">
+                                    <img
+                                        src={uploadedImage}
+                                        alt="Preview"
+                                        className="w-full max-h-48 object-contain rounded-lg border border-white/10"
+                                    />
+                                    <button
+                                        onClick={clearUploadedImage}
+                                        className="absolute top-2 right-2 p-1.5 rounded-full bg-red-500/80 hover:bg-red-600 text-white transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                    <div className={cn(
+                                        "absolute bottom-2 left-2 px-2 py-1 rounded text-xs",
+                                        "bg-green-500/80 text-white"
+                                    )}>
+                                        Converted to JPEG
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Drag & Drop zone */}
+                                    <div
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className={cn(
+                                            "relative mb-3 p-4 rounded-lg border-2 border-dashed cursor-pointer transition-colors",
+                                            isDragging
+                                                ? "border-pink-500 bg-pink-500/10"
+                                                : isDark
+                                                    ? "border-white/20 hover:border-white/40 bg-white/5"
+                                                    : "border-gray-300 hover:border-gray-400 bg-gray-50"
+                                        )}
+                                    >
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/gif,image/webp,image/bmp"
+                                            onChange={handleFileInputChange}
+                                            className="hidden"
+                                        />
+
+                                        <div className="flex flex-col items-center text-center">
+                                            {isUploading ? (
+                                                <Loader2 className="w-8 h-8 text-pink-500 animate-spin mb-2" />
+                                            ) : (
+                                                <Upload className={cn(
+                                                    "w-8 h-8 mb-2",
+                                                    isDark ? "text-white/40" : "text-gray-400"
+                                                )} />
+                                            )}
+                                            <p className={cn(
+                                                "text-sm font-medium",
+                                                isDark ? "text-white/70" : "text-gray-600"
+                                            )}>
+                                                {isUploading ? 'Converting...' : 'Drop image or click to upload'}
+                                            </p>
+                                            <p className={cn(
+                                                "text-xs mt-1",
+                                                isDark ? "text-white/40" : "text-gray-400"
+                                            )}>
+                                                PNG, JPG, GIF, WebP, BMP • Max {MAX_SIZE_MB}MB • Auto-converts to JPEG
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Upload error */}
+                                    {uploadError && (
+                                        <div className="mb-3 px-3 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
+                                            {uploadError}
+                                        </div>
+                                    )}
+
+                                    {/* Or URL input */}
+                                    <div className="relative">
+                                        <span className={cn(
+                                            "absolute left-0 right-0 -top-2 text-center text-xs",
+                                            isDark ? "text-white/30" : "text-gray-400"
+                                        )}>
+                                            or use URL
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="url"
+                                        value={imageUrl}
+                                        onChange={(e) => setImageUrl(e.target.value)}
+                                        placeholder="https://example.com/image.png"
+                                        className={cn(
+                                            "w-full px-4 py-2.5 rounded-lg border transition-colors mt-2",
+                                            isDark
+                                                ? "bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                                                : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
+                                        )}
+                                    />
+                                </>
+                            )}
                         </div>
 
                         {/* Link URL */}
