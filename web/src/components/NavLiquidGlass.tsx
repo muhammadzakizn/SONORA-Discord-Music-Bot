@@ -759,6 +759,7 @@ function ProfileMenu({
     customAvatar?: string | null;
 }) {
     const [showNotifications, setShowNotifications] = useState(false);
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
     const notificationContext = useNotificationsOptional();
     const notifications = notificationContext?.notifications || [];
     const unreadCount = notificationContext?.unreadCount || 0;
@@ -980,128 +981,252 @@ function ProfileMenu({
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        {/* Group Header with Clear All */}
-                                                        <div className="flex items-center justify-between px-1 mb-2">
-                                                            <span className={cn(
-                                                                "text-sm font-medium",
-                                                                isDark ? "text-white/50" : "text-gray-500"
-                                                            )}>
-                                                                SONORA
-                                                            </span>
-                                                            {notifications.length >= 2 && deleteAllNotifications && (
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        deleteAllNotifications();
-                                                                    }}
-                                                                    className={cn(
-                                                                        "w-6 h-6 rounded-full flex items-center justify-center transition-colors",
-                                                                        isDark
-                                                                            ? "bg-white/10 hover:bg-white/20 text-white/50"
-                                                                            : "bg-black/5 hover:bg-black/10 text-gray-400"
-                                                                    )}
-                                                                    title="Clear All"
-                                                                >
-                                                                    <X className="w-3 h-3" />
-                                                                </button>
-                                                            )}
-                                                        </div>
+                                                        {/* Group notifications by type */}
+                                                        {(() => {
+                                                            // Type label mapping
+                                                            const typeLabels: Record<string, string> = {
+                                                                general: 'General',
+                                                                changelog: 'Changelog',
+                                                                announcement: 'Announcement',
+                                                                personal: 'Personal',
+                                                            };
 
-                                                        {/* Notification Cards */}
-                                                        {notifications.map((notif, index) => (
-                                                            <motion.div
-                                                                key={notif.id}
-                                                                initial={{ opacity: 0, y: -10 }}
-                                                                animate={{ opacity: 1, y: 0 }}
-                                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                                transition={{ delay: index * 0.03 }}
-                                                                className={cn(
-                                                                    "relative p-4 rounded-2xl transition-all",
-                                                                    "backdrop-blur-xl",
-                                                                    isDark
-                                                                        ? "bg-gray-800/60 hover:bg-gray-800/80 border border-white/5"
-                                                                        : "bg-white/70 hover:bg-white/90 border border-black/5 shadow-sm",
-                                                                    !notif.readAt && (isDark ? "ring-1 ring-pink-500/30" : "ring-1 ring-pink-500/20")
-                                                                )}
-                                                                style={{
-                                                                    WebkitBackdropFilter: 'blur(20px)',
-                                                                    backdropFilter: 'blur(20px)',
-                                                                }}
-                                                            >
-                                                                <div className="flex items-start gap-3">
-                                                                    {/* App Icon */}
-                                                                    <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
-                                                                        <Bell className="w-5 h-5 text-white" />
-                                                                    </div>
+                                                            // Group notifications by type
+                                                            const grouped = notifications.reduce((acc, notif) => {
+                                                                const type = (notif as { type?: string }).type || 'general';
+                                                                if (!acc[type]) acc[type] = [];
+                                                                acc[type].push(notif);
+                                                                return acc;
+                                                            }, {} as Record<string, typeof notifications>);
 
-                                                                    {/* Content */}
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-start justify-between gap-2">
-                                                                            <p className={cn(
-                                                                                "text-sm font-semibold",
-                                                                                isDark ? "text-white" : "text-gray-900"
-                                                                            )}>
-                                                                                {notif.title}
-                                                                            </p>
-                                                                            <span className={cn(
-                                                                                "text-xs whitespace-nowrap",
-                                                                                isDark ? "text-white/40" : "text-gray-400"
-                                                                            )}>
-                                                                                {(() => {
-                                                                                    const diff = Date.now() - new Date(notif.createdAt).getTime();
-                                                                                    const mins = Math.floor(diff / 60000);
-                                                                                    if (mins < 1) return 'now';
-                                                                                    if (mins < 60) return `${mins}m ago`;
-                                                                                    const hours = Math.floor(mins / 60);
-                                                                                    if (hours < 24) return `${hours}h ago`;
-                                                                                    return `${Math.floor(hours / 24)}d ago`;
-                                                                                })()}
-                                                                            </span>
+                                                            return Object.entries(grouped).map(([type, groupNotifs]) => {
+                                                                const isExpanded = expandedGroups.has(type) || groupNotifs.length === 1;
+                                                                const visibleNotifs = isExpanded ? groupNotifs : [groupNotifs[0]];
+                                                                const hiddenCount = groupNotifs.length - 1;
+
+                                                                return (
+                                                                    <div key={type} className="space-y-2">
+                                                                        {/* Group Header with Clear All */}
+                                                                        <div className="flex items-center justify-between px-1">
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (groupNotifs.length > 1) {
+                                                                                        setExpandedGroups(prev => {
+                                                                                            const newSet = new Set(prev);
+                                                                                            if (newSet.has(type)) {
+                                                                                                newSet.delete(type);
+                                                                                            } else {
+                                                                                                newSet.add(type);
+                                                                                            }
+                                                                                            return newSet;
+                                                                                        });
+                                                                                    }
+                                                                                }}
+                                                                                className={cn(
+                                                                                    "flex items-center gap-2 text-sm font-medium transition-colors",
+                                                                                    isDark ? "text-white/50 hover:text-white/70" : "text-gray-500 hover:text-gray-700",
+                                                                                    groupNotifs.length > 1 && "cursor-pointer"
+                                                                                )}
+                                                                            >
+                                                                                <span>{typeLabels[type] || type}</span>
+                                                                                {!isExpanded && hiddenCount > 0 && (
+                                                                                    <span className={cn(
+                                                                                        "text-xs px-1.5 py-0.5 rounded-full",
+                                                                                        isDark ? "bg-white/10" : "bg-black/5"
+                                                                                    )}>
+                                                                                        +{hiddenCount}
+                                                                                    </span>
+                                                                                )}
+                                                                            </button>
+
+                                                                            {/* Clear All Button - X icon that shows text on hover */}
+                                                                            {groupNotifs.length >= 2 && deleteAllNotifications && (
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        deleteAllNotifications();
+                                                                                    }}
+                                                                                    className={cn(
+                                                                                        "group/clear flex items-center gap-1 px-2 py-1 rounded-full transition-all duration-200",
+                                                                                        isDark
+                                                                                            ? "bg-white/10 hover:bg-white/20 text-white/50 hover:text-white/70"
+                                                                                            : "bg-black/5 hover:bg-black/10 text-gray-400 hover:text-gray-600"
+                                                                                    )}
+                                                                                >
+                                                                                    <X className="w-3 h-3" />
+                                                                                    <span className="text-xs font-medium max-w-0 overflow-hidden group-hover/clear:max-w-[60px] transition-all duration-200 whitespace-nowrap">
+                                                                                        Clear All
+                                                                                    </span>
+                                                                                </button>
+                                                                            )}
                                                                         </div>
-                                                                        <p className={cn(
-                                                                            "text-sm mt-1",
-                                                                            isDark ? "text-white/70" : "text-gray-600"
-                                                                        )}>
-                                                                            {notif.body}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
 
-                                                                {/* Action Buttons */}
-                                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                    {!notif.readAt && markAsRead && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                markAsRead(notif.id);
-                                                                            }}
-                                                                            className={cn(
-                                                                                "p-1.5 rounded-full transition-colors",
-                                                                                isDark ? "hover:bg-white/10 text-green-400" : "hover:bg-gray-100 text-green-600"
+                                                                        {/* Stacked Cards Container */}
+                                                                        <div className="relative">
+                                                                            {/* Background stacked cards effect when collapsed */}
+                                                                            {!isExpanded && hiddenCount > 0 && (
+                                                                                <>
+                                                                                    {hiddenCount >= 2 && (
+                                                                                        <div
+                                                                                            className={cn(
+                                                                                                "absolute top-2 left-2 right-2 h-16 rounded-2xl",
+                                                                                                isDark ? "bg-gray-700/40" : "bg-gray-200/60"
+                                                                                            )}
+                                                                                            style={{ zIndex: 0 }}
+                                                                                        />
+                                                                                    )}
+                                                                                    <div
+                                                                                        className={cn(
+                                                                                            "absolute top-1 left-1 right-1 h-16 rounded-2xl",
+                                                                                            isDark ? "bg-gray-700/60" : "bg-gray-100/80"
+                                                                                        )}
+                                                                                        style={{ zIndex: 1 }}
+                                                                                    />
+                                                                                </>
                                                                             )}
-                                                                            title="Mark as read"
-                                                                        >
-                                                                            <Check className="w-3.5 h-3.5" />
-                                                                        </button>
-                                                                    )}
-                                                                    {deleteNotification && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                deleteNotification(notif.id);
-                                                                            }}
-                                                                            className={cn(
-                                                                                "p-1.5 rounded-full transition-colors",
-                                                                                isDark ? "hover:bg-white/10 text-white/50" : "hover:bg-gray-100 text-gray-400"
-                                                                            )}
-                                                                            title="Delete"
-                                                                        >
-                                                                            <X className="w-3.5 h-3.5" />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </motion.div>
-                                                        ))}
+
+                                                                            {/* Visible Notification Cards */}
+                                                                            <div className={cn("relative space-y-2", !isExpanded && hiddenCount > 0 && "z-10")}>
+                                                                                {visibleNotifs.map((notif, index) => (
+                                                                                    <motion.div
+                                                                                        key={notif.id}
+                                                                                        initial={{ opacity: 0, y: -10 }}
+                                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                                                        transition={{ delay: index * 0.03 }}
+                                                                                        onClick={(e) => {
+                                                                                            if (!isExpanded && hiddenCount > 0) {
+                                                                                                e.stopPropagation();
+                                                                                                setExpandedGroups(prev => new Set([...prev, type]));
+                                                                                            }
+                                                                                        }}
+                                                                                        className={cn(
+                                                                                            "relative p-4 rounded-2xl transition-all group",
+                                                                                            "backdrop-blur-xl",
+                                                                                            isDark
+                                                                                                ? "bg-gray-800/60 hover:bg-gray-800/80 border border-white/5"
+                                                                                                : "bg-white/70 hover:bg-white/90 border border-black/5 shadow-sm",
+                                                                                            !notif.readAt && (isDark ? "ring-1 ring-pink-500/30" : "ring-1 ring-pink-500/20"),
+                                                                                            !isExpanded && hiddenCount > 0 && "cursor-pointer"
+                                                                                        )}
+                                                                                        style={{
+                                                                                            WebkitBackdropFilter: 'blur(20px)',
+                                                                                            backdropFilter: 'blur(20px)',
+                                                                                        }}
+                                                                                    >
+                                                                                        <div className="flex items-start gap-3">
+                                                                                            {/* App Icon */}
+                                                                                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
+                                                                                                <Bell className="w-5 h-5 text-white" />
+                                                                                            </div>
+
+                                                                                            {/* Content */}
+                                                                                            <div className="flex-1 min-w-0">
+                                                                                                <div className="flex items-start justify-between gap-2">
+                                                                                                    <p className={cn(
+                                                                                                        "text-sm font-semibold",
+                                                                                                        isDark ? "text-white" : "text-gray-900"
+                                                                                                    )}>
+                                                                                                        {notif.title}
+                                                                                                    </p>
+                                                                                                    <span className={cn(
+                                                                                                        "text-xs whitespace-nowrap",
+                                                                                                        isDark ? "text-white/40" : "text-gray-400"
+                                                                                                    )}>
+                                                                                                        {(() => {
+                                                                                                            const diff = Date.now() - new Date(notif.createdAt).getTime();
+                                                                                                            const mins = Math.floor(diff / 60000);
+                                                                                                            if (mins < 1) return 'now';
+                                                                                                            if (mins < 60) return `${mins}m ago`;
+                                                                                                            const hours = Math.floor(mins / 60);
+                                                                                                            if (hours < 24) return `${hours}h ago`;
+                                                                                                            return `${Math.floor(hours / 24)}d ago`;
+                                                                                                        })()}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                <p className={cn(
+                                                                                                    "text-sm mt-1",
+                                                                                                    isDark ? "text-white/70" : "text-gray-600"
+                                                                                                )}>
+                                                                                                    {notif.body}
+                                                                                                </p>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {/* Action Buttons - visible on hover */}
+                                                                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                            {!notif.readAt && markAsRead && (
+                                                                                                <button
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        markAsRead(notif.id);
+                                                                                                    }}
+                                                                                                    className={cn(
+                                                                                                        "p-1.5 rounded-full transition-colors",
+                                                                                                        isDark ? "hover:bg-white/10 text-green-400" : "hover:bg-gray-100 text-green-600"
+                                                                                                    )}
+                                                                                                    title="Mark as read"
+                                                                                                >
+                                                                                                    <Check className="w-3.5 h-3.5" />
+                                                                                                </button>
+                                                                                            )}
+                                                                                            {deleteNotification && (
+                                                                                                <button
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        deleteNotification(notif.id);
+                                                                                                    }}
+                                                                                                    className={cn(
+                                                                                                        "p-1.5 rounded-full transition-colors",
+                                                                                                        isDark ? "hover:bg-white/10 text-white/50" : "hover:bg-gray-100 text-gray-400"
+                                                                                                    )}
+                                                                                                    title="Delete"
+                                                                                                >
+                                                                                                    <X className="w-3.5 h-3.5" />
+                                                                                                </button>
+                                                                                            )}
+                                                                                        </div>
+
+                                                                                        {/* Expand hint when collapsed */}
+                                                                                        {!isExpanded && hiddenCount > 0 && index === 0 && (
+                                                                                            <div className={cn(
+                                                                                                "absolute bottom-2 right-4 text-xs",
+                                                                                                isDark ? "text-white/30" : "text-gray-400"
+                                                                                            )}>
+                                                                                                Tap to show {hiddenCount} more
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </motion.div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Collapse button when expanded */}
+                                                                        {isExpanded && groupNotifs.length > 1 && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setExpandedGroups(prev => {
+                                                                                        const newSet = new Set(prev);
+                                                                                        newSet.delete(type);
+                                                                                        return newSet;
+                                                                                    });
+                                                                                }}
+                                                                                className={cn(
+                                                                                    "w-full py-2 text-xs font-medium transition-colors rounded-xl",
+                                                                                    isDark
+                                                                                        ? "text-white/40 hover:text-white/60 hover:bg-white/5"
+                                                                                        : "text-gray-400 hover:text-gray-600 hover:bg-black/5"
+                                                                                )}
+                                                                            >
+                                                                                Show less
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            });
+                                                        })()}
                                                     </>
                                                 )}
                                             </div>
@@ -1462,128 +1587,252 @@ function ProfileMenu({
                                                 </div>
                                             ) : (
                                                 <>
-                                                    {/* Group Header with Clear All */}
-                                                    <div className="flex items-center justify-between px-1 mb-2">
-                                                        <span className={cn(
-                                                            "text-sm font-medium",
-                                                            isDark ? "text-white/50" : "text-gray-500"
-                                                        )}>
-                                                            SONORA
-                                                        </span>
-                                                        {notifications.length >= 2 && deleteAllNotifications && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    deleteAllNotifications();
-                                                                }}
-                                                                className={cn(
-                                                                    "w-6 h-6 rounded-full flex items-center justify-center transition-colors",
-                                                                    isDark
-                                                                        ? "bg-white/10 hover:bg-white/20 text-white/50"
-                                                                        : "bg-black/5 hover:bg-black/10 text-gray-400"
-                                                                )}
-                                                                title="Clear All"
-                                                            >
-                                                                <X className="w-3 h-3" />
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                    {/* Group notifications by type */}
+                                                    {(() => {
+                                                        // Type label mapping
+                                                        const typeLabels: Record<string, string> = {
+                                                            general: 'General',
+                                                            changelog: 'Changelog',
+                                                            announcement: 'Announcement',
+                                                            personal: 'Personal',
+                                                        };
 
-                                                    {/* Notification Cards */}
-                                                    {notifications.map((notif, index) => (
-                                                        <motion.div
-                                                            key={notif.id}
-                                                            initial={{ opacity: 0, y: -10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            exit={{ opacity: 0, scale: 0.95 }}
-                                                            transition={{ delay: index * 0.03 }}
-                                                            className={cn(
-                                                                "relative p-4 rounded-2xl transition-all",
-                                                                "backdrop-blur-xl",
-                                                                isDark
-                                                                    ? "bg-gray-800/60 hover:bg-gray-800/80 border border-white/5"
-                                                                    : "bg-white/70 hover:bg-white/90 border border-black/5 shadow-sm",
-                                                                !notif.readAt && (isDark ? "ring-1 ring-pink-500/30" : "ring-1 ring-pink-500/20")
-                                                            )}
-                                                            style={{
-                                                                WebkitBackdropFilter: 'blur(20px)',
-                                                                backdropFilter: 'blur(20px)',
-                                                            }}
-                                                        >
-                                                            <div className="flex items-start gap-3">
-                                                                {/* App Icon */}
-                                                                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
-                                                                    <Bell className="w-5 h-5 text-white" />
-                                                                </div>
+                                                        // Group notifications by type
+                                                        const grouped = notifications.reduce((acc, notif) => {
+                                                            const type = (notif as { type?: string }).type || 'general';
+                                                            if (!acc[type]) acc[type] = [];
+                                                            acc[type].push(notif);
+                                                            return acc;
+                                                        }, {} as Record<string, typeof notifications>);
 
-                                                                {/* Content */}
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-start justify-between gap-2">
-                                                                        <p className={cn(
-                                                                            "text-sm font-semibold",
-                                                                            isDark ? "text-white" : "text-gray-900"
-                                                                        )}>
-                                                                            {notif.title}
-                                                                        </p>
-                                                                        <span className={cn(
-                                                                            "text-xs whitespace-nowrap",
-                                                                            isDark ? "text-white/40" : "text-gray-400"
-                                                                        )}>
-                                                                            {(() => {
-                                                                                const diff = Date.now() - new Date(notif.createdAt).getTime();
-                                                                                const mins = Math.floor(diff / 60000);
-                                                                                if (mins < 1) return 'now';
-                                                                                if (mins < 60) return `${mins}m ago`;
-                                                                                const hours = Math.floor(mins / 60);
-                                                                                if (hours < 24) return `${hours}h ago`;
-                                                                                return `${Math.floor(hours / 24)}d ago`;
-                                                                            })()}
-                                                                        </span>
+                                                        return Object.entries(grouped).map(([type, groupNotifs]) => {
+                                                            const isExpanded = expandedGroups.has(type) || groupNotifs.length === 1;
+                                                            const visibleNotifs = isExpanded ? groupNotifs : [groupNotifs[0]];
+                                                            const hiddenCount = groupNotifs.length - 1;
+
+                                                            return (
+                                                                <div key={type} className="space-y-2">
+                                                                    {/* Group Header with Clear All */}
+                                                                    <div className="flex items-center justify-between px-1">
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                if (groupNotifs.length > 1) {
+                                                                                    setExpandedGroups(prev => {
+                                                                                        const newSet = new Set(prev);
+                                                                                        if (newSet.has(type)) {
+                                                                                            newSet.delete(type);
+                                                                                        } else {
+                                                                                            newSet.add(type);
+                                                                                        }
+                                                                                        return newSet;
+                                                                                    });
+                                                                                }
+                                                                            }}
+                                                                            className={cn(
+                                                                                "flex items-center gap-2 text-sm font-medium transition-colors",
+                                                                                isDark ? "text-white/50 hover:text-white/70" : "text-gray-500 hover:text-gray-700",
+                                                                                groupNotifs.length > 1 && "cursor-pointer"
+                                                                            )}
+                                                                        >
+                                                                            <span>{typeLabels[type] || type}</span>
+                                                                            {!isExpanded && hiddenCount > 0 && (
+                                                                                <span className={cn(
+                                                                                    "text-xs px-1.5 py-0.5 rounded-full",
+                                                                                    isDark ? "bg-white/10" : "bg-black/5"
+                                                                                )}>
+                                                                                    +{hiddenCount}
+                                                                                </span>
+                                                                            )}
+                                                                        </button>
+
+                                                                        {/* Clear All Button - X icon that shows text on hover */}
+                                                                        {groupNotifs.length >= 2 && deleteAllNotifications && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    deleteAllNotifications();
+                                                                                }}
+                                                                                className={cn(
+                                                                                    "group/clear flex items-center gap-1 px-2 py-1 rounded-full transition-all duration-200",
+                                                                                    isDark
+                                                                                        ? "bg-white/10 hover:bg-white/20 text-white/50 hover:text-white/70"
+                                                                                        : "bg-black/5 hover:bg-black/10 text-gray-400 hover:text-gray-600"
+                                                                                )}
+                                                                            >
+                                                                                <X className="w-3 h-3" />
+                                                                                <span className="text-xs font-medium max-w-0 overflow-hidden group-hover/clear:max-w-[60px] transition-all duration-200 whitespace-nowrap">
+                                                                                    Clear All
+                                                                                </span>
+                                                                            </button>
+                                                                        )}
                                                                     </div>
-                                                                    <p className={cn(
-                                                                        "text-sm mt-1",
-                                                                        isDark ? "text-white/70" : "text-gray-600"
-                                                                    )}>
-                                                                        {notif.body}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
 
-                                                            {/* Action Buttons */}
-                                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                {!notif.readAt && markAsRead && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            markAsRead(notif.id);
-                                                                        }}
-                                                                        className={cn(
-                                                                            "p-1.5 rounded-full transition-colors",
-                                                                            isDark ? "hover:bg-white/10 text-green-400" : "hover:bg-gray-100 text-green-600"
+                                                                    {/* Stacked Cards Container */}
+                                                                    <div className="relative">
+                                                                        {/* Background stacked cards effect when collapsed */}
+                                                                        {!isExpanded && hiddenCount > 0 && (
+                                                                            <>
+                                                                                {hiddenCount >= 2 && (
+                                                                                    <div
+                                                                                        className={cn(
+                                                                                            "absolute top-2 left-2 right-2 h-16 rounded-2xl",
+                                                                                            isDark ? "bg-gray-700/40" : "bg-gray-200/60"
+                                                                                        )}
+                                                                                        style={{ zIndex: 0 }}
+                                                                                    />
+                                                                                )}
+                                                                                <div
+                                                                                    className={cn(
+                                                                                        "absolute top-1 left-1 right-1 h-16 rounded-2xl",
+                                                                                        isDark ? "bg-gray-700/60" : "bg-gray-100/80"
+                                                                                    )}
+                                                                                    style={{ zIndex: 1 }}
+                                                                                />
+                                                                            </>
                                                                         )}
-                                                                        title="Mark as read"
-                                                                    >
-                                                                        <Check className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                )}
-                                                                {deleteNotification && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            deleteNotification(notif.id);
-                                                                        }}
-                                                                        className={cn(
-                                                                            "p-1.5 rounded-full transition-colors",
-                                                                            isDark ? "hover:bg-white/10 text-white/50" : "hover:bg-gray-100 text-gray-400"
-                                                                        )}
-                                                                        title="Delete"
-                                                                    >
-                                                                        <X className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </motion.div>
-                                                    ))}
+
+                                                                        {/* Visible Notification Cards */}
+                                                                        <div className={cn("relative space-y-2", !isExpanded && hiddenCount > 0 && "z-10")}>
+                                                                            {visibleNotifs.map((notif, index) => (
+                                                                                <motion.div
+                                                                                    key={notif.id}
+                                                                                    initial={{ opacity: 0, y: -10 }}
+                                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                                    exit={{ opacity: 0, scale: 0.95 }}
+                                                                                    transition={{ delay: index * 0.03 }}
+                                                                                    onClick={(e) => {
+                                                                                        if (!isExpanded && hiddenCount > 0) {
+                                                                                            e.stopPropagation();
+                                                                                            setExpandedGroups(prev => new Set([...prev, type]));
+                                                                                        }
+                                                                                    }}
+                                                                                    className={cn(
+                                                                                        "relative p-4 rounded-2xl transition-all group",
+                                                                                        "backdrop-blur-xl",
+                                                                                        isDark
+                                                                                            ? "bg-gray-800/60 hover:bg-gray-800/80 border border-white/5"
+                                                                                            : "bg-white/70 hover:bg-white/90 border border-black/5 shadow-sm",
+                                                                                        !notif.readAt && (isDark ? "ring-1 ring-pink-500/30" : "ring-1 ring-pink-500/20"),
+                                                                                        !isExpanded && hiddenCount > 0 && "cursor-pointer"
+                                                                                    )}
+                                                                                    style={{
+                                                                                        WebkitBackdropFilter: 'blur(20px)',
+                                                                                        backdropFilter: 'blur(20px)',
+                                                                                    }}
+                                                                                >
+                                                                                    <div className="flex items-start gap-3">
+                                                                                        {/* App Icon */}
+                                                                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
+                                                                                            <Bell className="w-5 h-5 text-white" />
+                                                                                        </div>
+
+                                                                                        {/* Content */}
+                                                                                        <div className="flex-1 min-w-0">
+                                                                                            <div className="flex items-start justify-between gap-2">
+                                                                                                <p className={cn(
+                                                                                                    "text-sm font-semibold",
+                                                                                                    isDark ? "text-white" : "text-gray-900"
+                                                                                                )}>
+                                                                                                    {notif.title}
+                                                                                                </p>
+                                                                                                <span className={cn(
+                                                                                                    "text-xs whitespace-nowrap",
+                                                                                                    isDark ? "text-white/40" : "text-gray-400"
+                                                                                                )}>
+                                                                                                    {(() => {
+                                                                                                        const diff = Date.now() - new Date(notif.createdAt).getTime();
+                                                                                                        const mins = Math.floor(diff / 60000);
+                                                                                                        if (mins < 1) return 'now';
+                                                                                                        if (mins < 60) return `${mins}m ago`;
+                                                                                                        const hours = Math.floor(mins / 60);
+                                                                                                        if (hours < 24) return `${hours}h ago`;
+                                                                                                        return `${Math.floor(hours / 24)}d ago`;
+                                                                                                    })()}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                            <p className={cn(
+                                                                                                "text-sm mt-1",
+                                                                                                isDark ? "text-white/70" : "text-gray-600"
+                                                                                            )}>
+                                                                                                {notif.body}
+                                                                                            </p>
+                                                                                        </div>
+                                                                                    </div>
+
+                                                                                    {/* Action Buttons - visible on hover */}
+                                                                                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                        {!notif.readAt && markAsRead && (
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    markAsRead(notif.id);
+                                                                                                }}
+                                                                                                className={cn(
+                                                                                                    "p-1.5 rounded-full transition-colors",
+                                                                                                    isDark ? "hover:bg-white/10 text-green-400" : "hover:bg-gray-100 text-green-600"
+                                                                                                )}
+                                                                                                title="Mark as read"
+                                                                                            >
+                                                                                                <Check className="w-3.5 h-3.5" />
+                                                                                            </button>
+                                                                                        )}
+                                                                                        {deleteNotification && (
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    deleteNotification(notif.id);
+                                                                                                }}
+                                                                                                className={cn(
+                                                                                                    "p-1.5 rounded-full transition-colors",
+                                                                                                    isDark ? "hover:bg-white/10 text-white/50" : "hover:bg-gray-100 text-gray-400"
+                                                                                                )}
+                                                                                                title="Delete"
+                                                                                            >
+                                                                                                <X className="w-3.5 h-3.5" />
+                                                                                            </button>
+                                                                                        )}
+                                                                                    </div>
+
+                                                                                    {/* Expand hint when collapsed */}
+                                                                                    {!isExpanded && hiddenCount > 0 && index === 0 && (
+                                                                                        <div className={cn(
+                                                                                            "absolute bottom-2 right-4 text-xs",
+                                                                                            isDark ? "text-white/30" : "text-gray-400"
+                                                                                        )}>
+                                                                                            Tap to show {hiddenCount} more
+                                                                                        </div>
+                                                                                    )}
+                                                                                </motion.div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Collapse button when expanded */}
+                                                                    {isExpanded && groupNotifs.length > 1 && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setExpandedGroups(prev => {
+                                                                                    const newSet = new Set(prev);
+                                                                                    newSet.delete(type);
+                                                                                    return newSet;
+                                                                                });
+                                                                            }}
+                                                                            className={cn(
+                                                                                "w-full py-2 text-xs font-medium transition-colors rounded-xl",
+                                                                                isDark
+                                                                                    ? "text-white/40 hover:text-white/60 hover:bg-white/5"
+                                                                                    : "text-gray-400 hover:text-gray-600 hover:bg-black/5"
+                                                                            )}
+                                                                        >
+                                                                            Show less
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        });
+                                                    })()}
                                                 </>
                                             )}
                                         </div>
