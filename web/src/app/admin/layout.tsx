@@ -15,7 +15,6 @@ import {
   ChevronDown,
   LogOut,
   User,
-  Bell,
   UserCircle,
   Shield,
   Home,
@@ -31,6 +30,7 @@ import { useFullscreenLyrics } from "@/contexts/FullscreenLyricsContext";
 import { Footer } from "@/components/Footer";
 import { TimeAmbientBackground } from "@/components/admin/TimeAmbientBackground";
 import { PermissionReminder } from "@/components/PermissionReminder";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 interface NavItem {
   labelKey: string;
@@ -316,13 +316,7 @@ function Header({ onMenuClick, sidebarOpen, isDark, isScrolled }: { onMenuClick:
       {/* Right - Notifications & Profile (stays in place) */}
       <div className="flex items-center gap-2">
         {/* Notifications */}
-        <button className={cn(
-          "relative p-2 rounded-xl transition-colors",
-          isDark ? "hover:bg-white/[0.08]" : "hover:bg-black/[0.05]"
-        )}>
-          <Bell className={cn("w-5 h-5", isDark ? "text-white/60" : "text-gray-500")} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
-        </button>
+        <NotificationCenter isDark={isDark} />
 
         {/* Profile */}
         <div className="relative">
