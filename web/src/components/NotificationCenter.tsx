@@ -16,13 +16,14 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-    Notification,
+    Notification as AppNotification,
     NotificationPriority,
     groupNotificationsByDate,
     getPriorityColor,
     getPriorityLabel,
 } from '@/lib/notifications';
 import { useNotificationsOptional } from '@/contexts/NotificationContext';
+import { requestNotificationPermission, areNotificationsBlocked } from '@/lib/permissions';
 import Link from 'next/link';
 
 interface NotificationCenterProps {
@@ -32,6 +33,8 @@ interface NotificationCenterProps {
 export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
     const ctx = useNotificationsOptional();
     const [isOpen, setIsOpen] = useState(false);
+    const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+    const [permissionStatus, setPermissionStatus] = useState<'default' | 'granted' | 'denied' | 'requesting'>('default');
     const panelRef = useRef<HTMLDivElement>(null);
 
     // Close on click outside
@@ -50,6 +53,42 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isOpen]);
+
+    // Check permission status on mount
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            setPermissionStatus(Notification.permission as 'default' | 'granted' | 'denied');
+        }
+    }, []);
+
+    // Handle bell click
+    const handleBellClick = async () => {
+        // Check permission status
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            const currentPermission = Notification.permission;
+
+            if (currentPermission !== 'granted') {
+                // Show permission prompt
+                setShowPermissionPrompt(true);
+                return;
+            }
+        }
+
+        // Toggle dropdown if permission granted
+        setIsOpen(!isOpen);
+    };
+
+    // Request permission
+    const handleRequestPermission = async () => {
+        setPermissionStatus('requesting');
+        const granted = await requestNotificationPermission();
+        setPermissionStatus(granted ? 'granted' : 'denied');
+
+        if (granted) {
+            setShowPermissionPrompt(false);
+            setIsOpen(true);
+        }
+    };
 
     if (!ctx) {
         // Render a disabled bell if not in provider
@@ -108,7 +147,7 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
         <div className="relative" ref={panelRef}>
             {/* Bell Button */}
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={handleBellClick}
                 className={cn(
                     "relative p-2 rounded-xl transition-colors",
                     isDark ? "hover:bg-white/[0.08]" : "hover:bg-gray-100",
@@ -123,7 +162,88 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
                         {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                 )}
+
+                {/* Permission needed indicator */}
+                {permissionStatus !== 'granted' && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-yellow-500 rounded-full" />
+                )}
             </button>
+
+            {/* Permission Prompt Dropdown */}
+            <AnimatePresence>
+                {showPermissionPrompt && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        className={cn(
+                            "absolute top-full right-0 mt-2 w-80 p-4",
+                            "rounded-xl shadow-2xl border",
+                            isDark
+                                ? "bg-neutral-900/95 backdrop-blur-xl border-neutral-700"
+                                : "bg-white border-gray-200"
+                        )}
+                    >
+                        <div className="flex flex-col items-center text-center">
+                            <div className={cn(
+                                "w-12 h-12 rounded-xl flex items-center justify-center mb-3",
+                                areNotificationsBlocked()
+                                    ? "bg-red-500/20"
+                                    : isDark ? "bg-pink-500/20" : "bg-pink-100"
+                            )}>
+                                <Bell className={cn(
+                                    "w-6 h-6",
+                                    areNotificationsBlocked() ? "text-red-500" : "text-pink-500"
+                                )} />
+                            </div>
+
+                            <h3 className={cn(
+                                "font-semibold mb-1",
+                                isDark ? "text-white" : "text-gray-900"
+                            )}>
+                                {areNotificationsBlocked() ? "Notifications Blocked" : "Enable Notifications"}
+                            </h3>
+
+                            <p className={cn(
+                                "text-sm mb-4",
+                                isDark ? "text-white/60" : "text-gray-600"
+                            )}>
+                                {areNotificationsBlocked()
+                                    ? "Please enable in browser settings"
+                                    : "Get updates about new features and announcements"}
+                            </p>
+
+                            <div className="flex gap-2 w-full">
+                                {!areNotificationsBlocked() && (
+                                    <button
+                                        onClick={handleRequestPermission}
+                                        disabled={permissionStatus === 'requesting'}
+                                        className={cn(
+                                            "flex-1 py-2 px-3 rounded-lg font-medium transition-colors",
+                                            "bg-pink-600 hover:bg-pink-700 text-white",
+                                            permissionStatus === 'requesting' && "opacity-50 cursor-not-allowed"
+                                        )}
+                                    >
+                                        {permissionStatus === 'requesting' ? 'Requesting...' : 'Enable'}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setShowPermissionPrompt(false)}
+                                    className={cn(
+                                        "flex-1 py-2 px-3 rounded-lg font-medium transition-colors",
+                                        isDark
+                                            ? "bg-white/10 hover:bg-white/20 text-white"
+                                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                                    )}
+                                >
+                                    {areNotificationsBlocked() ? 'Close' : 'Later'}
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Dropdown Panel */}
             <AnimatePresence>
