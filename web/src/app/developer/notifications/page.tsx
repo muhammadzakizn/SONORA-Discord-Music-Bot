@@ -763,22 +763,18 @@ export default function NotificationsPage() {
                                                 </div>
                                             ) : (
                                                 filteredUsers.map((user) => {
-                                                    const isAvailable = canReceiveNotifications(user.notificationStatus);
                                                     const badge = getStatusBadge(user.notificationStatus);
 
                                                     return (
                                                         <div
                                                             key={user.id}
                                                             className={cn(
-                                                                "flex items-center gap-3 px-3 py-2 transition-colors",
-                                                                !isAvailable && "opacity-50 cursor-not-allowed",
-                                                                isAvailable && "cursor-pointer",
-                                                                isAvailable && selectedUsers.includes(user.id)
+                                                                "flex items-center gap-3 px-3 py-2 transition-colors cursor-pointer",
+                                                                selectedUsers.includes(user.id)
                                                                     ? isDark ? "bg-pink-500/10" : "bg-pink-50"
-                                                                    : isAvailable ? (isDark ? "hover:bg-white/5" : "hover:bg-gray-50") : ""
+                                                                    : isDark ? "hover:bg-white/5" : "hover:bg-gray-50"
                                                             )}
                                                             onClick={() => {
-                                                                if (!isAvailable) return;
                                                                 if (selectedUsers.includes(user.id)) {
                                                                     setSelectedUsers(selectedUsers.filter(id => id !== user.id));
                                                                 } else {
@@ -789,12 +785,8 @@ export default function NotificationsPage() {
                                                             <input
                                                                 type="checkbox"
                                                                 checked={selectedUsers.includes(user.id)}
-                                                                disabled={!isAvailable}
                                                                 onChange={() => { }}
-                                                                className={cn(
-                                                                    "rounded border-gray-300 text-pink-500 focus:ring-pink-500",
-                                                                    !isAvailable && "opacity-50"
-                                                                )}
+                                                                className="rounded border-gray-300 text-pink-500 focus:ring-pink-500"
                                                             />
                                                             <div className={cn(
                                                                 "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
