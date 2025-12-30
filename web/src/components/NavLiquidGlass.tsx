@@ -38,6 +38,8 @@ import {
     ExternalLink,
     MousePointer2,
     Code,
+    Trash2,
+    ChevronUp,
 } from "lucide-react";
 import { useSession, getAvatarUrl, DiscordUser } from "@/contexts/SessionContext";
 import { useSettings, LANGUAGES, Language } from "@/contexts/SettingsContext";
@@ -1005,42 +1007,67 @@ function ProfileMenu({
                                                                 const hiddenCount = groupNotifs.length - 1;
 
                                                                 return (
-                                                                    <div key={type} className="space-y-2">
-                                                                        {/* Group Header with Clear All */}
+                                                                    <div key={type} className="space-y-2 mb-4">
+                                                                        {/* Group Header with Show less and Clear All */}
                                                                         <div className="flex items-center justify-between px-1">
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    if (groupNotifs.length > 1) {
-                                                                                        setExpandedGroups(prev => {
-                                                                                            const newSet = new Set(prev);
-                                                                                            if (newSet.has(type)) {
-                                                                                                newSet.delete(type);
-                                                                                            } else {
-                                                                                                newSet.add(type);
-                                                                                            }
-                                                                                            return newSet;
-                                                                                        });
-                                                                                    }
-                                                                                }}
-                                                                                className={cn(
-                                                                                    "flex items-center gap-2 text-sm font-medium transition-colors",
-                                                                                    isDark ? "text-white/50 hover:text-white/70" : "text-gray-500 hover:text-gray-700",
-                                                                                    groupNotifs.length > 1 && "cursor-pointer"
-                                                                                )}
-                                                                            >
-                                                                                <span>{typeLabels[type] || type}</span>
-                                                                                {!isExpanded && hiddenCount > 0 && (
-                                                                                    <span className={cn(
-                                                                                        "text-xs px-1.5 py-0.5 rounded-full",
-                                                                                        isDark ? "bg-white/10" : "bg-black/5"
-                                                                                    )}>
-                                                                                        +{hiddenCount}
-                                                                                    </span>
-                                                                                )}
-                                                                            </button>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        if (groupNotifs.length > 1) {
+                                                                                            setExpandedGroups(prev => {
+                                                                                                const newSet = new Set(prev);
+                                                                                                if (newSet.has(type)) {
+                                                                                                    newSet.delete(type);
+                                                                                                } else {
+                                                                                                    newSet.add(type);
+                                                                                                }
+                                                                                                return newSet;
+                                                                                            });
+                                                                                        }
+                                                                                    }}
+                                                                                    className={cn(
+                                                                                        "flex items-center gap-2 text-sm font-medium transition-colors",
+                                                                                        isDark ? "text-white/50 hover:text-white/70" : "text-gray-500 hover:text-gray-700",
+                                                                                        groupNotifs.length > 1 && "cursor-pointer"
+                                                                                    )}
+                                                                                >
+                                                                                    <span>{typeLabels[type] || type}</span>
+                                                                                    {!isExpanded && hiddenCount > 0 && (
+                                                                                        <span className={cn(
+                                                                                            "text-xs px-1.5 py-0.5 rounded-full",
+                                                                                            isDark ? "bg-white/10" : "bg-black/5"
+                                                                                        )}>
+                                                                                            +{hiddenCount}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </button>
 
-                                                                            {/* Clear All Button - X icon that shows text on hover */}
+                                                                                {/* Show less button - next to category title */}
+                                                                                {isExpanded && groupNotifs.length > 1 && (
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setExpandedGroups(prev => {
+                                                                                                const newSet = new Set(prev);
+                                                                                                newSet.delete(type);
+                                                                                                return newSet;
+                                                                                            });
+                                                                                        }}
+                                                                                        className={cn(
+                                                                                            "flex items-center gap-1 px-2 py-0.5 text-xs font-medium transition-colors rounded-full",
+                                                                                            isDark
+                                                                                                ? "text-white/40 hover:text-white/60 bg-white/5 hover:bg-white/10"
+                                                                                                : "text-gray-400 hover:text-gray-600 bg-black/5 hover:bg-black/10"
+                                                                                        )}
+                                                                                    >
+                                                                                        <ChevronUp className="w-3 h-3" />
+                                                                                        <span>Show less</span>
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+
+                                                                            {/* Clear All Button - Trash icon, fully round, shows text on hover */}
                                                                             {groupNotifs.length >= 2 && deleteAllNotifications && (
                                                                                 <button
                                                                                     onClick={(e) => {
@@ -1048,15 +1075,16 @@ function ProfileMenu({
                                                                                         deleteAllNotifications();
                                                                                     }}
                                                                                     className={cn(
-                                                                                        "group/clear flex items-center gap-1 px-2 py-1 rounded-full transition-all duration-200",
+                                                                                        "group/clear flex items-center justify-center w-7 h-7 hover:w-auto hover:px-2.5 rounded-full transition-all duration-200",
                                                                                         isDark
-                                                                                            ? "bg-white/10 hover:bg-white/20 text-white/50 hover:text-white/70"
-                                                                                            : "bg-black/5 hover:bg-black/10 text-gray-400 hover:text-gray-600"
+                                                                                            ? "bg-white/10 hover:bg-red-500/20 text-white/50 hover:text-red-400"
+                                                                                            : "bg-black/5 hover:bg-red-50 text-gray-400 hover:text-red-500"
                                                                                     )}
+                                                                                    title="Clear All Notifications"
                                                                                 >
-                                                                                    <X className="w-3 h-3" />
-                                                                                    <span className="text-xs font-medium max-w-0 overflow-hidden group-hover/clear:max-w-[60px] transition-all duration-200 whitespace-nowrap">
-                                                                                        Clear All
+                                                                                    <Trash2 className="w-3.5 h-3.5 flex-shrink-0" />
+                                                                                    <span className="text-xs font-medium max-w-0 overflow-hidden group-hover/clear:max-w-[140px] group-hover/clear:ml-1.5 transition-all duration-200 whitespace-nowrap">
+                                                                                        Clear All Notifications
                                                                                     </span>
                                                                                 </button>
                                                                             )}
@@ -1068,7 +1096,7 @@ function ProfileMenu({
                                                                             {!isExpanded && hiddenCount > 0 && (
                                                                                 <>
                                                                                     {hiddenCount >= 2 && (
-                                                                                        <div 
+                                                                                        <div
                                                                                             className={cn(
                                                                                                 "absolute top-3 left-3 right-3 h-20 rounded-2xl border",
                                                                                                 isDark ? "bg-gray-700/50 border-white/5" : "bg-gray-200/70 border-black/5"
@@ -1076,7 +1104,7 @@ function ProfileMenu({
                                                                                             style={{ zIndex: 0 }}
                                                                                         />
                                                                                     )}
-                                                                                    <div 
+                                                                                    <div
                                                                                         className={cn(
                                                                                             "absolute top-1.5 left-1.5 right-1.5 h-20 rounded-2xl border",
                                                                                             isDark ? "bg-gray-700/70 border-white/5" : "bg-gray-100/90 border-black/5"
@@ -1085,7 +1113,7 @@ function ProfileMenu({
                                                                                     />
                                                                                 </>
                                                                             )}
-                                                                            
+
                                                                             {/* Visible Notification Cards */}
                                                                             <div className={cn("relative space-y-2", !isExpanded && hiddenCount > 0 && "z-10")}>
                                                                                 {visibleNotifs.map((notif, index) => (
@@ -1130,7 +1158,7 @@ function ProfileMenu({
                                                                                             <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
                                                                                                 <Bell className="w-5 h-5 text-white" />
                                                                                             </div>
-                                                                                            
+
                                                                                             {/* Content */}
                                                                                             <div className="flex-1 min-w-0 pr-8">
                                                                                                 <div className="flex items-start justify-between gap-2">
@@ -1162,7 +1190,7 @@ function ProfileMenu({
                                                                                                     {notif.body}
                                                                                                 </p>
                                                                                             </div>
-                                                                                            
+
                                                                                             {/* Delete button - always visible on the right edge */}
                                                                                             {deleteNotification && (
                                                                                                 <button
@@ -1173,8 +1201,8 @@ function ProfileMenu({
                                                                                                     className={cn(
                                                                                                         "absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all",
                                                                                                         "opacity-0 group-hover:opacity-100 md:opacity-30 md:hover:opacity-100",
-                                                                                                        isDark 
-                                                                                                            ? "hover:bg-red-500/20 text-white/40 hover:text-red-400" 
+                                                                                                        isDark
+                                                                                                            ? "hover:bg-red-500/20 text-white/40 hover:text-red-400"
                                                                                                             : "hover:bg-red-50 text-gray-400 hover:text-red-500"
                                                                                                     )}
                                                                                                     title="Delete"
@@ -1183,7 +1211,7 @@ function ProfileMenu({
                                                                                                 </button>
                                                                                             )}
                                                                                         </div>
-                                                                                        
+
                                                                                         {/* Mark as read - top right corner on hover */}
                                                                                         {!notif.readAt && markAsRead && (
                                                                                             <button
@@ -1193,8 +1221,8 @@ function ProfileMenu({
                                                                                                 }}
                                                                                                 className={cn(
                                                                                                     "absolute top-2 right-10 p-1.5 rounded-full transition-all opacity-0 group-hover:opacity-100",
-                                                                                                    isDark 
-                                                                                                        ? "hover:bg-green-500/20 text-green-400" 
+                                                                                                    isDark
+                                                                                                        ? "hover:bg-green-500/20 text-green-400"
                                                                                                         : "hover:bg-green-50 text-green-600"
                                                                                                 )}
                                                                                                 title="Mark as read"
@@ -1202,7 +1230,7 @@ function ProfileMenu({
                                                                                                 <Check className="w-3.5 h-3.5" />
                                                                                             </button>
                                                                                         )}
-                                                                                        
+
                                                                                         {/* Expand hint when collapsed */}
                                                                                         {!isExpanded && hiddenCount > 0 && index === 0 && (
                                                                                             <div className={cn(
@@ -1212,7 +1240,7 @@ function ProfileMenu({
                                                                                                 Tap to show {hiddenCount} more
                                                                                             </div>
                                                                                         )}
-                                                                                        
+
                                                                                         {/* Swipe hint for mobile */}
                                                                                         <div className={cn(
                                                                                             "absolute bottom-2 left-4 text-xs md:hidden",
@@ -1225,27 +1253,7 @@ function ProfileMenu({
                                                                             </div>
                                                                         </div>
 
-                                                                        {/* Collapse button when expanded */}
-                                                                        {isExpanded && groupNotifs.length > 1 && (
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setExpandedGroups(prev => {
-                                                                                        const newSet = new Set(prev);
-                                                                                        newSet.delete(type);
-                                                                                        return newSet;
-                                                                                    });
-                                                                                }}
-                                                                                className={cn(
-                                                                                    "w-full py-2 text-xs font-medium transition-colors rounded-xl",
-                                                                                    isDark
-                                                                                        ? "text-white/40 hover:text-white/60 hover:bg-white/5"
-                                                                                        : "text-gray-400 hover:text-gray-600 hover:bg-black/5"
-                                                                                )}
-                                                                            >
-                                                                                Show less
-                                                                            </button>
-                                                                        )}
+                                                                        {/* Collapse button removed - now in header */}
                                                                     </div>
                                                                 );
                                                             });
@@ -1253,9 +1261,9 @@ function ProfileMenu({
                                                     </>
                                                 )}
                                             </div>
-                                            
+
                                             {/* Mobile Grab Handle - swipe up to close */}
-                                            <div 
+                                            <div
                                                 className="flex justify-center py-3 cursor-grab active:cursor-grabbing md:hidden"
                                                 onTouchStart={(e) => {
                                                     const startY = e.touches[0].clientY;
@@ -1661,42 +1669,67 @@ function ProfileMenu({
                                                             const hiddenCount = groupNotifs.length - 1;
 
                                                             return (
-                                                                <div key={type} className="space-y-2">
-                                                                    {/* Group Header with Clear All */}
+                                                                <div key={type} className="space-y-2 mb-4">
+                                                                    {/* Group Header with Show less and Clear All */}
                                                                     <div className="flex items-center justify-between px-1">
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                if (groupNotifs.length > 1) {
-                                                                                    setExpandedGroups(prev => {
-                                                                                        const newSet = new Set(prev);
-                                                                                        if (newSet.has(type)) {
-                                                                                            newSet.delete(type);
-                                                                                        } else {
-                                                                                            newSet.add(type);
-                                                                                        }
-                                                                                        return newSet;
-                                                                                    });
-                                                                                }
-                                                                            }}
-                                                                            className={cn(
-                                                                                "flex items-center gap-2 text-sm font-medium transition-colors",
-                                                                                isDark ? "text-white/50 hover:text-white/70" : "text-gray-500 hover:text-gray-700",
-                                                                                groupNotifs.length > 1 && "cursor-pointer"
-                                                                            )}
-                                                                        >
-                                                                            <span>{typeLabels[type] || type}</span>
-                                                                            {!isExpanded && hiddenCount > 0 && (
-                                                                                <span className={cn(
-                                                                                    "text-xs px-1.5 py-0.5 rounded-full",
-                                                                                    isDark ? "bg-white/10" : "bg-black/5"
-                                                                                )}>
-                                                                                    +{hiddenCount}
-                                                                                </span>
-                                                                            )}
-                                                                        </button>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (groupNotifs.length > 1) {
+                                                                                        setExpandedGroups(prev => {
+                                                                                            const newSet = new Set(prev);
+                                                                                            if (newSet.has(type)) {
+                                                                                                newSet.delete(type);
+                                                                                            } else {
+                                                                                                newSet.add(type);
+                                                                                            }
+                                                                                            return newSet;
+                                                                                        });
+                                                                                    }
+                                                                                }}
+                                                                                className={cn(
+                                                                                    "flex items-center gap-2 text-sm font-medium transition-colors",
+                                                                                    isDark ? "text-white/50 hover:text-white/70" : "text-gray-500 hover:text-gray-700",
+                                                                                    groupNotifs.length > 1 && "cursor-pointer"
+                                                                                )}
+                                                                            >
+                                                                                <span>{typeLabels[type] || type}</span>
+                                                                                {!isExpanded && hiddenCount > 0 && (
+                                                                                    <span className={cn(
+                                                                                        "text-xs px-1.5 py-0.5 rounded-full",
+                                                                                        isDark ? "bg-white/10" : "bg-black/5"
+                                                                                    )}>
+                                                                                        +{hiddenCount}
+                                                                                    </span>
+                                                                                )}
+                                                                            </button>
 
-                                                                        {/* Clear All Button - X icon that shows text on hover */}
+                                                                            {/* Show less button - next to category title */}
+                                                                            {isExpanded && groupNotifs.length > 1 && (
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        setExpandedGroups(prev => {
+                                                                                            const newSet = new Set(prev);
+                                                                                            newSet.delete(type);
+                                                                                            return newSet;
+                                                                                        });
+                                                                                    }}
+                                                                                    className={cn(
+                                                                                        "flex items-center gap-1 px-2 py-0.5 text-xs font-medium transition-colors rounded-full",
+                                                                                        isDark
+                                                                                            ? "text-white/40 hover:text-white/60 bg-white/5 hover:bg-white/10"
+                                                                                            : "text-gray-400 hover:text-gray-600 bg-black/5 hover:bg-black/10"
+                                                                                    )}
+                                                                                >
+                                                                                    <ChevronUp className="w-3 h-3" />
+                                                                                    <span>Show less</span>
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {/* Clear All Button - Trash icon, fully round, shows text on hover */}
                                                                         {groupNotifs.length >= 2 && deleteAllNotifications && (
                                                                             <button
                                                                                 onClick={(e) => {
@@ -1704,15 +1737,16 @@ function ProfileMenu({
                                                                                     deleteAllNotifications();
                                                                                 }}
                                                                                 className={cn(
-                                                                                    "group/clear flex items-center gap-1 px-2 py-1 rounded-full transition-all duration-200",
+                                                                                    "group/clear flex items-center justify-center w-7 h-7 hover:w-auto hover:px-2.5 rounded-full transition-all duration-200",
                                                                                     isDark
-                                                                                        ? "bg-white/10 hover:bg-white/20 text-white/50 hover:text-white/70"
-                                                                                        : "bg-black/5 hover:bg-black/10 text-gray-400 hover:text-gray-600"
+                                                                                        ? "bg-white/10 hover:bg-red-500/20 text-white/50 hover:text-red-400"
+                                                                                        : "bg-black/5 hover:bg-red-50 text-gray-400 hover:text-red-500"
                                                                                 )}
+                                                                                title="Clear All Notifications"
                                                                             >
-                                                                                <X className="w-3 h-3" />
-                                                                                <span className="text-xs font-medium max-w-0 overflow-hidden group-hover/clear:max-w-[60px] transition-all duration-200 whitespace-nowrap">
-                                                                                    Clear All
+                                                                                <Trash2 className="w-3.5 h-3.5 flex-shrink-0" />
+                                                                                <span className="text-xs font-medium max-w-0 overflow-hidden group-hover/clear:max-w-[140px] group-hover/clear:ml-1.5 transition-all duration-200 whitespace-nowrap">
+                                                                                    Clear All Notifications
                                                                                 </span>
                                                                             </button>
                                                                         )}
@@ -1724,7 +1758,7 @@ function ProfileMenu({
                                                                         {!isExpanded && hiddenCount > 0 && (
                                                                             <>
                                                                                 {hiddenCount >= 2 && (
-                                                                                    <div 
+                                                                                    <div
                                                                                         className={cn(
                                                                                             "absolute top-3 left-3 right-3 h-20 rounded-2xl border",
                                                                                             isDark ? "bg-gray-700/50 border-white/5" : "bg-gray-200/70 border-black/5"
@@ -1732,7 +1766,7 @@ function ProfileMenu({
                                                                                         style={{ zIndex: 0 }}
                                                                                     />
                                                                                 )}
-                                                                                <div 
+                                                                                <div
                                                                                     className={cn(
                                                                                         "absolute top-1.5 left-1.5 right-1.5 h-20 rounded-2xl border",
                                                                                         isDark ? "bg-gray-700/70 border-white/5" : "bg-gray-100/90 border-black/5"
@@ -1741,7 +1775,7 @@ function ProfileMenu({
                                                                                 />
                                                                             </>
                                                                         )}
-                                                                        
+
                                                                         {/* Visible Notification Cards */}
                                                                         <div className={cn("relative space-y-2", !isExpanded && hiddenCount > 0 && "z-10")}>
                                                                             {visibleNotifs.map((notif, index) => (
@@ -1786,7 +1820,7 @@ function ProfileMenu({
                                                                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
                                                                                             <Bell className="w-5 h-5 text-white" />
                                                                                         </div>
-                                                                                        
+
                                                                                         {/* Content */}
                                                                                         <div className="flex-1 min-w-0 pr-8">
                                                                                             <div className="flex items-start justify-between gap-2">
@@ -1818,7 +1852,7 @@ function ProfileMenu({
                                                                                                 {notif.body}
                                                                                             </p>
                                                                                         </div>
-                                                                                        
+
                                                                                         {/* Delete button - always visible on the right edge */}
                                                                                         {deleteNotification && (
                                                                                             <button
@@ -1829,8 +1863,8 @@ function ProfileMenu({
                                                                                                 className={cn(
                                                                                                     "absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all",
                                                                                                     "opacity-0 group-hover:opacity-100 md:opacity-30 md:hover:opacity-100",
-                                                                                                    isDark 
-                                                                                                        ? "hover:bg-red-500/20 text-white/40 hover:text-red-400" 
+                                                                                                    isDark
+                                                                                                        ? "hover:bg-red-500/20 text-white/40 hover:text-red-400"
                                                                                                         : "hover:bg-red-50 text-gray-400 hover:text-red-500"
                                                                                                 )}
                                                                                                 title="Delete"
@@ -1839,7 +1873,7 @@ function ProfileMenu({
                                                                                             </button>
                                                                                         )}
                                                                                     </div>
-                                                                                    
+
                                                                                     {/* Mark as read - top right corner on hover */}
                                                                                     {!notif.readAt && markAsRead && (
                                                                                         <button
@@ -1849,8 +1883,8 @@ function ProfileMenu({
                                                                                             }}
                                                                                             className={cn(
                                                                                                 "absolute top-2 right-10 p-1.5 rounded-full transition-all opacity-0 group-hover:opacity-100",
-                                                                                                isDark 
-                                                                                                    ? "hover:bg-green-500/20 text-green-400" 
+                                                                                                isDark
+                                                                                                    ? "hover:bg-green-500/20 text-green-400"
                                                                                                     : "hover:bg-green-50 text-green-600"
                                                                                             )}
                                                                                             title="Mark as read"
@@ -1858,7 +1892,7 @@ function ProfileMenu({
                                                                                             <Check className="w-3.5 h-3.5" />
                                                                                         </button>
                                                                                     )}
-                                                                                    
+
                                                                                     {/* Expand hint when collapsed */}
                                                                                     {!isExpanded && hiddenCount > 0 && index === 0 && (
                                                                                         <div className={cn(
@@ -1868,7 +1902,7 @@ function ProfileMenu({
                                                                                             Tap to show {hiddenCount} more
                                                                                         </div>
                                                                                     )}
-                                                                                    
+
                                                                                     {/* Swipe hint for mobile */}
                                                                                     <div className={cn(
                                                                                         "absolute bottom-2 left-4 text-xs md:hidden",
@@ -1881,27 +1915,7 @@ function ProfileMenu({
                                                                         </div>
                                                                     </div>
 
-                                                                    {/* Collapse button when expanded */}
-                                                                    {isExpanded && groupNotifs.length > 1 && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                setExpandedGroups(prev => {
-                                                                                    const newSet = new Set(prev);
-                                                                                    newSet.delete(type);
-                                                                                    return newSet;
-                                                                                });
-                                                                            }}
-                                                                            className={cn(
-                                                                                "w-full py-2 text-xs font-medium transition-colors rounded-xl",
-                                                                                isDark
-                                                                                    ? "text-white/40 hover:text-white/60 hover:bg-white/5"
-                                                                                    : "text-gray-400 hover:text-gray-600 hover:bg-black/5"
-                                                                            )}
-                                                                        >
-                                                                            Show less
-                                                                        </button>
-                                                                    )}
+                                                                    {/* Collapse button removed - now in header */}
                                                                 </div>
                                                             );
                                                         });
@@ -1909,9 +1923,9 @@ function ProfileMenu({
                                                 </>
                                             )}
                                         </div>
-                                        
+
                                         {/* Mobile Grab Handle - swipe up to close */}
-                                        <div 
+                                        <div
                                             className="flex justify-center py-3 cursor-grab active:cursor-grabbing md:hidden"
                                             onTouchStart={(e) => {
                                                 const startY = e.touches[0].clientY;
