@@ -1,23 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
-// In-memory storage for notification permission status
-// In production, this should be in a database
-const permissionStore: Map<string, {
-    status: 'allowed' | 'denied' | 'disabled' | 'never_granted';
-    updatedAt: number;
-}> = new Map();
+// File path for permission storage (works in Vercel with /tmp)
+const PERMISSION_FILE = '/tmp/notification-permissions.json';
 
-// Export for use by other routes
-export function getPermissionStatus(userId: string): 'allowed' | 'denied' | 'disabled' | 'never_granted' {
-    const stored = permissionStore.get(userId);
-    return stored?.status || 'never_granted';
+type PermissionStatus = 'allowed' | 'denied' | 'disabled' | 'never_granted';
+
+interface PermissionData {
+    [userId: string]: {
+        status: PermissionStatus;
+        updatedAt: number;
+    };
 }
 
-export function getAllPermissions(): Map<string, {
-    status: 'allowed' | 'denied' | 'disabled' | 'never_granted';
-    updatedAt: number;
-}> {
-    return permissionStore;
+// Read permissions from file
+function readPermissions(): PermissionData {
+    try {
+        if (fs.existsSync(PERMISSION_FILE)) {
+            const data = fs.readFileSync(PERMISSION_FILE, 'utf-8');
+            return JSON.parse(data);
+        }
+    } catch (error) {
+        console.warn('Error reading permissions file:', error);
+    }
+    return {};
+}
+
+// Write permissions to file
+function writePermissions(data: PermissionData): void {
+    try {
+        fs.writeFileSync(PERMISSION_FILE, JSON.stringify(data, null, 2));
+    } catch (error) {
+        console.error('Error writing permissions file:', error);
+    }
+}
+
+// Export for use by other routes
+export function getPermissionStatus(userId: string): PermissionStatus {
+    const permissions = readPermissions();
+    return permissions[userId]?.status || 'never_granted';
+}
+
+export function getAllPermissions(): Record<string, PermissionStatus> {
+    const permissions = readPermissions();
+    const result: Record<string, PermissionStatus> = {};
+    for (const [userId, data] of Object.entries(permissions)) {
+        result[userId] = data.status;
+    }
+    return result;
 }
 
 // POST - Update user's notification permission status
@@ -33,7 +64,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const validStatuses = ['allowed', 'denied', 'disabled', 'never_granted'];
+        const validStatuses: PermissionStatus[] = ['allowed', 'denied', 'disabled', 'never_granted'];
         if (!validStatuses.includes(status)) {
             return NextResponse.json(
                 { error: 'Invalid status. Must be: allowed, denied, disabled, or never_granted' },
@@ -41,11 +72,17 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Store the permission status
-        permissionStore.set(userId, {
+        // Read current permissions
+        const permissions = readPermissions();
+        
+        // Update permission
+        permissions[userId] = {
             status,
             updatedAt: Date.now(),
-        });
+        };
+        
+        // Write back
+        writePermissions(permissions);
 
         console.log(`[Permission] Updated user ${userId} notification status to: ${status}`);
 
@@ -71,10 +108,7 @@ export async function GET(request: NextRequest) {
 
     if (!userId) {
         // Return all permissions if no userId specified
-        const allPermissions: Record<string, string> = {};
-        for (const [id, data] of permissionStore) {
-            allPermissions[id] = data.status;
-        }
+        const allPermissions = getAllPermissions();
         return NextResponse.json({ permissions: allPermissions });
     }
 

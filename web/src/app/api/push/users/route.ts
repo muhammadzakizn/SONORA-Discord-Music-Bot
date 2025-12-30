@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import fs from 'fs';
 
 // Notification status types
 type NotificationStatus = 'allowed' | 'denied' | 'disabled' | 'never_granted';
+
+// File path for permission storage (same as permission/route.ts)
+const PERMISSION_FILE = '/tmp/notification-permissions.json';
 
 // User interface from auth database
 interface AuthUser {
@@ -16,17 +20,32 @@ interface AuthUser {
     last_login?: string;
 }
 
-// In-memory permission store (same as permission/route.ts - shared in production via DB)
-const permissionStore: Map<string, NotificationStatus> = new Map();
+// Read permissions from file
+function readPermissions(): Record<string, NotificationStatus> {
+    try {
+        if (fs.existsSync(PERMISSION_FILE)) {
+            const data = fs.readFileSync(PERMISSION_FILE, 'utf-8');
+            const parsed = JSON.parse(data);
+            const result: Record<string, NotificationStatus> = {};
+            for (const [userId, value] of Object.entries(parsed)) {
+                result[userId] = (value as { status: NotificationStatus }).status;
+            }
+            return result;
+        }
+    } catch (error) {
+        console.warn('Error reading permissions file:', error);
+    }
+    return {};
+}
 
 // Transform user for notification targeting
-function transformUser(user: AuthUser, permissions: Map<string, NotificationStatus>) {
+function transformUser(user: AuthUser, permissions: Record<string, NotificationStatus>) {
     return {
         id: user.discord_id,
         username: user.username,
         displayName: user.username,
         avatar: user.avatar_url || null,
-        notificationStatus: permissions.get(user.discord_id) || 'never_granted' as NotificationStatus,
+        notificationStatus: permissions[user.discord_id] || 'never_granted' as NotificationStatus,
     };
 }
 
@@ -37,23 +56,8 @@ export async function GET(request: NextRequest) {
         const limit = parseInt(searchParams.get('limit') || '100');
         const offset = parseInt(searchParams.get('offset') || '0');
 
-        // Fetch permission statuses from permission API
-        try {
-            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-            const permResponse = await fetch(`${baseUrl}/api/push/permission`, {
-                cache: 'no-store',
-            });
-            if (permResponse.ok) {
-                const permData = await permResponse.json();
-                if (permData.permissions) {
-                    for (const [userId, status] of Object.entries(permData.permissions)) {
-                        permissionStore.set(userId, status as NotificationStatus);
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('Could not fetch permissions:', e);
-        }
+        // Read permission statuses from file
+        const permissions = readPermissions();
 
         // Fetch users from bot's auth API
         const botApiUrl = process.env.BOT_API_URL || 'http://localhost:5000';
@@ -66,7 +70,7 @@ export async function GET(request: NextRequest) {
 
         if (response.ok) {
             const data = await response.json();
-            const users = (data.users || []).map((u: AuthUser) => transformUser(u, permissionStore));
+            const users = (data.users || []).map((u: AuthUser) => transformUser(u, permissions));
 
             return NextResponse.json({
                 users,
