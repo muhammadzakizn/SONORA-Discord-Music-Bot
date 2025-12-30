@@ -1064,37 +1064,47 @@ function ProfileMenu({
 
                                                                         {/* Stacked Cards Container */}
                                                                         <div className="relative">
-                                                                            {/* Background stacked cards effect when collapsed */}
+                                                                            {/* Background stacked cards effect when collapsed - macOS style */}
                                                                             {!isExpanded && hiddenCount > 0 && (
                                                                                 <>
                                                                                     {hiddenCount >= 2 && (
-                                                                                        <div
+                                                                                        <div 
                                                                                             className={cn(
-                                                                                                "absolute top-2 left-2 right-2 h-16 rounded-2xl",
-                                                                                                isDark ? "bg-gray-700/40" : "bg-gray-200/60"
+                                                                                                "absolute top-3 left-3 right-3 h-20 rounded-2xl border",
+                                                                                                isDark ? "bg-gray-700/50 border-white/5" : "bg-gray-200/70 border-black/5"
                                                                                             )}
                                                                                             style={{ zIndex: 0 }}
                                                                                         />
                                                                                     )}
-                                                                                    <div
+                                                                                    <div 
                                                                                         className={cn(
-                                                                                            "absolute top-1 left-1 right-1 h-16 rounded-2xl",
-                                                                                            isDark ? "bg-gray-700/60" : "bg-gray-100/80"
+                                                                                            "absolute top-1.5 left-1.5 right-1.5 h-20 rounded-2xl border",
+                                                                                            isDark ? "bg-gray-700/70 border-white/5" : "bg-gray-100/90 border-black/5"
                                                                                         )}
                                                                                         style={{ zIndex: 1 }}
                                                                                     />
                                                                                 </>
                                                                             )}
-
+                                                                            
                                                                             {/* Visible Notification Cards */}
                                                                             <div className={cn("relative space-y-2", !isExpanded && hiddenCount > 0 && "z-10")}>
                                                                                 {visibleNotifs.map((notif, index) => (
                                                                                     <motion.div
                                                                                         key={notif.id}
                                                                                         initial={{ opacity: 0, y: -10 }}
-                                                                                        animate={{ opacity: 1, y: 0 }}
-                                                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                                                        animate={{ opacity: 1, y: 0, x: 0 }}
+                                                                                        exit={{ opacity: 0, x: 300 }}
                                                                                         transition={{ delay: index * 0.03 }}
+                                                                                        drag="x"
+                                                                                        dragConstraints={{ left: 0, right: 0 }}
+                                                                                        dragElastic={0.3}
+                                                                                        onDragEnd={(_, info) => {
+                                                                                            // Swipe to delete (right swipe)
+                                                                                            if (info.offset.x > 100 && deleteNotification) {
+                                                                                                deleteNotification(notif.id);
+                                                                                            }
+                                                                                        }}
+                                                                                        whileDrag={{ scale: 1.02 }}
                                                                                         onClick={(e) => {
                                                                                             if (!isExpanded && hiddenCount > 0) {
                                                                                                 e.stopPropagation();
@@ -1102,7 +1112,7 @@ function ProfileMenu({
                                                                                             }
                                                                                         }}
                                                                                         className={cn(
-                                                                                            "relative p-4 rounded-2xl transition-all group",
+                                                                                            "relative p-4 rounded-2xl transition-all group touch-pan-y",
                                                                                             "backdrop-blur-xl",
                                                                                             isDark
                                                                                                 ? "bg-gray-800/60 hover:bg-gray-800/80 border border-white/5"
@@ -1120,9 +1130,9 @@ function ProfileMenu({
                                                                                             <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
                                                                                                 <Bell className="w-5 h-5 text-white" />
                                                                                             </div>
-
+                                                                                            
                                                                                             {/* Content */}
-                                                                                            <div className="flex-1 min-w-0">
+                                                                                            <div className="flex-1 min-w-0 pr-8">
                                                                                                 <div className="flex items-start justify-between gap-2">
                                                                                                     <p className={cn(
                                                                                                         "text-sm font-semibold",
@@ -1152,25 +1162,8 @@ function ProfileMenu({
                                                                                                     {notif.body}
                                                                                                 </p>
                                                                                             </div>
-                                                                                        </div>
-
-                                                                                        {/* Action Buttons - visible on hover */}
-                                                                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                            {!notif.readAt && markAsRead && (
-                                                                                                <button
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        markAsRead(notif.id);
-                                                                                                    }}
-                                                                                                    className={cn(
-                                                                                                        "p-1.5 rounded-full transition-colors",
-                                                                                                        isDark ? "hover:bg-white/10 text-green-400" : "hover:bg-gray-100 text-green-600"
-                                                                                                    )}
-                                                                                                    title="Mark as read"
-                                                                                                >
-                                                                                                    <Check className="w-3.5 h-3.5" />
-                                                                                                </button>
-                                                                                            )}
+                                                                                            
+                                                                                            {/* Delete button - always visible on the right edge */}
                                                                                             {deleteNotification && (
                                                                                                 <button
                                                                                                     onClick={(e) => {
@@ -1178,25 +1171,55 @@ function ProfileMenu({
                                                                                                         deleteNotification(notif.id);
                                                                                                     }}
                                                                                                     className={cn(
-                                                                                                        "p-1.5 rounded-full transition-colors",
-                                                                                                        isDark ? "hover:bg-white/10 text-white/50" : "hover:bg-gray-100 text-gray-400"
+                                                                                                        "absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all",
+                                                                                                        "opacity-0 group-hover:opacity-100 md:opacity-30 md:hover:opacity-100",
+                                                                                                        isDark 
+                                                                                                            ? "hover:bg-red-500/20 text-white/40 hover:text-red-400" 
+                                                                                                            : "hover:bg-red-50 text-gray-400 hover:text-red-500"
                                                                                                     )}
                                                                                                     title="Delete"
                                                                                                 >
-                                                                                                    <X className="w-3.5 h-3.5" />
+                                                                                                    <X className="w-4 h-4" />
                                                                                                 </button>
                                                                                             )}
                                                                                         </div>
-
+                                                                                        
+                                                                                        {/* Mark as read - top right corner on hover */}
+                                                                                        {!notif.readAt && markAsRead && (
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    markAsRead(notif.id);
+                                                                                                }}
+                                                                                                className={cn(
+                                                                                                    "absolute top-2 right-10 p-1.5 rounded-full transition-all opacity-0 group-hover:opacity-100",
+                                                                                                    isDark 
+                                                                                                        ? "hover:bg-green-500/20 text-green-400" 
+                                                                                                        : "hover:bg-green-50 text-green-600"
+                                                                                                )}
+                                                                                                title="Mark as read"
+                                                                                            >
+                                                                                                <Check className="w-3.5 h-3.5" />
+                                                                                            </button>
+                                                                                        )}
+                                                                                        
                                                                                         {/* Expand hint when collapsed */}
                                                                                         {!isExpanded && hiddenCount > 0 && index === 0 && (
                                                                                             <div className={cn(
-                                                                                                "absolute bottom-2 right-4 text-xs",
+                                                                                                "absolute bottom-2 right-12 text-xs",
                                                                                                 isDark ? "text-white/30" : "text-gray-400"
                                                                                             )}>
                                                                                                 Tap to show {hiddenCount} more
                                                                                             </div>
                                                                                         )}
+                                                                                        
+                                                                                        {/* Swipe hint for mobile */}
+                                                                                        <div className={cn(
+                                                                                            "absolute bottom-2 left-4 text-xs md:hidden",
+                                                                                            isDark ? "text-white/20" : "text-gray-300"
+                                                                                        )}>
+                                                                                            Swipe right to delete
+                                                                                        </div>
                                                                                     </motion.div>
                                                                                 ))}
                                                                             </div>
@@ -1229,6 +1252,33 @@ function ProfileMenu({
                                                         })()}
                                                     </>
                                                 )}
+                                            </div>
+                                            
+                                            {/* Mobile Grab Handle - swipe up to close */}
+                                            <div 
+                                                className="flex justify-center py-3 cursor-grab active:cursor-grabbing md:hidden"
+                                                onTouchStart={(e) => {
+                                                    const startY = e.touches[0].clientY;
+                                                    const handleTouchMove = (moveEvt: TouchEvent) => {
+                                                        const deltaY = startY - moveEvt.touches[0].clientY;
+                                                        if (deltaY > 80) {
+                                                            setShowNotifications(false);
+                                                            document.removeEventListener('touchmove', handleTouchMove);
+                                                            document.removeEventListener('touchend', handleTouchEnd);
+                                                        }
+                                                    };
+                                                    const handleTouchEnd = () => {
+                                                        document.removeEventListener('touchmove', handleTouchMove);
+                                                        document.removeEventListener('touchend', handleTouchEnd);
+                                                    };
+                                                    document.addEventListener('touchmove', handleTouchMove);
+                                                    document.addEventListener('touchend', handleTouchEnd);
+                                                }}
+                                            >
+                                                <div className={cn(
+                                                    "w-10 h-1.5 rounded-full",
+                                                    isDark ? "bg-white/20" : "bg-gray-300"
+                                                )} />
                                             </div>
                                         </div>
                                     </motion.div>
@@ -1670,37 +1720,47 @@ function ProfileMenu({
 
                                                                     {/* Stacked Cards Container */}
                                                                     <div className="relative">
-                                                                        {/* Background stacked cards effect when collapsed */}
+                                                                        {/* Background stacked cards effect when collapsed - macOS style */}
                                                                         {!isExpanded && hiddenCount > 0 && (
                                                                             <>
                                                                                 {hiddenCount >= 2 && (
-                                                                                    <div
+                                                                                    <div 
                                                                                         className={cn(
-                                                                                            "absolute top-2 left-2 right-2 h-16 rounded-2xl",
-                                                                                            isDark ? "bg-gray-700/40" : "bg-gray-200/60"
+                                                                                            "absolute top-3 left-3 right-3 h-20 rounded-2xl border",
+                                                                                            isDark ? "bg-gray-700/50 border-white/5" : "bg-gray-200/70 border-black/5"
                                                                                         )}
                                                                                         style={{ zIndex: 0 }}
                                                                                     />
                                                                                 )}
-                                                                                <div
+                                                                                <div 
                                                                                     className={cn(
-                                                                                        "absolute top-1 left-1 right-1 h-16 rounded-2xl",
-                                                                                        isDark ? "bg-gray-700/60" : "bg-gray-100/80"
+                                                                                        "absolute top-1.5 left-1.5 right-1.5 h-20 rounded-2xl border",
+                                                                                        isDark ? "bg-gray-700/70 border-white/5" : "bg-gray-100/90 border-black/5"
                                                                                     )}
                                                                                     style={{ zIndex: 1 }}
                                                                                 />
                                                                             </>
                                                                         )}
-
+                                                                        
                                                                         {/* Visible Notification Cards */}
                                                                         <div className={cn("relative space-y-2", !isExpanded && hiddenCount > 0 && "z-10")}>
                                                                             {visibleNotifs.map((notif, index) => (
                                                                                 <motion.div
                                                                                     key={notif.id}
                                                                                     initial={{ opacity: 0, y: -10 }}
-                                                                                    animate={{ opacity: 1, y: 0 }}
-                                                                                    exit={{ opacity: 0, scale: 0.95 }}
+                                                                                    animate={{ opacity: 1, y: 0, x: 0 }}
+                                                                                    exit={{ opacity: 0, x: 300 }}
                                                                                     transition={{ delay: index * 0.03 }}
+                                                                                    drag="x"
+                                                                                    dragConstraints={{ left: 0, right: 0 }}
+                                                                                    dragElastic={0.3}
+                                                                                    onDragEnd={(_, info) => {
+                                                                                        // Swipe to delete (right swipe)
+                                                                                        if (info.offset.x > 100 && deleteNotification) {
+                                                                                            deleteNotification(notif.id);
+                                                                                        }
+                                                                                    }}
+                                                                                    whileDrag={{ scale: 1.02 }}
                                                                                     onClick={(e) => {
                                                                                         if (!isExpanded && hiddenCount > 0) {
                                                                                             e.stopPropagation();
@@ -1708,7 +1768,7 @@ function ProfileMenu({
                                                                                         }
                                                                                     }}
                                                                                     className={cn(
-                                                                                        "relative p-4 rounded-2xl transition-all group",
+                                                                                        "relative p-4 rounded-2xl transition-all group touch-pan-y",
                                                                                         "backdrop-blur-xl",
                                                                                         isDark
                                                                                             ? "bg-gray-800/60 hover:bg-gray-800/80 border border-white/5"
@@ -1726,9 +1786,9 @@ function ProfileMenu({
                                                                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
                                                                                             <Bell className="w-5 h-5 text-white" />
                                                                                         </div>
-
+                                                                                        
                                                                                         {/* Content */}
-                                                                                        <div className="flex-1 min-w-0">
+                                                                                        <div className="flex-1 min-w-0 pr-8">
                                                                                             <div className="flex items-start justify-between gap-2">
                                                                                                 <p className={cn(
                                                                                                     "text-sm font-semibold",
@@ -1758,25 +1818,8 @@ function ProfileMenu({
                                                                                                 {notif.body}
                                                                                             </p>
                                                                                         </div>
-                                                                                    </div>
-
-                                                                                    {/* Action Buttons - visible on hover */}
-                                                                                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                        {!notif.readAt && markAsRead && (
-                                                                                            <button
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    markAsRead(notif.id);
-                                                                                                }}
-                                                                                                className={cn(
-                                                                                                    "p-1.5 rounded-full transition-colors",
-                                                                                                    isDark ? "hover:bg-white/10 text-green-400" : "hover:bg-gray-100 text-green-600"
-                                                                                                )}
-                                                                                                title="Mark as read"
-                                                                                            >
-                                                                                                <Check className="w-3.5 h-3.5" />
-                                                                                            </button>
-                                                                                        )}
+                                                                                        
+                                                                                        {/* Delete button - always visible on the right edge */}
                                                                                         {deleteNotification && (
                                                                                             <button
                                                                                                 onClick={(e) => {
@@ -1784,25 +1827,55 @@ function ProfileMenu({
                                                                                                     deleteNotification(notif.id);
                                                                                                 }}
                                                                                                 className={cn(
-                                                                                                    "p-1.5 rounded-full transition-colors",
-                                                                                                    isDark ? "hover:bg-white/10 text-white/50" : "hover:bg-gray-100 text-gray-400"
+                                                                                                    "absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all",
+                                                                                                    "opacity-0 group-hover:opacity-100 md:opacity-30 md:hover:opacity-100",
+                                                                                                    isDark 
+                                                                                                        ? "hover:bg-red-500/20 text-white/40 hover:text-red-400" 
+                                                                                                        : "hover:bg-red-50 text-gray-400 hover:text-red-500"
                                                                                                 )}
                                                                                                 title="Delete"
                                                                                             >
-                                                                                                <X className="w-3.5 h-3.5" />
+                                                                                                <X className="w-4 h-4" />
                                                                                             </button>
                                                                                         )}
                                                                                     </div>
-
+                                                                                    
+                                                                                    {/* Mark as read - top right corner on hover */}
+                                                                                    {!notif.readAt && markAsRead && (
+                                                                                        <button
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                markAsRead(notif.id);
+                                                                                            }}
+                                                                                            className={cn(
+                                                                                                "absolute top-2 right-10 p-1.5 rounded-full transition-all opacity-0 group-hover:opacity-100",
+                                                                                                isDark 
+                                                                                                    ? "hover:bg-green-500/20 text-green-400" 
+                                                                                                    : "hover:bg-green-50 text-green-600"
+                                                                                            )}
+                                                                                            title="Mark as read"
+                                                                                        >
+                                                                                            <Check className="w-3.5 h-3.5" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                    
                                                                                     {/* Expand hint when collapsed */}
                                                                                     {!isExpanded && hiddenCount > 0 && index === 0 && (
                                                                                         <div className={cn(
-                                                                                            "absolute bottom-2 right-4 text-xs",
+                                                                                            "absolute bottom-2 right-12 text-xs",
                                                                                             isDark ? "text-white/30" : "text-gray-400"
                                                                                         )}>
                                                                                             Tap to show {hiddenCount} more
                                                                                         </div>
                                                                                     )}
+                                                                                    
+                                                                                    {/* Swipe hint for mobile */}
+                                                                                    <div className={cn(
+                                                                                        "absolute bottom-2 left-4 text-xs md:hidden",
+                                                                                        isDark ? "text-white/20" : "text-gray-300"
+                                                                                    )}>
+                                                                                        Swipe right to delete
+                                                                                    </div>
                                                                                 </motion.div>
                                                                             ))}
                                                                         </div>
@@ -1835,6 +1908,33 @@ function ProfileMenu({
                                                     })()}
                                                 </>
                                             )}
+                                        </div>
+                                        
+                                        {/* Mobile Grab Handle - swipe up to close */}
+                                        <div 
+                                            className="flex justify-center py-3 cursor-grab active:cursor-grabbing md:hidden"
+                                            onTouchStart={(e) => {
+                                                const startY = e.touches[0].clientY;
+                                                const handleTouchMove = (moveEvt: TouchEvent) => {
+                                                    const deltaY = startY - moveEvt.touches[0].clientY;
+                                                    if (deltaY > 80) {
+                                                        setShowNotifications(false);
+                                                        document.removeEventListener('touchmove', handleTouchMove);
+                                                        document.removeEventListener('touchend', handleTouchEnd);
+                                                    }
+                                                };
+                                                const handleTouchEnd = () => {
+                                                    document.removeEventListener('touchmove', handleTouchMove);
+                                                    document.removeEventListener('touchend', handleTouchEnd);
+                                                };
+                                                document.addEventListener('touchmove', handleTouchMove);
+                                                document.addEventListener('touchend', handleTouchEnd);
+                                            }}
+                                        >
+                                            <div className={cn(
+                                                "w-10 h-1.5 rounded-full",
+                                                isDark ? "bg-white/20" : "bg-gray-300"
+                                            )} />
                                         </div>
                                     </div>
                                 </motion.div>
