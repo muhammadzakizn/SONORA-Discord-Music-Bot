@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -861,146 +862,149 @@ function ProfileMenu({
                         )}
                     </button>
 
-                    {/* Full-screen Notification Dialog - slides from top */}
-                    <AnimatePresence>
-                        {showNotifications && (
-                            <>
-                                {/* Backdrop */}
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="fixed inset-0 bg-black/60 z-[9999]"
-                                    onClick={() => setShowNotifications(false)}
-                                />
-                                {/* Dialog */}
-                                <motion.div
-                                    initial={{ y: "-100%", opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
-                                    exit={{ y: "-100%", opacity: 0 }}
-                                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                                    className={cn(
-                                        "fixed top-0 left-0 right-0 z-[10000] max-h-[85vh] overflow-hidden",
-                                        "rounded-b-3xl shadow-2xl",
-                                        isDark
-                                            ? "bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 border-b border-white/10"
-                                            : "bg-gradient-to-b from-white via-white to-gray-50 border-b border-gray-200"
-                                    )}
-                                >
-                                    {/* Safe area for notch */}
-                                    <div className="pt-safe">
-                                        {/* Header */}
-                                        <div className={cn(
-                                            "flex items-center justify-between px-4 sm:px-6 py-4 border-b",
-                                            isDark ? "border-white/10" : "border-gray-200"
-                                        )}>
-                                            <div className="flex items-center gap-3">
-                                                <Bell className={cn("w-6 h-6", isDark ? "text-pink-400" : "text-pink-500")} />
-                                                <h2 className={cn("text-lg font-semibold", isDark ? "text-white" : "text-gray-900")}>
-                                                    Notifications
-                                                </h2>
-                                                {unreadCount > 0 && (
-                                                    <span className="flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-bold text-white bg-red-500 rounded-full">
-                                                        {unreadCount > 99 ? '99+' : unreadCount}
-                                                    </span>
+                    {/* Full-screen Notification Dialog - Portal to body so it appears at absolute top */}
+                    {typeof document !== 'undefined' && createPortal(
+                        <AnimatePresence>
+                            {showNotifications && (
+                                <>
+                                    {/* Backdrop */}
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="fixed inset-0 bg-black/60 z-[9999]"
+                                        onClick={() => setShowNotifications(false)}
+                                    />
+                                    {/* Dialog */}
+                                    <motion.div
+                                        initial={{ y: "-100%", opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        exit={{ y: "-100%", opacity: 0 }}
+                                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                        className={cn(
+                                            "fixed top-0 left-0 right-0 z-[10000] max-h-[85vh] overflow-hidden",
+                                            "rounded-b-3xl shadow-2xl",
+                                            isDark
+                                                ? "bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 border-b border-white/10"
+                                                : "bg-gradient-to-b from-white via-white to-gray-50 border-b border-gray-200"
+                                        )}
+                                    >
+                                        {/* Safe area for notch */}
+                                        <div className="pt-safe">
+                                            {/* Header */}
+                                            <div className={cn(
+                                                "flex items-center justify-between px-4 sm:px-6 py-4 border-b",
+                                                isDark ? "border-white/10" : "border-gray-200"
+                                            )}>
+                                                <div className="flex items-center gap-3">
+                                                    <Bell className={cn("w-6 h-6", isDark ? "text-pink-400" : "text-pink-500")} />
+                                                    <h2 className={cn("text-lg font-semibold", isDark ? "text-white" : "text-gray-900")}>
+                                                        Notifications
+                                                    </h2>
+                                                    {unreadCount > 0 && (
+                                                        <span className="flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-bold text-white bg-red-500 rounded-full">
+                                                            {unreadCount > 99 ? '99+' : unreadCount}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    onClick={() => setShowNotifications(false)}
+                                                    className={cn(
+                                                        "p-2 rounded-xl transition-colors",
+                                                        isDark ? "hover:bg-white/10 text-white/60" : "hover:bg-gray-100 text-gray-500"
+                                                    )}
+                                                >
+                                                    <X className="w-5 h-5" />
+                                                </button>
+                                            </div>
+
+                                            {/* Notification List */}
+                                            <div className="max-h-[calc(85vh-80px)] overflow-y-auto overscroll-contain">
+                                                {notifications.length === 0 ? (
+                                                    <div className={cn(
+                                                        "flex flex-col items-center justify-center py-16 px-4",
+                                                        isDark ? "text-white/40" : "text-gray-400"
+                                                    )}>
+                                                        <Bell className="w-12 h-12 mb-4 opacity-30" />
+                                                        <p className="text-base font-medium">No notifications</p>
+                                                        <p className="text-sm mt-1 opacity-70">You're all caught up!</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="divide-y divide-gray-200 dark:divide-white/5">
+                                                        {notifications.map((notif) => (
+                                                            <div
+                                                                key={notif.id}
+                                                                className={cn(
+                                                                    "flex items-start gap-3 sm:gap-4 p-4 sm:px-6 transition-colors",
+                                                                    isDark ? "hover:bg-white/5" : "hover:bg-gray-50",
+                                                                    !notif.readAt && (isDark ? "bg-pink-500/5" : "bg-pink-50/50")
+                                                                )}
+                                                            >
+                                                                <div className={cn(
+                                                                    "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center",
+                                                                    isDark ? "bg-pink-500/20" : "bg-pink-100"
+                                                                )}>
+                                                                    <Bell className={cn("w-5 h-5", isDark ? "text-pink-400" : "text-pink-500")} />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className={cn(
+                                                                        "text-sm sm:text-base font-medium",
+                                                                        isDark ? "text-white" : "text-gray-900"
+                                                                    )}>
+                                                                        {notif.title}
+                                                                    </p>
+                                                                    <p className={cn(
+                                                                        "text-xs sm:text-sm mt-0.5 line-clamp-2",
+                                                                        isDark ? "text-white/60" : "text-gray-600"
+                                                                    )}>
+                                                                        {notif.body}
+                                                                    </p>
+                                                                    <p className={cn(
+                                                                        "text-xs mt-1",
+                                                                        isDark ? "text-white/30" : "text-gray-400"
+                                                                    )}>
+                                                                        {new Date(notif.createdAt).toLocaleString()}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="flex gap-1 flex-shrink-0">
+                                                                    {!notif.readAt && markAsRead && (
+                                                                        <button
+                                                                            onClick={() => markAsRead(notif.id)}
+                                                                            className={cn(
+                                                                                "p-2 rounded-lg transition-colors",
+                                                                                isDark ? "hover:bg-green-500/20 text-green-400" : "hover:bg-green-100 text-green-600"
+                                                                            )}
+                                                                            title="Mark as read"
+                                                                        >
+                                                                            <Check className="w-4 h-4" />
+                                                                        </button>
+                                                                    )}
+                                                                    {deleteNotification && (
+                                                                        <button
+                                                                            onClick={() => deleteNotification(notif.id)}
+                                                                            className={cn(
+                                                                                "p-2 rounded-lg transition-colors",
+                                                                                isDark ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-100 text-red-600"
+                                                                            )}
+                                                                            title="Delete"
+                                                                        >
+                                                                            <X className="w-4 h-4" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 )}
                                             </div>
-                                            <button
-                                                onClick={() => setShowNotifications(false)}
-                                                className={cn(
-                                                    "p-2 rounded-xl transition-colors",
-                                                    isDark ? "hover:bg-white/10 text-white/60" : "hover:bg-gray-100 text-gray-500"
-                                                )}
-                                            >
-                                                <X className="w-5 h-5" />
-                                            </button>
                                         </div>
-
-                                        {/* Notification List */}
-                                        <div className="max-h-[calc(85vh-80px)] overflow-y-auto overscroll-contain">
-                                            {notifications.length === 0 ? (
-                                                <div className={cn(
-                                                    "flex flex-col items-center justify-center py-16 px-4",
-                                                    isDark ? "text-white/40" : "text-gray-400"
-                                                )}>
-                                                    <Bell className="w-12 h-12 mb-4 opacity-30" />
-                                                    <p className="text-base font-medium">No notifications</p>
-                                                    <p className="text-sm mt-1 opacity-70">You're all caught up!</p>
-                                                </div>
-                                            ) : (
-                                                <div className="divide-y divide-gray-200 dark:divide-white/5">
-                                                    {notifications.map((notif) => (
-                                                        <div
-                                                            key={notif.id}
-                                                            className={cn(
-                                                                "flex items-start gap-3 sm:gap-4 p-4 sm:px-6 transition-colors",
-                                                                isDark ? "hover:bg-white/5" : "hover:bg-gray-50",
-                                                                !notif.readAt && (isDark ? "bg-pink-500/5" : "bg-pink-50/50")
-                                                            )}
-                                                        >
-                                                            <div className={cn(
-                                                                "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center",
-                                                                isDark ? "bg-pink-500/20" : "bg-pink-100"
-                                                            )}>
-                                                                <Bell className={cn("w-5 h-5", isDark ? "text-pink-400" : "text-pink-500")} />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className={cn(
-                                                                    "text-sm sm:text-base font-medium",
-                                                                    isDark ? "text-white" : "text-gray-900"
-                                                                )}>
-                                                                    {notif.title}
-                                                                </p>
-                                                                <p className={cn(
-                                                                    "text-xs sm:text-sm mt-0.5 line-clamp-2",
-                                                                    isDark ? "text-white/60" : "text-gray-600"
-                                                                )}>
-                                                                    {notif.body}
-                                                                </p>
-                                                                <p className={cn(
-                                                                    "text-xs mt-1",
-                                                                    isDark ? "text-white/30" : "text-gray-400"
-                                                                )}>
-                                                                    {new Date(notif.createdAt).toLocaleString()}
-                                                                </p>
-                                                            </div>
-                                                            <div className="flex gap-1 flex-shrink-0">
-                                                                {!notif.readAt && markAsRead && (
-                                                                    <button
-                                                                        onClick={() => markAsRead(notif.id)}
-                                                                        className={cn(
-                                                                            "p-2 rounded-lg transition-colors",
-                                                                            isDark ? "hover:bg-green-500/20 text-green-400" : "hover:bg-green-100 text-green-600"
-                                                                        )}
-                                                                        title="Mark as read"
-                                                                    >
-                                                                        <Check className="w-4 h-4" />
-                                                                    </button>
-                                                                )}
-                                                                {deleteNotification && (
-                                                                    <button
-                                                                        onClick={() => deleteNotification(notif.id)}
-                                                                        className={cn(
-                                                                            "p-2 rounded-lg transition-colors",
-                                                                            isDark ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-100 text-red-600"
-                                                                        )}
-                                                                        title="Delete"
-                                                                    >
-                                                                        <X className="w-4 h-4" />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </>
-                        )}
-                    </AnimatePresence>
+                                    </motion.div>
+                                </>
+                            )}
+                        </AnimatePresence>,
+                        document.body
+                    )}
 
                     <div className={cn("my-2 border-t", isDark ? "border-white/10" : "border-gray-200")} />
 
@@ -1249,146 +1253,149 @@ function ProfileMenu({
                     )}
                 </button>
 
-                {/* Full-screen Notification Dialog - slides from top */}
-                <AnimatePresence>
-                    {showNotifications && (
-                        <>
-                            {/* Backdrop */}
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="fixed inset-0 bg-black/60 z-[9999]"
-                                onClick={() => setShowNotifications(false)}
-                            />
-                            {/* Dialog */}
-                            <motion.div
-                                initial={{ y: "-100%", opacity: 0 }}
-                                animate={{ y: 0, opacity: 1 }}
-                                exit={{ y: "-100%", opacity: 0 }}
-                                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                                className={cn(
-                                    "fixed top-0 left-0 right-0 z-[10000] max-h-[85vh] overflow-hidden",
-                                    "rounded-b-3xl shadow-2xl",
-                                    isDark
-                                        ? "bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 border-b border-white/10"
-                                        : "bg-gradient-to-b from-white via-white to-gray-50 border-b border-gray-200"
-                                )}
-                            >
-                                {/* Safe area for notch */}
-                                <div className="pt-safe">
-                                    {/* Header */}
-                                    <div className={cn(
-                                        "flex items-center justify-between px-4 sm:px-6 py-4 border-b",
-                                        isDark ? "border-white/10" : "border-gray-200"
-                                    )}>
-                                        <div className="flex items-center gap-3">
-                                            <Bell className={cn("w-6 h-6", isDark ? "text-pink-400" : "text-pink-500")} />
-                                            <h2 className={cn("text-lg font-semibold", isDark ? "text-white" : "text-gray-900")}>
-                                                Notifications
-                                            </h2>
-                                            {unreadCount > 0 && (
-                                                <span className="flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-bold text-white bg-red-500 rounded-full">
-                                                    {unreadCount > 99 ? '99+' : unreadCount}
-                                                </span>
+                {/* Full-screen Notification Dialog - Portal to body so it appears at absolute top */}
+                {typeof document !== 'undefined' && createPortal(
+                    <AnimatePresence>
+                        {showNotifications && (
+                            <>
+                                {/* Backdrop */}
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="fixed inset-0 bg-black/60 z-[9999]"
+                                    onClick={() => setShowNotifications(false)}
+                                />
+                                {/* Dialog */}
+                                <motion.div
+                                    initial={{ y: "-100%", opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    exit={{ y: "-100%", opacity: 0 }}
+                                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                    className={cn(
+                                        "fixed top-0 left-0 right-0 z-[10000] max-h-[85vh] overflow-hidden",
+                                        "rounded-b-3xl shadow-2xl",
+                                        isDark
+                                            ? "bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 border-b border-white/10"
+                                            : "bg-gradient-to-b from-white via-white to-gray-50 border-b border-gray-200"
+                                    )}
+                                >
+                                    {/* Safe area for notch */}
+                                    <div className="pt-safe">
+                                        {/* Header */}
+                                        <div className={cn(
+                                            "flex items-center justify-between px-4 sm:px-6 py-4 border-b",
+                                            isDark ? "border-white/10" : "border-gray-200"
+                                        )}>
+                                            <div className="flex items-center gap-3">
+                                                <Bell className={cn("w-6 h-6", isDark ? "text-pink-400" : "text-pink-500")} />
+                                                <h2 className={cn("text-lg font-semibold", isDark ? "text-white" : "text-gray-900")}>
+                                                    Notifications
+                                                </h2>
+                                                {unreadCount > 0 && (
+                                                    <span className="flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-bold text-white bg-red-500 rounded-full">
+                                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => setShowNotifications(false)}
+                                                className={cn(
+                                                    "p-2 rounded-xl transition-colors",
+                                                    isDark ? "hover:bg-white/10 text-white/60" : "hover:bg-gray-100 text-gray-500"
+                                                )}
+                                            >
+                                                <X className="w-5 h-5" />
+                                            </button>
+                                        </div>
+
+                                        {/* Notification List */}
+                                        <div className="max-h-[calc(85vh-80px)] overflow-y-auto overscroll-contain">
+                                            {notifications.length === 0 ? (
+                                                <div className={cn(
+                                                    "flex flex-col items-center justify-center py-16 px-4",
+                                                    isDark ? "text-white/40" : "text-gray-400"
+                                                )}>
+                                                    <Bell className="w-12 h-12 mb-4 opacity-30" />
+                                                    <p className="text-base font-medium">No notifications</p>
+                                                    <p className="text-sm mt-1 opacity-70">You're all caught up!</p>
+                                                </div>
+                                            ) : (
+                                                <div className="divide-y divide-gray-200 dark:divide-white/5">
+                                                    {notifications.map((notif) => (
+                                                        <div
+                                                            key={notif.id}
+                                                            className={cn(
+                                                                "flex items-start gap-3 sm:gap-4 p-4 sm:px-6 transition-colors",
+                                                                isDark ? "hover:bg-white/5" : "hover:bg-gray-50",
+                                                                !notif.readAt && (isDark ? "bg-pink-500/5" : "bg-pink-50/50")
+                                                            )}
+                                                        >
+                                                            <div className={cn(
+                                                                "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center",
+                                                                isDark ? "bg-pink-500/20" : "bg-pink-100"
+                                                            )}>
+                                                                <Bell className={cn("w-5 h-5", isDark ? "text-pink-400" : "text-pink-500")} />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className={cn(
+                                                                    "text-sm sm:text-base font-medium",
+                                                                    isDark ? "text-white" : "text-gray-900"
+                                                                )}>
+                                                                    {notif.title}
+                                                                </p>
+                                                                <p className={cn(
+                                                                    "text-xs sm:text-sm mt-0.5 line-clamp-2",
+                                                                    isDark ? "text-white/60" : "text-gray-600"
+                                                                )}>
+                                                                    {notif.body}
+                                                                </p>
+                                                                <p className={cn(
+                                                                    "text-xs mt-1",
+                                                                    isDark ? "text-white/30" : "text-gray-400"
+                                                                )}>
+                                                                    {new Date(notif.createdAt).toLocaleString()}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex gap-1 flex-shrink-0">
+                                                                {!notif.readAt && markAsRead && (
+                                                                    <button
+                                                                        onClick={() => markAsRead(notif.id)}
+                                                                        className={cn(
+                                                                            "p-2 rounded-lg transition-colors",
+                                                                            isDark ? "hover:bg-green-500/20 text-green-400" : "hover:bg-green-100 text-green-600"
+                                                                        )}
+                                                                        title="Mark as read"
+                                                                    >
+                                                                        <Check className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                                {deleteNotification && (
+                                                                    <button
+                                                                        onClick={() => deleteNotification(notif.id)}
+                                                                        className={cn(
+                                                                            "p-2 rounded-lg transition-colors",
+                                                                            isDark ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-100 text-red-600"
+                                                                        )}
+                                                                        title="Delete"
+                                                                    >
+                                                                        <X className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             )}
                                         </div>
-                                        <button
-                                            onClick={() => setShowNotifications(false)}
-                                            className={cn(
-                                                "p-2 rounded-xl transition-colors",
-                                                isDark ? "hover:bg-white/10 text-white/60" : "hover:bg-gray-100 text-gray-500"
-                                            )}
-                                        >
-                                            <X className="w-5 h-5" />
-                                        </button>
                                     </div>
-
-                                    {/* Notification List */}
-                                    <div className="max-h-[calc(85vh-80px)] overflow-y-auto overscroll-contain">
-                                        {notifications.length === 0 ? (
-                                            <div className={cn(
-                                                "flex flex-col items-center justify-center py-16 px-4",
-                                                isDark ? "text-white/40" : "text-gray-400"
-                                            )}>
-                                                <Bell className="w-12 h-12 mb-4 opacity-30" />
-                                                <p className="text-base font-medium">No notifications</p>
-                                                <p className="text-sm mt-1 opacity-70">You're all caught up!</p>
-                                            </div>
-                                        ) : (
-                                            <div className="divide-y divide-gray-200 dark:divide-white/5">
-                                                {notifications.map((notif) => (
-                                                    <div
-                                                        key={notif.id}
-                                                        className={cn(
-                                                            "flex items-start gap-3 sm:gap-4 p-4 sm:px-6 transition-colors",
-                                                            isDark ? "hover:bg-white/5" : "hover:bg-gray-50",
-                                                            !notif.readAt && (isDark ? "bg-pink-500/5" : "bg-pink-50/50")
-                                                        )}
-                                                    >
-                                                        <div className={cn(
-                                                            "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center",
-                                                            isDark ? "bg-pink-500/20" : "bg-pink-100"
-                                                        )}>
-                                                            <Bell className={cn("w-5 h-5", isDark ? "text-pink-400" : "text-pink-500")} />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className={cn(
-                                                                "text-sm sm:text-base font-medium",
-                                                                isDark ? "text-white" : "text-gray-900"
-                                                            )}>
-                                                                {notif.title}
-                                                            </p>
-                                                            <p className={cn(
-                                                                "text-xs sm:text-sm mt-0.5 line-clamp-2",
-                                                                isDark ? "text-white/60" : "text-gray-600"
-                                                            )}>
-                                                                {notif.body}
-                                                            </p>
-                                                            <p className={cn(
-                                                                "text-xs mt-1",
-                                                                isDark ? "text-white/30" : "text-gray-400"
-                                                            )}>
-                                                                {new Date(notif.createdAt).toLocaleString()}
-                                                            </p>
-                                                        </div>
-                                                        <div className="flex gap-1 flex-shrink-0">
-                                                            {!notif.readAt && markAsRead && (
-                                                                <button
-                                                                    onClick={() => markAsRead(notif.id)}
-                                                                    className={cn(
-                                                                        "p-2 rounded-lg transition-colors",
-                                                                        isDark ? "hover:bg-green-500/20 text-green-400" : "hover:bg-green-100 text-green-600"
-                                                                    )}
-                                                                    title="Mark as read"
-                                                                >
-                                                                    <Check className="w-4 h-4" />
-                                                                </button>
-                                                            )}
-                                                            {deleteNotification && (
-                                                                <button
-                                                                    onClick={() => deleteNotification(notif.id)}
-                                                                    className={cn(
-                                                                        "p-2 rounded-lg transition-colors",
-                                                                        isDark ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-100 text-red-600"
-                                                                    )}
-                                                                    title="Delete"
-                                                                >
-                                                                    <X className="w-4 h-4" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </motion.div>
-                        </>
-                    )}
-                </AnimatePresence>
+                                </motion.div>
+                            </>
+                        )}
+                    </AnimatePresence>,
+                    document.body
+                )}
 
                 <div className={cn("my-2 border-t", isDark ? "border-white/10" : "border-gray-200")} />
 
