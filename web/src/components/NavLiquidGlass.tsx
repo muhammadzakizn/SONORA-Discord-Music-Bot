@@ -971,7 +971,12 @@ function ProfileMenu({
                                             )}
 
                                             {/* Notification Cards */}
-                                            <div className="max-h-[calc(85vh-100px)] overflow-y-auto overscroll-contain p-4 space-y-3">
+                                            <div
+                                                className="max-h-[calc(85vh-100px)] overflow-y-auto overscroll-contain p-4 space-y-3"
+                                                style={{ touchAction: 'pan-y' }}
+                                                onTouchStart={(e) => e.stopPropagation()}
+                                                onTouchMove={(e) => e.stopPropagation()}
+                                            >
                                                 {notifications.length === 0 ? (
                                                     <div className={cn(
                                                         "flex flex-col items-center justify-center py-12 px-4",
@@ -1255,18 +1260,9 @@ function ProfileMenu({
                                                 )}
                                             </div>
 
-                                            {/* Bottom Fade Gradient - shows when content may overflow */}
-                                            <div
-                                                className={cn(
-                                                    "pointer-events-none h-8 -mt-8 relative z-10",
-                                                    "bg-gradient-to-t",
-                                                    isDark ? "from-gray-900/90 to-transparent" : "from-white/90 to-transparent"
-                                                )}
-                                            />
-
                                             {/* Mobile Grab Handle - swipe up to close */}
                                             <div
-                                                className="flex justify-center py-3 cursor-grab active:cursor-grabbing md:hidden"
+                                                className="flex justify-center py-4 cursor-grab active:cursor-grabbing md:hidden"
                                                 onTouchStart={(e) => {
                                                     e.stopPropagation();
                                                     const startY = e.touches[0].clientY;
@@ -1287,8 +1283,8 @@ function ProfileMenu({
                                                 }}
                                             >
                                                 <div className={cn(
-                                                    "w-10 h-1.5 rounded-full",
-                                                    isDark ? "bg-white/20" : "bg-gray-300"
+                                                    "w-16 h-1.5 rounded-full",
+                                                    isDark ? "bg-white/30" : "bg-gray-400"
                                                 )} />
                                             </div>
                                         </div>
@@ -1312,7 +1308,7 @@ function ProfileMenu({
                         <span className="text-sm font-medium">Logout</span>
                     </button>
                 </div>
-            </div>
+            </div >
         );
     }
 
@@ -1636,7 +1632,12 @@ function ProfileMenu({
                                         )}
 
                                         {/* Notification Cards */}
-                                        <div className="max-h-[calc(85vh-100px)] overflow-y-auto overscroll-contain p-4 space-y-3">
+                                        <div
+                                            className="max-h-[calc(85vh-100px)] overflow-y-auto overscroll-contain p-4 space-y-3"
+                                            style={{ touchAction: 'pan-y' }}
+                                            onTouchStart={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
+                                        >
                                             {notifications.length === 0 ? (
                                                 <div className={cn(
                                                     "flex flex-col items-center justify-center py-12 px-4",
@@ -1920,18 +1921,9 @@ function ProfileMenu({
                                             )}
                                         </div>
 
-                                        {/* Bottom Fade Gradient - shows when content may overflow */}
-                                        <div
-                                            className={cn(
-                                                "pointer-events-none h-8 -mt-8 relative z-10",
-                                                "bg-gradient-to-t",
-                                                isDark ? "from-gray-900/90 to-transparent" : "from-white/90 to-transparent"
-                                            )}
-                                        />
-
                                         {/* Mobile Grab Handle - swipe up to close */}
                                         <div
-                                            className="flex justify-center py-3 cursor-grab active:cursor-grabbing md:hidden"
+                                            className="flex justify-center py-4 cursor-grab active:cursor-grabbing md:hidden"
                                             onTouchStart={(e) => {
                                                 e.stopPropagation();
                                                 const startY = e.touches[0].clientY;
@@ -1952,8 +1944,8 @@ function ProfileMenu({
                                             }}
                                         >
                                             <div className={cn(
-                                                "w-10 h-1.5 rounded-full",
-                                                isDark ? "bg-white/20" : "bg-gray-300"
+                                                "w-16 h-1.5 rounded-full",
+                                                isDark ? "bg-white/30" : "bg-gray-400"
                                             )} />
                                         </div>
                                     </div>
