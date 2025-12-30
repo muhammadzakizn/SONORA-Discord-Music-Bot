@@ -7,6 +7,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
     Home,
+    Bell,
     Compass,
     User,
     Settings,
@@ -815,6 +816,18 @@ function ProfileMenu({
                     >
                         <User className="w-5 h-5" />
                         <span className="text-sm font-medium">Profile Settings</span>
+                    </Link>
+
+                    <Link
+                        href="/admin"
+                        onClick={onClose}
+                        className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors",
+                            isDark ? "hover:bg-white/10 text-white/80" : "hover:bg-black/5 text-gray-700"
+                        )}
+                    >
+                        <Bell className="w-5 h-5" />
+                        <span className="text-sm font-medium">Notifications</span>
                     </Link>
 
                     <div className={cn("my-2 border-t", isDark ? "border-white/10" : "border-gray-200")} />
