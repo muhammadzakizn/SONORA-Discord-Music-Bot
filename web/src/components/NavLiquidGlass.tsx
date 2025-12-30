@@ -1067,7 +1067,7 @@ function ProfileMenu({
                                                                                 )}
                                                                             </div>
 
-                                                                            {/* Clear All Button - Trash icon, fully round, shows text on hover */}
+                                                                            {/* Clear All Button - Trash icon, fully round, shows text on hover, taller on mobile */}
                                                                             {groupNotifs.length >= 2 && deleteAllNotifications && (
                                                                                 <button
                                                                                     onClick={(e) => {
@@ -1075,7 +1075,10 @@ function ProfileMenu({
                                                                                         deleteAllNotifications();
                                                                                     }}
                                                                                     className={cn(
-                                                                                        "group/clear flex items-center justify-center w-7 h-7 hover:w-auto hover:px-2.5 rounded-full transition-all duration-200",
+                                                                                        "group/clear flex items-center justify-center rounded-full transition-all duration-200",
+                                                                                        "w-7 h-7 md:w-7 md:h-7",
+                                                                                        "max-md:w-8 max-md:h-10 max-md:rounded-xl",
+                                                                                        "hover:w-auto hover:px-2.5",
                                                                                         isDark
                                                                                             ? "bg-white/10 hover:bg-red-500/20 text-white/50 hover:text-red-400"
                                                                                             : "bg-black/5 hover:bg-red-50 text-gray-400 hover:text-red-500"
@@ -1143,9 +1146,9 @@ function ProfileMenu({
                                                                                             "relative p-4 rounded-2xl transition-all group touch-pan-y",
                                                                                             "backdrop-blur-xl",
                                                                                             isDark
-                                                                                                ? "bg-gray-800/60 hover:bg-gray-800/80 border border-white/5"
-                                                                                                : "bg-white/70 hover:bg-white/90 border border-black/5 shadow-sm",
-                                                                                            !notif.readAt && (isDark ? "ring-1 ring-pink-500/30" : "ring-1 ring-pink-500/20"),
+                                                                                                ? "bg-gray-800/30 hover:bg-gray-800/50 border border-white/10"
+                                                                                                : "bg-white/40 hover:bg-white/60 border border-black/5 shadow-sm",
+                                                                                            !notif.readAt && (isDark ? "ring-1 ring-white/30" : "ring-1 ring-white/50"),
                                                                                             !isExpanded && hiddenCount > 0 && "cursor-pointer"
                                                                                         )}
                                                                                         style={{
@@ -1241,13 +1244,6 @@ function ProfileMenu({
                                                                                             </div>
                                                                                         )}
 
-                                                                                        {/* Swipe hint for mobile */}
-                                                                                        <div className={cn(
-                                                                                            "absolute bottom-2 left-4 text-xs md:hidden",
-                                                                                            isDark ? "text-white/20" : "text-gray-300"
-                                                                                        )}>
-                                                                                            Swipe right to delete
-                                                                                        </div>
                                                                                     </motion.div>
                                                                                 ))}
                                                                             </div>
@@ -1262,10 +1258,20 @@ function ProfileMenu({
                                                 )}
                                             </div>
 
+                                            {/* Bottom Fade Gradient - shows when content may overflow */}
+                                            <div
+                                                className={cn(
+                                                    "pointer-events-none h-8 -mt-8 relative z-10",
+                                                    "bg-gradient-to-t",
+                                                    isDark ? "from-gray-900/90 to-transparent" : "from-white/90 to-transparent"
+                                                )}
+                                            />
+
                                             {/* Mobile Grab Handle - swipe up to close */}
                                             <div
                                                 className="flex justify-center py-3 cursor-grab active:cursor-grabbing md:hidden"
                                                 onTouchStart={(e) => {
+                                                    e.stopPropagation();
                                                     const startY = e.touches[0].clientY;
                                                     const handleTouchMove = (moveEvt: TouchEvent) => {
                                                         const deltaY = startY - moveEvt.touches[0].clientY;
@@ -1729,7 +1735,7 @@ function ProfileMenu({
                                                                             )}
                                                                         </div>
 
-                                                                        {/* Clear All Button - Trash icon, fully round, shows text on hover */}
+                                                                        {/* Clear All Button - Trash icon, fully round, shows text on hover, taller on mobile */}
                                                                         {groupNotifs.length >= 2 && deleteAllNotifications && (
                                                                             <button
                                                                                 onClick={(e) => {
@@ -1737,7 +1743,10 @@ function ProfileMenu({
                                                                                     deleteAllNotifications();
                                                                                 }}
                                                                                 className={cn(
-                                                                                    "group/clear flex items-center justify-center w-7 h-7 hover:w-auto hover:px-2.5 rounded-full transition-all duration-200",
+                                                                                    "group/clear flex items-center justify-center rounded-full transition-all duration-200",
+                                                                                    "w-7 h-7 md:w-7 md:h-7",
+                                                                                    "max-md:w-8 max-md:h-10 max-md:rounded-xl",
+                                                                                    "hover:w-auto hover:px-2.5",
                                                                                     isDark
                                                                                         ? "bg-white/10 hover:bg-red-500/20 text-white/50 hover:text-red-400"
                                                                                         : "bg-black/5 hover:bg-red-50 text-gray-400 hover:text-red-500"
@@ -1805,9 +1814,9 @@ function ProfileMenu({
                                                                                         "relative p-4 rounded-2xl transition-all group touch-pan-y",
                                                                                         "backdrop-blur-xl",
                                                                                         isDark
-                                                                                            ? "bg-gray-800/60 hover:bg-gray-800/80 border border-white/5"
-                                                                                            : "bg-white/70 hover:bg-white/90 border border-black/5 shadow-sm",
-                                                                                        !notif.readAt && (isDark ? "ring-1 ring-pink-500/30" : "ring-1 ring-pink-500/20"),
+                                                                                            ? "bg-gray-800/30 hover:bg-gray-800/50 border border-white/10"
+                                                                                            : "bg-white/40 hover:bg-white/60 border border-black/5 shadow-sm",
+                                                                                        !notif.readAt && (isDark ? "ring-1 ring-white/30" : "ring-1 ring-white/50"),
                                                                                         !isExpanded && hiddenCount > 0 && "cursor-pointer"
                                                                                     )}
                                                                                     style={{
@@ -1903,13 +1912,6 @@ function ProfileMenu({
                                                                                         </div>
                                                                                     )}
 
-                                                                                    {/* Swipe hint for mobile */}
-                                                                                    <div className={cn(
-                                                                                        "absolute bottom-2 left-4 text-xs md:hidden",
-                                                                                        isDark ? "text-white/20" : "text-gray-300"
-                                                                                    )}>
-                                                                                        Swipe right to delete
-                                                                                    </div>
                                                                                 </motion.div>
                                                                             ))}
                                                                         </div>
@@ -1924,10 +1926,20 @@ function ProfileMenu({
                                             )}
                                         </div>
 
+                                        {/* Bottom Fade Gradient - shows when content may overflow */}
+                                        <div
+                                            className={cn(
+                                                "pointer-events-none h-8 -mt-8 relative z-10",
+                                                "bg-gradient-to-t",
+                                                isDark ? "from-gray-900/90 to-transparent" : "from-white/90 to-transparent"
+                                            )}
+                                        />
+
                                         {/* Mobile Grab Handle - swipe up to close */}
                                         <div
                                             className="flex justify-center py-3 cursor-grab active:cursor-grabbing md:hidden"
                                             onTouchStart={(e) => {
+                                                e.stopPropagation();
                                                 const startY = e.touches[0].clientY;
                                                 const handleTouchMove = (moveEvt: TouchEvent) => {
                                                     const deltaY = startY - moveEvt.touches[0].clientY;
