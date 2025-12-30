@@ -1067,7 +1067,7 @@ function ProfileMenu({
                                                                                 )}
                                                                             </div>
 
-                                                                            {/* Clear All Button - Trash icon, fully round, shows text on hover, taller on mobile */}
+                                                                            {/* Clear All Button - Trash icon, fully round, shows text on hover */}
                                                                             {groupNotifs.length >= 2 && deleteAllNotifications && (
                                                                                 <button
                                                                                     onClick={(e) => {
@@ -1075,10 +1075,7 @@ function ProfileMenu({
                                                                                         deleteAllNotifications();
                                                                                     }}
                                                                                     className={cn(
-                                                                                        "group/clear flex items-center justify-center rounded-full transition-all duration-200",
-                                                                                        "w-7 h-7 md:w-7 md:h-7",
-                                                                                        "max-md:w-8 max-md:h-10 max-md:rounded-xl",
-                                                                                        "hover:w-auto hover:px-2.5",
+                                                                                        "group/clear flex items-center justify-center w-7 h-7 hover:w-auto hover:px-2.5 rounded-full transition-all duration-200",
                                                                                         isDark
                                                                                             ? "bg-white/10 hover:bg-red-500/20 text-white/50 hover:text-red-400"
                                                                                             : "bg-black/5 hover:bg-red-50 text-gray-400 hover:text-red-500"
@@ -1735,7 +1732,7 @@ function ProfileMenu({
                                                                             )}
                                                                         </div>
 
-                                                                        {/* Clear All Button - Trash icon, fully round, shows text on hover, taller on mobile */}
+                                                                        {/* Clear All Button - Trash icon, fully round, shows text on hover */}
                                                                         {groupNotifs.length >= 2 && deleteAllNotifications && (
                                                                             <button
                                                                                 onClick={(e) => {
@@ -1743,10 +1740,7 @@ function ProfileMenu({
                                                                                     deleteAllNotifications();
                                                                                 }}
                                                                                 className={cn(
-                                                                                    "group/clear flex items-center justify-center rounded-full transition-all duration-200",
-                                                                                    "w-7 h-7 md:w-7 md:h-7",
-                                                                                    "max-md:w-8 max-md:h-10 max-md:rounded-xl",
-                                                                                    "hover:w-auto hover:px-2.5",
+                                                                                    "group/clear flex items-center justify-center w-7 h-7 hover:w-auto hover:px-2.5 rounded-full transition-all duration-200",
                                                                                     isDark
                                                                                         ? "bg-white/10 hover:bg-red-500/20 text-white/50 hover:text-red-400"
                                                                                         : "bg-black/5 hover:bg-red-50 text-gray-400 hover:text-red-500"
@@ -1816,7 +1810,7 @@ function ProfileMenu({
                                                                                         isDark
                                                                                             ? "bg-gray-800/30 hover:bg-gray-800/50 border border-white/10"
                                                                                             : "bg-white/40 hover:bg-white/60 border border-black/5 shadow-sm",
-                                                                                        !notif.readAt && (isDark ? "ring-1 ring-white/30" : "ring-1 ring-white/50"),
+                                                                                        !notif.readAt && (isDark ? "ring-1 ring-white/[0.15]" : "ring-1 ring-white/45"),
                                                                                         !isExpanded && hiddenCount > 0 && "cursor-pointer"
                                                                                     )}
                                                                                     style={{
