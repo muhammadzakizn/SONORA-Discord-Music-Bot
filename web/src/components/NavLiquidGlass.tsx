@@ -1263,13 +1263,18 @@ function ProfileMenu({
                                                 )}
                                             </div>
 
-                                            {/* Mobile Grab Handle - swipe up to close */}
+                                            {/* Bottom Fade Gradient - semi-transparent, not black */}
                                             <div
                                                 className={cn(
-                                                    "flex justify-center py-2 cursor-grab active:cursor-grabbing md:hidden",
+                                                    "pointer-events-none h-6 -mt-6 relative z-10",
                                                     "bg-gradient-to-t",
-                                                    isDark ? "from-transparent via-gray-950/30 to-transparent" : "from-transparent via-white/30 to-transparent"
+                                                    isDark ? "from-gray-950/40 to-transparent" : "from-white/40 to-transparent"
                                                 )}
+                                            />
+
+                                            {/* Mobile Grab Handle - swipe up to close */}
+                                            <div
+                                                className="flex justify-center py-2 cursor-grab active:cursor-grabbing md:hidden"
                                                 onTouchStart={(e) => {
                                                     e.stopPropagation();
                                                     const startY = e.touches[0].clientY;
@@ -1931,13 +1936,18 @@ function ProfileMenu({
                                             )}
                                         </div>
 
-                                        {/* Mobile Grab Handle - swipe up to close */}
+                                        {/* Bottom Fade Gradient - semi-transparent, not black */}
                                         <div
                                             className={cn(
-                                                "flex justify-center py-2 cursor-grab active:cursor-grabbing md:hidden",
+                                                "pointer-events-none h-6 -mt-6 relative z-10",
                                                 "bg-gradient-to-t",
-                                                isDark ? "from-transparent via-gray-950/30 to-transparent" : "from-transparent via-white/30 to-transparent"
+                                                isDark ? "from-gray-950/40 to-transparent" : "from-white/40 to-transparent"
                                             )}
+                                        />
+
+                                        {/* Mobile Grab Handle - swipe up to close */}
+                                        <div
+                                            className="flex justify-center py-2 cursor-grab active:cursor-grabbing md:hidden"
                                             onTouchStart={(e) => {
                                                 e.stopPropagation();
                                                 const startY = e.touches[0].clientY;
