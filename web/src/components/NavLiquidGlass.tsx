@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import {
     Home,
     Bell,
+    Check,
     Compass,
     User,
     Settings,
@@ -756,6 +757,13 @@ function ProfileMenu({
     isVerifying?: boolean;
     customAvatar?: string | null;
 }) {
+    const [showNotifications, setShowNotifications] = useState(false);
+    const notificationContext = useNotificationsOptional();
+    const notifications = notificationContext?.notifications || [];
+    const unreadCount = notificationContext?.unreadCount || 0;
+    const markAsRead = notificationContext?.markAsRead;
+    const deleteNotification = notificationContext?.deleteNotification;
+
     // Developer session active - show developer profile
     if (isDevLoggedIn && devSession) {
         return (
@@ -1070,16 +1078,94 @@ function ProfileMenu({
                     <span className="text-sm font-medium">{t("admin.profile")}</span>
                 </Link>
 
+                {/* Notifications toggle */}
                 <button
-                    onClick={onClose}
+                    onClick={() => setShowNotifications(!showNotifications)}
                     className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors w-full text-left",
-                        isDark ? "hover:bg-white/10 text-white/80" : "hover:bg-black/5 text-gray-700"
+                        "flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors w-full text-left",
+                        showNotifications
+                            ? (isDark ? "bg-white/10 text-white" : "bg-black/5 text-gray-900")
+                            : (isDark ? "hover:bg-white/10 text-white/80" : "hover:bg-black/5 text-gray-700")
                     )}
                 >
-                    <Bell className="w-5 h-5" />
-                    <span className="text-sm font-medium">Notifications</span>
+                    <div className="flex items-center gap-3">
+                        <Bell className="w-5 h-5" />
+                        <span className="text-sm font-medium">Notifications</span>
+                    </div>
+                    {unreadCount > 0 && (
+                        <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                    )}
                 </button>
+
+                {/* Inline Notification List */}
+                <AnimatePresence>
+                    {showNotifications && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className={cn(
+                                "overflow-hidden rounded-xl mt-1",
+                                isDark ? "bg-white/5" : "bg-gray-100"
+                            )}
+                        >
+                            <div className="max-h-[300px] overflow-y-auto">
+                                {notifications.length === 0 ? (
+                                    <div className={cn(
+                                        "text-center py-6 text-sm",
+                                        isDark ? "text-white/40" : "text-gray-400"
+                                    )}>
+                                        No notifications
+                                    </div>
+                                ) : (
+                                    notifications.slice(0, 10).map((notif) => (
+                                        <div
+                                            key={notif.id}
+                                            className={cn(
+                                                "flex items-start gap-3 p-3 border-b transition-colors",
+                                                isDark ? "border-white/5 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50",
+                                                !notif.readAt && (isDark ? "bg-pink-500/5" : "bg-pink-50")
+                                            )}
+                                        >
+                                            <Bell className={cn("w-4 h-4 mt-0.5 flex-shrink-0", isDark ? "text-pink-400" : "text-pink-500")} />
+                                            <div className="flex-1 min-w-0">
+                                                <p className={cn("text-sm font-medium truncate", isDark ? "text-white" : "text-gray-900")}>
+                                                    {notif.title}
+                                                </p>
+                                                <p className={cn("text-xs truncate", isDark ? "text-white/50" : "text-gray-500")}>
+                                                    {notif.body}
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                {!notif.readAt && markAsRead && (
+                                                    <button
+                                                        onClick={() => markAsRead(notif.id)}
+                                                        className="p-1 rounded hover:bg-white/10"
+                                                        title="Mark as read"
+                                                    >
+                                                        <Check className="w-3 h-3 text-green-400" />
+                                                    </button>
+                                                )}
+                                                {deleteNotification && (
+                                                    <button
+                                                        onClick={() => deleteNotification(notif.id)}
+                                                        className="p-1 rounded hover:bg-white/10"
+                                                        title="Delete"
+                                                    >
+                                                        <X className="w-3 h-3 text-red-400" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 <div className={cn("my-2 border-t", isDark ? "border-white/10" : "border-gray-200")} />
 
