@@ -886,20 +886,15 @@ function ProfileMenu({
                         <AnimatePresence>
                             {showNotifications && (
                                 <>
-                                    {/* Backdrop - more transparent */}
+                                    {/* Backdrop - only close on desktop mouse click, not on touch */}
                                     <motion.div
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
                                         transition={{ duration: 0.25, ease: "easeOut" }}
                                         className="fixed inset-0 bg-black/30 z-[9999]"
-                                        onMouseDown={() => setShowNotifications(false)}
-                                        onTouchEnd={(e) => {
-                                            // Only close if the touch ended on the backdrop itself
-                                            if (e.target === e.currentTarget) {
-                                                setShowNotifications(false);
-                                            }
-                                        }}
+                                        style={{ touchAction: 'none' }}
+                                        onClick={() => setShowNotifications(false)}
                                     />
                                     {/* Dialog - Ultra Transparent Liquid Glass like macOS */}
                                     <motion.div
@@ -1567,20 +1562,15 @@ function ProfileMenu({
                     <AnimatePresence>
                         {showNotifications && (
                             <>
-                                {/* Backdrop - more transparent */}
+                                {/* Backdrop - only close on desktop mouse click, not on touch */}
                                 <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
                                     transition={{ duration: 0.25, ease: "easeOut" }}
                                     className="fixed inset-0 bg-black/30 z-[9999]"
-                                    onMouseDown={() => setShowNotifications(false)}
-                                    onTouchEnd={(e) => {
-                                        // Only close if the touch ended on the backdrop itself
-                                        if (e.target === e.currentTarget) {
-                                            setShowNotifications(false);
-                                        }
-                                    }}
+                                    style={{ touchAction: 'none' }}
+                                    onClick={() => setShowNotifications(false)}
                                 />
                                 {/* Dialog - Ultra Transparent Liquid Glass like macOS */}
                                 <motion.div
