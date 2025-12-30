@@ -913,6 +913,9 @@ function ProfileMenu({
                                             WebkitBackdropFilter: 'blur(40px) saturate(180%)',
                                             backdropFilter: 'blur(40px) saturate(180%)',
                                         }}
+                                        onTouchStart={(e) => e.stopPropagation()}
+                                        onTouchMove={(e) => e.stopPropagation()}
+                                        onClick={(e) => e.stopPropagation()}
                                     >
                                         {/* Safe area for notch */}
                                         <div className="pt-safe">
@@ -1262,7 +1265,11 @@ function ProfileMenu({
 
                                             {/* Mobile Grab Handle - swipe up to close */}
                                             <div
-                                                className="flex justify-center py-4 cursor-grab active:cursor-grabbing md:hidden"
+                                                className={cn(
+                                                    "flex justify-center py-2 cursor-grab active:cursor-grabbing md:hidden",
+                                                    "bg-gradient-to-t",
+                                                    isDark ? "from-transparent via-gray-950/30 to-transparent" : "from-transparent via-white/30 to-transparent"
+                                                )}
                                                 onTouchStart={(e) => {
                                                     e.stopPropagation();
                                                     const startY = e.touches[0].clientY;
@@ -1284,7 +1291,7 @@ function ProfileMenu({
                                             >
                                                 <div className={cn(
                                                     "w-16 h-1.5 rounded-full",
-                                                    isDark ? "bg-white/30" : "bg-gray-400"
+                                                    isDark ? "bg-white/40" : "bg-gray-500"
                                                 )} />
                                             </div>
                                         </div>
@@ -1574,6 +1581,9 @@ function ProfileMenu({
                                         WebkitBackdropFilter: 'blur(40px) saturate(180%)',
                                         backdropFilter: 'blur(40px) saturate(180%)',
                                     }}
+                                    onTouchStart={(e) => e.stopPropagation()}
+                                    onTouchMove={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
                                 >
                                     {/* Safe area for notch */}
                                     <div className="pt-safe">
@@ -1923,7 +1933,11 @@ function ProfileMenu({
 
                                         {/* Mobile Grab Handle - swipe up to close */}
                                         <div
-                                            className="flex justify-center py-4 cursor-grab active:cursor-grabbing md:hidden"
+                                            className={cn(
+                                                "flex justify-center py-2 cursor-grab active:cursor-grabbing md:hidden",
+                                                "bg-gradient-to-t",
+                                                isDark ? "from-transparent via-gray-950/30 to-transparent" : "from-transparent via-white/30 to-transparent"
+                                            )}
                                             onTouchStart={(e) => {
                                                 e.stopPropagation();
                                                 const startY = e.touches[0].clientY;
@@ -1945,7 +1959,7 @@ function ProfileMenu({
                                         >
                                             <div className={cn(
                                                 "w-16 h-1.5 rounded-full",
-                                                isDark ? "bg-white/30" : "bg-gray-400"
+                                                isDark ? "bg-white/40" : "bg-gray-500"
                                             )} />
                                         </div>
                                     </div>
