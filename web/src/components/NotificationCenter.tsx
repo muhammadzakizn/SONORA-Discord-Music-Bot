@@ -23,6 +23,7 @@ import {
     getPriorityLabel,
 } from '@/lib/notifications';
 import { useNotificationsOptional } from '@/contexts/NotificationContext';
+import { useSession } from '@/contexts/SessionContext';
 import { requestNotificationPermission, areNotificationsBlocked } from '@/lib/permissions';
 import Link from 'next/link';
 
@@ -32,6 +33,7 @@ interface NotificationCenterProps {
 
 export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
     const ctx = useNotificationsOptional();
+    const { user } = useSession();
     const [isOpen, setIsOpen] = useState(false);
     const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
     const [permissionStatus, setPermissionStatus] = useState<'default' | 'granted' | 'denied' | 'requesting'>('default');
@@ -83,6 +85,22 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
         setPermissionStatus('requesting');
         const granted = await requestNotificationPermission();
         setPermissionStatus(granted ? 'granted' : 'denied');
+
+        // Save permission status to API for tracking
+        if (user?.id) {
+            try {
+                await fetch('/api/push/permission', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user.id,
+                        status: granted ? 'allowed' : 'denied',
+                    }),
+                });
+            } catch (error) {
+                console.warn('Failed to save notification permission status:', error);
+            }
+        }
 
         if (granted) {
             setShowPermissionPrompt(false);

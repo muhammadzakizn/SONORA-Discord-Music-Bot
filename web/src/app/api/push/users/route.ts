@@ -16,16 +16,17 @@ interface AuthUser {
     last_login?: string;
 }
 
+// In-memory permission store (same as permission/route.ts - shared in production via DB)
+const permissionStore: Map<string, NotificationStatus> = new Map();
+
 // Transform user for notification targeting
-function transformUser(user: AuthUser) {
+function transformUser(user: AuthUser, permissions: Map<string, NotificationStatus>) {
     return {
         id: user.discord_id,
         username: user.username,
         displayName: user.username,
         avatar: user.avatar_url || null,
-        // For now, all users are "never_granted" since we don't track push subscriptions yet
-        // In production, this would check if user has a push subscription
-        notificationStatus: 'never_granted' as NotificationStatus,
+        notificationStatus: permissions.get(user.discord_id) || 'never_granted' as NotificationStatus,
     };
 }
 
@@ -35,6 +36,24 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const limit = parseInt(searchParams.get('limit') || '100');
         const offset = parseInt(searchParams.get('offset') || '0');
+
+        // Fetch permission statuses from permission API
+        try {
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+            const permResponse = await fetch(`${baseUrl}/api/push/permission`, {
+                cache: 'no-store',
+            });
+            if (permResponse.ok) {
+                const permData = await permResponse.json();
+                if (permData.permissions) {
+                    for (const [userId, status] of Object.entries(permData.permissions)) {
+                        permissionStore.set(userId, status as NotificationStatus);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not fetch permissions:', e);
+        }
 
         // Fetch users from bot's auth API
         const botApiUrl = process.env.BOT_API_URL || 'http://localhost:5000';
@@ -47,7 +66,7 @@ export async function GET(request: NextRequest) {
 
         if (response.ok) {
             const data = await response.json();
-            const users = (data.users || []).map(transformUser);
+            const users = (data.users || []).map((u: AuthUser) => transformUser(u, permissionStore));
 
             return NextResponse.json({
                 users,
