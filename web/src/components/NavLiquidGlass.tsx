@@ -40,6 +40,7 @@ import {
 import { useSession, getAvatarUrl, DiscordUser } from "@/contexts/SessionContext";
 import { useSettings, LANGUAGES, Language } from "@/contexts/SettingsContext";
 import { useFullscreenLyrics } from "@/contexts/FullscreenLyricsContext";
+import { useNotificationsOptional } from "@/contexts/NotificationContext";
 import { cn } from "@/lib/utils";
 import { WEB_VERSION } from "@/constants/version";
 import { useUpdate } from "@/contexts/UpdateContext";
@@ -115,6 +116,10 @@ export default function NavLiquidGlass() {
 
     // Check if fullscreen lyrics is open - hide entire nav
     const { isFullscreenLyricsOpen } = useFullscreenLyrics();
+
+    // Get notification unread count for badge
+    const notificationContext = useNotificationsOptional();
+    const unreadCount = notificationContext?.unreadCount || 0;
 
     const [activePopup, setActivePopup] = useState<PopupType>(null);
     const [showScrollTop, setShowScrollTop] = useState(false);
@@ -482,7 +487,8 @@ export default function NavLiquidGlass() {
                                 data-nav-button
                                 index={3}
                                 buttonRef={(el) => { navButtonRefs.current[3] = el; }}
-                                showBadge={isDevLoggedIn}
+                                showBadge={unreadCount > 0}
+                                badgeCount={unreadCount}
                                 devInitial={isDevLoggedIn && !devSession?.avatar ? (devSession?.displayName || devSession?.username || 'D').charAt(0).toUpperCase() : undefined}
                             />
                         </motion.nav>
@@ -574,6 +580,7 @@ function NavButton({
     devInitial,
     index,
     showBadge,
+    badgeCount,
     buttonRef,
     ...props
 }: {
@@ -587,6 +594,7 @@ function NavButton({
     devInitial?: string;
     index?: number;
     showBadge?: boolean;
+    badgeCount?: number;
     buttonRef?: (el: HTMLElement | null) => void;
     [key: string]: unknown;
 }) {
@@ -631,6 +639,12 @@ function NavButton({
             >
                 {label}
             </span>
+            {/* Notification badge */}
+            {showBadge && badgeCount && badgeCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-md">
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                </span>
+            )}
         </div>
     );
 
@@ -1055,6 +1069,17 @@ function ProfileMenu({
                     <User className="w-5 h-5" />
                     <span className="text-sm font-medium">{t("admin.profile")}</span>
                 </Link>
+
+                <button
+                    onClick={onClose}
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors w-full text-left",
+                        isDark ? "hover:bg-white/10 text-white/80" : "hover:bg-black/5 text-gray-700"
+                    )}
+                >
+                    <Bell className="w-5 h-5" />
+                    <span className="text-sm font-medium">Notifications</span>
+                </button>
 
                 <div className={cn("my-2 border-t", isDark ? "border-white/10" : "border-gray-200")} />
 
