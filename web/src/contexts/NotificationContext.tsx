@@ -156,6 +156,56 @@ export function NotificationProvider({ children, userId }: NotificationProviderP
         }
     }, [settings, userId, playSound]);
 
+    // Poll for new notifications from API (for dev dashboard sent notifications)
+    useEffect(() => {
+        let lastChecked = Date.now();
+
+        const pollNotifications = async () => {
+            try {
+                const response = await fetch(`/api/push/pending?since=${lastChecked}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.notifications && data.notifications.length > 0) {
+                        data.notifications.forEach((notif: {
+                            id: string;
+                            title: string;
+                            body: string;
+                            type?: NotificationType;
+                            priority?: NotificationPriority;
+                            sound?: NotificationSound;
+                            image?: string;
+                            url?: string;
+                        }) => {
+                            addNotification({
+                                title: notif.title,
+                                body: notif.body,
+                                type: notif.type || 'general',
+                                priority: notif.priority || 'normal',
+                                sound: notif.sound || 'default',
+                                image: notif.image,
+                                url: notif.url,
+                            });
+                        });
+                        lastChecked = Date.now();
+                    }
+                }
+            } catch (error) {
+                // Silently ignore poll errors
+            }
+        };
+
+        // Poll every 3 seconds for faster notification delivery
+        const interval = setInterval(pollNotifications, 3000);
+
+        // Initial poll after a short delay
+        const timeout = setTimeout(pollNotifications, 1000);
+
+        return () => {
+            clearInterval(interval);
+            clearTimeout(timeout);
+        };
+    }, [addNotification]);
+
     // Mark as read
     const markAsRead = useCallback((id: string) => {
         markAsReadStorage(id, userId);

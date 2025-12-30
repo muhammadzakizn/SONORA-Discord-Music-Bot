@@ -382,8 +382,6 @@ export default function NotificationsPage() {
     // Sound options
     const soundOptions: { value: NotificationSound; label: string; icon: React.ReactNode }[] = [
         { value: "default", label: "Default", icon: <Volume2 className="w-4 h-4" /> },
-        { value: "changelog", label: "Changelog", icon: <Volume2 className="w-4 h-4" /> },
-        { value: "urgent", label: "Urgent", icon: <Volume2 className="w-4 h-4" /> },
         { value: "none", label: "Silent", icon: <VolumeX className="w-4 h-4" /> },
     ];
 

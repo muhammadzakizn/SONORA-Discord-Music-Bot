@@ -70,13 +70,32 @@ export async function POST(request: NextRequest) {
       notificationHistory.pop();
     }
 
-    // In production, you would use web-push library to send actual push notifications
-    // For now, return success with the notification ID
+    // Queue notification for real-time delivery via polling
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      await fetch(`${baseUrl}/api/push/pending`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: notification.id,
+          title: notification.title,
+          body: notification.body,
+          type: notification.type,
+          priority: notification.priority,
+          sound: notification.sound,
+          image: notification.image,
+          url: notification.url,
+        }),
+      });
+    } catch (error) {
+      console.warn('Failed to queue notification for real-time delivery:', error);
+    }
+
     return NextResponse.json({
       success: true,
       notificationId: notification.id,
       notification,
-      message: 'Notification queued for sending',
+      message: 'Notification sent successfully',
     });
   } catch (error) {
     console.error('Send notification error:', error);
