@@ -2,11 +2,13 @@
 // Custom sound and offline support
 
 const CACHE_NAME = 'sonora-v3.8.6';
+const NOTIFICATION_SOUND = '/sounds/notification.ogg';
 
 // Files to cache for offline (only files that definitely exist)
 const urlsToCache = [
   '/sonora-logo.png',
   '/manifest.json',
+  '/sounds/notification.ogg',
 ];
 
 // Install event - cache essential files with error handling

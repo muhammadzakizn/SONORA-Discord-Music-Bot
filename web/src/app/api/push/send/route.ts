@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NotificationPriority, NotificationType, NotificationSound } from '@/lib/notifications';
+import { sendPushToMultiple, PushPayload, PushSubscription } from '@/lib/webpush';
+import fs from 'fs';
 
 // Simple in-memory notification history (use database in production)
 const notificationHistory: NotificationRecord[] = [];
+const SUBSCRIPTIONS_FILE = '/tmp/push-subscriptions.json';
 
 interface NotificationRecord {
   id: string;
@@ -19,6 +22,19 @@ interface NotificationRecord {
   targetUsers?: string[];
   recipientCount: number;
   clickCount: number;
+  pushSent?: number;
+  pushFailed?: number;
+}
+
+function readSubscriptions(): Record<string, { endpoint: string; keys: { p256dh: string; auth: string }; userId?: string }> {
+    try {
+        if (fs.existsSync(SUBSCRIPTIONS_FILE)) {
+            return JSON.parse(fs.readFileSync(SUBSCRIPTIONS_FILE, 'utf-8'));
+        }
+    } catch (error) {
+        console.warn('Error reading subscriptions:', error);
+    }
+    return {};
 }
 
 // POST - Send notification (developer only)
@@ -55,22 +71,68 @@ export async function POST(request: NextRequest) {
       image,
       url: url || '/',
       sentAt: new Date().toISOString(),
-      sentBy: 'admin', // Would get from session
+      sentBy: 'admin',
       targetType: targetType || 'all',
       targetUsers,
       recipientCount: targetType === 'all' ? 0 : (targetUsers?.length || 0),
       clickCount: 0,
+      pushSent: 0,
+      pushFailed: 0,
     };
 
     // Store in history
     notificationHistory.unshift(notification);
-    
-    // Keep only last 100 notifications
     if (notificationHistory.length > 100) {
       notificationHistory.pop();
     }
 
-    // Queue notification for real-time delivery via polling
+    // Create push payload
+    const pushPayload: PushPayload = {
+      title: notification.title,
+      body: notification.body,
+      icon: '/sonora-logo.png',
+      badge: '/sonora-logo.png',
+      image: notification.image,
+      tag: `sonora-${notification.type}-${notification.id}`,
+      data: {
+        url: notification.url,
+        notificationId: notification.id,
+        type: notification.type,
+        sound: notification.sound,
+      },
+      requireInteraction: notification.priority === 'urgent',
+      silent: notification.sound === 'none',
+    };
+
+    // Get subscriptions and send push notifications
+    const allSubscriptions = readSubscriptions();
+    let subscriptionsToSend: PushSubscription[] = [];
+
+    if (targetType === 'all') {
+      subscriptionsToSend = Object.values(allSubscriptions).map(s => ({
+        endpoint: s.endpoint,
+        expirationTime: null,
+        keys: s.keys,
+      }));
+    } else if (targetType === 'specific' && targetUsers?.length) {
+      subscriptionsToSend = Object.values(allSubscriptions)
+        .filter(s => s.userId && targetUsers.includes(s.userId))
+        .map(s => ({
+          endpoint: s.endpoint,
+          expirationTime: null,
+          keys: s.keys,
+        }));
+    }
+
+    // Send push notifications
+    if (subscriptionsToSend.length > 0) {
+      const pushResult = await sendPushToMultiple(subscriptionsToSend, pushPayload);
+      notification.pushSent = pushResult.successful;
+      notification.pushFailed = pushResult.failed;
+      notification.recipientCount = pushResult.successful;
+    }
+
+    // Also queue for polling fallback
     try {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       await fetch(`${baseUrl}/api/push/pending`, {
@@ -88,13 +150,18 @@ export async function POST(request: NextRequest) {
         }),
       });
     } catch (error) {
-      console.warn('Failed to queue notification for real-time delivery:', error);
+      console.warn('Failed to queue notification for polling:', error);
     }
 
     return NextResponse.json({
       success: true,
       notificationId: notification.id,
       notification,
+      pushStats: {
+        sent: notification.pushSent,
+        failed: notification.pushFailed,
+        total: subscriptionsToSend.length,
+      },
       message: 'Notification sent successfully',
     });
   } catch (error) {

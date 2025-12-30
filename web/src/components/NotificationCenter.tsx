@@ -92,11 +92,59 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
             }
         }
 
+        // Subscribe to push notifications if permission granted
+        if (granted && user?.id) {
+            try {
+                // Register service worker
+                const registration = await navigator.serviceWorker.ready;
+
+                // Get VAPID public key
+                const vapidResponse = await fetch('/api/push/vapid');
+                const vapidData = await vapidResponse.json();
+
+                if (vapidData.publicKey) {
+                    // Subscribe to push
+                    const subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(vapidData.publicKey),
+                    });
+
+                    // Save subscription to server
+                    await fetch('/api/push/subscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            subscription: subscription.toJSON(),
+                            userId: user.id,
+                        }),
+                    });
+
+                    console.log('Push subscription created successfully');
+                }
+            } catch (error) {
+                console.warn('Failed to subscribe to push notifications:', error);
+            }
+        }
+
         if (granted) {
             setShowPermissionPrompt(false);
             setIsOpen(true);
         }
     };
+
+    // Helper to convert VAPID key
+    function urlBase64ToUint8Array(base64String: string) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/-/g, '+')
+            .replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
 
     if (!ctx) {
         // Render a disabled bell if not in provider
