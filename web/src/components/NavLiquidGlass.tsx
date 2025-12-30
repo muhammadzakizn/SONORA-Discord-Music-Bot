@@ -764,6 +764,22 @@ function ProfileMenu({
     const unreadCount = notificationContext?.unreadCount || 0;
     const markAsRead = notificationContext?.markAsRead;
     const deleteNotification = notificationContext?.deleteNotification;
+    const deleteAllNotifications = notificationContext?.deleteAllNotifications;
+
+    // Check notification permission
+    const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'default'>('default');
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            setNotifPermission(Notification.permission);
+        }
+    }, [showNotifications]);
+
+    const handleRequestPermission = async () => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            const permission = await Notification.requestPermission();
+            setNotifPermission(permission);
+        }
+    };
 
     // Developer session active - show developer profile
     if (isDevLoggedIn && devSession) {
@@ -872,30 +888,35 @@ function ProfileMenu({
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="fixed inset-0 bg-black/60 z-[9999]"
+                                        transition={{ duration: 0.25, ease: "easeOut" }}
+                                        className="fixed inset-0 bg-black/40 z-[9999]"
                                         onClick={() => setShowNotifications(false)}
                                     />
-                                    {/* Dialog */}
+                                    {/* Dialog - Liquid Glass Effect */}
                                     <motion.div
                                         initial={{ y: "-100%", opacity: 0 }}
                                         animate={{ y: 0, opacity: 1 }}
                                         exit={{ y: "-100%", opacity: 0 }}
-                                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                        transition={{ duration: 0.35, ease: "easeOut" }}
                                         className={cn(
                                             "fixed top-0 left-0 right-0 z-[10000] max-h-[85vh] overflow-hidden",
                                             "rounded-b-3xl shadow-2xl",
+                                            "backdrop-blur-xl backdrop-saturate-150",
                                             isDark
-                                                ? "bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 border-b border-white/10"
-                                                : "bg-gradient-to-b from-white via-white to-gray-50 border-b border-gray-200"
+                                                ? "bg-gray-900/80 border-b border-white/20"
+                                                : "bg-white/80 border-b border-gray-200/50"
                                         )}
+                                        style={{
+                                            WebkitBackdropFilter: 'blur(24px) saturate(150%)',
+                                            backdropFilter: 'blur(24px) saturate(150%)',
+                                        }}
                                     >
                                         {/* Safe area for notch */}
                                         <div className="pt-safe">
                                             {/* Header */}
                                             <div className={cn(
                                                 "flex items-center justify-between px-4 sm:px-6 py-4 border-b",
-                                                isDark ? "border-white/10" : "border-gray-200"
+                                                isDark ? "border-white/10" : "border-gray-200/50"
                                             )}>
                                                 <div className="flex items-center gap-3">
                                                     <Bell className={cn("w-6 h-6", isDark ? "text-pink-400" : "text-pink-500")} />
@@ -908,19 +929,71 @@ function ProfileMenu({
                                                         </span>
                                                     )}
                                                 </div>
-                                                <button
-                                                    onClick={() => setShowNotifications(false)}
-                                                    className={cn(
-                                                        "p-2 rounded-xl transition-colors",
-                                                        isDark ? "hover:bg-white/10 text-white/60" : "hover:bg-gray-100 text-gray-500"
+                                                <div className="flex items-center gap-2">
+                                                    {/* Delete All Button */}
+                                                    {notifications.length >= 2 && deleteAllNotifications && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                deleteAllNotifications();
+                                                            }}
+                                                            className={cn(
+                                                                "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                                                                isDark
+                                                                    ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                                                    : "bg-red-100 text-red-600 hover:bg-red-200"
+                                                            )}
+                                                        >
+                                                            Clear All
+                                                        </button>
                                                     )}
-                                                >
-                                                    <X className="w-5 h-5" />
-                                                </button>
+                                                    <button
+                                                        onClick={() => setShowNotifications(false)}
+                                                        className={cn(
+                                                            "p-2 rounded-xl transition-colors",
+                                                            isDark ? "hover:bg-white/10 text-white/60" : "hover:bg-gray-100 text-gray-500"
+                                                        )}
+                                                    >
+                                                        <X className="w-5 h-5" />
+                                                    </button>
+                                                </div>
                                             </div>
 
+                                            {/* Permission Warning Banner */}
+                                            {notifPermission !== 'granted' && (
+                                                <div className={cn(
+                                                    "flex items-center justify-between gap-3 px-4 sm:px-6 py-3",
+                                                    isDark ? "bg-amber-500/10 border-b border-amber-500/20" : "bg-amber-50 border-b border-amber-200"
+                                                )}>
+                                                    <div className="flex items-center gap-2">
+                                                        <Bell className={cn("w-4 h-4", isDark ? "text-amber-400" : "text-amber-600")} />
+                                                        <p className={cn("text-sm", isDark ? "text-amber-300" : "text-amber-700")}>
+                                                            {notifPermission === 'denied'
+                                                                ? "Notifications are blocked. Please enable in browser settings."
+                                                                : "Enable push notifications to get notified instantly."}
+                                                        </p>
+                                                    </div>
+                                                    {notifPermission !== 'denied' && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRequestPermission();
+                                                            }}
+                                                            className={cn(
+                                                                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap",
+                                                                isDark
+                                                                    ? "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+                                                                    : "bg-amber-200 text-amber-800 hover:bg-amber-300"
+                                                            )}
+                                                        >
+                                                            Enable
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             {/* Notification List */}
-                                            <div className="max-h-[calc(85vh-80px)] overflow-y-auto overscroll-contain">
+                                            <div className="max-h-[calc(85vh-140px)] overflow-y-auto overscroll-contain">
                                                 {notifications.length === 0 ? (
                                                     <div className={cn(
                                                         "flex flex-col items-center justify-center py-16 px-4",
@@ -931,14 +1004,14 @@ function ProfileMenu({
                                                         <p className="text-sm mt-1 opacity-70">You're all caught up!</p>
                                                     </div>
                                                 ) : (
-                                                    <div className="divide-y divide-gray-200 dark:divide-white/5">
+                                                    <div className={cn("divide-y", isDark ? "divide-white/5" : "divide-gray-200/50")}>
                                                         {notifications.map((notif) => (
                                                             <div
                                                                 key={notif.id}
                                                                 className={cn(
                                                                     "flex items-start gap-3 sm:gap-4 p-4 sm:px-6 transition-colors",
-                                                                    isDark ? "hover:bg-white/5" : "hover:bg-gray-50",
-                                                                    !notif.readAt && (isDark ? "bg-pink-500/5" : "bg-pink-50/50")
+                                                                    isDark ? "hover:bg-white/5" : "hover:bg-gray-50/50",
+                                                                    !notif.readAt && (isDark ? "bg-pink-500/10" : "bg-pink-50/70")
                                                                 )}
                                                             >
                                                                 <div className={cn(
@@ -970,7 +1043,10 @@ function ProfileMenu({
                                                                 <div className="flex gap-1 flex-shrink-0">
                                                                     {!notif.readAt && markAsRead && (
                                                                         <button
-                                                                            onClick={() => markAsRead(notif.id)}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                markAsRead(notif.id);
+                                                                            }}
                                                                             className={cn(
                                                                                 "p-2 rounded-lg transition-colors",
                                                                                 isDark ? "hover:bg-green-500/20 text-green-400" : "hover:bg-green-100 text-green-600"
@@ -982,7 +1058,10 @@ function ProfileMenu({
                                                                     )}
                                                                     {deleteNotification && (
                                                                         <button
-                                                                            onClick={() => deleteNotification(notif.id)}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                deleteNotification(notif.id);
+                                                                            }}
                                                                             className={cn(
                                                                                 "p-2 rounded-lg transition-colors",
                                                                                 isDark ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-100 text-red-600"
@@ -1263,30 +1342,35 @@ function ProfileMenu({
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="fixed inset-0 bg-black/60 z-[9999]"
+                                    transition={{ duration: 0.25, ease: "easeOut" }}
+                                    className="fixed inset-0 bg-black/40 z-[9999]"
                                     onClick={() => setShowNotifications(false)}
                                 />
-                                {/* Dialog */}
+                                {/* Dialog - Liquid Glass Effect */}
                                 <motion.div
                                     initial={{ y: "-100%", opacity: 0 }}
                                     animate={{ y: 0, opacity: 1 }}
                                     exit={{ y: "-100%", opacity: 0 }}
-                                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                    transition={{ duration: 0.35, ease: "easeOut" }}
                                     className={cn(
                                         "fixed top-0 left-0 right-0 z-[10000] max-h-[85vh] overflow-hidden",
                                         "rounded-b-3xl shadow-2xl",
+                                        "backdrop-blur-xl backdrop-saturate-150",
                                         isDark
-                                            ? "bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 border-b border-white/10"
-                                            : "bg-gradient-to-b from-white via-white to-gray-50 border-b border-gray-200"
+                                            ? "bg-gray-900/80 border-b border-white/20"
+                                            : "bg-white/80 border-b border-gray-200/50"
                                     )}
+                                    style={{
+                                        WebkitBackdropFilter: 'blur(24px) saturate(150%)',
+                                        backdropFilter: 'blur(24px) saturate(150%)',
+                                    }}
                                 >
                                     {/* Safe area for notch */}
                                     <div className="pt-safe">
                                         {/* Header */}
                                         <div className={cn(
                                             "flex items-center justify-between px-4 sm:px-6 py-4 border-b",
-                                            isDark ? "border-white/10" : "border-gray-200"
+                                            isDark ? "border-white/10" : "border-gray-200/50"
                                         )}>
                                             <div className="flex items-center gap-3">
                                                 <Bell className={cn("w-6 h-6", isDark ? "text-pink-400" : "text-pink-500")} />
@@ -1299,19 +1383,71 @@ function ProfileMenu({
                                                     </span>
                                                 )}
                                             </div>
-                                            <button
-                                                onClick={() => setShowNotifications(false)}
-                                                className={cn(
-                                                    "p-2 rounded-xl transition-colors",
-                                                    isDark ? "hover:bg-white/10 text-white/60" : "hover:bg-gray-100 text-gray-500"
+                                            <div className="flex items-center gap-2">
+                                                {/* Delete All Button */}
+                                                {notifications.length >= 2 && deleteAllNotifications && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteAllNotifications();
+                                                        }}
+                                                        className={cn(
+                                                            "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                                                            isDark
+                                                                ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                                                : "bg-red-100 text-red-600 hover:bg-red-200"
+                                                        )}
+                                                    >
+                                                        Clear All
+                                                    </button>
                                                 )}
-                                            >
-                                                <X className="w-5 h-5" />
-                                            </button>
+                                                <button
+                                                    onClick={() => setShowNotifications(false)}
+                                                    className={cn(
+                                                        "p-2 rounded-xl transition-colors",
+                                                        isDark ? "hover:bg-white/10 text-white/60" : "hover:bg-gray-100 text-gray-500"
+                                                    )}
+                                                >
+                                                    <X className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </div>
 
+                                        {/* Permission Warning Banner */}
+                                        {notifPermission !== 'granted' && (
+                                            <div className={cn(
+                                                "flex items-center justify-between gap-3 px-4 sm:px-6 py-3",
+                                                isDark ? "bg-amber-500/10 border-b border-amber-500/20" : "bg-amber-50 border-b border-amber-200"
+                                            )}>
+                                                <div className="flex items-center gap-2">
+                                                    <Bell className={cn("w-4 h-4", isDark ? "text-amber-400" : "text-amber-600")} />
+                                                    <p className={cn("text-sm", isDark ? "text-amber-300" : "text-amber-700")}>
+                                                        {notifPermission === 'denied'
+                                                            ? "Notifications are blocked. Please enable in browser settings."
+                                                            : "Enable push notifications to get notified instantly."}
+                                                    </p>
+                                                </div>
+                                                {notifPermission !== 'denied' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRequestPermission();
+                                                        }}
+                                                        className={cn(
+                                                            "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap",
+                                                            isDark
+                                                                ? "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+                                                                : "bg-amber-200 text-amber-800 hover:bg-amber-300"
+                                                        )}
+                                                    >
+                                                        Enable
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {/* Notification List */}
-                                        <div className="max-h-[calc(85vh-80px)] overflow-y-auto overscroll-contain">
+                                        <div className="max-h-[calc(85vh-140px)] overflow-y-auto overscroll-contain">
                                             {notifications.length === 0 ? (
                                                 <div className={cn(
                                                     "flex flex-col items-center justify-center py-16 px-4",
@@ -1322,14 +1458,14 @@ function ProfileMenu({
                                                     <p className="text-sm mt-1 opacity-70">You're all caught up!</p>
                                                 </div>
                                             ) : (
-                                                <div className="divide-y divide-gray-200 dark:divide-white/5">
+                                                <div className={cn("divide-y", isDark ? "divide-white/5" : "divide-gray-200/50")}>
                                                     {notifications.map((notif) => (
                                                         <div
                                                             key={notif.id}
                                                             className={cn(
                                                                 "flex items-start gap-3 sm:gap-4 p-4 sm:px-6 transition-colors",
-                                                                isDark ? "hover:bg-white/5" : "hover:bg-gray-50",
-                                                                !notif.readAt && (isDark ? "bg-pink-500/5" : "bg-pink-50/50")
+                                                                isDark ? "hover:bg-white/5" : "hover:bg-gray-50/50",
+                                                                !notif.readAt && (isDark ? "bg-pink-500/10" : "bg-pink-50/70")
                                                             )}
                                                         >
                                                             <div className={cn(
@@ -1361,7 +1497,10 @@ function ProfileMenu({
                                                             <div className="flex gap-1 flex-shrink-0">
                                                                 {!notif.readAt && markAsRead && (
                                                                     <button
-                                                                        onClick={() => markAsRead(notif.id)}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            markAsRead(notif.id);
+                                                                        }}
                                                                         className={cn(
                                                                             "p-2 rounded-lg transition-colors",
                                                                             isDark ? "hover:bg-green-500/20 text-green-400" : "hover:bg-green-100 text-green-600"
@@ -1373,7 +1512,10 @@ function ProfileMenu({
                                                                 )}
                                                                 {deleteNotification && (
                                                                     <button
-                                                                        onClick={() => deleteNotification(notif.id)}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            deleteNotification(notif.id);
+                                                                        }}
                                                                         className={cn(
                                                                             "p-2 rounded-lg transition-colors",
                                                                             isDark ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-100 text-red-600"
