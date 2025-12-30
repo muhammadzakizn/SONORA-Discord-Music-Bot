@@ -63,20 +63,10 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
         }
     }, []);
 
-    // Handle bell click
-    const handleBellClick = async () => {
-        // Check permission status
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-            const currentPermission = Notification.permission;
-
-            if (currentPermission !== 'granted') {
-                // Show permission prompt
-                setShowPermissionPrompt(true);
-                return;
-            }
-        }
-
-        // Toggle dropdown if permission granted
+    // Handle bell click - always open panel
+    const handleBellClick = () => {
+        // Just toggle the panel open/closed - no blocking
+        setShowPermissionPrompt(false);
         setIsOpen(!isOpen);
     };
 
@@ -281,57 +271,86 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
                     >
                         {/* Header */}
                         <div className={cn(
-                            "sticky top-0 z-10 flex items-center justify-between p-4 border-b",
+                            "sticky top-0 z-10 flex flex-col border-b",
                             isDark ? "bg-neutral-900/95 border-neutral-700" : "bg-white border-gray-200"
                         )}>
-                            <h3 className={cn(
-                                "font-semibold",
-                                isDark ? "text-white" : "text-gray-900"
-                            )}>
-                                Notifications
-                            </h3>
-                            <div className="flex items-center gap-1">
-                                {unreadCount > 0 && (
-                                    <button
-                                        onClick={markAllAsRead}
+                            {/* Permission banner - show if not granted */}
+                            {typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission !== 'granted' && (
+                                <div className={cn(
+                                    "flex items-center justify-between px-3 py-2 text-xs border-b",
+                                    areNotificationsBlocked()
+                                        ? "bg-red-500/10 border-red-500/20"
+                                        : "bg-yellow-500/10 border-yellow-500/20"
+                                )}>
+                                    <span className={areNotificationsBlocked() ? "text-red-400" : "text-yellow-400"}>
+                                        {areNotificationsBlocked()
+                                            ? "Notifications blocked in browser"
+                                            : "Enable notifications for alerts"
+                                        }
+                                    </span>
+                                    {!areNotificationsBlocked() && (
+                                        <button
+                                            onClick={handleRequestPermission}
+                                            disabled={permissionStatus === 'requesting'}
+                                            className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-500 hover:bg-yellow-600 text-black transition-colors"
+                                        >
+                                            {permissionStatus === 'requesting' ? '...' : 'Enable'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Title row */}
+                            <div className="flex items-center justify-between p-4">
+                                <h3 className={cn(
+                                    "font-semibold",
+                                    isDark ? "text-white" : "text-gray-900"
+                                )}>
+                                    Notifications
+                                </h3>
+                                <div className="flex items-center gap-1">
+                                    {unreadCount > 0 && (
+                                        <button
+                                            onClick={markAllAsRead}
+                                            className={cn(
+                                                "p-1.5 rounded-lg transition-colors text-xs flex items-center gap-1",
+                                                isDark
+                                                    ? "hover:bg-white/10 text-white/60 hover:text-white"
+                                                    : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                                            )}
+                                            title="Mark all as read"
+                                        >
+                                            <CheckCheck className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    {notifications.length > 0 && (
+                                        <button
+                                            onClick={deleteAllNotifications}
+                                            className={cn(
+                                                "p-1.5 rounded-lg transition-colors",
+                                                isDark
+                                                    ? "hover:bg-red-500/20 text-white/60 hover:text-red-400"
+                                                    : "hover:bg-red-50 text-gray-500 hover:text-red-500"
+                                            )}
+                                            title="Clear all"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    <Link
+                                        href="/admin/settings"
                                         className={cn(
-                                            "p-1.5 rounded-lg transition-colors text-xs flex items-center gap-1",
+                                            "p-1.5 rounded-lg transition-colors",
                                             isDark
                                                 ? "hover:bg-white/10 text-white/60 hover:text-white"
                                                 : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
                                         )}
-                                        title="Mark all as read"
+                                        title="Settings"
+                                        onClick={() => setIsOpen(false)}
                                     >
-                                        <CheckCheck className="w-4 h-4" />
-                                    </button>
-                                )}
-                                {notifications.length > 0 && (
-                                    <button
-                                        onClick={deleteAllNotifications}
-                                        className={cn(
-                                            "p-1.5 rounded-lg transition-colors",
-                                            isDark
-                                                ? "hover:bg-red-500/20 text-white/60 hover:text-red-400"
-                                                : "hover:bg-red-50 text-gray-500 hover:text-red-500"
-                                        )}
-                                        title="Clear all"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                )}
-                                <Link
-                                    href="/admin/settings"
-                                    className={cn(
-                                        "p-1.5 rounded-lg transition-colors",
-                                        isDark
-                                            ? "hover:bg-white/10 text-white/60 hover:text-white"
-                                            : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                                    )}
-                                    title="Settings"
-                                    onClick={() => setIsOpen(false)}
-                                >
-                                    <Settings className="w-4 h-4" />
-                                </Link>
+                                        <Settings className="w-4 h-4" />
+                                    </Link>
+                                </div>
                             </div>
                         </div>
 
