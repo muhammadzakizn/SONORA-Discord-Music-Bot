@@ -2089,84 +2089,80 @@ def api_admin_broadcast():
         async def send_broadcasts():
             nonlocal sent_count, failed_count
             
-            # If all_channels is true, send to ONE sendable channel per guild (not all)
+            # If all_channels is true, send to ALL text channels in ALL guilds
             if all_channels:
-                logger.info(f"Broadcasting to ONE channel per server in {len(bot.guilds)} guilds")
+                logger.info(f"Broadcasting to ALL channels in {len(bot.guilds)} guilds")
                 
                 for guild in bot.guilds:
-                    # Find the first sendable text channel in this guild
-                    target_channel = None
-                    
                     for channel in guild.text_channels:
+                        # Check permissions
                         permissions = channel.permissions_for(guild.me)
                         
-                        # Check if we can send messages
                         if not permissions.send_messages:
+                            results.append({
+                                "guild": guild.name,
+                                "channel": channel.name,
+                                "status": "failed",
+                                "reason": "No send_messages permission"
+                            })
+                            failed_count += 1
                             continue
                         
                         # Check mention permission if needed
                         if mention_type in ['everyone', 'here'] and not permissions.mention_everyone:
+                            results.append({
+                                "guild": guild.name,
+                                "channel": channel.name,
+                                "status": "failed",
+                                "reason": "No mention_everyone permission"
+                            })
+                            failed_count += 1
                             continue
                         
-                        # Found a suitable channel
-                        target_channel = channel
-                        break
-                    
-                    # No suitable channel found in this guild
-                    if not target_channel:
-                        results.append({
-                            "guild": guild.name,
-                            "channel": "N/A",
-                            "status": "failed",
-                            "reason": "No sendable channel found"
-                        })
-                        failed_count += 1
-                        continue
-                    
-                    # Send message to the first suitable channel
-                    try:
-                        embed = discord.Embed(
-                            title="📢 Broadcast Message",
-                            description=message,
-                            color=0x3498DB,
-                            timestamp=datetime.now()
-                        )
-                        embed.set_footer(text="Admin Broadcast")
-                        
-                        # Prepare file if image exists
-                        file_to_send = None
-                        if image_path:
-                            import os
-                            if os.path.exists(image_path):
-                                file_to_send = discord.File(image_path, filename="image.png")
-                                embed.set_image(url="attachment://image.png")
-                        
-                        # Send with or without mention
-                        if mention_type == 'everyone':
-                            await target_channel.send(content="@everyone", embed=embed, file=file_to_send)
-                        elif mention_type == 'here':
-                            await target_channel.send(content="@here", embed=embed, file=file_to_send)
-                        else:
-                            await target_channel.send(embed=embed, file=file_to_send)
-                        
-                        results.append({
-                            "guild": guild.name,
-                            "channel": target_channel.name,
-                            "status": "success"
-                        })
-                        sent_count += 1
-                        
-                        # Small delay to avoid rate limits
-                        await asyncio.sleep(0.5)
-                        
-                    except Exception as e:
-                        results.append({
-                            "guild": guild.name,
-                            "channel": target_channel.name,
-                            "status": "failed",
-                            "reason": str(e)[:100]
-                        })
-                        failed_count += 1
+                        # Send message
+                        try:
+                            embed = discord.Embed(
+                                title="📢 Broadcast Message",
+                                description=message,
+                                color=0x3498DB,
+                                timestamp=datetime.now()
+                            )
+                            embed.set_footer(text="Admin Broadcast")
+                            
+                            # Prepare file if image exists
+                            file_to_send = None
+                            if image_path:
+                                import os
+                                if os.path.exists(image_path):
+                                    file_to_send = discord.File(image_path, filename="image.png")
+                                    embed.set_image(url="attachment://image.png")
+                            
+                            # Send with or without mention
+                            if mention_type == 'everyone':
+                                await channel.send(content="@everyone", embed=embed, file=file_to_send)
+                            elif mention_type == 'here':
+                                await channel.send(content="@here", embed=embed, file=file_to_send)
+                            else:
+                                await channel.send(embed=embed, file=file_to_send)
+                            
+                            results.append({
+                                "guild": guild.name,
+                                "channel": channel.name,
+                                "status": "success"
+                            })
+                            sent_count += 1
+                            
+                            # Small delay to avoid rate limits
+                            await asyncio.sleep(0.5)
+                            
+                        except Exception as e:
+                            results.append({
+                                "guild": guild.name,
+                                "channel": channel.name,
+                                "status": "failed",
+                                "reason": str(e)[:100]
+                            })
+                            failed_count += 1
             
             # Otherwise, send to specific selected channels
             else:
@@ -2492,6 +2488,151 @@ def api_admin_dm_users():
         logger.error(f"DM users failed: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/admin/dm-owners', methods=['POST'])
+def api_admin_dm_owners():
+    """Send DM to all server owners"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        from datetime import datetime
+        import discord
+        
+        # Handle both JSON and FormData
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            message = request.form.get('message', '').strip()
+            image_file = request.files.get('image')
+        else:
+            data = request.json or {}
+            message = data.get('message', '').strip()
+            image_file = None
+        
+        if not message:
+            return jsonify({"error": "Message is required"}), 400
+        
+        # Save image temporarily if provided
+        image_path = None
+        if image_file and image_file.filename:
+            import os
+            import uuid
+            ext = image_file.filename.rsplit('.', 1)[-1].lower() if '.' in image_file.filename else 'png'
+            filename = f"dm_owners_{uuid.uuid4().hex[:8]}.{ext}"
+            image_path = os.path.join('/tmp', filename)
+            image_file.save(image_path)
+            logger.info(f"Saved owner DM image: {image_path}")
+        
+        # Get unique server owners
+        owner_ids = set()
+        owner_guilds = {}  # owner_id -> list of guild names
+        
+        for guild in bot.guilds:
+            if guild.owner_id:
+                owner_ids.add(guild.owner_id)
+                if guild.owner_id not in owner_guilds:
+                    owner_guilds[guild.owner_id] = []
+                owner_guilds[guild.owner_id].append(guild.name)
+        
+        logger.info(f"DM owners request: sending to {len(owner_ids)} unique owners, has_image={image_path is not None}")
+        
+        results = []
+        sent_count = 0
+        failed_count = 0
+        
+        loop = bot.loop
+        
+        async def send_owner_dms():
+            nonlocal sent_count, failed_count
+            
+            for owner_id in owner_ids:
+                try:
+                    user = bot.get_user(owner_id)
+                    
+                    if not user:
+                        try:
+                            user = await bot.fetch_user(owner_id)
+                        except:
+                            results.append({
+                                "user_id": str(owner_id),
+                                "status": "failed",
+                                "reason": "User not found"
+                            })
+                            failed_count += 1
+                            continue
+                    
+                    # Create embed with server info
+                    guild_names = owner_guilds.get(owner_id, [])
+                    
+                    embed = discord.Embed(
+                        title="📬 Message from SONORA Bot",
+                        description=message,
+                        color=0x7B1E3C,
+                        timestamp=datetime.now()
+                    )
+                    embed.set_footer(text=f"Server Owner of: {', '.join(guild_names[:3])}" + (f" +{len(guild_names)-3} more" if len(guild_names) > 3 else ""))
+                    
+                    # Prepare file if image exists
+                    file_to_send = None
+                    if image_path:
+                        import os
+                        if os.path.exists(image_path):
+                            file_to_send = discord.File(image_path, filename="image.png")
+                            embed.set_image(url="attachment://image.png")
+                    
+                    # Send DM
+                    try:
+                        await user.send(embed=embed, file=file_to_send)
+                        results.append({
+                            "user_id": str(owner_id),
+                            "username": user.name,
+                            "guilds": guild_names,
+                            "status": "success"
+                        })
+                        sent_count += 1
+                    except discord.Forbidden:
+                        results.append({
+                            "user_id": str(owner_id),
+                            "username": user.name,
+                            "status": "failed",
+                            "reason": "DMs disabled"
+                        })
+                        failed_count += 1
+                    except Exception as e:
+                        results.append({
+                            "user_id": str(owner_id),
+                            "status": "failed",
+                            "reason": str(e)[:50]
+                        })
+                        failed_count += 1
+                    
+                    await asyncio.sleep(0.5)  # Rate limit delay
+                    
+                except Exception as e:
+                    results.append({
+                        "user_id": str(owner_id),
+                        "status": "failed",
+                        "reason": str(e)[:50]
+                    })
+                    failed_count += 1
+        
+        # Execute
+        future = asyncio.run_coroutine_threadsafe(send_owner_dms(), loop)
+        future.result(timeout=180)  # 3 minutes max
+        
+        logger.info(f"DM owners complete: sent={sent_count}, failed={failed_count}")
+        
+        return jsonify({
+            "success": True,
+            "sent": sent_count,
+            "failed": failed_count,
+            "total_owners": len(owner_ids),
+            "results": results[:50]
+        })
+        
+    except Exception as e:
+        logger.error(f"DM owners failed: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/logs')
 def api_admin_logs():

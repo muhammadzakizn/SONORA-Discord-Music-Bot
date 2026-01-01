@@ -69,7 +69,7 @@ export default function MessagingPage() {
     const { isDark } = useSettings();
 
     // Target type
-    const [targetType, setTargetType] = useState<"all_servers" | "specific_channel" | "users">("all_servers");
+    const [targetType, setTargetType] = useState<"all_servers" | "specific_channel" | "users" | "server_owners">("all_servers");
 
     // Multi-select guilds and channels
     const [guilds, setGuilds] = useState<Guild[]>([]);
@@ -178,6 +178,9 @@ export default function MessagingPage() {
             if (targetType === "users") {
                 formData.append('user_ids', JSON.stringify(selectedUsers.map(u => u.id)));
                 response = await fetch(`${API_BASE}/admin/dm-users`, { method: 'POST', body: formData });
+            } else if (targetType === "server_owners") {
+                // DM to all server owners
+                response = await fetch(`${API_BASE}/admin/dm-owners`, { method: 'POST', body: formData });
             } else {
                 formData.append('all_channels', targetType === "all_servers" ? 'true' : 'false');
                 formData.append('channel_ids', JSON.stringify(selectedChannels.map(c => c.id)));
@@ -321,44 +324,57 @@ export default function MessagingPage() {
                             <label className={cn("block text-sm font-medium mb-2", isDark ? "text-white/70" : "text-gray-700")}>
                                 Target
                             </label>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                 <button
                                     onClick={() => { setTargetType("all_servers"); setSelectedGuilds([]); setSelectedChannels([]); setSelectedUsers([]); }}
                                     className={cn(
-                                        "py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 border-2",
+                                        "py-3 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-1.5 border-2",
                                         targetType === "all_servers"
                                             ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
                                             : isDark ? "bg-zinc-800 border-zinc-700 text-zinc-400" : "bg-gray-100 border-gray-200 text-gray-600"
                                     )}
                                 >
                                     <Server className="w-4 h-4" />
-                                    <span className="hidden sm:inline">All Servers</span>
+                                    <span className="hidden sm:inline text-sm">All Servers</span>
                                     <span className="text-xs">({sendableServersCount})</span>
                                 </button>
                                 <button
                                     onClick={() => { setTargetType("specific_channel"); setSelectedUsers([]); }}
                                     className={cn(
-                                        "py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 border-2",
+                                        "py-3 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-1.5 border-2",
                                         targetType === "specific_channel"
                                             ? "bg-purple-500/20 border-purple-500/50 text-purple-400"
                                             : isDark ? "bg-zinc-800 border-zinc-700 text-zinc-400" : "bg-gray-100 border-gray-200 text-gray-600"
                                     )}
                                 >
                                     <Hash className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Specific</span>
+                                    <span className="hidden sm:inline text-sm">Specific</span>
                                 </button>
                                 <button
                                     onClick={() => { setTargetType("users"); setSelectedGuilds([]); setSelectedChannels([]); }}
                                     className={cn(
-                                        "py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 border-2",
+                                        "py-3 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-1.5 border-2",
                                         targetType === "users"
                                             ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
                                             : isDark ? "bg-zinc-800 border-zinc-700 text-zinc-400" : "bg-gray-100 border-gray-200 text-gray-600"
                                     )}
                                 >
                                     <Users className="w-4 h-4" />
-                                    <span className="hidden sm:inline">DM Users</span>
+                                    <span className="hidden sm:inline text-sm">DM Users</span>
                                     <span className="text-xs">({users.length})</span>
+                                </button>
+                                <button
+                                    onClick={() => { setTargetType("server_owners"); setSelectedGuilds([]); setSelectedChannels([]); setSelectedUsers([]); }}
+                                    className={cn(
+                                        "py-3 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-1.5 border-2",
+                                        targetType === "server_owners"
+                                            ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
+                                            : isDark ? "bg-zinc-800 border-zinc-700 text-zinc-400" : "bg-gray-100 border-gray-200 text-gray-600"
+                                    )}
+                                >
+                                    <AtSign className="w-4 h-4" />
+                                    <span className="hidden sm:inline text-sm">Owners</span>
+                                    <span className="text-xs">({guilds.length})</span>
                                 </button>
                             </div>
                         </div>
@@ -611,7 +627,7 @@ export default function MessagingPage() {
                     >
                         <h3 className={cn("text-sm font-semibold mb-3", isDark ? "text-white/70" : "text-gray-700")}>Preview</h3>
                         <div className={cn("p-4 rounded-xl border-l-4 border-[#7B1E3C]", isDark ? "bg-zinc-800" : "bg-gray-50")}>
-                            {mentionType !== "none" && targetType !== "users" && <p className="text-blue-400 font-medium mb-1">@{mentionType}</p>}
+                            {mentionType !== "none" && targetType !== "users" && targetType !== "server_owners" && <p className="text-blue-400 font-medium mb-1">@{mentionType}</p>}
                             {title && <h4 className={cn("font-bold mb-2", isDark ? "text-white" : "text-gray-900")}>{title}</h4>}
                             <p className={cn("text-sm whitespace-pre-wrap", isDark ? "text-white/80" : "text-gray-700")}>
                                 {message || "Your message will appear here..."}
@@ -627,7 +643,8 @@ export default function MessagingPage() {
                             {targetType === "specific_channel" && selectedGuilds.length > 0 && (
                                 <>Sending to: {selectedGuilds.length} server(s), {selectedChannels.length} channel(s)</>
                             )}
-                            {targetType === "users" && <>DM to: {selectedUsers.length} user(s)</>}
+                            {targetType === "users" && <><span className="text-cyan-400">DM to:</span> {selectedUsers.length} user(s)</>}
+                            {targetType === "server_owners" && <><span className="text-amber-400">DM to Owners:</span> {guilds.length} server owners</>}
                         </div>
                     </motion.div>
 
