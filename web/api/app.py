@@ -2028,6 +2028,48 @@ def api_admin_guilds_channels():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/owners')
+def api_admin_owners():
+    """Get list of unique server owners with their guilds"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        # Collect unique owners with their guilds
+        owner_data = {}  # owner_id -> {user info, guilds list}
+        
+        for guild in bot.guilds:
+            if guild.owner_id:
+                owner_id = str(guild.owner_id)
+                
+                if owner_id not in owner_data:
+                    # Get owner user info
+                    owner = guild.owner or bot.get_user(guild.owner_id)
+                    owner_data[owner_id] = {
+                        "id": owner_id,
+                        "username": owner.name if owner else f"User {owner_id}",
+                        "displayName": owner.display_name if owner else None,
+                        "avatar": str(owner.avatar.url) if owner and owner.avatar else None,
+                        "guilds": []
+                    }
+                
+                owner_data[owner_id]["guilds"].append({
+                    "id": str(guild.id),
+                    "name": guild.name,
+                    "icon": str(guild.icon.url) if guild.icon else None,
+                    "member_count": guild.member_count
+                })
+        
+        # Convert to list sorted by number of guilds (descending)
+        owners_list = sorted(owner_data.values(), key=lambda x: len(x["guilds"]), reverse=True)
+        
+        return jsonify(owners_list)
+    except Exception as e:
+        logger.error(f"Failed to get owners: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/admin/broadcast', methods=['POST'])
 def api_admin_broadcast():
     """Send broadcast message to selected channels"""
@@ -2504,10 +2546,17 @@ def api_admin_dm_owners():
         if request.content_type and 'multipart/form-data' in request.content_type:
             message = request.form.get('message', '').strip()
             image_file = request.files.get('image')
+            owner_ids_str = request.form.get('owner_ids', '[]')
+            all_owners = request.form.get('all_owners', 'false').lower() == 'true'
+            
+            import json
+            selected_owner_ids = json.loads(owner_ids_str) if owner_ids_str else []
         else:
             data = request.json or {}
             message = data.get('message', '').strip()
             image_file = None
+            selected_owner_ids = data.get('owner_ids', [])
+            all_owners = data.get('all_owners', False)
         
         if not message:
             return jsonify({"error": "Message is required"}), 400
@@ -2523,19 +2572,24 @@ def api_admin_dm_owners():
             image_file.save(image_path)
             logger.info(f"Saved owner DM image: {image_path}")
         
-        # Get unique server owners
-        owner_ids = set()
+        # Get unique server owners and their guilds
         owner_guilds = {}  # owner_id -> list of guild names
         
         for guild in bot.guilds:
             if guild.owner_id:
-                owner_ids.add(guild.owner_id)
                 if guild.owner_id not in owner_guilds:
                     owner_guilds[guild.owner_id] = []
                 owner_guilds[guild.owner_id].append(guild.name)
         
-        logger.info(f"DM owners request: sending to {len(owner_ids)} unique owners, has_image={image_path is not None}")
+        # Filter by selected owner IDs if not all_owners
+        if all_owners or not selected_owner_ids:
+            target_owner_ids = set(owner_guilds.keys())
+        else:
+            target_owner_ids = set(int(oid) for oid in selected_owner_ids if int(oid) in owner_guilds)
         
+        logger.info(f"DM owners request: sending to {len(target_owner_ids)} owners (all={all_owners}), has_image={image_path is not None}")
+        
+
         results = []
         sent_count = 0
         failed_count = 0
@@ -2545,7 +2599,7 @@ def api_admin_dm_owners():
         async def send_owner_dms():
             nonlocal sent_count, failed_count
             
-            for owner_id in owner_ids:
+            for owner_id in target_owner_ids:
                 try:
                     user = bot.get_user(owner_id)
                     

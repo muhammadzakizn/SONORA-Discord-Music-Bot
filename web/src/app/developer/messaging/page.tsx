@@ -63,6 +63,21 @@ interface UserData {
     serverName?: string;
 }
 
+interface OwnerGuild {
+    id: string;
+    name: string;
+    icon: string | null;
+    member_count?: number;
+}
+
+interface OwnerData {
+    id: string;
+    username: string;
+    displayName?: string;
+    avatar: string | null;
+    guilds: OwnerGuild[];
+}
+
 const API_BASE = '/api/bot';
 
 export default function MessagingPage() {
@@ -83,6 +98,13 @@ export default function MessagingPage() {
     const [selectedUsers, setSelectedUsers] = useState<UserData[]>([]);
     const [showUserDialog, setShowUserDialog] = useState(false);
     const [userSearch, setUserSearch] = useState("");
+
+    // Owners selection
+    const [owners, setOwners] = useState<OwnerData[]>([]);
+    const [selectedOwners, setSelectedOwners] = useState<OwnerData[]>([]);
+    const [showOwnerDialog, setShowOwnerDialog] = useState(false);
+    const [ownerSearch, setOwnerSearch] = useState("");
+    const [loadingOwners, setLoadingOwners] = useState(false);
 
     // Message content
     const [title, setTitle] = useState("");
@@ -106,6 +128,7 @@ export default function MessagingPage() {
     useEffect(() => {
         fetchGuilds();
         fetchUsers();
+        fetchOwners();
     }, []);
 
     const fetchGuilds = async () => {
@@ -134,6 +157,20 @@ export default function MessagingPage() {
             console.error('Failed to fetch users:', error);
         }
         setLoadingUsers(false);
+    };
+
+    const fetchOwners = async () => {
+        setLoadingOwners(true);
+        try {
+            const response = await fetch(`${API_BASE}/admin/owners`, { cache: 'no-store' });
+            if (response.ok) {
+                const data = await response.json();
+                setOwners(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch owners:', error);
+        }
+        setLoadingOwners(false);
     };
 
     // Image file handling
@@ -179,7 +216,13 @@ export default function MessagingPage() {
                 formData.append('user_ids', JSON.stringify(selectedUsers.map(u => u.id)));
                 response = await fetch(`${API_BASE}/admin/dm-users`, { method: 'POST', body: formData });
             } else if (targetType === "server_owners") {
-                // DM to all server owners
+                // DM to selected server owners
+                if (selectedOwners.length > 0) {
+                    formData.append('owner_ids', JSON.stringify(selectedOwners.map(o => o.id)));
+                    formData.append('all_owners', 'false');
+                } else {
+                    formData.append('all_owners', 'true');
+                }
                 response = await fetch(`${API_BASE}/admin/dm-owners`, { method: 'POST', body: formData });
             } else {
                 formData.append('all_channels', targetType === "all_servers" ? 'true' : 'false');
@@ -246,6 +289,17 @@ export default function MessagingPage() {
         }
     };
 
+    const toggleOwnerSelection = (owner: OwnerData) => {
+        if (selectedOwners.find(o => o.id === owner.id)) {
+            setSelectedOwners(prev => prev.filter(o => o.id !== owner.id));
+        } else {
+            setSelectedOwners(prev => [...prev, owner]);
+        }
+    };
+
+    const selectAllOwners = () => setSelectedOwners([...owners]);
+    const deselectAllOwners = () => setSelectedOwners([]);
+
     const selectAllSendableChannels = () => {
         const allSendable: Channel[] = [];
         selectedGuilds.forEach(guild => {
@@ -259,6 +313,12 @@ export default function MessagingPage() {
     const filteredUsers = users.filter(u =>
         u.username.toLowerCase().includes(userSearch.toLowerCase()) ||
         (u.displayName && u.displayName.toLowerCase().includes(userSearch.toLowerCase()))
+    );
+
+    const filteredOwners = owners.filter(o =>
+        o.username.toLowerCase().includes(ownerSearch.toLowerCase()) ||
+        (o.displayName && o.displayName.toLowerCase().includes(ownerSearch.toLowerCase())) ||
+        o.guilds.some(g => g.name.toLowerCase().includes(ownerSearch.toLowerCase()))
     );
 
     const sendableServersCount = guilds.filter(g => (g.sendable_channels || 0) > 0).length;
@@ -490,8 +550,58 @@ export default function MessagingPage() {
                             )}
                         </AnimatePresence>
 
+                        {/* Owner Selection */}
+                        <AnimatePresence>
+                            {targetType === "server_owners" && (
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className={cn("text-sm font-medium", isDark ? "text-white/70" : "text-gray-700")}>
+                                            Select Server Owners ({selectedOwners.length}/{owners.length} selected)
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <button onClick={selectAllOwners} className="text-xs text-amber-400 hover:text-amber-300">
+                                                Select All
+                                            </button>
+                                            <button onClick={deselectAllOwners} className="text-xs text-zinc-400 hover:text-zinc-300">
+                                                None
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowOwnerDialog(true)}
+                                        className={cn(
+                                            "w-full px-4 py-3 rounded-xl flex items-center justify-between border",
+                                            isDark ? "bg-zinc-800 border-zinc-700 text-white" : "bg-gray-100 border-gray-200 text-gray-900"
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            {selectedOwners.length > 0 ? (
+                                                selectedOwners.slice(0, 3).map(o => (
+                                                    <span key={o.id} className="px-2 py-1 rounded-md bg-amber-500/20 text-amber-400 text-xs flex items-center gap-1">
+                                                        <User className="w-3 h-3" />
+                                                        {o.username} ({o.guilds.length} servers)
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className={isDark ? "text-zinc-500" : "text-gray-500"}>
+                                                    {owners.length > 0 ? "All owners selected (click to choose specific)" : "Loading owners..."}
+                                                </span>
+                                            )}
+                                            {selectedOwners.length > 3 && <span className="text-xs text-zinc-400">+{selectedOwners.length - 3} more</span>}
+                                        </div>
+                                        <ChevronDown className="w-5 h-5" />
+                                    </button>
+                                    {selectedOwners.length === 0 && owners.length > 0 && (
+                                        <p className="text-xs text-amber-400/60 mt-1">
+                                            Will send to all {owners.length} server owners
+                                        </p>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
                         {/* Mention Options */}
-                        {targetType !== "users" && (
+                        {targetType !== "users" && targetType !== "server_owners" && (
                             <div className="mb-4">
                                 <label className={cn("block text-sm font-medium mb-2", isDark ? "text-white/70" : "text-gray-700")}>
                                     Mention
@@ -901,6 +1011,120 @@ export default function MessagingPage() {
                                     className="w-full py-2.5 rounded-xl bg-cyan-500 text-white font-medium hover:bg-cyan-600"
                                 >
                                     Done ({selectedUsers.length} selected)
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Owner Selection Dialog */}
+            <AnimatePresence>
+                {showOwnerDialog && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowOwnerDialog(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                                "w-full max-w-lg max-h-[70vh] rounded-2xl border shadow-2xl overflow-hidden flex flex-col",
+                                isDark ? "bg-zinc-900 border-zinc-700" : "bg-white border-gray-200"
+                            )}
+                        >
+                            <div className={cn("p-4 border-b", isDark ? "border-zinc-700" : "border-gray-200")}>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className={cn("text-lg font-semibold", isDark ? "text-white" : "text-gray-900")}>
+                                        Select Server Owners
+                                    </h3>
+                                    <div className="flex gap-2">
+                                        <button onClick={selectAllOwners} className="text-xs px-2 py-1 rounded bg-amber-500/20 text-amber-400 hover:bg-amber-500/30">
+                                            Select All
+                                        </button>
+                                        <button onClick={deselectAllOwners} className="text-xs px-2 py-1 rounded bg-zinc-700 text-zinc-300 hover:bg-zinc-600">
+                                            None
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search owners or server names..."
+                                        value={ownerSearch}
+                                        onChange={(e) => setOwnerSearch(e.target.value)}
+                                        className={cn(
+                                            "w-full pl-10 pr-4 py-2 rounded-xl border",
+                                            isDark ? "bg-zinc-800 border-zinc-700 text-white" : "bg-gray-100 border-gray-200 text-gray-900"
+                                        )}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4">
+                                {loadingOwners ? (
+                                    <div className="text-center py-8 text-zinc-500">Loading owners...</div>
+                                ) : filteredOwners.length === 0 ? (
+                                    <div className="text-center py-8 text-zinc-500">No owners found</div>
+                                ) : filteredOwners.map(owner => {
+                                    const isSelected = selectedOwners.some(o => o.id === owner.id);
+                                    return (
+                                        <button
+                                            key={owner.id}
+                                            onClick={() => toggleOwnerSelection(owner)}
+                                            className={cn(
+                                                "w-full p-3 rounded-xl flex items-start gap-3 transition-colors mb-2",
+                                                isSelected ? "bg-amber-500/20" : isDark ? "hover:bg-zinc-800" : "hover:bg-gray-100"
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                "w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5",
+                                                isSelected ? "bg-amber-500 border-amber-500" : isDark ? "border-zinc-600" : "border-gray-300"
+                                            )}>
+                                                {isSelected && <Check className="w-3 h-3 text-white" />}
+                                            </div>
+                                            {owner.avatar ? (
+                                                <img src={owner.avatar} alt="" className="w-10 h-10 rounded-full" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold">
+                                                    {owner.username.charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
+                                            <div className="flex-1 text-left">
+                                                <p className={cn("font-medium", isDark ? "text-white" : "text-gray-900")}>
+                                                    {owner.displayName || owner.username}
+                                                </p>
+                                                <p className={cn("text-xs mb-1", isDark ? "text-zinc-500" : "text-gray-500")}>
+                                                    @{owner.username}
+                                                </p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {owner.guilds.slice(0, 3).map(g => (
+                                                        <span key={g.id} className="text-xs px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">
+                                                            {g.name}
+                                                        </span>
+                                                    ))}
+                                                    {owner.guilds.length > 3 && (
+                                                        <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-400">
+                                                            +{owner.guilds.length - 3} more
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div className={cn("p-4 border-t", isDark ? "border-zinc-700" : "border-gray-200")}>
+                                <button
+                                    onClick={() => setShowOwnerDialog(false)}
+                                    className="w-full py-2.5 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600"
+                                >
+                                    Done ({selectedOwners.length > 0 ? `${selectedOwners.length} selected` : `All ${owners.length} owners`})
                                 </button>
                             </div>
                         </motion.div>
