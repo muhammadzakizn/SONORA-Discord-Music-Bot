@@ -2089,80 +2089,84 @@ def api_admin_broadcast():
         async def send_broadcasts():
             nonlocal sent_count, failed_count
             
-            # If all_channels is true, send to ALL text channels in ALL guilds
+            # If all_channels is true, send to ONE sendable channel per guild (not all)
             if all_channels:
-                logger.info(f"Broadcasting to ALL channels in {len(bot.guilds)} guilds")
+                logger.info(f"Broadcasting to ONE channel per server in {len(bot.guilds)} guilds")
                 
                 for guild in bot.guilds:
+                    # Find the first sendable text channel in this guild
+                    target_channel = None
+                    
                     for channel in guild.text_channels:
-                        # Check permissions
                         permissions = channel.permissions_for(guild.me)
                         
+                        # Check if we can send messages
                         if not permissions.send_messages:
-                            results.append({
-                                "guild": guild.name,
-                                "channel": channel.name,
-                                "status": "failed",
-                                "reason": "No send_messages permission"
-                            })
-                            failed_count += 1
                             continue
                         
                         # Check mention permission if needed
                         if mention_type in ['everyone', 'here'] and not permissions.mention_everyone:
-                            results.append({
-                                "guild": guild.name,
-                                "channel": channel.name,
-                                "status": "failed",
-                                "reason": "No mention_everyone permission"
-                            })
-                            failed_count += 1
                             continue
                         
-                        # Send message
-                        try:
-                            embed = discord.Embed(
-                                title="📢 Broadcast Message",
-                                description=message,
-                                color=0x3498DB,
-                                timestamp=datetime.now()
-                            )
-                            embed.set_footer(text="Admin Broadcast")
-                            
-                            # Prepare file if image exists
-                            file_to_send = None
-                            if image_path:
-                                import os
-                                if os.path.exists(image_path):
-                                    file_to_send = discord.File(image_path, filename="image.png")
-                                    embed.set_image(url="attachment://image.png")
-                            
-                            # Send with or without mention
-                            if mention_type == 'everyone':
-                                await channel.send(content="@everyone", embed=embed, file=file_to_send)
-                            elif mention_type == 'here':
-                                await channel.send(content="@here", embed=embed, file=file_to_send)
-                            else:
-                                await channel.send(embed=embed, file=file_to_send)
-                            
-                            results.append({
-                                "guild": guild.name,
-                                "channel": channel.name,
-                                "status": "success"
-                            })
-                            sent_count += 1
-                            
-                            # Small delay to avoid rate limits
-                            await asyncio.sleep(0.5)
-                            
-                        except Exception as e:
-                            results.append({
-                                "guild": guild.name,
-                                "channel": channel.name,
-                                "status": "failed",
-                                "reason": str(e)[:100]
-                            })
-                            failed_count += 1
+                        # Found a suitable channel
+                        target_channel = channel
+                        break
+                    
+                    # No suitable channel found in this guild
+                    if not target_channel:
+                        results.append({
+                            "guild": guild.name,
+                            "channel": "N/A",
+                            "status": "failed",
+                            "reason": "No sendable channel found"
+                        })
+                        failed_count += 1
+                        continue
+                    
+                    # Send message to the first suitable channel
+                    try:
+                        embed = discord.Embed(
+                            title="📢 Broadcast Message",
+                            description=message,
+                            color=0x3498DB,
+                            timestamp=datetime.now()
+                        )
+                        embed.set_footer(text="Admin Broadcast")
+                        
+                        # Prepare file if image exists
+                        file_to_send = None
+                        if image_path:
+                            import os
+                            if os.path.exists(image_path):
+                                file_to_send = discord.File(image_path, filename="image.png")
+                                embed.set_image(url="attachment://image.png")
+                        
+                        # Send with or without mention
+                        if mention_type == 'everyone':
+                            await target_channel.send(content="@everyone", embed=embed, file=file_to_send)
+                        elif mention_type == 'here':
+                            await target_channel.send(content="@here", embed=embed, file=file_to_send)
+                        else:
+                            await target_channel.send(embed=embed, file=file_to_send)
+                        
+                        results.append({
+                            "guild": guild.name,
+                            "channel": target_channel.name,
+                            "status": "success"
+                        })
+                        sent_count += 1
+                        
+                        # Small delay to avoid rate limits
+                        await asyncio.sleep(0.5)
+                        
+                    except Exception as e:
+                        results.append({
+                            "guild": guild.name,
+                            "channel": target_channel.name,
+                            "status": "failed",
+                            "reason": str(e)[:100]
+                        })
+                        failed_count += 1
             
             # Otherwise, send to specific selected channels
             else:
