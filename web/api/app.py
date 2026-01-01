@@ -2036,51 +2036,70 @@ def api_admin_owners():
         return jsonify({"error": "Bot not connected"}), 503
     
     try:
-        # First pass: collect guild data for each owner
-        owner_guilds = {}  # owner_id -> list of guild info
+        # Collect owner data - use guild.owner when available (faster, no API call)
+        owner_data = {}  # owner_id -> {user info, guilds list}
+        missing_owner_ids = []  # owners we need to fetch
         
         for guild in bot.guilds:
             if guild.owner_id:
                 owner_id = guild.owner_id
-                if owner_id not in owner_guilds:
-                    owner_guilds[owner_id] = []
-                owner_guilds[owner_id].append({
+                
+                if owner_id not in owner_data:
+                    # Try to get owner from guild (cached) or bot cache
+                    owner = guild.owner or bot.get_user(owner_id)
+                    
+                    if owner:
+                        owner_data[owner_id] = {
+                            "id": str(owner_id),
+                            "username": owner.name,
+                            "displayName": owner.display_name,
+                            "globalName": getattr(owner, 'global_name', None),
+                            "avatar": str(owner.avatar.url) if owner.avatar else None,
+                            "guilds": []
+                        }
+                    else:
+                        # Need to fetch this user
+                        missing_owner_ids.append(owner_id)
+                        owner_data[owner_id] = {
+                            "id": str(owner_id),
+                            "username": f"User",
+                            "displayName": None,
+                            "globalName": None,
+                            "avatar": None,
+                            "guilds": []
+                        }
+                
+                owner_data[owner_id]["guilds"].append({
                     "id": str(guild.id),
                     "name": guild.name,
                     "icon": str(guild.icon.url) if guild.icon else None,
                     "member_count": guild.member_count
                 })
         
-        # Second pass: fetch user info (async)
-        async def get_owners_data():
-            owners_list = []
-            
-            for owner_id, guilds in owner_guilds.items():
-                # Try to get from cache first, then fetch
-                owner = bot.get_user(owner_id)
-                
-                if not owner:
+        # Fetch missing owners (limit to first 20 to avoid timeout)
+        if missing_owner_ids:
+            async def fetch_missing():
+                for owner_id in missing_owner_ids[:20]:  # Limit to prevent timeout
                     try:
-                        owner = await bot.fetch_user(owner_id)
+                        user = await bot.fetch_user(owner_id)
+                        if user and owner_id in owner_data:
+                            owner_data[owner_id]["username"] = user.name
+                            owner_data[owner_id]["displayName"] = user.display_name
+                            owner_data[owner_id]["globalName"] = getattr(user, 'global_name', None)
+                            owner_data[owner_id]["avatar"] = str(user.avatar.url) if user.avatar else None
                     except Exception as e:
                         logger.warning(f"Could not fetch user {owner_id}: {e}")
-                        owner = None
-                
-                owners_list.append({
-                    "id": str(owner_id),
-                    "username": owner.name if owner else f"Unknown User",
-                    "displayName": owner.display_name if owner else None,
-                    "avatar": str(owner.avatar.url) if owner and owner.avatar else None,
-                    "globalName": owner.global_name if owner and hasattr(owner, 'global_name') else None,
-                    "guilds": guilds
-                })
+                    await asyncio.sleep(0.1)  # Small delay
             
-            # Sort by number of guilds (descending)
-            return sorted(owners_list, key=lambda x: len(x["guilds"]), reverse=True)
+            loop = bot.loop
+            future = asyncio.run_coroutine_threadsafe(fetch_missing(), loop)
+            try:
+                future.result(timeout=10)  # 10 second max for fetching
+            except:
+                pass  # Continue with partial data
         
-        loop = bot.loop
-        future = asyncio.run_coroutine_threadsafe(get_owners_data(), loop)
-        owners_list = future.result(timeout=30)
+        # Convert to list sorted by number of guilds (descending)
+        owners_list = sorted(owner_data.values(), key=lambda x: len(x["guilds"]), reverse=True)
         
         return jsonify(owners_list)
     except Exception as e:
