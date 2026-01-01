@@ -2248,7 +2248,7 @@ def api_admin_broadcast():
                             sent_count += 1
                             
                             # Small delay to avoid rate limits
-                            await asyncio.sleep(0.5)
+                            await asyncio.sleep(0.2)
                             
                         except Exception as e:
                             results.append({
@@ -2323,7 +2323,7 @@ def api_admin_broadcast():
                             })
                             sent_count += 1
                             
-                            await asyncio.sleep(0.5)
+                            await asyncio.sleep(0.2)
                             
                         except Exception as e:
                             results.append({
@@ -2405,7 +2405,7 @@ def api_admin_broadcast():
                             })
                             sent_count += 1
                             
-                            await asyncio.sleep(0.5)
+                            await asyncio.sleep(0.2)
                             
                         except Exception as e:
                             results.append({
@@ -2423,7 +2423,21 @@ def api_admin_broadcast():
         # Execute broadcast
         logger.info("Executing broadcast...")
         future = asyncio.run_coroutine_threadsafe(send_broadcasts(), loop)
-        future.result(timeout=60)  # Wait max 60 seconds
+        try:
+            future.result(timeout=300)  # Wait max 5 minutes
+        except Exception as timeout_error:
+            # Timeout or error - but some messages may have been sent
+            logger.warning(f"Broadcast timeout/error after {sent_count} messages: {timeout_error}")
+            # Return partial success instead of error
+            return jsonify({
+                "success": sent_count > 0,  # Success if at least 1 sent
+                "sent": sent_count,
+                "failed": failed_count,
+                "total_guilds": len(bot.guilds),
+                "results": results[:50],
+                "partial": True,
+                "warning": f"Operation timed out after sending {sent_count} messages"
+            })
         
         logger.info(f"Broadcast complete: sent={sent_count}, failed={failed_count}")
         
@@ -2725,7 +2739,21 @@ def api_admin_dm_owners():
         
         # Execute
         future = asyncio.run_coroutine_threadsafe(send_owner_dms(), loop)
-        future.result(timeout=300)  # 5 minutes max for many owners
+        try:
+            future.result(timeout=300)  # 5 minutes max for many owners
+        except Exception as timeout_error:
+            # Timeout or error - but some DMs may have been sent
+            logger.warning(f"DM owners timeout/error after {sent_count} messages: {timeout_error}")
+            # Return partial success instead of error
+            return jsonify({
+                "success": sent_count > 0,  # Success if at least 1 sent
+                "sent": sent_count,
+                "failed": failed_count,
+                "total_owners": len(target_owner_ids),
+                "results": results[:50],
+                "partial": True,
+                "warning": f"Operation timed out after sending {sent_count} DMs"
+            })
         
         logger.info(f"DM owners complete: sent={sent_count}, failed={failed_count}")
         

@@ -294,7 +294,10 @@ export default function MessagingPage() {
 
             const data = await response.json();
 
-            if (response.ok && data.success) {
+            // Success if response ok AND (data.success OR at least 1 message sent)
+            const isSuccess = response.ok && (data.success || (data.sent && data.sent > 0));
+
+            if (isSuccess) {
                 const newResult: BroadcastResult = {
                     success: true,
                     serversReached: data.sent || 0,
@@ -303,6 +306,12 @@ export default function MessagingPage() {
                 };
                 setResult(newResult);
                 setHistory(prev => [newResult, ...prev].slice(0, 10));
+
+                // Show warning if partial (timeout occurred but some sent)
+                if (data.partial) {
+                    console.warn('Partial send:', data.warning);
+                }
+
                 setTimeout(() => {
                     setTitle("");
                     setMessage("");
@@ -313,7 +322,7 @@ export default function MessagingPage() {
                     setSelectedGuilds([]);
                 }, 3000);
             } else {
-                setResult({ success: false, serversReached: 0, failed: data.failed || 1, timestamp: new Date().toLocaleString() });
+                setResult({ success: false, serversReached: data.sent || 0, failed: data.failed || 1, timestamp: new Date().toLocaleString() });
             }
         } catch (error) {
             console.error('Broadcast error:', error);
