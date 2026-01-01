@@ -149,7 +149,7 @@ export default function PrivacyPolicyPage() {
                                 <ul>
                                     <li><strong>Data Collected:</strong> Track title, artist, album art URL, play timestamp, and duration</li>
                                     <li><strong>Purpose:</strong> Display your personal "Top 10 Tracks" statistics in the dashboard</li>
-                                    <li><strong>Auto-Cleanup:</strong> Data older than 1 year is <strong>automatically deleted on January 1st</strong></li>
+                                    <li><strong>Auto-Cleanup:</strong> All history from previous years is <strong>automatically deleted on January 1st</strong></li>
                                     <li><strong>Manual Deletion:</strong> You can delete individual tracks, months, or years from Settings anytime</li>
                                 </ul>
                             </div>

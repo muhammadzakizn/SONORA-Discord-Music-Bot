@@ -277,7 +277,7 @@ function ListeningHistorySection({
           )}>
             <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
             <p className={cn("text-xs", isDark ? "text-amber-400" : "text-amber-700")}>
-              History older than 1 year is automatically deleted on January 1st.
+              All history from previous years is automatically deleted on January 1st.
             </p>
           </div>
         </>

@@ -1065,23 +1065,32 @@ class DatabaseManager:
 
     async def cleanup_old_history(self, years_to_keep: int = 1) -> int:
         """
-        Auto-cleanup history older than specified years
-        Called on bot startup if Jan 1st passed
+        Auto-cleanup history from previous years on January 1st.
+        Deletes ALL history from years before current year.
+        
+        Called on bot startup if it's January.
+        Example: On Jan 1, 2026 - deletes all 2025 and earlier history.
         
         Args:
-            years_to_keep: Number of years to keep (default 1)
+            years_to_keep: Years of history to keep (default 1 = current year only)
         
         Returns:
             Number of deleted entries
         """
+        from datetime import datetime
+        
+        current_year = datetime.now().year
+        cutoff_year = current_year - years_to_keep + 1  # Keep current year, delete before
+        
+        # Delete all history from years before cutoff_year
         cursor = await self.db.execute("""
             DELETE FROM play_history 
-            WHERE played_at < datetime('now', '-' || ? || ' years')
-        """, (years_to_keep,))
+            WHERE strftime('%Y', played_at) < ?
+        """, (str(cutoff_year),))
         await self.db.commit()
         deleted = cursor.rowcount
         if deleted > 0:
-            logger.info(f"Cleaned up {deleted} old history entries (older than {years_to_keep} year(s))")
+            logger.info(f"Annual cleanup: Deleted {deleted} history entries from years before {cutoff_year}")
         return deleted
 
 
