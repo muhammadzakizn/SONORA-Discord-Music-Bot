@@ -74,6 +74,7 @@ interface OwnerData {
     id: string;
     username: string;
     displayName?: string;
+    globalName?: string;  // Discord's new display name
     avatar: string | null;
     guilds: OwnerGuild[];
 }
@@ -1097,7 +1098,7 @@ export default function MessagingPage() {
                                             )}
                                             <div className="flex-1 text-left">
                                                 <p className={cn("font-medium", isDark ? "text-white" : "text-gray-900")}>
-                                                    {owner.displayName || owner.username}
+                                                    {owner.globalName || owner.displayName || owner.username}
                                                 </p>
                                                 <p className={cn("text-xs mb-1", isDark ? "text-zinc-500" : "text-gray-500")}>
                                                     @{owner.username}
