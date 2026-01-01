@@ -72,10 +72,11 @@ interface OwnerGuild {
 
 interface OwnerData {
     id: string;
-    username: string;
-    displayName?: string;
-    globalName?: string;  // Discord's new display name
+    username: string | null;  // null means needs fetch
+    displayName?: string | null;
+    globalName?: string | null;  // Discord's new display name
     avatar: string | null;
+    needsFetch?: boolean;  // Flag for lazy loading
     guilds: OwnerGuild[];
 }
 
@@ -165,13 +166,69 @@ export default function MessagingPage() {
         try {
             const response = await fetch(`${API_BASE}/admin/owners`, { cache: 'no-store' });
             if (response.ok) {
-                const data = await response.json();
-                setOwners(data);
+                const data: OwnerData[] = await response.json();
+
+                // Check localStorage cache for user details
+                const CACHE_KEY = 'sonora_owner_cache';
+                const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+                let cache: Record<string, { data: Partial<OwnerData>; timestamp: number }> = {};
+
+                try {
+                    const stored = localStorage.getItem(CACHE_KEY);
+                    if (stored) cache = JSON.parse(stored);
+                } catch { }
+
+                // Apply cached data and mark which need fetch
+                const ownersWithCache = data.map(owner => {
+                    const cached = cache[owner.id];
+                    if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY && cached.data.username) {
+                        return {
+                            ...owner,
+                            username: cached.data.username || owner.username,
+                            displayName: cached.data.displayName || owner.displayName,
+                            globalName: cached.data.globalName || owner.globalName,
+                            avatar: cached.data.avatar || owner.avatar,
+                            needsFetch: false
+                        };
+                    }
+                    return owner;
+                });
+
+                setOwners(ownersWithCache);
+                setLoadingOwners(false);
+
+                // Lazy load missing user details
+                const needsFetch = ownersWithCache.filter(o => o.needsFetch || !o.username);
+                for (const owner of needsFetch) {
+                    try {
+                        const userRes = await fetch(`${API_BASE}/admin/user-details/${owner.id}`);
+                        if (userRes.ok) {
+                            const userData = await userRes.json();
+
+                            // Update cache
+                            cache[owner.id] = { data: userData, timestamp: Date.now() };
+                            try {
+                                localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+                            } catch { }
+
+                            // Update state
+                            setOwners(prev => prev.map(o =>
+                                o.id === owner.id
+                                    ? { ...o, ...userData, needsFetch: false }
+                                    : o
+                            ));
+                        }
+                    } catch (e) {
+                        console.warn(`Failed to fetch user ${owner.id}:`, e);
+                    }
+                    // Small delay between requests
+                    await new Promise(r => setTimeout(r, 150));
+                }
             }
         } catch (error) {
             console.error('Failed to fetch owners:', error);
+            setLoadingOwners(false);
         }
-        setLoadingOwners(false);
     };
 
     // Image file handling
@@ -317,7 +374,7 @@ export default function MessagingPage() {
     );
 
     const filteredOwners = owners.filter(o =>
-        o.username.toLowerCase().includes(ownerSearch.toLowerCase()) ||
+        (o.username && o.username.toLowerCase().includes(ownerSearch.toLowerCase())) ||
         (o.displayName && o.displayName.toLowerCase().includes(ownerSearch.toLowerCase())) ||
         o.guilds.some(g => g.name.toLowerCase().includes(ownerSearch.toLowerCase()))
     );
@@ -1091,6 +1148,10 @@ export default function MessagingPage() {
                                             </div>
                                             {owner.avatar ? (
                                                 <img src={owner.avatar} alt="" className="w-10 h-10 rounded-full" />
+                                            ) : owner.needsFetch || !owner.username ? (
+                                                <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center animate-pulse">
+                                                    <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                                                </div>
                                             ) : (
                                                 <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold">
                                                     {owner.username.charAt(0).toUpperCase()}
@@ -1098,10 +1159,14 @@ export default function MessagingPage() {
                                             )}
                                             <div className="flex-1 text-left">
                                                 <p className={cn("font-medium", isDark ? "text-white" : "text-gray-900")}>
-                                                    {owner.globalName || owner.displayName || owner.username}
+                                                    {owner.needsFetch || !owner.username ? (
+                                                        <span className="text-zinc-500">Loading...</span>
+                                                    ) : (
+                                                        owner.globalName || owner.displayName || owner.username
+                                                    )}
                                                 </p>
                                                 <p className={cn("text-xs mb-1", isDark ? "text-zinc-500" : "text-gray-500")}>
-                                                    @{owner.username}
+                                                    @{owner.username || '...'}
                                                 </p>
                                                 <div className="flex flex-wrap gap-1">
                                                     {owner.guilds.slice(0, 3).map(g => (

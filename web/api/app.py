@@ -2030,44 +2030,32 @@ def api_admin_guilds_channels():
 
 @app.route('/api/admin/owners')
 def api_admin_owners():
-    """Get list of unique server owners with their guilds"""
+    """Get list of unique server owners with their guilds - fast, no async fetch"""
     bot = get_bot()
     if not bot:
         return jsonify({"error": "Bot not connected"}), 503
     
     try:
-        # Collect owner data - use guild.owner when available (faster, no API call)
+        # Collect owner data - only use cached data for speed
         owner_data = {}  # owner_id -> {user info, guilds list}
-        missing_owner_ids = []  # owners we need to fetch
         
         for guild in bot.guilds:
             if guild.owner_id:
                 owner_id = guild.owner_id
                 
                 if owner_id not in owner_data:
-                    # Try to get owner from guild (cached) or bot cache
+                    # Try to get owner from guild (cached) or bot cache - NO ASYNC FETCH
                     owner = guild.owner or bot.get_user(owner_id)
                     
-                    if owner:
-                        owner_data[owner_id] = {
-                            "id": str(owner_id),
-                            "username": owner.name,
-                            "displayName": owner.display_name,
-                            "globalName": getattr(owner, 'global_name', None),
-                            "avatar": str(owner.avatar.url) if owner.avatar else None,
-                            "guilds": []
-                        }
-                    else:
-                        # Need to fetch this user
-                        missing_owner_ids.append(owner_id)
-                        owner_data[owner_id] = {
-                            "id": str(owner_id),
-                            "username": f"User",
-                            "displayName": None,
-                            "globalName": None,
-                            "avatar": None,
-                            "guilds": []
-                        }
+                    owner_data[owner_id] = {
+                        "id": str(owner_id),
+                        "username": owner.name if owner else None,  # None means needs fetch
+                        "displayName": owner.display_name if owner else None,
+                        "globalName": getattr(owner, 'global_name', None) if owner else None,
+                        "avatar": str(owner.avatar.url) if owner and owner.avatar else None,
+                        "needsFetch": owner is None,  # Flag for frontend lazy loading
+                        "guilds": []
+                    }
                 
                 owner_data[owner_id]["guilds"].append({
                     "id": str(guild.id),
@@ -2076,34 +2064,62 @@ def api_admin_owners():
                     "member_count": guild.member_count
                 })
         
-        # Fetch missing owners (limit to first 20 to avoid timeout)
-        if missing_owner_ids:
-            async def fetch_missing():
-                for owner_id in missing_owner_ids[:20]:  # Limit to prevent timeout
-                    try:
-                        user = await bot.fetch_user(owner_id)
-                        if user and owner_id in owner_data:
-                            owner_data[owner_id]["username"] = user.name
-                            owner_data[owner_id]["displayName"] = user.display_name
-                            owner_data[owner_id]["globalName"] = getattr(user, 'global_name', None)
-                            owner_data[owner_id]["avatar"] = str(user.avatar.url) if user.avatar else None
-                    except Exception as e:
-                        logger.warning(f"Could not fetch user {owner_id}: {e}")
-                    await asyncio.sleep(0.1)  # Small delay
-            
-            loop = bot.loop
-            future = asyncio.run_coroutine_threadsafe(fetch_missing(), loop)
-            try:
-                future.result(timeout=10)  # 10 second max for fetching
-            except:
-                pass  # Continue with partial data
-        
         # Convert to list sorted by number of guilds (descending)
         owners_list = sorted(owner_data.values(), key=lambda x: len(x["guilds"]), reverse=True)
         
         return jsonify(owners_list)
     except Exception as e:
         logger.error(f"Failed to get owners: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/user-details/<user_id>')
+def api_admin_user_details(user_id):
+    """Fetch single user details for lazy loading - returns username, avatar, etc"""
+    bot = get_bot()
+    if not bot:
+        return jsonify({"error": "Bot not connected"}), 503
+    
+    try:
+        user_id_int = int(user_id)
+        
+        # Try cache first
+        user = bot.get_user(user_id_int)
+        
+        if user:
+            return jsonify({
+                "id": str(user_id_int),
+                "username": user.name,
+                "displayName": user.display_name,
+                "globalName": getattr(user, 'global_name', None),
+                "avatar": str(user.avatar.url) if user.avatar else None,
+                "cached": True
+            })
+        
+        # Fetch from Discord API
+        async def fetch_user():
+            return await bot.fetch_user(user_id_int)
+        
+        loop = bot.loop
+        future = asyncio.run_coroutine_threadsafe(fetch_user(), loop)
+        user = future.result(timeout=5)
+        
+        if user:
+            return jsonify({
+                "id": str(user_id_int),
+                "username": user.name,
+                "displayName": user.display_name,
+                "globalName": getattr(user, 'global_name', None),
+                "avatar": str(user.avatar.url) if user.avatar else None,
+                "cached": False
+            })
+        
+        return jsonify({"error": "User not found"}), 404
+        
+    except ValueError:
+        return jsonify({"error": "Invalid user ID"}), 400
+    except Exception as e:
+        logger.warning(f"Failed to fetch user {user_id}: {e}")
         return jsonify({"error": str(e)}), 500
 
 
