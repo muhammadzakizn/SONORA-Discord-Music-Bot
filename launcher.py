@@ -12,9 +12,14 @@ import time
 
 # Add Deno to PATH for yt-dlp EJS challenge solver
 # yt-dlp requires Deno/Node for YouTube signature solving since v2025.11.12
-deno_bin = Path.home() / '.deno' / 'bin'
-if deno_bin.exists():
-    os.environ['PATH'] = f"{deno_bin}:{os.environ.get('PATH', '')}"
+if os.name == 'nt':  # Windows
+    deno_bin = Path.home() / 'AppData' / 'Local' / 'deno'
+    if deno_bin.exists():
+        os.environ['PATH'] = f"{deno_bin};{os.environ.get('PATH', '')}"
+else:  # Linux/macOS
+    deno_bin = Path.home() / '.deno' / 'bin'
+    if deno_bin.exists():
+        os.environ['PATH'] = f"{deno_bin}:{os.environ.get('PATH', '')}"
 
 # Cloudflare Tunnel token for HTTPS API access
 os.environ['CLOUDFLARE_TUNNEL_TOKEN'] = "eyJhIjoiYzAxZjBkYjYzMDY0YjJjOWFhMmQ3NjIxYjMxYTJkNWMiLCJ0IjoiOTg5MDJmZWMtMmFmYy00Y2U2LTg2NDktZDQ5ODIzZjdkZjRjIiwicyI6Ik5UbGhOekkwTnprdFpXVmxZeTAwWXpJeUxUZ3lNVGN0WldRNFltVmhPVGd6WkRWbCJ9"
@@ -88,12 +93,19 @@ def cleanup_processes():
     """Kill any existing bot/web processes before starting"""
     print(f"{Colors.YELLOW}🧹 Cleaning up existing processes...{Colors.END}")
     
-    # Kill existing processes (works without root)
-    subprocess.run(['pkill', '-f', 'next'], capture_output=True)
-    subprocess.run(['pkill', '-f', 'npm'], capture_output=True)
-    subprocess.run(['pkill', '-f', 'python3 main.py'], capture_output=True)
-    subprocess.run(['pkill', '-f', 'cloudflared'], capture_output=True)
-    subprocess.run(['pkill', '-f', 'LyricifyApi'], capture_output=True)
+    if os.name == 'nt':  # Windows
+        # Use taskkill on Windows
+        subprocess.run(['taskkill', '/F', '/IM', 'python.exe', '/FI', 'WINDOWTITLE eq *main.py*'], 
+                       capture_output=True, shell=True)
+        subprocess.run(['taskkill', '/F', '/IM', 'cloudflared.exe'], 
+                       capture_output=True, shell=True)
+    else:  # Linux/macOS
+        # Kill existing processes (works without root)
+        subprocess.run(['pkill', '-f', 'next'], capture_output=True)
+        subprocess.run(['pkill', '-f', 'npm'], capture_output=True)
+        subprocess.run(['pkill', '-f', 'python3 main.py'], capture_output=True)
+        subprocess.run(['pkill', '-f', 'cloudflared'], capture_output=True)
+        subprocess.run(['pkill', '-f', 'LyricifyApi'], capture_output=True)
     
     # Remove Next.js lock files
     for lock_file in [WEB_DIR / '.next/dev/lock', WEB_DIR / '.next/build/lock']:
@@ -147,9 +159,12 @@ def run_production():
     env['NODE_ENV'] = 'production'
     env['PORT'] = str(WEB_PORT)
     
+    # Python command - 'python' on Windows, 'python3' on Linux/macOS
+    python_cmd = 'python' if os.name == 'nt' else 'python3'
+    
     # Start Bot with API on public port (accessible from Vercel)
     print(f"{Colors.CYAN}Starting Discord Bot with API...{Colors.END}")
-    proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+    proc_bot = subprocess.Popen([python_cmd, 'main.py'], env=env)
     time.sleep(3)
     print(f"{Colors.GREEN}✓ Bot started with API on port {BOT_API_PORT}{Colors.END}")
     
@@ -278,7 +293,7 @@ def run_production():
                 
                 # Start new bot instance
                 print(f"{Colors.CYAN}Starting new bot instance...{Colors.END}")
-                proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+                proc_bot = subprocess.Popen([python_cmd, 'main.py'], env=env)
                 time.sleep(3)
                 print(f"{Colors.GREEN}✓ Bot restarted successfully!{Colors.END}\n")
                 continue
@@ -296,7 +311,7 @@ def run_production():
                     
                     time.sleep(1)
                     print(f"{Colors.CYAN}Starting new bot instance...{Colors.END}")
-                    proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+                    proc_bot = subprocess.Popen([python_cmd, 'main.py'], env=env)
                     time.sleep(3)
                     print(f"{Colors.GREEN}✓ Bot restarted successfully!{Colors.END}\n")
                     continue
@@ -356,7 +371,10 @@ def run_bot_only():
     env['WEB_DASHBOARD_PORT'] = str(BOT_API_PORT)
     env['DATABASE_PATH'] = 'bot.db'
     
-    proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+    # Python command - 'python' on Windows, 'python3' on Linux/macOS
+    python_cmd = 'python' if os.name == 'nt' else 'python3'
+    
+    proc_bot = subprocess.Popen([python_cmd, 'main.py'], env=env)
     
     try:
         while True:
@@ -373,7 +391,7 @@ def run_bot_only():
                     
                     time.sleep(1)
                     print(f"{Colors.CYAN}Starting new bot instance...{Colors.END}")
-                    proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+                    proc_bot = subprocess.Popen([python_cmd, 'main.py'], env=env)
                     time.sleep(3)
                     print(f"{Colors.GREEN}✓ Bot restarted successfully!{Colors.END}\n")
                     continue
@@ -433,9 +451,12 @@ def run_development():
     env['WEB_DASHBOARD_PORT'] = str(BOT_API_PORT)
     env['DATABASE_PATH'] = 'bot.db'
     
+    # Python command - 'python' on Windows, 'python3' on Linux/macOS
+    python_cmd = 'python' if os.name == 'nt' else 'python3'
+    
     # Start Bot
     print(f"{Colors.CYAN}Starting Discord Bot...{Colors.END}")
-    proc_bot = subprocess.Popen(['python3', 'main.py'], env=env)
+    proc_bot = subprocess.Popen([python_cmd, 'main.py'], env=env)
     time.sleep(3)
     
     # Start Web Dashboard (Development)

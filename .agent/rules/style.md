@@ -2,7 +2,7 @@
 trigger: always_on
 ---
 
-1. Pastikan semuanya berjalan bagus, cek, dan recheck, test, cek, fix kalau ada error, dan cek ulangi-ulangi, sampai benar-benar berjalan baik dan tidak ada bug atau error sama sekali serta berjalan baik di server Pterodacyl Linux, macOS.
+1. Pastikan semuanya berjalan bagus, cek, dan recheck, test, cek, fix kalau ada error, dan cek ulangi-ulangi, sampai benar-benar berjalan baik dan tidak ada bug atau error sama sekali serta berjalan baik di server Windows OS (sebelumnya saya dari Pterodacyl Linux CLI), macOS.
 
 2. Pastikan selalu mengupdate changelog di :
 
@@ -16,4 +16,3 @@ trigger: always_on
 3. Jika semuanya telah selesai maka, selalu git push ke github. tapi selain dari folder .agent/rules ya. dan jangan hilangkan folder .agent / rules di local/laptopku ini.
 
 4. Dan pastikan setiap output, minim emote.
-

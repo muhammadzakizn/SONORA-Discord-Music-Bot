@@ -133,6 +133,19 @@ class Settings:
     # Example: http://bore.pub:31909 (via bore tunnel from local machine)
     YOUTUBE_PROXY: str = os.getenv('YOUTUBE_PROXY', '')
     
+    # Rclone Cache - Use mounted Google Drive instead of FTP
+    # On Windows: mount Google Drive as drive letter (e.g., G:)
+    # Command: rclone mount gdrive:SONORA-Cache G: --vfs-cache-mode full
+    RCLONE_CACHE_ENABLED: bool = os.getenv('RCLONE_CACHE_ENABLED', 'false').lower() == 'true'
+    RCLONE_CACHE_PATH: Path = Path(os.getenv('RCLONE_CACHE_PATH', 'G:/audio'))
+    
+    @classmethod
+    def get_cache_path(cls) -> Path:
+        """Get the active cache path - Rclone mount or local downloads"""
+        if cls.RCLONE_CACHE_ENABLED and cls.RCLONE_CACHE_PATH.exists():
+            return cls.RCLONE_CACHE_PATH
+        return cls.DOWNLOADS_DIR
+    
     @classmethod
     def validate(cls) -> bool:
         """Validate that all required settings are present"""
