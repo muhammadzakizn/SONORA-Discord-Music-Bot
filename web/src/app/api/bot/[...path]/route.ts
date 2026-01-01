@@ -58,37 +58,48 @@ export async function POST(
   console.log(`[Proxy] POST ${url} (content-type: ${contentType})`);
   
   try {
-    let fetchOptions: RequestInit;
+    let response: Response;
     
     // Handle FormData (multipart/form-data) for file uploads
     if (contentType.includes('multipart/form-data')) {
-      // Get the raw body as ArrayBuffer and forward it
-      const body = await request.arrayBuffer();
+      // Parse the incoming FormData
+      const incomingFormData = await request.formData();
       
-      fetchOptions = {
+      // Create a new FormData to send to backend
+      const outgoingFormData = new FormData();
+      
+      // Copy all fields from incoming to outgoing
+      for (const [key, value] of incomingFormData.entries()) {
+        if (value instanceof File) {
+          // For files, we need to convert to Blob for Node.js fetch
+          const buffer = await value.arrayBuffer();
+          const blob = new Blob([buffer], { type: value.type });
+          outgoingFormData.append(key, blob, value.name);
+          console.log(`[Proxy] Forwarding file: ${key} (${value.name}, ${value.size} bytes)`);
+        } else {
+          outgoingFormData.append(key, value);
+          console.log(`[Proxy] Forwarding field: ${key} = ${String(value).substring(0, 50)}...`);
+        }
+      }
+      
+      // Send FormData without explicit Content-Type (fetch will set it with boundary)
+      response = await fetch(url, {
         method: 'POST',
-        headers: {
-          // Forward the original content-type with boundary
-          'Content-Type': contentType,
-        },
-        body: body,
-      };
+        body: outgoingFormData,
+      });
       
-      console.log(`[Proxy] Forwarding FormData request (${body.byteLength} bytes)`);
     } else {
       // Handle JSON
       const body = await request.json().catch(() => ({}));
       
-      fetchOptions = {
+      response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
-      };
+      });
     }
-    
-    const response = await fetch(url, fetchOptions);
     
     console.log(`[Proxy] Response status: ${response.status}`);
     
