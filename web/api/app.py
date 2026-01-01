@@ -2678,7 +2678,7 @@ def api_admin_dm_owners():
                         })
                         failed_count += 1
                     
-                    await asyncio.sleep(0.5)  # Rate limit delay
+                    await asyncio.sleep(0.2)  # Rate limit delay (reduced for faster sending)
                     
                 except Exception as e:
                     results.append({
@@ -2690,7 +2690,7 @@ def api_admin_dm_owners():
         
         # Execute
         future = asyncio.run_coroutine_threadsafe(send_owner_dms(), loop)
-        future.result(timeout=180)  # 3 minutes max
+        future.result(timeout=300)  # 5 minutes max for many owners
         
         logger.info(f"DM owners complete: sent={sent_count}, failed={failed_count}")
         
@@ -2698,7 +2698,7 @@ def api_admin_dm_owners():
             "success": True,
             "sent": sent_count,
             "failed": failed_count,
-            "total_owners": len(owner_ids),
+            "total_owners": len(target_owner_ids),
             "results": results[:50]
         })
         
