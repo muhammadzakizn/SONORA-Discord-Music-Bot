@@ -84,10 +84,14 @@ class Settings:
                 'libopus.dylib'
             ]
         elif sys.platform == 'win32':  # Windows
+            # Include opus.dll from project folder first
+            project_opus = str(cls.BASE_DIR / 'opus.dll')
             return [
+                project_opus,  # Project folder first
                 'opus.dll',
                 'libopus-0.dll',
-                'libopus.dll'
+                'libopus.dll',
+                str(Path.home() / 'opus.dll'),  # User home
             ]
         else:  # Linux and others
             return [
