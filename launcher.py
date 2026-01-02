@@ -200,15 +200,22 @@ def run_production():
     
     # Start LyricifyApi C# microservice (for QQ Music syllable lyrics)
     proc_lyricify = None
-    lyricify_binary = (LYRICIFY_DIR / 'publish' / 'linux-x64-single' / 'LyricifyApi').resolve()
-    lyricify_workdir = (LYRICIFY_DIR / 'publish' / 'linux-x64-single').resolve()
+    
+    # Determine platform-specific binary paths
+    if IS_WINDOWS:
+        lyricify_binary = (LYRICIFY_DIR / 'publish' / 'win-x64' / 'LyricifyApi.exe').resolve()
+        lyricify_workdir = (LYRICIFY_DIR / 'publish' / 'win-x64').resolve()
+    else:
+        lyricify_binary = (LYRICIFY_DIR / 'publish' / 'linux-x64-single' / 'LyricifyApi').resolve()
+        lyricify_workdir = (LYRICIFY_DIR / 'publish' / 'linux-x64-single').resolve()
     
     if lyricify_binary.exists() and lyricify_binary.is_file():
-        # Use pre-built Linux binary (no .NET SDK required)
+        # Use pre-built binary (no .NET SDK required)
         print(f"{Colors.CYAN}Starting LyricifyApi (pre-built binary)...{Colors.END}")
         try:
-            # Make sure it's executable
-            subprocess.run(['chmod', '+x', str(lyricify_binary)], capture_output=True)
+            # Make sure it's executable (Linux only)
+            if not IS_WINDOWS:
+                subprocess.run(['chmod', '+x', str(lyricify_binary)], capture_output=True)
             
             # Start with stderr captured for debugging
             proc_lyricify = subprocess.Popen(
@@ -234,9 +241,11 @@ def run_production():
             proc_lyricify = None
     elif LYRICIFY_DIR.exists() and (LYRICIFY_DIR / 'LyricifyApi.csproj').exists():
         # Try dotnet if available
-        print(f"{Colors.CYAN}Starting LyricifyApi (via dotnet)...{Colors.END}")
+        print(f"{Colors.CYAN}Starting LyricifyApi (via dotnet run)...{Colors.END}")
         try:
-            dotnet_check = subprocess.run(['which', 'dotnet'], capture_output=True)
+            # Check if dotnet is available
+            dotnet_cmd = 'where' if IS_WINDOWS else 'which'
+            dotnet_check = subprocess.run([dotnet_cmd, 'dotnet'], capture_output=True)
             if dotnet_check.returncode == 0:
                 proc_lyricify = subprocess.Popen(
                     ['dotnet', 'run', '--no-build'],
@@ -257,6 +266,7 @@ def run_production():
             proc_lyricify = None
     else:
         print(f"{Colors.YELLOW}[!]  LyricifyApi not found - Syllable lyrics disabled{Colors.END}")
+        print(f"{Colors.YELLOW}     Build with: cd LyricifyApi && dotnet publish -c Release -r {'win-x64' if IS_WINDOWS else 'linux-x64'} --self-contained{Colors.END}")
     
     # Web Dashboard now runs on Vercel (https://sonora.muhammadzakizn.com)
     # No need to start local web dashboard
