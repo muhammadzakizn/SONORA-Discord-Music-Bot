@@ -10,6 +10,19 @@ import subprocess
 from pathlib import Path
 import time
 
+# Fix Windows console encoding for emoji/unicode and ANSI colors
+if os.name == 'nt':
+    # Enable UTF-8 output
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    # Enable ANSI escape sequence processing on Windows
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+    except Exception:
+        pass
+
 # Add Deno to PATH for yt-dlp EJS challenge solver
 # yt-dlp requires Deno/Node for YouTube signature solving since v2025.11.12
 if os.name == 'nt':  # Windows
