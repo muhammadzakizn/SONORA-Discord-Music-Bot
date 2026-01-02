@@ -1098,7 +1098,7 @@ class SynchronizedMediaPlayer:
                         logger.warning(f"Cache check failed: {e}")
                     
                     # ========================================
-                    # STEP 2: If not cached, stream with 3s buffer
+                    # STEP 2: If not cached, stream with adaptive buffer
                     # ========================================
                     if not audio_result:
                         logger.info(f"🌐 Streaming: {next_item.title}")
@@ -1107,8 +1107,17 @@ class SynchronizedMediaPlayer:
                             stream_url = await play_cog.youtube_downloader.get_stream_url(next_item)
                             if stream_url:
                                 use_streaming = True
-                                logger.info(f"✓ Got stream URL, buffering 3s...")
-                                await asyncio.sleep(3)
+                                
+                                # Adaptive buffer based on network speed
+                                from services.audio.adaptive_buffer import get_adaptive_buffer
+                                adaptive = get_adaptive_buffer()
+                                network_speed = await adaptive.measure_stream_speed(stream_url)
+                                buffer_time = network_speed.buffer_recommended
+                                
+                                logger.info(f"✓ Stream URL ready, {network_speed.quality} ({buffer_time:.0f}s buffer)")
+                                
+                                if buffer_time > 0:
+                                    await asyncio.sleep(buffer_time)
                                 
                                 # Background: download to FTP cache
                                 asyncio.create_task(

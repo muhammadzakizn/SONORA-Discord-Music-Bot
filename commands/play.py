@@ -184,16 +184,25 @@ class PlayCommand(commands.Cog):
                     stream_url = await self.youtube_downloader.get_stream_url(track_info)
                     if stream_url:
                         use_streaming = True
-                        logger.info(f"✓ Got stream URL, using streaming mode")
+                        logger.info(f"✓ Got stream URL, measuring network speed...")
                         
-                        # Wait for buffer (important for stable playback)
+                        # Adaptive buffer based on network speed
+                        from services.audio.adaptive_buffer import get_adaptive_buffer
+                        adaptive = get_adaptive_buffer()
+                        network_speed = await adaptive.measure_stream_speed(stream_url)
+                        buffer_time = network_speed.buffer_recommended
+                        
                         await self._safe_loader_update(loader, 
                             embed=EmbedBuilder.create_loading(
                                 "Buffering",
-                                f"**{track_info.title}** - *{track_info.artist}*\n\n⏳ Buffering stream (3s)..."
+                                f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                                f"⏳ Buffering ({network_speed.quality}: {buffer_time:.0f}s)...\n"
+                                f"📡 Speed: {network_speed.mbps:.1f} Mbps"
                             )
                         )
-                        await asyncio.sleep(3)  # 3 second buffer for streaming
+                        
+                        if buffer_time > 0:
+                            await asyncio.sleep(buffer_time)
                         
                         # Start background download for FTP cache
                         asyncio.create_task(
