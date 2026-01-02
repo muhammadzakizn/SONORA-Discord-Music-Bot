@@ -10,16 +10,19 @@ from config.logging_config import get_logger
 
 logger = get_logger('ui.loading')
 
+# CLI-style Braille spinner frames
+SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
 
 class SafeLoadingManager:
     """
-    Safe loading manager dengan rate limit protection
+    Safe loading manager with rate limit protection and CLI spinner
     
     Features:
     - Rate limit aware (max 5 edits per 5 seconds)
-    - Update setiap 2 detik minimum
+    - CLI-style Braille spinner animation
+    - Minimum 2 second update interval
     - Exponential backoff on rate limit
-    - Batch updates untuk efisiensi
     """
     
     def __init__(self, message: discord.Message):
@@ -35,8 +38,41 @@ class SafeLoadingManager:
         self.pending_update: Optional[asyncio.Task] = None
         self.pending_content: Optional[str] = None
         self.pending_embed: Optional[discord.Embed] = None
+        self._spinner_index = 0  # Track spinner frame
         
         logger.debug(f"SafeLoadingManager initialized for message {message.id}")
+    
+    def _get_spinner_frame(self) -> str:
+        """Get current spinner frame and advance to next"""
+        frame = SPINNER_FRAMES[self._spinner_index]
+        self._spinner_index = (self._spinner_index + 1) % len(SPINNER_FRAMES)
+        return frame
+    
+    async def spinner_update(
+        self,
+        title: str,
+        details: str = "",
+        color: int = 0x3498DB  # Blue
+    ) -> None:
+        """
+        Update with CLI-style spinner animation.
+        
+        Creates embed with Braille spinner prefix.
+        
+        Args:
+            title: Loading stage title (e.g., "Buffering")
+            details: Additional details
+            color: Embed color
+        """
+        spinner = self._get_spinner_frame()
+        
+        embed = discord.Embed(
+            title=f"{spinner} {title}",
+            description=details,
+            color=color
+        )
+        
+        await self.update(embed=embed)
     
     async def update(
         self,
@@ -44,7 +80,7 @@ class SafeLoadingManager:
         embed: Optional[discord.Embed] = None
     ) -> None:
         """
-        Update message dengan rate limit protection
+        Update message with rate limit protection
         
         Args:
             content: Message content

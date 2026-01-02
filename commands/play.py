@@ -198,12 +198,10 @@ class PlayCommand(commands.Cog):
             # STEP 2: If not cached, stream + background download
             # Skip streaming if DISABLE_STREAMING=true (server mode)
             if not cached and not Settings.DISABLE_STREAMING:
-                await self._safe_loader_update(loader, 
-                    embed=EmbedBuilder.create_loading(
-                        "Preparing Stream",
-                        f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                        f"Finding audio source..."
-                    )
+                await loader.spinner_update(
+                    "Preparing Stream",
+                    f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                    f"Finding audio source..."
                 )
                 
                 try:
@@ -218,13 +216,11 @@ class PlayCommand(commands.Cog):
                         network_speed = await adaptive.measure_stream_speed(stream_url)
                         buffer_time = network_speed.buffer_recommended
                         
-                        await self._safe_loader_update(loader, 
-                            embed=EmbedBuilder.create_loading(
-                                "Buffering Audio",
-                                f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                                f"Buffering ({network_speed.quality}: {buffer_time:.0f}s)...\n"
-                                f"Speed: {network_speed.mbps:.1f} Mbps"
-                            )
+                        await loader.spinner_update(
+                            "Buffering Audio",
+                            f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                            f"Buffering ({network_speed.quality}: {buffer_time:.0f}s)...\n"
+                            f"Speed: {network_speed.mbps:.1f} Mbps"
                         )
                         
                         if buffer_time > 0:
@@ -253,12 +249,10 @@ class PlayCommand(commands.Cog):
                 
                 for attempt in range(1, MAX_DOWNLOAD_RETRIES + 1):
                     try:
-                        await self._safe_loader_update(loader, 
-                            embed=EmbedBuilder.create_loading(
-                                f"Downloading ({attempt}/{MAX_DOWNLOAD_RETRIES})",
-                                f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                                f"🔄 Mengunduh dan memverifikasi audio..."
-                            )
+                        await loader.spinner_update(
+                            f"Downloading ({attempt}/{MAX_DOWNLOAD_RETRIES})",
+                            f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                            f"Downloading and verifying audio..."
                         )
                         
                         audio_result = await self._download_with_fallback(track_info, loader)
@@ -275,12 +269,10 @@ class PlayCommand(commands.Cog):
                         logger.warning(f"Download attempt {attempt} error: {e}")
                         
                         if attempt < MAX_DOWNLOAD_RETRIES:
-                            await self._safe_loader_update(loader, 
-                                embed=EmbedBuilder.create_loading(
-                                    f"Retry ({attempt}/{MAX_DOWNLOAD_RETRIES})",
-                                    f"⚠️ Percobaan {attempt} gagal\n"
-                                    f"🔄 Mencoba ulang dalam 2 detik..."
-                                )
+                            await loader.spinner_update(
+                                f"Retry ({attempt}/{MAX_DOWNLOAD_RETRIES})",
+                                f"Attempt {attempt} failed\n"
+                                f"Retrying in 2 seconds..."
                             )
                             await asyncio.sleep(2)
                 
@@ -288,7 +280,7 @@ class PlayCommand(commands.Cog):
                     await self._safe_loader_update(loader, 
                         embed=EmbedBuilder.create_error(
                             "Download Failed",
-                            f"❌ Gagal setelah {MAX_DOWNLOAD_RETRIES} percobaan\n\n"
+                            f"Failed after {MAX_DOWNLOAD_RETRIES} attempts\n\n"
                             f"**Error:** {last_error or 'Unknown'}"
                         )
                     )
