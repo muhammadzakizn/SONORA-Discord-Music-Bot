@@ -102,6 +102,7 @@ function TrackCard({
     const [imageError, setImageError] = useState(false);
     const [isFetching, setIsFetching] = useState(false);
     const [hasFetched, setHasFetched] = useState(false);
+    const [showStats, setShowStats] = useState(false); // For mobile click toggle
 
     // Generate cache key for localStorage
     const cacheKey = `artwork_${track.title}_${track.artist}`.replace(/[^a-zA-Z0-9]/g, '_');
@@ -166,6 +167,20 @@ function TrackCard({
         }
     }, [track.title, track.artist, artworkUrl, hasFetched, imageError, cacheKey]);
 
+    // Handle click - toggle stats on mobile, or call onClick prop
+    const handleClick = () => {
+        setShowStats(!showStats);
+        onClick?.();
+    };
+
+    // Auto-hide stats after 3 seconds
+    useEffect(() => {
+        if (showStats) {
+            const timer = setTimeout(() => setShowStats(false), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [showStats]);
+
     return (
         <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -174,7 +189,7 @@ function TrackCard({
                 "relative flex-shrink-0 rounded-xl overflow-hidden cursor-pointer group",
                 "w-28 sm:w-36 md:w-44"
             )}
-            onClick={onClick}
+            onClick={handleClick}
         >
             {/* Album Art */}
             <div className="relative aspect-square rounded-xl overflow-hidden">
@@ -231,11 +246,13 @@ function TrackCard({
                     {track.rank}
                 </span>
 
-                {/* Play count overlay */}
+                {/* Play count overlay - shows on hover (desktop) AND click (mobile) */}
                 <div className={cn(
                     "absolute bottom-0 left-0 right-0 p-2",
                     "bg-gradient-to-t from-black/80 to-transparent",
-                    "opacity-0 group-hover:opacity-100 transition-opacity"
+                    "transition-opacity duration-200",
+                    // Show on hover (group-hover) OR when showStats is true (clicked on mobile)
+                    showStats ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 )}>
                     <div className="flex items-center gap-1 text-white text-xs">
                         <TrendingUp className="w-3 h-3" />
