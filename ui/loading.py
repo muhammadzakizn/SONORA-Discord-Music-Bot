@@ -67,10 +67,29 @@ class SafeLoadingManager:
             color: Embed color
             update_interval: Seconds between updates
         """
+        # Stop any existing spinner first
+        if hasattr(self, '_spinner_running') and self._spinner_running:
+            await self.stop_spinner()
+        
         self._spinner_title = title
         self._spinner_details = details
         self._spinner_color = color
         self._spinner_running = True
+        self._spinner_interval = update_interval
+        
+        # Show FIRST frame immediately (don't wait for loop)
+        try:
+            spinner = self._get_spinner_frame()
+            embed = discord.Embed(
+                title=f"{spinner} {self._spinner_title}",
+                description=self._spinner_details,
+                color=self._spinner_color
+            )
+            await self.message.edit(embed=embed)
+        except:
+            pass
+        
+        # Start background loop for subsequent frames
         self._spinner_task = asyncio.create_task(
             self._spinner_loop(update_interval)
         )
@@ -79,6 +98,12 @@ class SafeLoadingManager:
     async def _spinner_loop(self, interval: float) -> None:
         """Background loop for animated spinner"""
         while self._spinner_running:
+            # Wait first, then update (first frame already shown in start_spinner)
+            await asyncio.sleep(interval)
+            
+            if not self._spinner_running:
+                break
+                
             try:
                 spinner = self._get_spinner_frame()
                 
@@ -88,7 +113,6 @@ class SafeLoadingManager:
                     color=self._spinner_color
                 )
                 
-                # Direct edit (bypass rate limit for animation)
                 await self.message.edit(embed=embed)
                 
             except discord.HTTPException as e:
@@ -98,8 +122,6 @@ class SafeLoadingManager:
                     logger.debug(f"Spinner update failed: {e}")
             except Exception as e:
                 logger.debug(f"Spinner error: {e}")
-            
-            await asyncio.sleep(interval)
     
     async def update_spinner(self, title: str = None, details: str = None) -> None:
         """Update spinner text without stopping animation"""
