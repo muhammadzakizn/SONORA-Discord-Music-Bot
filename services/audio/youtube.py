@@ -749,17 +749,12 @@ class YouTubeDownloader(BaseDownloader):
                             success = await cloud_cache.upload(downloaded_file, artist, title)
                             
                             if success:
-                                logger.info(f"☁️ Cached to FTP: {title} ({song_info.get('ext', 'unknown')})")
+                                logger.info(f"☁️ Cached to cloud: {title} ({song_info.get('ext', 'unknown')})")
                             else:
-                                logger.warning(f"FTP upload failed for: {title}")
+                                logger.warning(f"Cloud cache upload failed for: {title}")
                             
-                            # ALWAYS clean up local file (success or fail - save disk space)
-                            try:
-                                file_size = downloaded_file.stat().st_size / (1024 * 1024)
-                                downloaded_file.unlink()
-                                logger.info(f"🗑️ Deleted local file: {downloaded_file.name} ({file_size:.1f}MB)")
-                            except Exception as del_err:
-                                logger.warning(f"Failed to delete local file: {del_err}")
+                            # Keep local file - SmartCacheManager handles cleanup
+                            logger.info(f"✓ Kept local cache: {downloaded_file.name}")
                             return
                 else:
                     logger.info(f"MusicDL found no results for: {query}")
@@ -786,17 +781,12 @@ class YouTubeDownloader(BaseDownloader):
                 if result and result.file_path and result.file_path.exists():
                     success = await cloud_cache.upload(result.file_path, artist, title)
                     if success:
-                        logger.info(f"☁️ Cached to FTP via yt-dlp: {title}")
+                        logger.info(f"☁️ Cached to cloud via yt-dlp: {title}")
                     else:
-                        logger.warning(f"FTP upload failed for: {title}")
+                        logger.warning(f"Cloud cache upload failed for: {title}")
                     
-                    # ALWAYS clean up local file (success or fail - save disk space)
-                    try:
-                        file_size = result.file_path.stat().st_size / (1024 * 1024)
-                        result.file_path.unlink()
-                        logger.info(f"🗑️ Deleted local file: {result.file_path.name} ({file_size:.1f}MB)")
-                    except Exception as del_err:
-                        logger.warning(f"Failed to delete local file: {del_err}")
+                    # Keep local file - SmartCacheManager handles cleanup
+                    logger.info(f"✓ Kept local cache: {result.file_path.name}")
                     
         except Exception as e:
             logger.error(f"Background cache download failed: {e}")

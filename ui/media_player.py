@@ -498,72 +498,69 @@ class SynchronizedMediaPlayer:
     
     def _cleanup_audio_file(self) -> None:
         """
-        Delete audio files after playback to save storage.
+        Mark audio file as used after playback.
         
-        ALWAYS deletes the audio file after playback to conserve disk space.
-        This is called in _on_end after playback finishes.
+        CHANGED: No longer deletes immediately! Files are kept locally for cache.
+        SmartCacheManager handles cleanup based on:
+        - Normal: Delete after 4 days unused
+        - High storage (>450GB): Delete after 2 days unused
         
-        Two-pronged approach:
-        1. Delete known audio_path if exists
-        2. Search and delete matching files in downloads folder (for streaming mode)
+        This allows faster playback for frequently played tracks.
         """
-        deleted = False
-        
-        # Method 1: Delete known audio_path
+        # Method 1: Mark known audio_path as recently used
         if self.metadata and self.metadata.audio_path:
             try:
                 audio_path = self.metadata.audio_path
                 
-                # Unregister from active files first
+                # Unregister from active files (no longer playing)
                 if self.guild_id:
                     registry = get_audio_registry()
                     registry.unregister(self.guild_id, audio_path)
                     logger.debug(f"Unregistered file: {audio_path.name}")
                 
+                # Mark file as recently used (DON'T DELETE!)
                 if audio_path.exists():
-                    file_size = audio_path.stat().st_size
-                    file_size_mb = file_size / (1024 * 1024)
-                    audio_path.unlink()
-                    logger.info(f"🗑️ Deleted (audio_path): {audio_path.name} ({file_size_mb:.1f}MB)")
-                    deleted = True
+                    try:
+                        from services.audio.cache import get_cache_manager
+                        from config.settings import Settings
+                        cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
+                        cache_mgr.touch_file(audio_path)
+                        logger.info(f"✓ Cache: Marked as used: {audio_path.name}")
+                    except Exception as e:
+                        logger.debug(f"Could not mark file as used: {e}")
+                        
             except Exception as e:
-                logger.warning(f"Failed to cleanup audio_path: {e}")
+                logger.warning(f"Failed to process audio_path: {e}")
         
-        # Method 2: Aggressively search downloads folder for matching files
-        # This catches: streaming mode downloads, background cache downloads, etc.
+        # Also mark any related files in downloads folder
         if self.metadata:
             try:
                 from config.settings import Settings
+                from services.audio.cache import get_cache_manager
                 from pathlib import Path
                 import re
                 
+                cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
                 downloads_dir = Settings.DOWNLOADS_DIR
+                
                 if downloads_dir.exists():
-                    # Create search pattern from artist and title
                     artist = self.metadata.artist or ""
                     title = self.metadata.title or ""
                     
-                    # Sanitize for filename matching
                     def sanitize(s):
                         return re.sub(r'[^\w\s-]', '', s.lower()).strip()
                     
                     artist_clean = sanitize(artist)
                     title_clean = sanitize(title)
                     
-                    # Search for matching files
+                    # Mark matching files as used
                     for ext in ['*.opus', '*.m4a', '*.mp3', '*.flac', '*.webm']:
                         for f in downloads_dir.glob(ext):
                             try:
                                 filename_clean = sanitize(f.stem)
-                                
-                                # Match if both artist and title are in filename
                                 if artist_clean and title_clean:
                                     if artist_clean in filename_clean and title_clean in filename_clean:
-                                        file_size = f.stat().st_size
-                                        file_size_mb = file_size / (1024 * 1024)
-                                        f.unlink()
-                                        logger.info(f"🗑️ Deleted (pattern match): {f.name} ({file_size_mb:.1f}MB)")
-                                        deleted = True
+                                        cache_mgr.touch_file(f)
                             except:
                                 pass
                     
@@ -576,19 +573,12 @@ class SynchronizedMediaPlayer:
                                     filename_clean = sanitize(f.stem)
                                     if artist_clean and title_clean:
                                         if artist_clean in filename_clean or title_clean in filename_clean:
-                                            file_size = f.stat().st_size
-                                            file_size_mb = file_size / (1024 * 1024)
-                                            f.unlink()
-                                            logger.info(f"🗑️ Deleted (playlist cache): {f.name} ({file_size_mb:.1f}MB)")
-                                            deleted = True
+                                            cache_mgr.touch_file(f)
                                 except:
                                     pass
                     
             except Exception as e:
-                logger.warning(f"Aggressive cleanup failed: {e}")
-        
-        if not deleted and self.metadata:
-            logger.debug(f"No files to cleanup for: {self.metadata.title}")
+                logger.debug(f"Cache touch failed: {e}")
     
     async def _save_play_history(self, completed: bool = True) -> None:
         """
@@ -777,19 +767,20 @@ class SynchronizedMediaPlayer:
         """
         try:
             # ========================================
-            # CLEANUP: Delete finished track's audio file
-            # CRITICAL: Always delete to save storage!
+            # CACHE: Mark finished track as recently used
+            # No longer deleting - SmartCacheManager handles cleanup
             # ========================================
             if self.metadata and self.metadata.audio_path:
                 try:
                     finished_file = self.metadata.audio_path
                     if finished_file.exists():
-                        file_size = finished_file.stat().st_size
-                        file_size_mb = file_size / (1024 * 1024)
-                        finished_file.unlink()
-                        logger.info(f"🗑️ Auto-deleted after next track: {finished_file.name} ({file_size_mb:.1f}MB)")
+                        from services.audio.cache import get_cache_manager
+                        from config.settings import Settings
+                        cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
+                        cache_mgr.touch_file(finished_file)
+                        logger.debug(f"✓ Cache: Marked as used: {finished_file.name}")
                 except Exception as e:
-                    logger.warning(f"Cleanup failed: {e}")
+                    logger.debug(f"Cache touch failed: {e}")
             
             # Check if voice is still connected
             if not self.voice or not self.voice.is_connected():
