@@ -11,10 +11,42 @@ import asyncio
 from pathlib import Path
 import discord
 
-# Windows asyncio fix - ProactorEventLoop has issues with pipe reads
-# Use WindowsSelectorEventLoopPolicy to avoid WinError 995 errors
+# Note: On Windows, ProactorEventLoop is required for subprocess support.
+# The WinError 995 pipe errors are harmless - we filter them from stderr.
 if sys.platform == 'win32':
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    # Filter stderr to suppress harmless asyncio pipe errors
+    class StderrFilter:
+        """Wrapper to filter out harmless Windows asyncio errors from stderr"""
+        SUPPRESS_PATTERNS = [
+            'Error on reading from the event loop self pipe',
+            'WinError 995',
+            'The I/O operation has been aborted',
+        ]
+        
+        def __init__(self, stream):
+            self._stream = stream
+            self._buffer = ""
+        
+        def write(self, text):
+            # Buffer traceback lines
+            self._buffer += text
+            # Only process when we get a newline or the buffer is getting large
+            if '\n' in self._buffer or len(self._buffer) > 1000:
+                lines = self._buffer.split('\n')
+                self._buffer = lines[-1] if not self._buffer.endswith('\n') else ""
+                for line in lines[:-1] if not self._buffer else lines:
+                    if not any(pattern in line for pattern in self.SUPPRESS_PATTERNS):
+                        # Check if the line is part of the WinError 995 traceback
+                        if 'proactor_events.py' not in line and 'windows_events.py' not in line:
+                            self._stream.write(line + '\n')
+        
+        def flush(self):
+            self._stream.flush()
+        
+        def __getattr__(self, name):
+            return getattr(self._stream, name)
+    
+    sys.stderr = StderrFilter(sys.stderr)
 
 from config.settings import Settings
 from config.logging_config import setup_logging

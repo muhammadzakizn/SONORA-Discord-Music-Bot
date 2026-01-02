@@ -9,6 +9,25 @@ from typing import Optional
 from .settings import Settings
 
 
+class WinError995Filter(logging.Filter):
+    """Filter to suppress harmless Windows ProactorEventLoop pipe errors"""
+    
+    SUPPRESS_PATTERNS = [
+        'Error on reading from the event loop self pipe',
+        'WinError 995',
+        'The I/O operation has been aborted',
+        'ConnectionResetError',
+    ]
+    
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return False to suppress the log record, True to allow it"""
+        message = record.getMessage()
+        for pattern in self.SUPPRESS_PATTERNS:
+            if pattern in message:
+                return False
+        return True
+
+
 def setup_logging(
     level: int = logging.INFO,
     log_to_file: bool = True,
@@ -48,7 +67,15 @@ def setup_logging(
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(level)
         console_handler.setFormatter(simple_formatter)
+        # Add Windows pipe error filter (harmless asyncio errors)
+        if sys.platform == 'win32':
+            console_handler.addFilter(WinError995Filter())
         logger.addHandler(console_handler)
+    
+    # Suppress asyncio logger errors on Windows (ProactorEventLoop pipe errors)
+    if sys.platform == 'win32':
+        asyncio_logger = logging.getLogger('asyncio')
+        asyncio_logger.addFilter(WinError995Filter())
     
     # File handlers
     if log_to_file:
