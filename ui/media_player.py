@@ -1098,7 +1098,7 @@ class SynchronizedMediaPlayer:
                         logger.warning(f"Cache check failed: {e}")
                     
                     # ========================================
-                    # STEP 2: If not cached, stream with 6s buffer
+                    # STEP 2: If not cached, stream with 3s buffer
                     # ========================================
                     if not audio_result:
                         logger.info(f"🌐 Streaming: {next_item.title}")
@@ -1107,8 +1107,8 @@ class SynchronizedMediaPlayer:
                             stream_url = await play_cog.youtube_downloader.get_stream_url(next_item)
                             if stream_url:
                                 use_streaming = True
-                                logger.info(f"✓ Got stream URL, buffering 6s...")
-                                await asyncio.sleep(6)
+                                logger.info(f"✓ Got stream URL, buffering 3s...")
+                                await asyncio.sleep(3)
                                 
                                 # Background: download to FTP cache
                                 asyncio.create_task(

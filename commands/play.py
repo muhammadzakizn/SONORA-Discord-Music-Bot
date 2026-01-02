@@ -190,10 +190,10 @@ class PlayCommand(commands.Cog):
                         await self._safe_loader_update(loader, 
                             embed=EmbedBuilder.create_loading(
                                 "Buffering",
-                                f"**{track_info.title}** - *{track_info.artist}*\n\n⏳ Buffering stream (6s)..."
+                                f"**{track_info.title}** - *{track_info.artist}*\n\n⏳ Buffering stream (3s)..."
                             )
                         )
-                        await asyncio.sleep(6)  # 6 second buffer for stable playback
+                        await asyncio.sleep(3)  # 3 second buffer for streaming
                         
                         # Start background download for FTP cache
                         asyncio.create_task(
