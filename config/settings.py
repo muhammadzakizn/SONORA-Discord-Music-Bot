@@ -143,6 +143,22 @@ class Settings:
     RCLONE_CACHE_ENABLED: bool = os.getenv('RCLONE_CACHE_ENABLED', 'false').lower() == 'true'
     RCLONE_CACHE_PATH: Path = Path(os.getenv('RCLONE_CACHE_PATH', 'G:/audio'))
     
+    # Audio Verification - Unwanted version keywords
+    # Comma-separated list of keywords to reject (remix, DJ version, cover, etc.)
+    # Add or remove keywords to customize what gets rejected
+    _DEFAULT_UNWANTED = (
+        'remix,dj ,dj mix,bootleg,mashup,cover,live version,live from,live at,'
+        'acoustic version,instrumental,karaoke,tribute,originally performed,'
+        'made famous,backing track,sped up,slowed,nightcore,reverb,8d audio,'
+        'bass boosted,extended mix,radio edit,club mix,dance mix,party mix,'
+        'edit,vip mix,billboard masters,in the style of,version by'
+    )
+    UNWANTED_KEYWORDS: List[str] = [
+        kw.strip() for kw in 
+        os.getenv('UNWANTED_KEYWORDS', _DEFAULT_UNWANTED).split(',')
+        if kw.strip()
+    ]
+    
     @classmethod
     def get_cache_path(cls) -> Path:
         """Get the active cache path - Rclone mount or local downloads"""

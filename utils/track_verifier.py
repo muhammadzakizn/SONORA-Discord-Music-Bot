@@ -96,25 +96,18 @@ class TrackVerifier:
         """
         Check if the actual track is an unwanted version (remix, DJ, cover, etc.)
         
+        Uses UNWANTED_KEYWORDS from Settings (configurable via .env)
+        
         Returns:
             Tuple of (is_unwanted, reason)
         """
+        from config.settings import Settings
+        
         expected_lower = expected_title.lower()
         actual_lower = actual_title.lower()
         
-        # Unwanted keywords that indicate wrong version
-        UNWANTED_KEYWORDS = [
-            'remix', 'dj ', 'dj mix', 'bootleg', 'mashup', 'cover', 
-            'live version', 'live from', 'live at', 'acoustic version',
-            'instrumental', 'karaoke', 'tribute', 'originally performed',
-            'made famous', 'backing track', 'sped up', 'slowed', 'nightcore',
-            'reverb', '8d audio', 'bass boosted', 'extended mix', 'radio edit',
-            'club mix', 'dance mix', 'party mix', 'edit', 'vip mix',
-            'billboard masters', 'in the style of', 'version by'
-        ]
-        
-        # Check each keyword
-        for keyword in UNWANTED_KEYWORDS:
+        # Use keywords from Settings (configurable via .env)
+        for keyword in Settings.UNWANTED_KEYWORDS:
             # If keyword is in actual but NOT in expected, it's unwanted
             if keyword in actual_lower and keyword not in expected_lower:
                 return True, f"Unwanted version detected: '{keyword}' in actual title"
