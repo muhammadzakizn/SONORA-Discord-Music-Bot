@@ -784,30 +784,32 @@ class YouTubeDownloader(BaseDownloader):
                 use_ytdlp = True
             
             # ========================================
-            # FALLBACK: Use yt-dlp AAC
+            # FALLBACK: Use yt-dlp (when MusicDL disabled or failed)
             # ========================================
             if use_ytdlp:
-                logger.info(f"📥 yt-dlp AAC fallback for: {title}")
+                logger.info(f"yt-dlp background download for: {artist} - {title}")
                 
                 from database.models import TrackInfo as TI
                 temp_track = TI(
                     title=title,
                     artist=artist,
-                    url=None,
-                    source="youtube_music"
+                    url=None  # Will search YouTube Music
                 )
                 
                 # Use regular download (yt-dlp)
                 result = await self.download(temp_track)
                 if result and result.file_path and result.file_path.exists():
+                    # Upload to cloud cache
                     success = await cloud_cache.upload(result.file_path, artist, title)
                     if success:
-                        logger.info(f"☁️ Cached to cloud via yt-dlp: {title}")
+                        logger.info(f"Cached to cloud via yt-dlp: {title} ({result.format})")
                     else:
                         logger.warning(f"Cloud cache upload failed for: {title}")
                     
                     # Keep local file - SmartCacheManager handles cleanup
-                    logger.info(f"✓ Kept local cache: {result.file_path.name}")
+                    logger.info(f"Kept local cache: {result.file_path.name}")
+                else:
+                    logger.warning(f"yt-dlp download failed for background cache: {title}")
                     
         except Exception as e:
             logger.error(f"Background cache download failed: {e}")
