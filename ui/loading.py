@@ -48,6 +48,97 @@ class SafeLoadingManager:
         self._spinner_index = (self._spinner_index + 1) % len(SPINNER_FRAMES)
         return frame
     
+    async def start_spinner(
+        self,
+        title: str,
+        details: str = "",
+        color: int = 0x3498DB,  # Blue
+        update_interval: float = 0.5  # 500ms
+    ) -> None:
+        """
+        Start continuous animated spinner.
+        
+        Runs in background, updating embed every 500ms with rotating spinner.
+        Call stop_spinner() when done.
+        
+        Args:
+            title: Loading stage title
+            details: Additional details  
+            color: Embed color
+            update_interval: Seconds between updates
+        """
+        self._spinner_title = title
+        self._spinner_details = details
+        self._spinner_color = color
+        self._spinner_running = True
+        self._spinner_task = asyncio.create_task(
+            self._spinner_loop(update_interval)
+        )
+        logger.debug(f"Started spinner: {title}")
+    
+    async def _spinner_loop(self, interval: float) -> None:
+        """Background loop for animated spinner"""
+        while self._spinner_running:
+            try:
+                spinner = self._get_spinner_frame()
+                
+                embed = discord.Embed(
+                    title=f"{spinner} {self._spinner_title}",
+                    description=self._spinner_details,
+                    color=self._spinner_color
+                )
+                
+                # Direct edit (bypass rate limit for animation)
+                await self.message.edit(embed=embed)
+                
+            except discord.HTTPException as e:
+                if e.code == 429:  # Rate limited
+                    await asyncio.sleep(2)
+                else:
+                    logger.debug(f"Spinner update failed: {e}")
+            except Exception as e:
+                logger.debug(f"Spinner error: {e}")
+            
+            await asyncio.sleep(interval)
+    
+    async def update_spinner(self, title: str = None, details: str = None) -> None:
+        """Update spinner text without stopping animation"""
+        if title is not None:
+            self._spinner_title = title
+        if details is not None:
+            self._spinner_details = details
+    
+    async def stop_spinner(self, final_title: str = None, final_details: str = None) -> None:
+        """
+        Stop the spinner animation.
+        
+        Args:
+            final_title: Final title to show (optional)
+            final_details: Final details to show (optional)
+        """
+        self._spinner_running = False
+        
+        if hasattr(self, '_spinner_task') and self._spinner_task:
+            self._spinner_task.cancel()
+            try:
+                await self._spinner_task
+            except asyncio.CancelledError:
+                pass
+        
+        # Show final state
+        if final_title or final_details:
+            try:
+                embed = discord.Embed(
+                    title=final_title or self._spinner_title,
+                    description=final_details or self._spinner_details,
+                    color=self._spinner_color if hasattr(self, '_spinner_color') else 0x3498DB
+                )
+                await self.message.edit(embed=embed)
+            except:
+                pass
+        
+        logger.debug("Stopped spinner")
+    
     async def spinner_update(
         self,
         title: str,

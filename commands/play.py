@@ -214,7 +214,7 @@ class PlayCommand(commands.Cog):
             # STEP 2: If not cached, stream + background download
             # Skip streaming if DISABLE_STREAMING=true (server mode)
             if not cached and not Settings.DISABLE_STREAMING:
-                await loader.spinner_update(
+                await loader.start_spinner(
                     "Preparing Stream",
                     f"**{track_info.title}** - *{track_info.artist}*\n\n"
                     f"Finding audio source..."
@@ -232,15 +232,20 @@ class PlayCommand(commands.Cog):
                         network_speed = await adaptive.measure_stream_speed(stream_url)
                         buffer_time = network_speed.buffer_recommended
                         
-                        await loader.spinner_update(
-                            "Buffering Audio",
-                            f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                            f"Buffering ({network_speed.quality}: {buffer_time:.0f}s)...\n"
-                            f"Speed: {network_speed.mbps:.1f} Mbps"
+                        # Update spinner text (keeps animating)
+                        await loader.update_spinner(
+                            title="Buffering Audio",
+                            details=f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                                    f"Buffering ({network_speed.quality}: {buffer_time:.0f}s)...\n"
+                                    f"Speed: {network_speed.mbps:.1f} Mbps"
                         )
                         
+                        # Wait for buffer (spinner keeps rotating during this!)
                         if buffer_time > 0:
                             await asyncio.sleep(buffer_time)
+                        
+                        # Stop spinner animation
+                        await loader.stop_spinner()
                         
                         # Start background download for cache
                         asyncio.create_task(
