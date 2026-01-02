@@ -133,9 +133,9 @@ class MusicDLHandler:
             score += 30
         
         # PENALIZE remixes/covers unless specifically requested
-        remix_keywords = ['remix', 'cover', 'dj ', 'mashup', 'bootleg', 'edit', 
-                         'extended', 'club mix', 'radio edit', 'instrumental',
-                         'karaoke', 'acapella', 'acoustic version', 'live']
+        # Use UNWANTED_KEYWORDS from Settings (configurable via .env)
+        from config.settings import Settings
+        remix_keywords = Settings.UNWANTED_KEYWORDS
         
         is_remix_requested = any(kw in query_lower for kw in remix_keywords)
         
@@ -267,7 +267,10 @@ class MusicDLHandler:
             
             # Extract expected title from query
             query_lower = query.lower()
-            remix_keywords = ['remix', 'mix', 'bootleg', 'edit', 'version', 'cover', 'mashup']
+            
+            # Use UNWANTED_KEYWORDS from Settings
+            from config.settings import Settings
+            remix_keywords = Settings.UNWANTED_KEYWORDS
             is_remix_requested = any(kw in query_lower for kw in remix_keywords)
             
             for source, songs in results.items():
