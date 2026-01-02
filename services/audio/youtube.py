@@ -355,17 +355,24 @@ class YouTubeDownloader(BaseDownloader):
                 
                 # CRITICAL: Penalize unwanted variations (remix, cover, live, etc.)
                 # when query doesn't request them
-                unwanted_variations = ['remix', 'cover', 'live', 'acoustic', 'instrumental', 
-                                      'karaoke', 'version', 'edit', 'bootleg', 'mashup', 'extended']
+                unwanted_variations = [
+                    'remix', 'cover', 'live', 'acoustic', 'instrumental', 
+                    'karaoke', 'version', 'edit', 'bootleg', 'mashup', 'extended',
+                    'tribute', 'billboard masters', 'originally performed',
+                    'made famous', 'in the style of', 'backing track', 'minus one',
+                    'sped up', 'slowed', 'reverb', '8d audio', 'nightcore',
+                    'metal version', 'rock version', 'jazz version', 'lofi'
+                ]
                 query_lower = query.lower()
                 result_title_lower = result_title.lower()
+                result_artist_lower = result_artist.lower()
                 
                 for variation in unwanted_variations:
-                    # If result contains variation but query doesn't
-                    if variation in result_title_lower and variation not in query_lower:
+                    # If result title OR artist contains variation but query doesn't
+                    if (variation in result_title_lower or variation in result_artist_lower) and variation not in query_lower:
                         # Strong penalty - prefer original over variations
-                        final_score *= 0.3
-                        logger.debug(f"Penalized for unwanted '{variation}': {result_title}")
+                        final_score *= 0.1  # Very strong penalty (was 0.3)
+                        logger.debug(f"Penalized for unwanted '{variation}': {result_title} by {result_artist}")
                         break  # Apply penalty once
                 
                 details = f"title_cov={title_coverage:.2f}, total_cov={total_coverage:.2f}, bonus={title_bonus:.2f}"
@@ -724,7 +731,9 @@ class YouTubeDownloader(BaseDownloader):
                     expected_title = title.lower()
                     
                     # Check for unwanted keywords
-                    unwanted = ['remix', 'cover', 'bootleg', 'mashup', 'dj ', 'live version', 'instrumental']
+                    unwanted = ['remix', 'cover', 'bootleg', 'mashup', 'dj ', 'live version', 
+                               'instrumental', 'tribute', 'billboard masters', 'originally performed',
+                               'made famous', 'karaoke', 'backing track', 'sped up', 'slowed', 'nightcore']
                     is_remix = any(kw in found_title and kw not in expected_title for kw in unwanted)
                     
                     if is_remix:
