@@ -864,54 +864,59 @@ class YouTubeDownloader(BaseDownloader):
             logger.warning(f"FTP cache check failed: {e}")
         
         # ========================================
-        # PRIORITY 1: Try MusicDL (primary source)
+        # PRIORITY 1: Try MusicDL (primary source) - SKIP IF DISABLED
         # ========================================
-        try:
-            from services.audio.musicdl_handler import get_musicdl_handler
-            musicdl = get_musicdl_handler()
-            
-            if musicdl.is_available:
-                logger.info("Trying MusicDL as primary source...")
+        from config.settings import Settings as SettingsConfig
+        
+        if SettingsConfig.DISABLE_MUSICDL:
+            logger.info("MusicDL disabled, skipping to yt-dlp...")
+        else:
+            try:
+                from services.audio.musicdl_handler import get_musicdl_handler
+                musicdl = get_musicdl_handler()
                 
-                # Search query for MusicDL
-                search_query = f"{track_info.artist} - {track_info.title}"
+                if musicdl.is_available:
+                    logger.info("Trying MusicDL as primary source...")
                 
-                # Try download via MusicDL
-                downloaded_file = await musicdl.search_and_download(
-                    search_query, 
-                    output_dir=self.download_dir
-                )
-                
-                if downloaded_file and downloaded_file.exists():
-                    # Check file size - returns True if should delete after play
-                    delete_after_play = self._check_file_size(downloaded_file)
+                    # Search query for MusicDL
+                    search_query = f"{track_info.artist} - {track_info.title}"
                     
-                    actual_format = downloaded_file.suffix.lstrip('.')
-                    logger.info(f"Downloaded via MusicDL: {downloaded_file.name}")
-                    
-                    result = AudioResult(
-                        file_path=downloaded_file,
-                        title=track_info.title,
-                        artist=track_info.artist,
-                        duration=track_info.duration,
-                        source=AudioSource.YOUTUBE_MUSIC,
-                        bitrate=Settings.AUDIO_BITRATE,
-                        format=actual_format,
-                        sample_rate=Settings.AUDIO_SAMPLE_RATE
+                    # Try download via MusicDL
+                    downloaded_file = await musicdl.search_and_download(
+                        search_query, 
+                        output_dir=self.download_dir
                     )
-                    result.delete_after_play = delete_after_play
                     
-                    # Upload to FTP cache (background, non-blocking)
-                    await self._upload_to_ftp_cache(downloaded_file, track_info.artist, track_info.title)
-                    
-                    return result
+                    if downloaded_file and downloaded_file.exists():
+                        # Check file size - returns True if should delete after play
+                        delete_after_play = self._check_file_size(downloaded_file)
+                        
+                        actual_format = downloaded_file.suffix.lstrip('.')
+                        logger.info(f"Downloaded via MusicDL: {downloaded_file.name}")
+                        
+                        result = AudioResult(
+                            file_path=downloaded_file,
+                            title=track_info.title,
+                            artist=track_info.artist,
+                            duration=track_info.duration,
+                            source=AudioSource.YOUTUBE_MUSIC,
+                            bitrate=Settings.AUDIO_BITRATE,
+                            format=actual_format,
+                            sample_rate=Settings.AUDIO_SAMPLE_RATE
+                        )
+                        result.delete_after_play = delete_after_play
+                        
+                        # Upload to FTP cache (background, non-blocking)
+                        await self._upload_to_ftp_cache(downloaded_file, track_info.artist, track_info.title)
+                        
+                        return result
+                    else:
+                        logger.info("MusicDL: No result, falling back to yt-dlp...")
                 else:
-                    logger.info("MusicDL: No result, falling back to yt-dlp...")
-            else:
-                logger.info("MusicDL not available, using yt-dlp...")
-                
-        except Exception as e:
-            logger.warning(f"MusicDL failed: {e}, falling back to yt-dlp...")
+                    logger.info("MusicDL not available, using yt-dlp...")
+                    
+            except Exception as e:
+                logger.warning(f"MusicDL failed: {e}, falling back to yt-dlp...")
         
         # Use yt-dlp fallback
         return await self._download_from_ytdlp(track_info)
