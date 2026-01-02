@@ -119,60 +119,90 @@ class PlayCommand(commands.Cog):
                 return
             
             # ========================================
-            # SINGLE TRACK: HYBRID STREAMING FLOW
-            # Priority: Cloud Cache → Stream + Background Download
+            # SINGLE TRACK: SMART CACHE FLOW
+            # Priority: Local Cache → Rclone Cache → Stream + Background Download
             # ========================================
             stream_url = None
             audio_result = None
             use_streaming = False
-            ftp_cached = False
+            cached = False
             
-            # STEP 1: Check Cloud Cache first
+            # STEP 0: Check LOCAL Cache first (fastest!)
             try:
-                from services.storage import get_cloud_cache
-                cloud_cache = get_cloud_cache()
+                from services.audio.cache import get_cache_manager
+                cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
+                local_cached = cache_mgr.is_file_cached(track_info.artist, track_info.title)
                 
-                if cloud_cache.is_enabled:
-                    await self._safe_loader_update(loader, 
-                        embed=EmbedBuilder.create_loading(
-                            "Checking Cache",
-                            f"**{track_info.title}** - *{track_info.artist}*\n\n☁️ Checking FTP cache..."
-                        )
-                    )
+                if local_cached and local_cached.exists():
+                    logger.info(f"🚀 Found in LOCAL cache: {local_cached.name}")
+                    cached = True
                     
-                    if await cloud_cache.exists(track_info.artist, track_info.title):
-                        logger.info(f"☁️ Found in FTP cache: {track_info.title}")
-                        ftp_cached = True
-                        
-                        # Download from FTP cache
+                    # Mark as recently used
+                    cache_mgr.touch_file(local_cached)
+                    
+                    from database.models import AudioResult as AR
+                    from config.constants import AudioSource
+                    audio_result = AR(
+                        file_path=local_cached,
+                        title=track_info.title,
+                        artist=track_info.artist,
+                        duration=track_info.duration,
+                        source=AudioSource.YOUTUBE_MUSIC,
+                        bitrate=256,
+                        format=local_cached.suffix.lstrip('.'),
+                        sample_rate=48000
+                    )
+                    logger.info(f"🚀 Using LOCAL cache: {local_cached.name}")
+            except Exception as e:
+                logger.debug(f"Local cache check failed: {e}")
+            
+            # STEP 1: Check Cloud/Rclone Cache (if not found locally)
+            if not cached:
+                try:
+                    from services.storage import get_cloud_cache
+                    cloud_cache = get_cloud_cache()
+                    
+                    if cloud_cache.is_enabled:
                         await self._safe_loader_update(loader, 
                             embed=EmbedBuilder.create_loading(
-                                "Loading from Cache",
-                                f"**{track_info.title}** - *{track_info.artist}*\n\n📥 Downloading from cache..."
+                                "Checking Cache",
+                                f"**{track_info.title}** - *{track_info.artist}*\n\n☁️ Checking cloud cache..."
                             )
                         )
                         
-                        cache_path = self.youtube_downloader.download_dir / f"{track_info.artist}_{track_info.title}_cached.opus"
-                        if await cloud_cache.download(track_info.artist, track_info.title, cache_path):
-                            from database.models import AudioResult as AR
-                            from config.constants import AudioSource
-                            audio_result = AR(
-                                file_path=cache_path,
-                                title=track_info.title,
-                                artist=track_info.artist,
-                                duration=track_info.duration,
-                                source=AudioSource.YOUTUBE_MUSIC,
-                                bitrate=256,
-                                format='opus',
-                                sample_rate=48000
+                        if await cloud_cache.exists(track_info.artist, track_info.title):
+                            logger.info(f"☁️ Found in cloud cache: {track_info.title}")
+                            cached = True
+                            
+                            # Download from cloud cache
+                            await self._safe_loader_update(loader, 
+                                embed=EmbedBuilder.create_loading(
+                                    "Loading from Cache",
+                                    f"**{track_info.title}** - *{track_info.artist}*\n\n📥 Downloading from cloud..."
+                                )
                             )
-                            logger.info(f"☁️ Loaded from FTP cache: {cache_path.name}")
-            except Exception as e:
-                logger.warning(f"FTP cache check failed: {e}")
+                            
+                            cache_path = self.youtube_downloader.download_dir / f"{track_info.artist}_{track_info.title}_cached.opus"
+                            if await cloud_cache.download(track_info.artist, track_info.title, cache_path):
+                                from database.models import AudioResult as AR
+                                from config.constants import AudioSource
+                                audio_result = AR(
+                                    file_path=cache_path,
+                                    title=track_info.title,
+                                    artist=track_info.artist,
+                                    duration=track_info.duration,
+                                    source=AudioSource.YOUTUBE_MUSIC,
+                                    bitrate=256,
+                                    format='opus',
+                                    sample_rate=48000
+                                )
+                                logger.info(f"☁️ Loaded from cloud cache: {cache_path.name}")
+                except Exception as e:
+                    logger.warning(f"Cloud cache check failed: {e}")
             
             # STEP 2: If not cached, stream + background download
             # Skip streaming if DISABLE_STREAMING=true (server mode)
-            if not ftp_cached and not Settings.DISABLE_STREAMING:
+            if not cached and not Settings.DISABLE_STREAMING:
                 await self._safe_loader_update(loader, 
                     embed=EmbedBuilder.create_loading(
                         "Streaming",
@@ -215,7 +245,7 @@ class PlayCommand(commands.Cog):
                         logger.info("No stream URL, falling back to download")
                 except Exception as e:
                     logger.warning(f"Stream URL failed: {e}, falling back to download")
-            elif Settings.DISABLE_STREAMING and not ftp_cached:
+            elif Settings.DISABLE_STREAMING and not cached:
                 logger.info(f"📥 Streaming disabled (server mode), downloading first: {track_info.title}")
             
             # If streaming not available AND not from cache, download
