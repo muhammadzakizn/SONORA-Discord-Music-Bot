@@ -730,32 +730,47 @@ class YouTubeDownloader(BaseDownloader):
                     found_title = song_info.get('title', '').lower()
                     expected_title = title.lower()
                     
-                    # Check for unwanted keywords
-                    unwanted = ['remix', 'cover', 'bootleg', 'mashup', 'dj ', 'live version', 
-                               'instrumental', 'tribute', 'billboard masters', 'originally performed',
-                               'made famous', 'karaoke', 'backing track', 'sped up', 'slowed', 'nightcore']
-                    is_remix = any(kw in found_title and kw not in expected_title for kw in unwanted)
+                    # Use TrackVerifier for stricter check
+                    from utils.track_verifier import TrackVerifier
+                    is_unwanted, unwanted_reason = TrackVerifier.is_unwanted_version(title, song_info.get('title', ''))
                     
-                    if is_remix:
-                        logger.warning(f"⚠️ MusicDL returned remix/cover: '{song_info.get('title')}'")
-                        logger.info(f"🔄 Falling back to yt-dlp AAC...")
+                    if is_unwanted:
+                        logger.warning(f"MusicDL returned wrong version: {unwanted_reason}")
+                        logger.info(f"Falling back to yt-dlp AAC...")
                         use_ytdlp = True
                     else:
                         # Title OK, download via MusicDL
                         downloaded_file = await musicdl.download(song_info, self.download_dir)
                         
                         if downloaded_file and downloaded_file.exists():
-                            # Upload to FTP
-                            success = await cloud_cache.upload(downloaded_file, artist, title)
+                            # VERIFY downloaded audio BEFORE uploading to cloud
+                            from database.models import TrackInfo as TI
+                            temp_track = TI(title=title, artist=artist, url=None, source="musicdl")
+                            verification = await TrackVerifier.verify_track(downloaded_file, temp_track)
                             
-                            if success:
-                                logger.info(f"☁️ Cached to cloud: {title} ({song_info.get('ext', 'unknown')})")
+                            if not verification.success:
+                                logger.warning(f"Downloaded audio verification FAILED: {verification.message}")
+                                logger.warning(f"Expected: {title} by {artist}")
+                                logger.warning(f"Got: {verification.actual_title} by {verification.actual_artist}")
+                                # Delete bad file
+                                try:
+                                    downloaded_file.unlink()
+                                    logger.info(f"Deleted wrong audio file: {downloaded_file.name}")
+                                except:
+                                    pass
+                                use_ytdlp = True  # Fallback to yt-dlp
                             else:
-                                logger.warning(f"Cloud cache upload failed for: {title}")
-                            
-                            # Keep local file - SmartCacheManager handles cleanup
-                            logger.info(f"✓ Kept local cache: {downloaded_file.name}")
-                            return
+                                # Verification passed - upload to cloud
+                                success = await cloud_cache.upload(downloaded_file, artist, title)
+                                
+                                if success:
+                                    logger.info(f"Cached to cloud (VERIFIED): {title} ({song_info.get('ext', 'unknown')})")
+                                else:
+                                    logger.warning(f"Cloud cache upload failed for: {title}")
+                                
+                                # Keep local file - SmartCacheManager handles cleanup
+                                logger.info(f"Kept local cache: {downloaded_file.name}")
+                                return
                 else:
                     logger.info(f"MusicDL found no results for: {query}")
                     use_ytdlp = True

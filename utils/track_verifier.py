@@ -91,6 +91,36 @@ class TrackVerifier:
         
         return SequenceMatcher(None, norm1, norm2).ratio()
     
+    @staticmethod
+    def is_unwanted_version(expected_title: str, actual_title: str) -> Tuple[bool, str]:
+        """
+        Check if the actual track is an unwanted version (remix, DJ, cover, etc.)
+        
+        Returns:
+            Tuple of (is_unwanted, reason)
+        """
+        expected_lower = expected_title.lower()
+        actual_lower = actual_title.lower()
+        
+        # Unwanted keywords that indicate wrong version
+        UNWANTED_KEYWORDS = [
+            'remix', 'dj ', 'dj mix', 'bootleg', 'mashup', 'cover', 
+            'live version', 'live from', 'live at', 'acoustic version',
+            'instrumental', 'karaoke', 'tribute', 'originally performed',
+            'made famous', 'backing track', 'sped up', 'slowed', 'nightcore',
+            'reverb', '8d audio', 'bass boosted', 'extended mix', 'radio edit',
+            'club mix', 'dance mix', 'party mix', 'edit', 'vip mix',
+            'billboard masters', 'in the style of', 'version by'
+        ]
+        
+        # Check each keyword
+        for keyword in UNWANTED_KEYWORDS:
+            # If keyword is in actual but NOT in expected, it's unwanted
+            if keyword in actual_lower and keyword not in expected_lower:
+                return True, f"Unwanted version detected: '{keyword}' in actual title"
+        
+        return False, ""
+    
     @classmethod
     async def extract_audio_metadata(cls, file_path: Path) -> Optional[dict]:
         """
@@ -230,20 +260,34 @@ class TrackVerifier:
         # Also check if artist appears in title or vice versa (common in YouTube)
         title_has_artist = cls.calculate_similarity(expected.artist, actual['title']) > 0.5
         
+        # CRITICAL: Check for unwanted versions (remix, DJ, cover, etc.)
+        is_unwanted, unwanted_reason = cls.is_unwanted_version(expected.title, actual['title'])
+        if is_unwanted:
+            logger.warning(f"Rejected unwanted version: {unwanted_reason}")
+            return VerificationResult(
+                success=False,
+                confidence=0.0,
+                expected_title=expected.title,
+                actual_title=actual.get('title', ''),
+                expected_artist=expected.artist,
+                actual_artist=actual.get('artist', ''),
+                message=f"Versi salah terdeteksi: {unwanted_reason}"
+            )
+        
         # Calculate overall confidence
         if title_sim >= cls.MIN_TITLE_SIMILARITY:
             if artist_sim >= cls.MIN_ARTIST_SIMILARITY or title_has_artist:
                 confidence = (title_sim + max(artist_sim, 0.7 if title_has_artist else 0)) / 2
                 success = True
-                message = "✓ Audio sesuai dengan metadata"
+                message = "Audio sesuai dengan metadata"
             else:
                 confidence = title_sim * 0.7
                 success = confidence >= 0.5
-                message = f"⚠ Artist berbeda ({expected.artist} vs {actual['artist']})"
+                message = f"Artist berbeda ({expected.artist} vs {actual['artist']})"
         else:
             confidence = title_sim
             success = False
-            message = f"✗ Title tidak cocok ({expected.title} vs {actual['title']})"
+            message = f"Title tidak cocok ({expected.title} vs {actual['title']})"
         
         logger.debug(
             f"Verification: '{expected.title}' vs '{actual['title']}' = {title_sim:.2f}, "

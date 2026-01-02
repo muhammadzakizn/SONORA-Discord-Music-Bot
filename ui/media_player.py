@@ -498,16 +498,13 @@ class SynchronizedMediaPlayer:
     
     def _cleanup_audio_file(self) -> None:
         """
-        Mark audio file as used after playback.
+        Cleanup after playback:
+        - DELETE: OPUS files (streaming temp files)
+        - KEEP: FLAC/MP3 files (high quality from MusicDL)
         
-        CHANGED: No longer deletes immediately! Files are kept locally for cache.
-        SmartCacheManager handles cleanup based on:
-        - Normal: Delete after 4 days unused
-        - High storage (>450GB): Delete after 2 days unused
-        
-        This allows faster playback for frequently played tracks.
+        This ensures we keep high quality downloads but remove streaming temp files.
         """
-        # Method 1: Mark known audio_path as recently used
+        # Method 1: Handle known audio_path
         if self.metadata and self.metadata.audio_path:
             try:
                 audio_path = self.metadata.audio_path
@@ -518,16 +515,37 @@ class SynchronizedMediaPlayer:
                     registry.unregister(self.guild_id, audio_path)
                     logger.debug(f"Unregistered file: {audio_path.name}")
                 
-                # Mark file as recently used (DON'T DELETE!)
                 if audio_path.exists():
-                    try:
-                        from services.audio.cache import get_cache_manager
-                        from config.settings import Settings
-                        cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
-                        cache_mgr.touch_file(audio_path)
-                        logger.info(f"✓ Cache: Marked as used: {audio_path.name}")
-                    except Exception as e:
-                        logger.debug(f"Could not mark file as used: {e}")
+                    ext = audio_path.suffix.lower()
+                    
+                    # DELETE opus files (streaming temp files)
+                    if ext == '.opus':
+                        try:
+                            file_size = audio_path.stat().st_size / (1024 * 1024)
+                            audio_path.unlink()
+                            logger.info(f"Deleted streaming temp file: {audio_path.name} ({file_size:.1f}MB)")
+                        except Exception as e:
+                            logger.debug(f"Could not delete opus file: {e}")
+                    
+                    # KEEP flac/mp3/m4a (high quality files)
+                    elif ext in ['.flac', '.mp3', '.m4a']:
+                        try:
+                            from services.audio.cache import get_cache_manager
+                            from config.settings import Settings
+                            cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
+                            cache_mgr.touch_file(audio_path)
+                            logger.info(f"Cache: Kept high-quality file: {audio_path.name}")
+                        except Exception as e:
+                            logger.debug(f"Could not mark file as used: {e}")
+                    else:
+                        # Other formats - touch for cache
+                        try:
+                            from services.audio.cache import get_cache_manager
+                            from config.settings import Settings
+                            cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
+                            cache_mgr.touch_file(audio_path)
+                        except:
+                            pass
                         
             except Exception as e:
                 logger.warning(f"Failed to process audio_path: {e}")
