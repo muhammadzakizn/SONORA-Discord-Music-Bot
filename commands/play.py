@@ -187,12 +187,10 @@ class PlayCommand(commands.Cog):
                             cached = True
                             
                             # Download from cloud cache
-                            await self._safe_loader_update(loader, 
-                                embed=EmbedBuilder.create_loading(
-                                    "Loading from Cache",
-                                    f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                                    f"Downloading from cloud cache..."
-                                )
+                            await loader.spinner_update(
+                                "Loading from Cache",
+                                f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                                f"Downloading from cloud cache..."
                             )
                             
                             cache_path = self.youtube_downloader.download_dir / f"{track_info.artist}_{track_info.title}_cached.opus"
@@ -305,11 +303,9 @@ class PlayCommand(commands.Cog):
                     return
             
             # Stage 3: Process Metadata (parallel: artwork + lyrics)
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Processing",
-                    "Fetching artwork and lyrics..."
-                )
+            await loader.spinner_update(
+                "Processing",
+                "Fetching artwork and lyrics..."
             )
             
             # Single track: Always use Apple Music artwork (highest quality)
