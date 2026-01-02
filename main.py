@@ -12,31 +12,9 @@ from pathlib import Path
 import discord
 
 # Windows asyncio fix - ProactorEventLoop has issues with pipe reads
+# Use WindowsSelectorEventLoopPolicy to avoid WinError 995 errors
 if sys.platform == 'win32':
-    # Option 1: Use WindowsSelectorEventLoopPolicy (more compatible)
-    # asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    
-    # Option 2: Keep ProactorEventLoop but suppress the known pipe error
-    # This error is harmless and happens when event loop's self-pipe is read during shutdown
-    def suppress_pipe_error(loop, context):
-        """Suppress known Windows ProactorEventLoop pipe errors"""
-        exception = context.get('exception')
-        if exception is not None:
-            # Check if it's the known WinError 995 (I/O operation aborted)
-            if isinstance(exception, (OSError, ConnectionResetError)):
-                if getattr(exception, 'winerror', None) == 995:
-                    # Silently ignore this error - it's harmless
-                    return
-        # For other exceptions, use default handler
-        loop.default_exception_handler(context)
-    
-    # Apply the custom exception handler to the default event loop
-    try:
-        loop = asyncio.get_event_loop()
-        loop.set_exception_handler(suppress_pipe_error)
-    except RuntimeError:
-        # No event loop yet, will be set later
-        pass
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from config.settings import Settings
 from config.logging_config import setup_logging
