@@ -264,11 +264,41 @@ def run_production():
     
     # Start Cloudflare Tunnel for HTTPS API access
     proc_tunnel = None
-    cloudflared_path = Path('cloudflared')  # Relative to current dir (inside SONORA folder)
     tunnel_token = os.getenv('CLOUDFLARE_TUNNEL_TOKEN', '')
     
-    if cloudflared_path.exists() and tunnel_token:
+    # Find cloudflared - check local folder first, then system PATH
+    cloudflared_path = None
+    if IS_WINDOWS:
+        # On Windows, check system PATH (installed via Chocolatey)
+        import shutil
+        cloudflared_exe = shutil.which('cloudflared')
+        if cloudflared_exe:
+            cloudflared_path = Path(cloudflared_exe)
+        else:
+            # Check common Chocolatey install locations
+            choco_paths = [
+                Path('C:/ProgramData/chocolatey/bin/cloudflared.exe'),
+                Path('C:/ProgramData/chocolatey/lib/cloudflared/tools/cloudflared.exe'),
+            ]
+            for p in choco_paths:
+                if p.exists():
+                    cloudflared_path = p
+                    break
+    else:
+        # On Linux, check project folder first
+        local_cloudflared = Path('cloudflared')
+        if local_cloudflared.exists():
+            cloudflared_path = local_cloudflared
+        else:
+            # Check system PATH
+            import shutil
+            cloudflared_exe = shutil.which('cloudflared')
+            if cloudflared_exe:
+                cloudflared_path = Path(cloudflared_exe)
+    
+    if cloudflared_path and cloudflared_path.exists() and tunnel_token:
         print(f"{Colors.CYAN}Starting Cloudflare Tunnel...{Colors.END}")
+        print(f"{Colors.CYAN}   Using: {cloudflared_path}{Colors.END}")
         try:
             proc_tunnel = subprocess.Popen(
                 [str(cloudflared_path), 'tunnel', 'run', '--token', tunnel_token],
@@ -284,8 +314,8 @@ def run_production():
         except Exception as e:
             print(f"{Colors.YELLOW}[!]  Cloudflare Tunnel error: {e}{Colors.END}")
             proc_tunnel = None
-    elif not cloudflared_path.exists():
-        print(f"{Colors.YELLOW}[!]  cloudflared not found at {cloudflared_path}{Colors.END}")
+    elif not cloudflared_path or not cloudflared_path.exists():
+        print(f"{Colors.YELLOW}[!]  cloudflared not found (install via: choco install cloudflared){Colors.END}")
         print(f"{Colors.YELLOW}   API only accessible via HTTP (waguri.caliphdev.com:{BOT_API_PORT}){Colors.END}")
     elif not tunnel_token:
         print(f"{Colors.YELLOW}[!]  CLOUDFLARE_TUNNEL_TOKEN not set in environment{Colors.END}")
