@@ -73,6 +73,12 @@ class YTDLPApiClient:
                     return True
         except asyncio.TimeoutError:
             logger.warning("YTDLP API not available: timeout")
+        except RuntimeError as e:
+            # Windows-specific: "Timeout context manager should be used inside a task"
+            if "Timeout context manager" in str(e):
+                logger.warning(f"YTDLP API not available: {e}")
+            else:
+                raise
         except Exception as e:
             logger.warning(f"YTDLP API not available: {e}")
         return False
