@@ -38,9 +38,9 @@ class FTPAudioCache:
         self._enabled = bool(self.host and self.user and self.password)
         
         if self._enabled:
-            logger.info(f"FTP Cache initialized: {self.host}")
+            logger.info(f"Cloud Cache (FTP) initialized: {self.host}")
         else:
-            logger.warning("FTP Cache disabled - missing credentials")
+            logger.debug("FTP fallback not configured - using Rclone or local only")
     
     @property
     def is_enabled(self) -> bool:

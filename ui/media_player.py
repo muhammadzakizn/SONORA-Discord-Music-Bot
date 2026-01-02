@@ -1072,15 +1072,15 @@ class SynchronizedMediaPlayer:
                             )
                         else:
                             # Check FTP directly
-                            from services.storage.ftp_storage import get_ftp_cache
-                            ftp_cache = get_ftp_cache()
+                            from services.storage import get_cloud_cache
+                            cloud_cache = get_cloud_cache()
                             
-                            if ftp_cache.is_enabled and await ftp_cache.exists(next_item.artist, next_item.title):
+                            if cloud_cache.is_enabled and await cloud_cache.exists(next_item.artist, next_item.title):
                                 logger.info(f"☁️ Found in FTP: {next_item.title}")
                                 from config.settings import Settings
                                 cache_path = Settings.DOWNLOADS_DIR / f"ftp_{next_item.artist}_{next_item.title}.opus"
                                 
-                                if await ftp_cache.download(next_item.artist, next_item.title, cache_path):
+                                if await cloud_cache.download(next_item.artist, next_item.title, cache_path):
                                     from config.constants import AudioSource
                                     from database.models import AudioResult as AR
                                     audio_result = AR(

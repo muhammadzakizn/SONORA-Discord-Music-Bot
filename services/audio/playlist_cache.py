@@ -96,16 +96,16 @@ class PlaylistCacheManager:
         Returns True if track exists in FTP (no download needed).
         """
         try:
-            from services.storage.ftp_storage import get_ftp_cache
-            ftp_cache = get_ftp_cache()
+            from services.storage import get_cloud_cache
+            cloud_cache = get_cloud_cache()
             
-            if not ftp_cache.is_enabled:
+            if not cloud_cache.is_enabled:
                 logger.info("FTP cache disabled, will download in background")
                 return False
             
             # Check FTP
             logger.info(f"☁️ Checking FTP for first track: {track.title}")
-            exists = await ftp_cache.exists(track.artist, track.title)
+            exists = await cloud_cache.exists(track.artist, track.title)
             
             if exists:
                 logger.info(f"☁️ First track found in FTP: {track.title} (no download needed)")
@@ -136,20 +136,20 @@ class PlaylistCacheManager:
             logger.info(f"{'='*50}")
             
             try:
-                from services.storage.ftp_storage import get_ftp_cache
+                from services.storage import get_cloud_cache
                 from services.audio.musicdl_handler import get_musicdl_handler
                 
-                ftp_cache = get_ftp_cache()
+                cloud_cache = get_cloud_cache()
                 
                 # ========================================
                 # STEP 1: Check FTP cache
                 # ========================================
                 cached.status = TrackStatus.CHECKING_FTP
                 
-                if ftp_cache.is_enabled:
+                if cloud_cache.is_enabled:
                     logger.info(f"[{index}] Checking FTP cache...")
                     
-                    if await ftp_cache.exists(track_info.artist, track_info.title):
+                    if await cloud_cache.exists(track_info.artist, track_info.title):
                         logger.info(f"[{index}] ☁️ FOUND in FTP: {track_info.title}")
                         
                         # Download from FTP to local cache
@@ -159,7 +159,7 @@ class PlaylistCacheManager:
                         
                         logger.info(f"[{index}] Downloading from FTP → {local_path.name}")
                         
-                        if await ftp_cache.download(track_info.artist, track_info.title, local_path):
+                        if await cloud_cache.download(track_info.artist, track_info.title, local_path):
                             cached.audio_path = local_path
                             cached.is_from_ftp = True
                             cached.is_verified = True
@@ -221,7 +221,7 @@ class PlaylistCacheManager:
                             cached.status = TrackStatus.READY
                             
                             # Upload to FTP
-                            if ftp_cache.is_enabled:
+                            if cloud_cache.is_enabled:
                                 logger.info(f"[{index}] ☁️ Uploading yt-dlp result to FTP...")
                                 asyncio.create_task(
                                     self._upload_to_ftp(track_info.artist, track_info.title, audio_result.file_path)
@@ -261,7 +261,7 @@ class PlaylistCacheManager:
                 # ========================================
                 # STEP 3: Upload to FTP (background, no wait)
                 # ========================================
-                if ftp_cache.is_enabled:
+                if cloud_cache.is_enabled:
                     cached.status = TrackStatus.UPLOADING_FTP
                     logger.info(f"[{index}] ☁️ Uploading to FTP (background)...")
                     asyncio.create_task(
@@ -401,11 +401,11 @@ class PlaylistCacheManager:
         to save disk space (since we can't cache it anyway).
         """
         try:
-            from services.storage.ftp_storage import get_ftp_cache
-            ftp = get_ftp_cache()
+            from services.storage import get_cloud_cache
+            cloud_cache = get_cloud_cache()
             
-            if ftp.is_enabled:
-                success = await ftp.upload(file_path, artist, title)
+            if cloud_cache.is_enabled:
+                success = await cloud_cache.upload(file_path, artist, title)
                 if success:
                     logger.info(f"☁️ Uploaded to FTP: {title}")
                     # FTP success - file can be kept for local cache or deleted

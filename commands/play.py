@@ -120,19 +120,19 @@ class PlayCommand(commands.Cog):
             
             # ========================================
             # SINGLE TRACK: HYBRID STREAMING FLOW
-            # Priority: FTP Cache → Stream + Background Download
+            # Priority: Cloud Cache → Stream + Background Download
             # ========================================
             stream_url = None
             audio_result = None
             use_streaming = False
             ftp_cached = False
             
-            # STEP 1: Check FTP Cache first
+            # STEP 1: Check Cloud Cache first
             try:
-                from services.storage.ftp_storage import get_ftp_cache
-                ftp_cache = get_ftp_cache()
+                from services.storage import get_cloud_cache
+                cloud_cache = get_cloud_cache()
                 
-                if ftp_cache.is_enabled:
+                if cloud_cache.is_enabled:
                     await self._safe_loader_update(loader, 
                         embed=EmbedBuilder.create_loading(
                             "Checking Cache",
@@ -140,7 +140,7 @@ class PlayCommand(commands.Cog):
                         )
                     )
                     
-                    if await ftp_cache.exists(track_info.artist, track_info.title):
+                    if await cloud_cache.exists(track_info.artist, track_info.title):
                         logger.info(f"☁️ Found in FTP cache: {track_info.title}")
                         ftp_cached = True
                         
@@ -153,7 +153,7 @@ class PlayCommand(commands.Cog):
                         )
                         
                         cache_path = self.youtube_downloader.download_dir / f"{track_info.artist}_{track_info.title}_cached.opus"
-                        if await ftp_cache.download(track_info.artist, track_info.title, cache_path):
+                        if await cloud_cache.download(track_info.artist, track_info.title, cache_path):
                             from database.models import AudioResult as AR
                             from config.constants import AudioSource
                             audio_result = AR(
@@ -706,14 +706,14 @@ class PlayCommand(commands.Cog):
                 
                 # Check if this cached file needs to be uploaded to FTP
                 try:
-                    from services.storage.ftp_storage import get_ftp_cache
-                    ftp_cache = get_ftp_cache()
-                    if ftp_cache.is_enabled:
+                    from services.storage import get_cloud_cache
+                    cloud_cache = get_cloud_cache()
+                    if cloud_cache.is_enabled:
                         # Check if file exists in FTP
-                        if not await ftp_cache.exists(track_info.artist, track_info.title):
+                        if not await cloud_cache.exists(track_info.artist, track_info.title):
                             async def _upload_cache_to_ftp():
                                 try:
-                                    success = await ftp_cache.upload(cached_file, track_info.artist, track_info.title)
+                                    success = await cloud_cache.upload(cached_file, track_info.artist, track_info.title)
                                     if success:
                                         logger.info(f"☁️ Local cache uploaded to FTP: {track_info.title}")
                                     else:
@@ -746,14 +746,14 @@ class PlayCommand(commands.Cog):
         errors = []
         
         # ========================================
-        # TIER 1: FTP Cache (REMOTE CACHE) 
+        # TIER 1: Cloud Cache (REMOTE CACHE) 
         # Check FTP first for previously downloaded tracks
         # ========================================
         try:
-            from services.storage.ftp_storage import get_ftp_cache
-            ftp_cache = get_ftp_cache()
+            from services.storage import get_cloud_cache
+            cloud_cache = get_cloud_cache()
             
-            if ftp_cache.is_enabled:
+            if cloud_cache.is_enabled:
                 await self._safe_loader_update(loader, 
                     embed=EmbedBuilder.create_loading(
                         "Checking Cloud Cache",
@@ -761,11 +761,11 @@ class PlayCommand(commands.Cog):
                     )
                 )
                 
-                if await ftp_cache.exists(track_info.artist, track_info.title):
+                if await cloud_cache.exists(track_info.artist, track_info.title):
                     logger.info(f"☁️ Found in FTP cache: {track_info.title}")
                     
                     # Download from FTP
-                    cache_path = await ftp_cache.download(track_info.artist, track_info.title)
+                    cache_path = await cloud_cache.download(track_info.artist, track_info.title)
                     
                     if cache_path and cache_path.exists():
                         result = AudioResult(
@@ -773,7 +773,7 @@ class PlayCommand(commands.Cog):
                             title=track_info.title,
                             artist=track_info.artist,
                             duration=track_info.duration,
-                            source="FTP Cache",
+                            source="Cloud Cache",
                             bitrate=256,
                             format='opus',
                             sample_rate=48000,
@@ -817,13 +817,13 @@ class PlayCommand(commands.Cog):
                     
                     # Upload to FTP cache in background
                     try:
-                        from services.storage.ftp_storage import get_ftp_cache
-                        ftp_cache = get_ftp_cache()
-                        if ftp_cache.is_enabled:
+                        from services.storage import get_cloud_cache
+                        cloud_cache = get_cloud_cache()
+                        if cloud_cache.is_enabled:
                             # Use wrapper to ensure logs are shown
                             async def _safe_ftp_upload():
                                 try:
-                                    success = await ftp_cache.upload(result.file_path, track_info.artist, track_info.title)
+                                    success = await cloud_cache.upload(result.file_path, track_info.artist, track_info.title)
                                     if success:
                                         logger.info(f"☁️ FTP upload complete: {track_info.title}")
                                     else:
@@ -891,11 +891,11 @@ class PlayCommand(commands.Cog):
                             
                             # Upload to FTP
                             try:
-                                from services.storage.ftp_storage import get_ftp_cache
-                                ftp_cache = get_ftp_cache()
-                                if ftp_cache.is_enabled:
+                                from services.storage import get_cloud_cache
+                                cloud_cache = get_cloud_cache()
+                                if cloud_cache.is_enabled:
                                     asyncio.create_task(
-                                        ftp_cache.upload(result.file_path, track_info.artist, track_info.title)
+                                        cloud_cache.upload(result.file_path, track_info.artist, track_info.title)
                                     )
                             except:
                                 pass

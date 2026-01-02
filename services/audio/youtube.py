@@ -648,12 +648,12 @@ class YouTubeDownloader(BaseDownloader):
             title: Track title
         """
         try:
-            from services.storage.ftp_storage import get_ftp_cache
-            ftp_cache = get_ftp_cache()
+            from services.storage import get_cloud_cache
+            cloud_cache = get_cloud_cache()
             
-            if ftp_cache.is_enabled:
+            if cloud_cache.is_enabled:
                 # Upload and wait for result
-                success = await ftp_cache.upload(file_path, artist, title)
+                success = await cloud_cache.upload(file_path, artist, title)
                 if success:
                     logger.info(f"☁️ Uploaded to FTP: {title}")
                 else:
@@ -693,16 +693,16 @@ class YouTubeDownloader(BaseDownloader):
         """
         try:
             from services.audio.musicdl_handler import get_musicdl_handler
-            from services.storage.ftp_storage import get_ftp_cache
+            from services.storage import get_cloud_cache
             import re
             
-            ftp_cache = get_ftp_cache()
-            if not ftp_cache.is_enabled:
+            cloud_cache = get_cloud_cache()
+            if not cloud_cache.is_enabled:
                 logger.debug("FTP cache disabled, skipping background download")
                 return
             
             # Check if already cached
-            if await ftp_cache.exists(artist, title):
+            if await cloud_cache.exists(artist, title):
                 logger.info(f"✓ Already in FTP cache: {title}")
                 return
             
@@ -737,7 +737,7 @@ class YouTubeDownloader(BaseDownloader):
                         
                         if downloaded_file and downloaded_file.exists():
                             # Upload to FTP
-                            success = await ftp_cache.upload(downloaded_file, artist, title)
+                            success = await cloud_cache.upload(downloaded_file, artist, title)
                             
                             if success:
                                 logger.info(f"☁️ Cached to FTP: {title} ({song_info.get('ext', 'unknown')})")
@@ -775,7 +775,7 @@ class YouTubeDownloader(BaseDownloader):
                 # Use regular download (yt-dlp)
                 result = await self.download(temp_track)
                 if result and result.file_path and result.file_path.exists():
-                    success = await ftp_cache.upload(result.file_path, artist, title)
+                    success = await cloud_cache.upload(result.file_path, artist, title)
                     if success:
                         logger.info(f"☁️ Cached to FTP via yt-dlp: {title}")
                     else:
@@ -811,19 +811,19 @@ class YouTubeDownloader(BaseDownloader):
         output_path = self._get_output_path(track_info, 'opus')
         
         # ========================================
-        # PRIORITY 0: Check FTP Cache first
+        # PRIORITY 0: Check Cloud Cache first
         # ========================================
         try:
-            from services.storage.ftp_storage import get_ftp_cache
-            ftp_cache = get_ftp_cache()
+            from services.storage import get_cloud_cache
+            cloud_cache = get_cloud_cache()
             
-            if ftp_cache.is_enabled:
+            if cloud_cache.is_enabled:
                 # Check if exists in FTP cache
-                if await ftp_cache.exists(track_info.artist, track_info.title):
+                if await cloud_cache.exists(track_info.artist, track_info.title):
                     logger.info(f"☁️ Found in FTP cache: {track_info.title}")
                     
                     # Download from FTP
-                    if await ftp_cache.download(track_info.artist, track_info.title, output_path):
+                    if await cloud_cache.download(track_info.artist, track_info.title, output_path):
                         logger.info(f"☁️ Downloaded from FTP cache: {output_path.name}")
                         
                         return AudioResult(
