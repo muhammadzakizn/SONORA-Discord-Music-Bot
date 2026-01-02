@@ -130,29 +130,47 @@ class PlayCommand(commands.Cog):
             # STEP 0: Check LOCAL Cache first (fastest!)
             try:
                 from services.audio.cache import get_cache_manager
+                from utils.track_verifier import TrackVerifier
+                
                 cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
                 local_cached = cache_mgr.is_file_cached(track_info.artist, track_info.title)
                 
                 if local_cached and local_cached.exists():
-                    logger.info(f"🚀 Found in LOCAL cache: {local_cached.name}")
-                    cached = True
+                    logger.info(f"Found in LOCAL cache: {local_cached.name}")
                     
-                    # Mark as recently used
-                    cache_mgr.touch_file(local_cached)
-                    
-                    from database.models import AudioResult as AR
-                    from config.constants import AudioSource
-                    audio_result = AR(
-                        file_path=local_cached,
-                        title=track_info.title,
-                        artist=track_info.artist,
-                        duration=track_info.duration,
-                        source=AudioSource.YOUTUBE_MUSIC,
-                        bitrate=256,
-                        format=local_cached.suffix.lstrip('.'),
-                        sample_rate=48000
+                    # CRITICAL: Verify the cached file is not a remix/DJ version
+                    is_unwanted, unwanted_reason = TrackVerifier.is_unwanted_version(
+                        track_info.title, 
+                        local_cached.stem  # Check filename
                     )
-                    logger.info(f"🚀 Using LOCAL cache: {local_cached.name}")
+                    
+                    if is_unwanted:
+                        # Wrong version! Delete and re-download
+                        logger.warning(f"LOCAL cache has wrong version: {unwanted_reason}")
+                        logger.warning(f"Deleting bad cache file: {local_cached.name}")
+                        try:
+                            local_cached.unlink()
+                        except Exception as del_err:
+                            logger.debug(f"Could not delete bad cache: {del_err}")
+                        # Don't set cached=True, continue to streaming/download
+                    else:
+                        # File is valid
+                        cached = True
+                        cache_mgr.touch_file(local_cached)
+                        
+                        from database.models import AudioResult as AR
+                        from config.constants import AudioSource
+                        audio_result = AR(
+                            file_path=local_cached,
+                            title=track_info.title,
+                            artist=track_info.artist,
+                            duration=track_info.duration,
+                            source=AudioSource.YOUTUBE_MUSIC,
+                            bitrate=256,
+                            format=local_cached.suffix.lstrip('.'),
+                            sample_rate=48000
+                        )
+                        logger.info(f"Using LOCAL cache (verified): {local_cached.name}")
             except Exception as e:
                 logger.debug(f"Local cache check failed: {e}")
             
