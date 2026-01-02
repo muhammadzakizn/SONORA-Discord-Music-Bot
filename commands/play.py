@@ -171,9 +171,9 @@ class PlayCommand(commands.Cog):
                             # Download from cloud cache
                             await self._safe_loader_update(loader, 
                                 embed=EmbedBuilder.create_loading(
-                                    "Memuat dari Cache",
+                                    "Loading from Cache",
                                     f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                                    f"Mengunduh dari cloud cache..."
+                                    f"Downloading from cloud cache..."
                                 )
                             )
                             
@@ -200,9 +200,9 @@ class PlayCommand(commands.Cog):
             if not cached and not Settings.DISABLE_STREAMING:
                 await self._safe_loader_update(loader, 
                     embed=EmbedBuilder.create_loading(
-                        "Mempersiapkan Streaming",
+                        "Preparing Stream",
                         f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                        f"Mencari sumber audio..."
+                        f"Finding audio source..."
                     )
                 )
                 
@@ -223,7 +223,7 @@ class PlayCommand(commands.Cog):
                                 "Buffering Audio",
                                 f"**{track_info.title}** - *{track_info.artist}*\n\n"
                                 f"Buffering ({network_speed.quality}: {buffer_time:.0f}s)...\n"
-                                f"Kecepatan: {network_speed.mbps:.1f} Mbps"
+                                f"Speed: {network_speed.mbps:.1f} Mbps"
                             )
                         )
                         

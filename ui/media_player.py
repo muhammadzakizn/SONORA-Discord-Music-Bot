@@ -882,17 +882,17 @@ class SynchronizedMediaPlayer:
                                 ))
                         
                         embed = discord.Embed(
-                            title="👋 Sampai Jumpa!",
+                            title="Goodbye!",
                             description=(
-                                f"Selesai memutar: **{self.metadata.title}**\n\n"
-                                "Terima kasih sudah menggunakan **SONORA**! 🎵\n\n"
-                                "Jika kamu menyukai bot ini, pertimbangkan untuk mendukung developer "
-                                "agar SONORA terus berkembang dengan fitur-fitur baru! 💖\n\n"
-                                "*Bot telah disconnect untuk menghemat bandwidth.*"
+                                f"Finished playing: **{self.metadata.title}**\n\n"
+                                "Thank you for using **SONORA**!\n\n"
+                                "If you enjoy this bot, consider supporting the developer "
+                                "to help SONORA grow with new features!\n\n"
+                                "*Bot has disconnected to save bandwidth.*"
                             ),
                             color=discord.Color.from_rgb(123, 30, 60)  # Maroon
                         )
-                        embed.set_footer(text="SONORA • Premium Discord Music Bot")
+                        embed.set_footer(text="SONORA - Premium Discord Music Bot")
                         
                         await self.message.edit(embed=embed, view=SupportView())
                     except discord.HTTPException:

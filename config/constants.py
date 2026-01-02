@@ -41,16 +41,16 @@ class PlayerState(str, Enum):
     ERROR = "error"
 
 
-# Emoji constants
-EMOJI_LOADING = "⏳"
-EMOJI_SUCCESS = "✓"
-EMOJI_ERROR = "❌"
-EMOJI_WARNING = "⚠️"
-EMOJI_MUSIC = "🎵"
-EMOJI_PAUSE = "⏸️"
-EMOJI_PLAY = "▶️"
-EMOJI_SKIP = "⏭️"
-EMOJI_STOP = "⏹️"
+# Emoji constants - use minimal/text-based indicators
+EMOJI_LOADING = ""  # No emoji for loading - use dots animation
+EMOJI_SUCCESS = ""  # No emoji
+EMOJI_ERROR = ""    # No emoji
+EMOJI_WARNING = ""  # No emoji
+EMOJI_MUSIC = ""    # No emoji
+EMOJI_PAUSE = ""
+EMOJI_PLAY = ""
+EMOJI_SKIP = ""
+EMOJI_STOP = ""
 
 # Progress bar characters
 PROGRESS_FILLED = "█"
