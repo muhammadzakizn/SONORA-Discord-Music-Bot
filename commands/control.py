@@ -117,12 +117,25 @@ class ControlCommands(commands.Cog):
             )
             return
         
+        # CLEANUP: Delete opus streaming files before stopping
+        if hasattr(self.bot, 'players') and interaction.guild.id in self.bot.players:
+            player = self.bot.players[interaction.guild.id]
+            if player.metadata and player.metadata.audio_path:
+                audio_path = player.metadata.audio_path
+                if audio_path.exists() and audio_path.suffix.lower() == '.opus':
+                    try:
+                        file_size = audio_path.stat().st_size / (1024 * 1024)
+                        audio_path.unlink()
+                        logger.info(f"Deleted opus file on stop: {audio_path.name} ({file_size:.1f}MB)")
+                    except Exception as e:
+                        logger.debug(f"Could not delete opus file: {e}")
+        
         await connection.disconnect()
         
         await interaction.response.send_message(
             embed=EmbedBuilder.create_success(
                 "Stopped",
-                "⏹️ Playback stopped and disconnected"
+                "Playback stopped and disconnected"
             )
         )
         
