@@ -123,11 +123,15 @@ class AdaptiveBuffer:
                 
                 download_time = time.time() - download_start
                 
-                # Calculate speed
-                if download_time > 0:
-                    bytes_per_second = downloaded / download_time
-                else:
-                    bytes_per_second = float('inf')
+                # Calculate speed - ensure minimum time to avoid inf
+                if download_time < 0.001:
+                    download_time = 0.001  # Minimum 1ms to avoid division by zero
+                
+                bytes_per_second = downloaded / download_time
+                
+                # Cap unrealistic speeds (faster than 1 Gbps = 125 MB/s)
+                if bytes_per_second > 125 * 1024 * 1024:
+                    bytes_per_second = 125 * 1024 * 1024  # Cap at 1 Gbps
                 
                 # Determine quality and buffer
                 if bytes_per_second >= self.SPEED_FAST:

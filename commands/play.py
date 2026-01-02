@@ -156,29 +156,24 @@ class PlayCommand(commands.Cog):
             except Exception as e:
                 logger.debug(f"Local cache check failed: {e}")
             
-            # STEP 1: Check Cloud/Rclone Cache (if not found locally)
+            # STEP 1: Check Cloud/Rclone Cache (if not found locally) - SILENT CHECK
             if not cached:
                 try:
                     from services.storage import get_cloud_cache
                     cloud_cache = get_cloud_cache()
                     
                     if cloud_cache.is_enabled:
-                        await self._safe_loader_update(loader, 
-                            embed=EmbedBuilder.create_loading(
-                                "Checking Cache",
-                                f"**{track_info.title}** - *{track_info.artist}*\n\n☁️ Checking cloud cache..."
-                            )
-                        )
-                        
+                        # Silent check - no UI message for cloud cache check
                         if await cloud_cache.exists(track_info.artist, track_info.title):
-                            logger.info(f"☁️ Found in cloud cache: {track_info.title}")
+                            logger.info(f"Found in cloud cache: {track_info.title}")
                             cached = True
                             
                             # Download from cloud cache
                             await self._safe_loader_update(loader, 
                                 embed=EmbedBuilder.create_loading(
-                                    "Loading from Cache",
-                                    f"**{track_info.title}** - *{track_info.artist}*\n\n📥 Downloading from cloud..."
+                                    "Memuat dari Cache",
+                                    f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                                    f"Mengunduh dari cloud cache..."
                                 )
                             )
                             
@@ -196,7 +191,7 @@ class PlayCommand(commands.Cog):
                                     format='opus',
                                     sample_rate=48000
                                 )
-                                logger.info(f"☁️ Loaded from cloud cache: {cache_path.name}")
+                                logger.info(f"Loaded from cloud cache: {cache_path.name}")
                 except Exception as e:
                     logger.warning(f"Cloud cache check failed: {e}")
             
@@ -205,8 +200,9 @@ class PlayCommand(commands.Cog):
             if not cached and not Settings.DISABLE_STREAMING:
                 await self._safe_loader_update(loader, 
                     embed=EmbedBuilder.create_loading(
-                        "Streaming",
-                        f"**{track_info.title}** - *{track_info.artist}*\n\n🌐 Preparing stream..."
+                        "Mempersiapkan Streaming",
+                        f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                        f"Mencari sumber audio..."
                     )
                 )
                 
@@ -214,7 +210,7 @@ class PlayCommand(commands.Cog):
                     stream_url = await self.youtube_downloader.get_stream_url(track_info)
                     if stream_url:
                         use_streaming = True
-                        logger.info(f"✓ Got stream URL, measuring network speed...")
+                        logger.info(f"Got stream URL, measuring network speed...")
                         
                         # Adaptive buffer based on network speed
                         from services.audio.adaptive_buffer import get_adaptive_buffer
@@ -224,29 +220,30 @@ class PlayCommand(commands.Cog):
                         
                         await self._safe_loader_update(loader, 
                             embed=EmbedBuilder.create_loading(
-                                "Buffering",
+                                "Buffering Audio",
                                 f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                                f"⏳ Buffering ({network_speed.quality}: {buffer_time:.0f}s)...\n"
-                                f"📡 Speed: {network_speed.mbps:.1f} Mbps"
+                                f"Buffering ({network_speed.quality}: {buffer_time:.0f}s)...\n"
+                                f"Kecepatan: {network_speed.mbps:.1f} Mbps"
                             )
                         )
                         
                         if buffer_time > 0:
                             await asyncio.sleep(buffer_time)
                         
-                        # Start background download for FTP cache
+                        # Start background download for cache
                         asyncio.create_task(
                             self.youtube_downloader.background_download_for_cache(
                                 track_info.artist, track_info.title
                             )
                         )
-                        logger.info(f"📥 Background: Started caching {track_info.title}")
+                        logger.info(f"Background: Started caching {track_info.title}")
                     else:
                         logger.info("No stream URL, falling back to download")
                 except Exception as e:
                     logger.warning(f"Stream URL failed: {e}, falling back to download")
             elif Settings.DISABLE_STREAMING and not cached:
-                logger.info(f"📥 Streaming disabled (server mode), downloading first: {track_info.title}")
+                logger.info(f"Streaming disabled (server mode), downloading first: {track_info.title}")
+            
             
             # If streaming not available AND not from cache, download
             if not use_streaming and not audio_result:
