@@ -713,12 +713,18 @@ class YouTubeDownloader(BaseDownloader):
                 logger.info(f"✓ Already in FTP cache: {title}")
                 return
             
-            logger.info(f"📥 Background: Downloading for cache: {artist} - {title}")
+            logger.info(f"Background: Downloading for cache: {artist} - {title}")
+            
+            from config.settings import Settings
             
             musicdl = get_musicdl_handler()
             use_ytdlp = False
             
-            if musicdl.is_available:
+            # Check if MusicDL is disabled via settings
+            if Settings.DISABLE_MUSICDL:
+                logger.info("MusicDL disabled in settings, using yt-dlp only")
+                use_ytdlp = True
+            elif musicdl.is_available:
                 # Search for best quality (FLAC preferred)
                 query = f"{artist} - {title}"
                 song_info = await musicdl.search_best_quality(query)

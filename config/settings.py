@@ -143,6 +143,11 @@ class Settings:
     RCLONE_CACHE_ENABLED: bool = os.getenv('RCLONE_CACHE_ENABLED', 'false').lower() == 'true'
     RCLONE_CACHE_PATH: Path = Path(os.getenv('RCLONE_CACHE_PATH', 'G:/audio'))
     
+    # MusicDL - Disable to use only yt-dlp for audio downloads
+    # MusicDL sometimes downloads wrong audio (DJ versions) despite correct title
+    # Set to true to skip MusicDL and use yt-dlp directly
+    DISABLE_MUSICDL: bool = os.getenv('DISABLE_MUSICDL', 'false').lower() == 'true'
+    
     # Audio Verification - Unwanted version keywords
     # Comma-separated list of keywords to reject (remix, DJ version, cover, etc.)
     # Add or remove keywords to customize what gets rejected
