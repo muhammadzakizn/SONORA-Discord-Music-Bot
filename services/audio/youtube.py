@@ -745,7 +745,7 @@ class YouTubeDownloader(BaseDownloader):
                         if downloaded_file and downloaded_file.exists():
                             # VERIFY downloaded audio BEFORE uploading to cloud
                             from database.models import TrackInfo as TI
-                            temp_track = TI(title=title, artist=artist, url=None, source="musicdl")
+                            temp_track = TI(title=title, artist=artist, url=None)
                             verification = await TrackVerifier.verify_track(downloaded_file, temp_track)
                             
                             if not verification.success:
