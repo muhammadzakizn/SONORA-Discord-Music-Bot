@@ -1,8 +1,54 @@
 {
-  "web_version": "3.8.0",
-  "bot_version": "3.8.0",
-  "last_updated": "2025-12-13T22:30:00+08:00",
+  "web_version": "3.28.0",
+  "bot_version": "3.28.0",
+  "last_updated": "2026-01-03T17:30:00+08:00",
   "entries": [
+    {
+      "id": "v3.28.0",
+      "version": "3.28.0",
+      "date": "2026-01-03",
+      "title": "Server Migration & Major Improvements",
+      "highlights": [
+        "Server migrated for better stability",
+        "Groq AI integration (free 14,400 req/day)",
+        "Voice channel protection for playback",
+        "English-only messages"
+      ],
+      "changes": [
+        {
+          "category": "Infrastructure",
+          "items": [
+            "Server migrated from Pterodactyl (Linux) to Windows Server",
+            "Improved stability and performance",
+            "All services fully operational"
+          ]
+        },
+        {
+          "category": "AI Support System",
+          "items": [
+            "Groq integration - free with 14,400 requests/day",
+            "Fallback chain: Groq -> DeepSeek -> Gemini",
+            "Faster AI response times"
+          ]
+        },
+        {
+          "category": "Voice Channel Protection",
+          "items": [
+            "Playback controls require voice presence",
+            "Users must be in same channel as bot",
+            "Prevents unwanted control from outside users"
+          ]
+        },
+        {
+          "category": "UI & Language",
+          "items": [
+            "All messages now in English only",
+            "Reduced emoji usage for cleaner interface",
+            "Admin dashboard status controls removed (dev only)"
+          ]
+        }
+      ]
+    },
     {
       "id": "v3.8.0",
       "version": "3.8.0",
