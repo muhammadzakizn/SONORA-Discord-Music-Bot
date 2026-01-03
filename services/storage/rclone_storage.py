@@ -112,6 +112,16 @@ class RcloneAudioCache:
             logger.warning(f"Cannot upload - file not found: {local_path}")
             return False
         
+        # VALIDATE: Minimum file size (500KB = ~30 seconds of opus audio)
+        # This prevents corrupt/incomplete files from being cached
+        MIN_FILE_SIZE_KB = 500
+        file_size_kb = local_path.stat().st_size / 1024
+        
+        if file_size_kb < MIN_FILE_SIZE_KB:
+            logger.warning(f"File too small to cache: {local_path.name} ({file_size_kb:.0f}KB < {MIN_FILE_SIZE_KB}KB minimum)")
+            logger.warning(f"Skipping upload - file may be corrupt or incomplete")
+            return False
+        
         cache_file = self._get_cache_file_path(artist, title)
         
         try:
@@ -122,7 +132,7 @@ class RcloneAudioCache:
             shutil.copy2(local_path, cache_file)
             
             file_size = local_path.stat().st_size / (1024 * 1024)
-            logger.info(f"☁️ Uploaded to Rclone: {cache_file.name} ({file_size:.1f}MB)")
+            logger.info(f"Uploaded to Rclone: {cache_file.name} ({file_size:.1f}MB)")
             return True
             
         except Exception as e:
