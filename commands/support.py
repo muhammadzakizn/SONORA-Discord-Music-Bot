@@ -18,8 +18,67 @@ from ui.support_modals import SupportActionView, FeedbackModal, IssueReportModal
 logger = logging.getLogger('discord_music_bot.commands.support')
 
 
+class StartSupportView(discord.ui.View):
+    """View with button to start DM support session"""
+    
+    def __init__(self, bot: commands.Bot, user: discord.User, is_registered: bool):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.user = user
+        self.is_registered = is_registered
+    
+    @discord.ui.button(label="📩 Start DM Support", style=discord.ButtonStyle.primary)
+    async def start_dm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Send DM to user to start support session"""
+        try:
+            # Create welcome DM embed
+            embed = discord.Embed(
+                title="👋 Welcome to SONORA Support!",
+                description=(
+                    "**Hai! Selamat datang di SONORA Support.**\n"
+                    "*Hi! Welcome to SONORA Support.*\n\n"
+                    "Saya adalah AI Assistant yang siap membantu 24/7.\n"
+                    "*I'm an AI Assistant ready to help 24/7.*\n\n"
+                    "Silakan ketik pertanyaan atau masalahmu di bawah!\n"
+                    "*Please type your question or issue below!*"
+                ),
+                color=0x7B1E3C
+            )
+            
+            if self.is_registered:
+                embed.add_field(
+                    name="✅ Account Status",
+                    value="Registered in Dashboard / Terdaftar di Dashboard",
+                    inline=False
+                )
+            
+            embed.set_footer(text="SONORA AI Support • Powered by DeepSeek")
+            
+            # Send DM
+            await self.user.send(embed=embed)
+            
+            # Update original message
+            await interaction.response.edit_message(
+                content="✅ Check your DM! / Cek DM kamu!",
+                embed=None,
+                view=None
+            )
+            
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ Cannot send DM! Please enable DMs from server members.\n"
+                "*Tidak bisa kirim DM! Aktifkan DM dari anggota server.*",
+                ephemeral=True
+            )
+        except Exception as e:
+            logger.error(f"Error starting DM support: {e}")
+            await interaction.response.send_message(
+                "❌ Error occurred. Please try again.\n*Terjadi kesalahan. Coba lagi.*",
+                ephemeral=True
+            )
+
 class SupportCog(commands.Cog):
-    """Customer Support DM handling - Users just DM the bot directly"""
+    """Customer Support - /support command and DM handling"""
     
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -27,8 +86,68 @@ class SupportCog(commands.Cog):
         self.db = get_support_db()
         self._active_sessions = {}  # user_id -> session info
     
-    # No /support command - users just DM the bot directly
-    # Info about DM support is shown in welcome/goodbye messages
+    @app_commands.command(name="support", description="Minta bantuan dari AI Support")
+    async def support(self, interaction: discord.Interaction):
+        """Redirect user to DM for support and check database registration"""
+        user = interaction.user
+        
+        # Check if user is registered in dashboard
+        is_registered = await self._check_user_registration(str(user.id))
+        
+        # Create embed for redirect (bilingual)
+        embed = discord.Embed(
+            title="💬 SONORA Support",
+            description=(
+                "**Untuk bantuan, silakan DM bot ini langsung!**\n"
+                "*For support, please DM this bot directly!*\n\n"
+                "🤖 AI Support siap membantu 24/7 dengan:\n"
+                "*AI Support is ready to help 24/7 with:*\n"
+                "• Pertanyaan fitur / Feature questions\n"
+                "• Lapor bug / Bug reports\n"
+                "• Feedback & saran / Suggestions\n"
+                "• Hubungi developer / Contact developer"
+            ),
+            color=0x7B1E3C
+        )
+        
+        if is_registered:
+            embed.add_field(
+                name="✅ Account Status",
+                value="Terdaftar di Dashboard / Registered in Dashboard",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="📝 Join Dashboard",
+                value=(
+                    "Belum punya akun? / Don't have an account?\n"
+                    "[sonora.muhammadzakizn.com](https://sonora.muhammadzakizn.com)"
+                ),
+                inline=False
+            )
+        
+        embed.set_footer(text="Click button below to start DM chat / Klik tombol untuk mulai chat")
+        
+        # Create view with DM button
+        view = StartSupportView(self.bot, user, is_registered)
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    async def _check_user_registration(self, discord_id: str) -> bool:
+        """Check if user is registered in dashboard database"""
+        try:
+            from database.db_manager import get_db_manager
+            db = get_db_manager()
+            
+            # Check if user exists in users table
+            result = db.execute_raw(
+                "SELECT id FROM users WHERE discord_id = ?",
+                (discord_id,)
+            )
+            return len(result) > 0 if result else False
+        except Exception as e:
+            logger.debug(f"Error checking user registration: {e}")
+            return False
     
     async def _notify_developers(self, ticket_id: str):
         """Notify developers about new ticket"""

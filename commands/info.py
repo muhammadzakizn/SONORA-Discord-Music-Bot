@@ -26,8 +26,45 @@ class WebsiteView(discord.ui.View):
         ))
 
 
+class AskAIModal(discord.ui.Modal, title="Tanya AI Support"):
+    """Modal for asking AI questions"""
+    
+    question = discord.ui.TextInput(
+        label="Pertanyaan kamu",
+        style=discord.TextStyle.paragraph,
+        placeholder="Contoh: Bagaimana cara menggunakan /play?",
+        max_length=500,
+        required=True
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        from services.support.support_ai import get_support_ai
+        ai = get_support_ai()
+        
+        await interaction.response.defer(thinking=True)
+        
+        try:
+            response, intent = await ai.generate_response(
+                self.question.value,
+                interaction.user.display_name
+            )
+            
+            embed = discord.Embed(
+                title="💬 Jawaban AI",
+                description=response,
+                color=0x7B1E3C
+            )
+            embed.set_footer(text="Butuh bantuan lebih? DM bot ini langsung!")
+            
+            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            await interaction.followup.send(
+                "Maaf, AI sedang tidak tersedia. Coba DM bot ini langsung untuk bantuan."
+            )
+
+
 class HelpView(discord.ui.View):
-    """View with help-related buttons"""
+    """View with help-related buttons including Ask AI"""
     
     def __init__(self):
         super().__init__(timeout=None)
@@ -46,6 +83,11 @@ class HelpView(discord.ui.View):
             url="https://sonora.muhammadzakizn.com",
             style=discord.ButtonStyle.link
         ))
+    
+    @discord.ui.button(label="🤖 Tanya AI", style=discord.ButtonStyle.primary, row=1)
+    async def ask_ai_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Open AI question modal"""
+        await interaction.response.send_modal(AskAIModal())
 
 
 class InfoCommands(commands.Cog):
@@ -106,14 +148,49 @@ class InfoCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, view=WebsiteView())
     
     @app_commands.command(name="help", description="Panduan lengkap menggunakan bot SONORA")
-    async def help(self, interaction: discord.Interaction):
-        """Show help guide"""
+    @app_commands.describe(command="Nama command spesifik untuk dijelaskan oleh AI (opsional)")
+    async def help(self, interaction: discord.Interaction, command: str = None):
+        """Show help guide or AI explanation for specific command"""
         
+        # If specific command requested, use AI to explain
+        if command:
+            from services.support.support_ai import get_support_ai
+            ai = get_support_ai()
+            
+            await interaction.response.defer(thinking=True)
+            
+            try:
+                # Ask AI to explain the specific command
+                question = f"Jelaskan cara menggunakan command /{command} di bot SONORA secara detail. Berikan contoh penggunaan."
+                response, intent = await ai.generate_response(
+                    question,
+                    interaction.user.display_name
+                )
+                
+                embed = discord.Embed(
+                    title=f"📖 Bantuan: /{command}",
+                    description=response,
+                    color=0x7B1E3C
+                )
+                embed.set_footer(text="Klik 'Tanya AI' untuk pertanyaan lainnya!")
+                
+                await interaction.followup.send(embed=embed, view=HelpView())
+            except Exception as e:
+                logger.error(f"Error getting AI help for command: {e}")
+                await interaction.followup.send(
+                    f"Maaf, tidak bisa mendapatkan info untuk `/{command}`. Coba `/help` tanpa parameter.",
+                    ephemeral=True
+                )
+            return
+        
+        # Show general help guide
         embed = discord.Embed(
             title="📖 Panduan SONORA",
             description=(
                 "**SONORA** adalah bot musik premium yang mendukung "
-                "Spotify, Apple Music, dan YouTube Music dengan kualitas audio terbaik.\n"
+                "Spotify, Apple Music, dan YouTube Music dengan kualitas audio terbaik.\n\n"
+                "💡 **Tip:** Gunakan `/help [command]` untuk penjelasan detail dari AI!\n"
+                "Contoh: `/help play` atau `/help queue`"
             ),
             color=discord.Color.blue()
         )
@@ -165,7 +242,8 @@ class InfoCommands(commands.Cog):
             value=(
                 "`/website` - Lihat fitur web\n"
                 "`/donate` - Dukung developer\n"
-                "`/stats` - Statistik bot"
+                "`/stats` - Statistik bot\n"
+                "`/support` - Minta bantuan"
             ),
             inline=True
         )
@@ -179,7 +257,7 @@ class InfoCommands(commands.Cog):
             inline=False
         )
         
-        embed.set_footer(text="Gunakan /donate untuk mendukung pengembangan SONORA! 💖")
+        embed.set_footer(text="Klik 🤖 Tanya AI untuk bertanya langsung! | /donate untuk support 💖")
         
         await interaction.response.send_message(embed=embed, view=HelpView())
 
