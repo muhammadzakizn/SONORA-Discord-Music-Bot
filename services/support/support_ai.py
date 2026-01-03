@@ -188,7 +188,15 @@ IMPORTANT:
         """
         msg_lower = message.lower()
         
-        # Check for feature QUESTIONS first (these should go to AI, not feedback form)
+        # Check for ISSUE keywords FIRST (higher priority than questions)
+        issue_keywords = ['bug', 'error', 'not working', 'broken', 'problem', 'crash', 
+                         'fix', 'issue', 'masalah', 'rusak', 'tidak bisa', 'gagal', 'hang',
+                         'report', 'lapor', 'laporkan', 'komplain', 'complaint']
+        for kw in issue_keywords:
+            if kw in msg_lower:
+                return UserIntent.ISSUE
+        
+        # Check for feature QUESTIONS (these should go to AI)
         question_patterns = [
             'apa saja', 'apa aja', 'fitur apa', 'fiturnya apa', 'bisa apa', 
             'what can', 'what features', 'commands apa', 'command apa',
@@ -198,13 +206,6 @@ IMPORTANT:
         for pattern in question_patterns:
             if pattern in msg_lower:
                 return UserIntent.QUESTION
-        
-        # Quick keyword detection for issues (should be first)
-        issue_keywords = ['bug', 'error', 'not working', 'broken', 'problem', 'crash', 
-                         'fix', 'issue', 'masalah', 'rusak', 'tidak bisa', 'gagal', 'hang']
-        for kw in issue_keywords:
-            if kw in msg_lower:
-                return UserIntent.ISSUE
         
         # Feedback keywords (specific phrases that indicate wanting to suggest)
         feedback_keywords = ['saran saya', 'suggestion', 'i wish', 'would be nice', 
