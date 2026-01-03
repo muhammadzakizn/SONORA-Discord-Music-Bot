@@ -13,15 +13,22 @@ from config.logging_config import get_logger
 
 logger = get_logger('audio.musicdl')
 
-# Check if musicdl is available
-MUSICDL_AVAILABLE = False
-try:
-    from musicdl import musicdl
-    from musicdl.modules import MusicClientBuilder
-    MUSICDL_AVAILABLE = True
-    logger.info("MusicDL library loaded successfully")
-except ImportError:
-    logger.warning("MusicDL library not available - pip install musicdl")
+# Check if MusicDL is disabled via environment variable
+MUSICDL_DISABLED_BY_ENV = os.getenv('DISABLE_MUSICDL', 'false').lower() in ('true', '1', 'yes')
+
+if MUSICDL_DISABLED_BY_ENV:
+    logger.info("MusicDL DISABLED via DISABLE_MUSICDL environment variable")
+    MUSICDL_AVAILABLE = False
+else:
+    # Check if musicdl is available
+    MUSICDL_AVAILABLE = False
+    try:
+        from musicdl import musicdl
+        from musicdl.modules import MusicClientBuilder
+        MUSICDL_AVAILABLE = True
+        logger.info("MusicDL library loaded successfully")
+    except ImportError:
+        logger.warning("MusicDL library not available - pip install musicdl")
 
 
 class MusicDLHandler:
