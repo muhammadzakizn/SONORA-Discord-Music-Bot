@@ -100,69 +100,64 @@ IMPORTANT:
 - Respond in the same language the user uses (Indonesian/English)."""
 
     def __init__(self):
-        self.api_key = os.getenv('GEMINI_API_KEY', '')
-        self._model = None
+        # Support multiple AI providers
+        self.deepseek_key = os.getenv('DEEPSEEK_API_KEY', '')
+        self.gemini_key = os.getenv('GEMINI_API_KEY', '')
+        
         self._client = None
+        self._model = None
+        self._provider = None  # 'deepseek', 'gemini', or None
         self._initialized = False
         
     async def _ensure_initialized(self) -> bool:
-        """Initialize Gemini client if not already done"""
+        """Initialize AI client - tries DeepSeek first, then Gemini"""
         if self._initialized:
             return True
-            
-        if not self.api_key:
-            logger.warning("GEMINI_API_KEY not set, AI support disabled")
-            return False
         
-        # Try new google-genai package first, then fallback to deprecated one
-        try:
-            # New package: google-genai
-            from google import genai
-            logger.info("google-genai package found, initializing client...")
-            
-            self._client = genai.Client(api_key=self.api_key)
-            
-            # Don't test on init to save quota - just initialize
-            self._model = 'gemini-2.0-flash'
-            self._use_new_api = True
-            self._initialized = True
-            logger.info(f"Gemini AI initialized for support (new API, model: {self._model})")
-            return True
-            
-        except ImportError as ie:
-            logger.warning(f"google-genai package NOT found: {ie}. Install with: pip install google-genai")
-        except Exception as e:
-            logger.warning(f"New google-genai failed: {e}. Trying deprecated package...")
+        # Provider 1: DeepSeek (uses OpenAI SDK, free tier more generous)
+        if self.deepseek_key:
+            try:
+                from openai import OpenAI
+                
+                self._client = OpenAI(
+                    api_key=self.deepseek_key,
+                    base_url="https://api.deepseek.com"
+                )
+                self._model = 'deepseek-chat'
+                self._provider = 'deepseek'
+                self._initialized = True
+                logger.info(f"AI Support initialized with DeepSeek (model: {self._model})")
+                return True
+                
+            except ImportError:
+                logger.warning("openai package not installed. Run: pip install openai")
+            except Exception as e:
+                logger.warning(f"DeepSeek init failed: {e}")
         
-        # Fallback to deprecated google.generativeai
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.api_key)
-            
-            # Try different model names
-            model_names = ['gemini-2.0-flash-exp', 'gemini-pro', 'gemini-1.0-pro']
-            
-            for model_name in model_names:
-                try:
-                    self._model = genai.GenerativeModel(model_name)
-                    test_response = self._model.generate_content("Hi", generation_config={"max_output_tokens": 5})
-                    self._use_new_api = False
-                    self._initialized = True
-                    logger.info(f"Gemini AI initialized for support (deprecated API, model: {model_name})")
-                    return True
-                except Exception as model_error:
-                    logger.debug(f"Model {model_name} not available: {model_error}")
-                    continue
-            
-            logger.error("No Gemini model available with deprecated API")
-            return False
-            
-        except ImportError:
-            logger.error("Neither google-genai nor google-generativeai installed. Run: pip install google-genai")
-            return False
-        except Exception as e:
-            logger.error(f"Failed to initialize Gemini: {e}")
-            return False
+        # Provider 2: Gemini (google-genai new package)
+        if self.gemini_key:
+            try:
+                from google import genai
+                
+                self._client = genai.Client(api_key=self.gemini_key)
+                self._model = 'gemini-2.0-flash'
+                self._provider = 'gemini'
+                self._initialized = True
+                logger.info(f"AI Support initialized with Gemini (model: {self._model})")
+                return True
+                
+            except ImportError:
+                logger.debug("google-genai not installed")
+            except Exception as e:
+                logger.warning(f"Gemini init failed: {e}")
+        
+        # No API keys configured
+        if not self.deepseek_key and not self.gemini_key:
+            logger.warning("No AI API key configured. Set DEEPSEEK_API_KEY or GEMINI_API_KEY")
+        else:
+            logger.error("All AI providers failed to initialize")
+        
+        return False
     
     async def detect_intent(self, message: str) -> UserIntent:
         """
@@ -272,7 +267,7 @@ IMPORTANT:
                 intent
             )
         
-        # For questions, use Gemini AI
+        # For questions, use AI
         if not await self._ensure_initialized():
             return (
                 "Maaf, AI sedang tidak tersedia. Silakan hubungi developer langsung.",
@@ -283,8 +278,22 @@ IMPORTANT:
             # Send system prompt + user message
             prompt = f"{self.SYSTEM_PROMPT}\n\nUser ({user_name}): {message}\n\nRespond briefly and helpfully:"
             
-            if getattr(self, '_use_new_api', False):
-                # New google-genai API
+            if self._provider == 'deepseek':
+                # DeepSeek uses OpenAI SDK
+                response = await asyncio.to_thread(
+                    lambda: self._client.chat.completions.create(
+                        model=self._model,
+                        messages=[
+                            {"role": "system", "content": self.SYSTEM_PROMPT},
+                            {"role": "user", "content": message}
+                        ],
+                        max_tokens=500
+                    )
+                )
+                return (response.choices[0].message.content.strip(), intent)
+                
+            elif self._provider == 'gemini':
+                # Gemini uses google-genai
                 response = await asyncio.to_thread(
                     lambda: self._client.models.generate_content(
                         model=self._model,
@@ -292,16 +301,12 @@ IMPORTANT:
                     )
                 )
                 return (response.text.strip(), intent)
+            
             else:
-                # Deprecated google.generativeai API
-                chat = self._model.start_chat(history=[])
-                response = await asyncio.to_thread(
-                    lambda: chat.send_message(prompt)
-                )
-                return (response.text.strip(), intent)
+                return ("AI provider tidak dikenali.", UserIntent.UNKNOWN)
             
         except Exception as e:
-            logger.error(f"Gemini API error: {e}")
+            logger.error(f"AI API error ({self._provider}): {e}")
             return (
                 "Maaf, terjadi kesalahan. Coba lagi nanti atau hubungi developer.",
                 UserIntent.UNKNOWN
