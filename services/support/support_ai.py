@@ -101,40 +101,40 @@ IMPORTANT:
 
     def __init__(self):
         # Support multiple AI providers (priority order)
-        self.openrouter_key = os.getenv('OPENROUTER_API_KEY', '')  # Free models available!
+        self.groq_key = os.getenv('GROQ_API_KEY', '')  # FREE! 14,400 requests/day
         self.deepseek_key = os.getenv('DEEPSEEK_API_KEY', '')
         self.gemini_key = os.getenv('GEMINI_API_KEY', '')
         
         self._client = None
         self._model = None
-        self._provider = None  # 'openrouter', 'deepseek', 'gemini', or None
+        self._provider = None  # 'groq', 'deepseek', 'gemini', or None
         self._initialized = False
         
     async def _ensure_initialized(self) -> bool:
-        """Initialize AI client - tries OpenRouter first (FREE), then DeepSeek, then Gemini"""
+        """Initialize AI client - tries Groq first (FREE), then DeepSeek, then Gemini"""
         if self._initialized:
             return True
         
-        # Provider 1: OpenRouter (FREE models like deepseek-r1:free)
-        if self.openrouter_key:
+        # Provider 1: Groq (FREE - 14,400 requests/day!)
+        if self.groq_key:
             try:
                 from openai import OpenAI
                 
                 self._client = OpenAI(
-                    api_key=self.openrouter_key,
-                    base_url="https://openrouter.ai/api/v1"
+                    api_key=self.groq_key,
+                    base_url="https://api.groq.com/openai/v1"
                 )
-                # Use deepseek-chat model (free tier available)
-                self._model = 'deepseek/deepseek-chat'
-                self._provider = 'openrouter'
+                # Use llama model - fast and free!
+                self._model = 'llama-3.3-70b-versatile'
+                self._provider = 'groq'
                 self._initialized = True
-                logger.info(f"AI Support initialized with OpenRouter FREE (model: {self._model})")
+                logger.info(f"AI Support initialized with Groq FREE (model: {self._model})")
                 return True
                 
             except ImportError:
                 logger.warning("openai package not installed. Run: pip install openai")
             except Exception as e:
-                logger.warning(f"OpenRouter init failed: {e}")
+                logger.warning(f"Groq init failed: {e}")
         
         # Provider 2: DeepSeek (uses OpenAI SDK)
         if self.deepseek_key:
@@ -174,8 +174,8 @@ IMPORTANT:
                 logger.warning(f"Gemini init failed: {e}")
         
         # No API keys configured
-        if not self.openrouter_key and not self.deepseek_key and not self.gemini_key:
-            logger.warning("No AI API key configured. Set OPENROUTER_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")
+        if not self.groq_key and not self.deepseek_key and not self.gemini_key:
+            logger.warning("No AI API key configured. Set GROQ_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")
         else:
             logger.error("All AI providers failed to initialize")
         
@@ -301,8 +301,8 @@ IMPORTANT:
             # Send system prompt + user message
             prompt = f"{self.SYSTEM_PROMPT}\n\nUser ({user_name}): {message}\n\nRespond briefly and helpfully:"
             
-            if self._provider in ('openrouter', 'deepseek'):
-                # OpenRouter and DeepSeek use OpenAI SDK
+            if self._provider in ('groq', 'deepseek'):
+                # Groq and DeepSeek use OpenAI SDK
                 response = await asyncio.to_thread(
                     lambda: self._client.chat.completions.create(
                         model=self._model,
