@@ -626,8 +626,19 @@ class YouTubeDownloader(BaseDownloader):
                 '--geo-bypass',
                 '--socket-timeout', '15',
                 '--no-check-certificate',
-                '--extractor-args', 'youtube:player_client=android_sdkless',
+                '--extractor-args', 'youtube:player_client=ios,web',
+                '--remote-components', 'ejs:github',  # Enable EJS challenge solver
             ]
+            
+            # CRITICAL: Add cookies for authentication (required to bypass bot detection)
+            yt_cookies = Settings.get_youtube_cookies()
+            if yt_cookies:
+                try:
+                    if yt_cookies.stat().st_size > 0:
+                        command.extend(['--cookies', str(yt_cookies)])
+                        logger.info(f"✓ Using cookies for proxy stream: {yt_cookies.name}")
+                except Exception as e:
+                    logger.warning(f"Could not add cookies: {e}")
             
             stdout, stderr, returncode = await self._run_command(command, timeout=30)
             
