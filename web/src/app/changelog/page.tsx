@@ -94,7 +94,7 @@ export default function ChangelogPage() {
                             className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
                         >
                             <ArrowLeft className="w-5 h-5" />
-                            <span>Kembali</span>
+                            <span>Back</span>
                         </Link>
                         <div className="flex items-center gap-4">
                             <button
@@ -125,7 +125,7 @@ export default function ChangelogPage() {
                         Changelog
                     </h1>
                     <p className="text-zinc-400 max-w-xl mx-auto">
-                        Riwayat perubahan dan pembaruan SONORA Dashboard
+                        SONORA Dashboard change history and updates
                     </p>
                 </motion.div>
 
@@ -158,7 +158,7 @@ export default function ChangelogPage() {
                                 {isLatest && (
                                     <div className="absolute -top-3 left-6 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 text-white text-xs font-bold flex items-center gap-1">
                                         <Sparkles className="w-3 h-3" />
-                                        TERBARU
+                                        LATEST
                                     </div>
                                 )}
 
@@ -230,7 +230,7 @@ export default function ChangelogPage() {
                 {/* Empty State */}
                 {!loading && entries.length === 0 && (
                     <div className="text-center py-12 text-zinc-500">
-                        <p>Belum ada changelog tersedia</p>
+                        <p>No changelog available</p>
                     </div>
                 )}
 
