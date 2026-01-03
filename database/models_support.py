@@ -299,7 +299,7 @@ class SupportDatabase:
             
             tickets = []
             for row in cursor.fetchall():
-                tickets.append(SupportTicket(
+                ticket = SupportTicket(
                     id=row['id'],
                     user_id=row['user_id'],
                     user_name=row['user_name'],
@@ -312,7 +312,24 @@ class SupportDatabase:
                     created_at=row['created_at'],
                     updated_at=row['updated_at'],
                     resolved_at=row['resolved_at']
-                ))
+                )
+                
+                # Load messages for this ticket
+                cursor.execute(
+                    'SELECT * FROM messages WHERE ticket_id = ? ORDER BY created_at',
+                    (ticket.id,)
+                )
+                for msg_row in cursor.fetchall():
+                    ticket.messages.append(SupportMessage(
+                        id=msg_row['id'],
+                        ticket_id=msg_row['ticket_id'],
+                        sender_type=msg_row['sender_type'],
+                        sender_id=msg_row['sender_id'],
+                        content=msg_row['content'],
+                        created_at=msg_row['created_at']
+                    ))
+                
+                tickets.append(ticket)
             
             return tickets
     

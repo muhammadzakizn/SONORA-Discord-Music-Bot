@@ -179,10 +179,20 @@ def send_message(ticket_id: str):
         # Try to send DM to user
         dm_sent = False
         try:
-            from web.api.flask_app import get_bot
+            # Try both app.py and flask_app.py for bot instance
+            bot = None
+            try:
+                from web.api.app import get_bot
+                bot = get_bot()
+            except ImportError:
+                try:
+                    from web.api.flask_app import get_bot
+                    bot = get_bot()
+                except ImportError:
+                    logger.warning("Could not import get_bot from either app")
+            
             import asyncio
             
-            bot = get_bot()
             if bot:
                 async def send_dm():
                     try:
