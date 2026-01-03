@@ -18,6 +18,7 @@ from ui.embeds import EmbedBuilder
 from ui.menu_view import MediaPlayerView
 from utils.validators import URLValidator, InputValidator
 from utils.formatters import TimeFormatter
+from utils.permission_fallback import send_with_fallback
 from config.settings import Settings
 from config.logging_config import get_logger
 from core.error_handler import DownloadError
@@ -474,20 +475,21 @@ class PlayCommand(commands.Cog):
             except Exception as cleanup_error:
                 logger.debug(f"Could not delete loader: {cleanup_error}")
             
-            # Send error message
-            try:
-                await interaction.followup.send(
-                    embed=EmbedBuilder.create_error(
-                        "Error",
-                        f"An error occurred: {str(e)[:200]}"
-                    ),
-                    ephemeral=True
-                )
-            except discord.NotFound:
-                # Interaction expired, log only
-                logger.error(f"Could not send error message - interaction expired")
-            except Exception as send_error:
-                logger.error(f"Failed to send error message: {send_error}")
+            # Send error message with fallback
+            error_embed = EmbedBuilder.create_error(
+                "Error",
+                f"An error occurred: {str(e)[:200]}"
+            )
+            
+            # Use fallback chain: interaction -> channel -> owner notification
+            success = await send_with_fallback(
+                interaction,
+                embed=error_embed,
+                guild=interaction.guild
+            )
+            
+            if not success:
+                logger.error("Failed to send error message via all fallback methods")
     
     async def _detect_track(self, query: str) -> Optional[TrackInfo]:
         """

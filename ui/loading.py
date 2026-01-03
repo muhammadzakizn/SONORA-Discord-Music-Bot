@@ -7,6 +7,7 @@ from typing import Optional
 
 from config.settings import Settings
 from config.logging_config import get_logger
+from utils.permission_fallback import edit_with_fallback, find_sendable_channel, notify_owner_permission_issue
 
 logger = get_logger('ui.loading')
 
@@ -252,11 +253,71 @@ class SafeLoadingManager:
                 await asyncio.sleep(retry_after)
                 # Retry
                 await self._do_update(content, embed)
+            elif e.code in [50027, 10062, 40060]:  # Token expired/invalid interaction
+                logger.warning(f"Interaction token expired ({e.code}), using fallback")
+                # Fallback to channel send
+                await self._fallback_send(content, embed)
+            elif e.status == 403:  # Forbidden
+                logger.warning(f"Permission denied: {e}")
+                await self._fallback_send(content, embed)
             else:
                 logger.error(f"Failed to update message: {e}")
         
         except Exception as e:
             logger.error(f"Unexpected error updating message: {e}", exc_info=True)
+    
+    async def _fallback_send(
+        self,
+        content: Optional[str] = None,
+        embed: Optional[discord.Embed] = None
+    ) -> None:
+        """
+        Fallback: send to channel when edit fails.
+        
+        Tries:
+        1. Send to same channel
+        2. Find another sendable channel
+        3. Notify server owner
+        """
+        kwargs = {}
+        if content is not None:
+            kwargs['content'] = content
+        if embed is not None:
+            kwargs['embed'] = embed
+        
+        if not kwargs:
+            return
+        
+        guild = self.message.guild
+        channel = self.message.channel
+        
+        # Try same channel first
+        if isinstance(channel, discord.TextChannel):
+            perms = channel.permissions_for(guild.me) if guild else None
+            if perms and perms.send_messages:
+                try:
+                    await channel.send(**kwargs)
+                    logger.info(f"Sent via fallback to channel: {channel.name}")
+                    return
+                except Exception as e:
+                    logger.warning(f"Fallback channel send failed: {e}")
+        
+        # Try to find any sendable channel
+        if guild:
+            fallback_channel = await find_sendable_channel(guild)
+            if fallback_channel and fallback_channel.id != getattr(channel, 'id', None):
+                try:
+                    await fallback_channel.send(**kwargs)
+                    logger.info(f"Sent via alternative channel: {fallback_channel.name}")
+                    return
+                except Exception as e:
+                    logger.warning(f"Alternative channel send failed: {e}")
+            
+            # Last resort: notify owner
+            await notify_owner_permission_issue(
+                guild,
+                "Cannot send messages - all channels are restricted"
+            )
     
     async def _delayed_update(self, delay: float) -> None:
         """
