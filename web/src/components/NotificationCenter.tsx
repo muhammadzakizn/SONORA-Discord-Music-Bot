@@ -39,20 +39,39 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
     const [permissionStatus, setPermissionStatus] = useState<'default' | 'granted' | 'denied' | 'requesting'>('default');
     const panelRef = useRef<HTMLDivElement>(null);
 
-    // Close on click outside
+    // Close on click outside (not on scroll)
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
+        let isScrolling = false;
+        let scrollTimeout: NodeJS.Timeout;
+
+        const handleScroll = () => {
+            isScrolling = true;
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                isScrolling = false;
+            }, 150);
+        };
+
+        const handleClick = (e: MouseEvent) => {
+            // Don't close if user was scrolling
+            if (isScrolling) return;
+
             if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
                 setIsOpen(false);
             }
         };
 
         if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
+            // Use click instead of mousedown to avoid closing during scroll
+            document.addEventListener('click', handleClick);
+            // Track scroll events
+            document.addEventListener('scroll', handleScroll, true);
         }
 
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('click', handleClick);
+            document.removeEventListener('scroll', handleScroll, true);
+            clearTimeout(scrollTimeout);
         };
     }, [isOpen]);
 
