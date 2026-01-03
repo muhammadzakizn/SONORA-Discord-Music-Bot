@@ -118,6 +118,7 @@ IMPORTANT:
         try:
             # New package: google-genai
             from google import genai
+            logger.info("google-genai package found, attempting to initialize...")
             
             self._client = genai.Client(api_key=self.api_key)
             
@@ -133,10 +134,10 @@ IMPORTANT:
             logger.info(f"Gemini AI initialized for support (new API, model: {self._model})")
             return True
             
-        except ImportError:
-            logger.debug("google-genai not installed, trying deprecated package")
+        except ImportError as ie:
+            logger.warning(f"google-genai package NOT found: {ie}. Install with: pip install google-genai")
         except Exception as e:
-            logger.debug(f"New google-genai failed: {e}, trying deprecated package")
+            logger.warning(f"New google-genai failed: {e}. Trying deprecated package...")
         
         # Fallback to deprecated google.generativeai
         try:
