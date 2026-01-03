@@ -72,15 +72,15 @@ class YTDLPApiClient:
                     logger.debug(f"API available: {data.get('status')}")
                     return True
         except asyncio.TimeoutError:
-            logger.warning("YTDLP API not available: timeout")
+            logger.debug("YTDLP API not available: timeout")
         except RuntimeError as e:
             # Windows-specific: "Timeout context manager should be used inside a task"
             if "Timeout context manager" in str(e):
-                logger.warning(f"YTDLP API not available: {e}")
+                logger.debug(f"YTDLP API check skipped (Windows async): {e}")
             else:
                 raise
         except Exception as e:
-            logger.warning(f"YTDLP API not available: {e}")
+            logger.debug(f"YTDLP API not available: {e}")
         return False
     
     async def search(self, query: str) -> Optional[TrackInfo]:

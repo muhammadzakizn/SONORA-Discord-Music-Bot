@@ -125,12 +125,24 @@ async def api_ytdlp_stream_url():
         
         # Create track info
         if url:
-            # Direct URL provided
-            track_info = TrackInfo(
-                title=title or "Unknown",
-                artist=artist or "Unknown",
-                url=url
-            )
+            # Direct URL provided - get metadata if title/artist are missing
+            if not title or not artist:
+                search_result = await downloader.search(url)
+                if search_result:
+                    track_info = search_result
+                    logger.info(f"[YTDLP API] Got metadata from URL: {track_info}")
+                else:
+                    track_info = TrackInfo(
+                        title=title or "Stream",
+                        artist=artist or "Unknown",
+                        url=url
+                    )
+            else:
+                track_info = TrackInfo(
+                    title=title,
+                    artist=artist,
+                    url=url
+                )
         else:
             # Search first to get URL
             search_result = await downloader.search(f"{artist} {title}")
@@ -206,11 +218,24 @@ async def api_ytdlp_download():
         
         # Create or search for track
         if url:
-            track_info = TrackInfo(
-                title=title or "Unknown",
-                artist=artist or "Unknown",
-                url=url
-            )
+            # Get metadata if title/artist are missing
+            if not title or not artist:
+                search_result = await downloader.search(url)
+                if search_result:
+                    track_info = search_result
+                    logger.info(f"[YTDLP API] Got metadata from URL: {track_info}")
+                else:
+                    track_info = TrackInfo(
+                        title=title or "Download",
+                        artist=artist or "Unknown",
+                        url=url
+                    )
+            else:
+                track_info = TrackInfo(
+                    title=title,
+                    artist=artist,
+                    url=url
+                )
         else:
             # Search first
             search_result = await downloader.search(f"{artist} {title}")
