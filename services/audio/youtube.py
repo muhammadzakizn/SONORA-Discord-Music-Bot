@@ -521,7 +521,7 @@ class YouTubeDownloader(BaseDownloader):
                 '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
                 '--no-playlist',
                 '--geo-bypass',
-                '--socket-timeout', '15',
+                '--socket-timeout', '45',
                 '--no-check-certificate',
                 '--extractor-args', 'youtube:player_client=ios,web',
             ]
@@ -536,7 +536,7 @@ class YouTubeDownloader(BaseDownloader):
                 except:
                     pass
             
-            stdout, stderr, returncode = await self._run_command(command, timeout=15)
+            stdout, stderr, returncode = await self._run_command(command, timeout=45)
             
             if returncode != 0:
                 logger.warning(f"Failed to get stream URL: {stderr}")
@@ -624,7 +624,7 @@ class YouTubeDownloader(BaseDownloader):
                 '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
                 '--no-playlist',
                 '--geo-bypass',
-                '--socket-timeout', '15',
+                '--socket-timeout', '45',
                 '--no-check-certificate',
                 '--extractor-args', 'youtube:player_client=ios,web',
                 '--remote-components', 'ejs:github',  # Enable EJS challenge solver
