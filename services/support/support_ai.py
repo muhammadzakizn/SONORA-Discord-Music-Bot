@@ -114,35 +114,55 @@ IMPORTANT:
             logger.warning("GEMINI_API_KEY not set, AI support disabled")
             return False
         
+        # Try new google-genai package first, then fallback to deprecated one
+        try:
+            # New package: google-genai
+            from google import genai
+            
+            self._client = genai.Client(api_key=self.api_key)
+            
+            # Test with a simple prompt
+            response = self._client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents='Hi'
+            )
+            
+            self._model = 'gemini-2.0-flash'
+            self._use_new_api = True
+            self._initialized = True
+            logger.info(f"Gemini AI initialized for support (new API, model: {self._model})")
+            return True
+            
+        except ImportError:
+            logger.debug("google-genai not installed, trying deprecated package")
+        except Exception as e:
+            logger.debug(f"New google-genai failed: {e}, trying deprecated package")
+        
+        # Fallback to deprecated google.generativeai
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.api_key)
             
-            # Try different model names (API versions vary)
-            model_names = [
-                'gemini-2.0-flash',      # Latest 2026
-                'gemini-1.5-flash',      # Previous version
-                'gemini-pro',            # Fallback
-                'models/gemini-2.0-flash-001',  # With prefix
-                'models/gemini-1.5-flash-latest',
-            ]
+            # Try different model names
+            model_names = ['gemini-2.0-flash-exp', 'gemini-pro', 'gemini-1.0-pro']
             
             for model_name in model_names:
                 try:
                     self._model = genai.GenerativeModel(model_name)
-                    # Test if model works
                     test_response = self._model.generate_content("Hi", generation_config={"max_output_tokens": 5})
+                    self._use_new_api = False
                     self._initialized = True
-                    logger.info(f"Gemini AI initialized for support (model: {model_name})")
+                    logger.info(f"Gemini AI initialized for support (deprecated API, model: {model_name})")
                     return True
                 except Exception as model_error:
                     logger.debug(f"Model {model_name} not available: {model_error}")
                     continue
             
-            logger.error("No Gemini model available")
+            logger.error("No Gemini model available with deprecated API")
             return False
+            
         except ImportError:
-            logger.error("google-generativeai not installed. Run: pip install google-generativeai")
+            logger.error("Neither google-genai nor google-generativeai installed. Run: pip install google-genai")
             return False
         except Exception as e:
             logger.error(f"Failed to initialize Gemini: {e}")
@@ -264,18 +284,25 @@ IMPORTANT:
             )
         
         try:
-            # Build conversation
-            chat = self._model.start_chat(history=[])
-            
             # Send system prompt + user message
             prompt = f"{self.SYSTEM_PROMPT}\n\nUser ({user_name}): {message}\n\nRespond briefly and helpfully:"
             
-            # Generate response
-            response = await asyncio.to_thread(
-                lambda: chat.send_message(prompt)
-            )
-            
-            return (response.text.strip(), intent)
+            if getattr(self, '_use_new_api', False):
+                # New google-genai API
+                response = await asyncio.to_thread(
+                    lambda: self._client.models.generate_content(
+                        model=self._model,
+                        contents=prompt
+                    )
+                )
+                return (response.text.strip(), intent)
+            else:
+                # Deprecated google.generativeai API
+                chat = self._model.start_chat(history=[])
+                response = await asyncio.to_thread(
+                    lambda: chat.send_message(prompt)
+                )
+                return (response.text.strip(), intent)
             
         except Exception as e:
             logger.error(f"Gemini API error: {e}")
