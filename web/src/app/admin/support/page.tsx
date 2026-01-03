@@ -82,6 +82,33 @@ export default function SupportPage() {
     const [replyText, setReplyText] = useState("");
     const [isSending, setIsSending] = useState(false);
 
+    // Ticket ID search
+    const [ticketIdSearch, setTicketIdSearch] = useState("");
+    const [searchingTicket, setSearchingTicket] = useState(false);
+
+    // Search ticket by ID
+    const searchTicketById = async () => {
+        if (!ticketIdSearch.trim()) return;
+
+        setSearchingTicket(true);
+        try {
+            const ticketId = ticketIdSearch.trim().toUpperCase();
+            const res = await fetch(`${API_BASE}/api/support/tickets/${ticketId}`);
+            const data = await res.json();
+
+            if (data.success && data.ticket) {
+                setSelectedTicket(data.ticket);
+                setError(null);
+            } else {
+                setError(`Tiket "${ticketId}" tidak ditemukan`);
+            }
+        } catch (err) {
+            setError("Gagal mencari tiket. Pastikan API terhubung.");
+        } finally {
+            setSearchingTicket(false);
+        }
+    };
+
     // Fetch tickets from real API
     const fetchTickets = useCallback(async () => {
         try {
@@ -232,6 +259,50 @@ export default function SupportPage() {
                     {error}
                 </div>
             )}
+
+            {/* Search Ticket by ID */}
+            <div className={cn(
+                "p-4 rounded-xl border",
+                isDark ? "bg-zinc-900/50 border-white/10" : "bg-white border-gray-200"
+            )}>
+                <div className="flex flex-col md:flex-row gap-3">
+                    <div className="flex-1">
+                        <label className={cn(
+                            "block text-sm font-medium mb-2",
+                            isDark ? "text-white/70" : "text-gray-700"
+                        )}>
+                            Cari Tiket Berdasarkan ID
+                        </label>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                placeholder="Contoh: SNRA-AB12-CD34"
+                                value={ticketIdSearch}
+                                onChange={(e) => setTicketIdSearch(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && searchTicketById()}
+                                className={cn(
+                                    "flex-1 px-4 py-2 rounded-lg outline-none text-sm uppercase",
+                                    isDark
+                                        ? "bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500"
+                                        : "bg-gray-100 border border-gray-200 text-gray-900 placeholder:text-gray-400"
+                                )}
+                            />
+                            <button
+                                onClick={searchTicketById}
+                                disabled={!ticketIdSearch.trim() || searchingTicket}
+                                className="px-4 py-2 rounded-lg bg-[#7B1E3C] text-white font-medium hover:bg-[#9B2E4C] transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {searchingTicket ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Search className="w-4 h-4" />
+                                )}
+                                Cari
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
