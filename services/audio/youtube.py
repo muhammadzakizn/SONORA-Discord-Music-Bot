@@ -983,10 +983,11 @@ class YouTubeDownloader(BaseDownloader):
         url = track_info.url
         original_url = url  # Keep original for fallback
         
-        # CRITICAL: Spotify URLs cannot be downloaded (DRM protected)
-        # Always search YouTube Music for Spotify tracks
-        if url and 'spotify.com' in url:
-            logger.info(f"Spotify URL detected, searching YouTube Music instead...")
+        # CRITICAL: Spotify and Apple Music URLs cannot be downloaded (DRM protected)
+        # Always search YouTube Music for these sources
+        is_drm_url = url and ('spotify.com' in url or 'music.apple.com' in url or 'apple.com' in url)
+        if is_drm_url:
+            logger.info(f"DRM-protected URL detected, searching YouTube Music instead...")
             url = None  # Force YouTube Music search below
         
         if url and 'youtube.com/watch' in url and 'music.youtube.com' not in url:
