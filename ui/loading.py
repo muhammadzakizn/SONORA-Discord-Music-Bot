@@ -11,8 +11,8 @@ from utils.permission_fallback import edit_with_fallback, find_sendable_channel,
 
 logger = get_logger('ui.loading')
 
-# CLI-style Braille spinner frames
-SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+# Dynamic dot spinner frames (bouncing ball effect)
+SPINNER_FRAMES = ["●・・・", "・●・・", "・・●・", "・・・●", "・・●・", "・●・・"]
 
 
 class SafeLoadingManager:
