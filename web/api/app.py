@@ -2174,9 +2174,10 @@ def api_admin_broadcast():
         if image_file and image_file.filename:
             import os
             import uuid
+            import tempfile
             ext = image_file.filename.rsplit('.', 1)[-1].lower() if '.' in image_file.filename else 'png'
             filename = f"broadcast_{uuid.uuid4().hex[:8]}.{ext}"
-            image_path = os.path.join('/tmp', filename)
+            image_path = os.path.join(tempfile.gettempdir(), filename)
             image_file.save(image_path)
             logger.info(f"Saved broadcast image: {image_path}")
         
@@ -2500,9 +2501,10 @@ def api_admin_dm_users():
         if image_file and image_file.filename:
             import os
             import uuid
+            import tempfile
             ext = image_file.filename.rsplit('.', 1)[-1].lower() if '.' in image_file.filename else 'png'
             filename = f"dm_{uuid.uuid4().hex[:8]}.{ext}"
-            image_path = os.path.join('/tmp', filename)
+            image_path = os.path.join(tempfile.gettempdir(), filename)
             image_file.save(image_path)
             logger.info(f"Saved DM image: {image_path}")
         
@@ -2641,9 +2643,10 @@ def api_admin_dm_owners():
         if image_file and image_file.filename:
             import os
             import uuid
+            import tempfile
             ext = image_file.filename.rsplit('.', 1)[-1].lower() if '.' in image_file.filename else 'png'
             filename = f"dm_owners_{uuid.uuid4().hex[:8]}.{ext}"
-            image_path = os.path.join('/tmp', filename)
+            image_path = os.path.join(tempfile.gettempdir(), filename)
             image_file.save(image_path)
             logger.info(f"Saved owner DM image: {image_path}")
         

@@ -182,10 +182,42 @@ class PlaylistCacheManager:
                 musicdl = get_musicdl_handler()
                 
                 if not musicdl.is_available:
-                    logger.warning(f"[{index}] MusicDL not available")
-                    cached.status = TrackStatus.FAILED
-                    self.prepared_tracks[index] = cached
-                    return cached
+                    # MusicDL not available - FALLBACK to yt-dlp immediately
+                    logger.info(f"[{index}] MusicDL disabled, using yt-dlp directly...")
+                    
+                    try:
+                        from services.audio.youtube import YouTubeDownloader
+                        yt_downloader = YouTubeDownloader(self.cache_dir)
+                        
+                        # Download via yt-dlp
+                        audio_result = await yt_downloader.download(track_info)
+                        
+                        if audio_result and audio_result.is_success and audio_result.file_path:
+                            cached.audio_path = audio_result.file_path
+                            cached.is_verified = True
+                            cached.status = TrackStatus.READY
+                            
+                            # Upload to cloud cache (Rclone)
+                            if cloud_cache.is_enabled:
+                                logger.info(f"[{index}] ☁️ Uploading to cloud cache...")
+                                asyncio.create_task(
+                                    self._upload_to_ftp(track_info.artist, track_info.title, audio_result.file_path)
+                                )
+                            
+                            self.prepared_tracks[index] = cached
+                            logger.info(f"[{index}] ✓ READY (yt-dlp): {track_info.title}")
+                            logger.info(f"{'='*50}")
+                            return cached
+                        else:
+                            logger.warning(f"[{index}] yt-dlp download failed")
+                            cached.status = TrackStatus.FAILED
+                            self.prepared_tracks[index] = cached
+                            return cached
+                    except Exception as yt_err:
+                        logger.error(f"[{index}] yt-dlp error: {yt_err}")
+                        cached.status = TrackStatus.FAILED
+                        self.prepared_tracks[index] = cached
+                        return cached
                 
                 # Search with title matching
                 query = f"{track_info.artist} - {track_info.title}"
