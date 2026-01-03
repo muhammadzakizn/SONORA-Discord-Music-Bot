@@ -12,17 +12,24 @@ class LoadingSpinner:
     """
     CLI-style loading spinner for Discord embed updates.
     
-    Uses Braille Unicode characters for smooth animation:
-    ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏
+    Uses dynamic dot animation:
+    ・・・● → ・・●・ → ・●・・ → ●・・・ (loop)
     
     Updates embed every 500ms (configurable) with rotating spinner.
     """
     
-    # Braille spinner frames
-    SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    # Dynamic dot spinner frames (small -> medium -> large -> medium -> small pattern)
+    SPINNER_FRAMES = [
+        "●・・・",
+        "・●・・",
+        "・・●・",
+        "・・・●",
+        "・・●・",
+        "・●・・"
+    ]
     
-    # Alternative: Dots animation
-    DOTS_FRAMES = [".", "..", "...", "....", "...", ".."]
+    # Alternative: Simple dots animation
+    DOTS_FRAMES = ["・", "・・", "・・・", "・・・・", "・・・", "・・"]
     
     # Simple line spinner
     LINE_FRAMES = ["|", "/", "-", "\\"]
