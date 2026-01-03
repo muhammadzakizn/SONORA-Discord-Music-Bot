@@ -536,6 +536,11 @@ class YouTubeDownloader(BaseDownloader):
                 except:
                     pass
             
+            # Add source address (IPv6 bypass)
+            if Settings.YTDLP_SOURCE_ADDRESS:
+                command.extend(['--source-address', Settings.YTDLP_SOURCE_ADDRESS])
+                logger.debug(f"Using source address: {Settings.YTDLP_SOURCE_ADDRESS}")
+            
             stdout, stderr, returncode = await self._run_command(command, timeout=100)
             
             if returncode != 0:
@@ -1055,6 +1060,11 @@ class YouTubeDownloader(BaseDownloader):
         
         if not cookies_added:
             logger.warning("⚠ No YouTube Music cookies - download may have video intro!")
+        
+        # Add source address (IPv6 bypass)
+        if Settings.YTDLP_SOURCE_ADDRESS:
+            command.extend(['--source-address', Settings.YTDLP_SOURCE_ADDRESS])
+            logger.info(f"✓ Using source address: {Settings.YTDLP_SOURCE_ADDRESS}")
         
         # Run download
         logger.info(f"  Downloading with yt-dlp (default client)...")

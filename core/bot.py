@@ -330,12 +330,32 @@ class MusicBot(commands.Bot):
                 )
             )
             
-            # Sync slash commands
-            try:
-                synced = await self.tree.sync()
-                logger.info(f"Synced {len(synced)} slash commands")
-            except Exception as e:
-                logger.error(f"Failed to sync commands: {e}")
+            # Sync slash commands with retry and backoff
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    # Wait before sync to avoid rate limits (longer on retry)
+                    wait_time = 5 * (attempt + 1)  # 5s, 10s, 15s
+                    if attempt > 0:
+                        logger.info(f"Waiting {wait_time}s before retry {attempt + 1}...")
+                        await asyncio.sleep(wait_time)
+                    
+                    synced = await self.tree.sync()
+                    logger.info(f"Synced {len(synced)} slash commands")
+                    break  # Success!
+                except discord.HTTPException as e:
+                    if e.status == 429:  # Rate limited
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Rate limited, will retry (attempt {attempt + 1}/{max_retries})")
+                            continue
+                        else:
+                            logger.error(f"Failed to sync commands after {max_retries} attempts: {e}")
+                    else:
+                        logger.error(f"Failed to sync commands: {e}")
+                        break
+                except Exception as e:
+                    logger.error(f"Failed to sync commands: {e}")
+                    break
             
             # Start welcome retry background task
             from ui.welcome import start_welcome_retry_task

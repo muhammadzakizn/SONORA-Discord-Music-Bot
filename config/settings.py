@@ -137,6 +137,11 @@ class Settings:
     # Example: http://bore.pub:31909 (via bore tunnel from local machine)
     YOUTUBE_PROXY: str = os.getenv('YOUTUBE_PROXY', '')
     
+    # yt-dlp Source Address - bind to specific IP (IPv4 or IPv6)
+    # Use IPv6 to bypass IP blocks: e.g., 2607:adc0:5::3e
+    # This forces yt-dlp to use a specific network interface/IP
+    YTDLP_SOURCE_ADDRESS: str = os.getenv('YTDLP_SOURCE_ADDRESS', '')
+    
     # Rclone Cache - Use mounted Google Drive instead of FTP
     # On Windows: mount Google Drive as drive letter (e.g., G:)
     # Command: rclone mount gdrive:SONORA-Cache G: --vfs-cache-mode full
