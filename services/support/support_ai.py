@@ -124,8 +124,8 @@ IMPORTANT:
                     api_key=self.openrouter_key,
                     base_url="https://openrouter.ai/api/v1"
                 )
-                # Use free model - deepseek-r1:free is completely free!
-                self._model = 'deepseek/deepseek-r1:free'
+                # Use free model - deepseek-r1-0528:free or deepseek-chat-v3-0324:free
+                self._model = 'deepseek/deepseek-chat-v3-0324:free'
                 self._provider = 'openrouter'
                 self._initialized = True
                 logger.info(f"AI Support initialized with OpenRouter FREE (model: {self._model})")
