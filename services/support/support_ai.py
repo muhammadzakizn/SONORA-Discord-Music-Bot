@@ -100,21 +100,43 @@ IMPORTANT:
 - Respond in the same language the user uses (Indonesian/English)."""
 
     def __init__(self):
-        # Support multiple AI providers
+        # Support multiple AI providers (priority order)
+        self.openrouter_key = os.getenv('OPENROUTER_API_KEY', '')  # Free models available!
         self.deepseek_key = os.getenv('DEEPSEEK_API_KEY', '')
         self.gemini_key = os.getenv('GEMINI_API_KEY', '')
         
         self._client = None
         self._model = None
-        self._provider = None  # 'deepseek', 'gemini', or None
+        self._provider = None  # 'openrouter', 'deepseek', 'gemini', or None
         self._initialized = False
         
     async def _ensure_initialized(self) -> bool:
-        """Initialize AI client - tries DeepSeek first, then Gemini"""
+        """Initialize AI client - tries OpenRouter first (FREE), then DeepSeek, then Gemini"""
         if self._initialized:
             return True
         
-        # Provider 1: DeepSeek (uses OpenAI SDK, free tier more generous)
+        # Provider 1: OpenRouter (FREE models like deepseek-r1:free)
+        if self.openrouter_key:
+            try:
+                from openai import OpenAI
+                
+                self._client = OpenAI(
+                    api_key=self.openrouter_key,
+                    base_url="https://openrouter.ai/api/v1"
+                )
+                # Use free model - deepseek-r1:free is completely free!
+                self._model = 'deepseek/deepseek-r1:free'
+                self._provider = 'openrouter'
+                self._initialized = True
+                logger.info(f"AI Support initialized with OpenRouter FREE (model: {self._model})")
+                return True
+                
+            except ImportError:
+                logger.warning("openai package not installed. Run: pip install openai")
+            except Exception as e:
+                logger.warning(f"OpenRouter init failed: {e}")
+        
+        # Provider 2: DeepSeek (uses OpenAI SDK)
         if self.deepseek_key:
             try:
                 from openai import OpenAI
@@ -134,7 +156,7 @@ IMPORTANT:
             except Exception as e:
                 logger.warning(f"DeepSeek init failed: {e}")
         
-        # Provider 2: Gemini (google-genai new package)
+        # Provider 3: Gemini (google-genai)
         if self.gemini_key:
             try:
                 from google import genai
@@ -152,8 +174,8 @@ IMPORTANT:
                 logger.warning(f"Gemini init failed: {e}")
         
         # No API keys configured
-        if not self.deepseek_key and not self.gemini_key:
-            logger.warning("No AI API key configured. Set DEEPSEEK_API_KEY or GEMINI_API_KEY")
+        if not self.openrouter_key and not self.deepseek_key and not self.gemini_key:
+            logger.warning("No AI API key configured. Set OPENROUTER_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")
         else:
             logger.error("All AI providers failed to initialize")
         
@@ -278,8 +300,8 @@ IMPORTANT:
             # Send system prompt + user message
             prompt = f"{self.SYSTEM_PROMPT}\n\nUser ({user_name}): {message}\n\nRespond briefly and helpfully:"
             
-            if self._provider == 'deepseek':
-                # DeepSeek uses OpenAI SDK
+            if self._provider in ('openrouter', 'deepseek'):
+                # OpenRouter and DeepSeek use OpenAI SDK
                 response = await asyncio.to_thread(
                     lambda: self._client.chat.completions.create(
                         model=self._model,
