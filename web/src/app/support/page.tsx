@@ -116,7 +116,7 @@ export default function SupportPage() {
                 </div>
 
                 {/* Contact Cards */}
-                <div className="grid md:grid-cols-2 gap-4 mb-12">
+                <div className="grid md:grid-cols-3 gap-4 mb-12">
                     <ContactCard
                         icon={<DiscordIcon />}
                         platform="Discord"
@@ -124,6 +124,15 @@ export default function SupportPage() {
                         description="Best for quick questions"
                         href="https://discord.com/users/thixxert"
                         color="#5865F2"
+                        isDark={isDark}
+                    />
+                    <ContactCard
+                        icon={<MessageCircle className="w-5 h-5" />}
+                        platform="AI Support"
+                        handle="DM the Bot"
+                        description="24/7 AI-powered help"
+                        href="https://discord.com/users/1443855730656788503"
+                        color="#7B1E3C"
                         isDark={isDark}
                     />
                     <ContactCard
