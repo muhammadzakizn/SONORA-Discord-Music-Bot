@@ -1,7 +1,7 @@
 {
   "web_version": "3.28.0",
   "bot_version": "3.28.0",
-  "last_updated": "2026-01-03T17:30:00+08:00",
+  "last_updated": "2026-01-03T17:45:00+08:00",
   "entries": [
     {
       "id": "v3.28.0",
@@ -9,10 +9,11 @@
       "date": "2026-01-03",
       "title": "Server Migration & Major Improvements",
       "highlights": [
-        "Server migrated for better stability",
-        "Groq AI integration (free 14,400 req/day)",
-        "Voice channel protection for playback",
-        "English-only messages"
+        "Server migrated to Windows Server",
+        "Groq AI (FREE 14,400 req/day)",
+        "Voice channel protection",
+        "English-only messages",
+        "Broadcast system fixed"
       ],
       "changes": [
         {
@@ -20,23 +21,34 @@
           "items": [
             "Server migrated from Pterodactyl (Linux) to Windows Server",
             "Improved stability and performance",
-            "All services fully operational"
+            "All services fully operational",
+            "Bot API fully accessible"
           ]
         },
         {
           "category": "AI Support System",
           "items": [
-            "Groq integration - free with 14,400 requests/day",
+            "Groq integration - FREE with 14,400 requests/day",
             "Fallback chain: Groq -> DeepSeek -> Gemini",
-            "Faster AI response times"
+            "Faster AI response times",
+            "Improved AI prompts for better answers"
           ]
         },
         {
           "category": "Voice Channel Protection",
           "items": [
             "Playback controls require voice presence",
-            "Users must be in same channel as bot",
-            "Prevents unwanted control from outside users"
+            "Users must be in same channel as bot to control",
+            "Prevents unwanted control from outside users",
+            "Applies to: pause, resume, skip, stop, volume, queue"
+          ]
+        },
+        {
+          "category": "Broadcast System Fixes",
+          "items": [
+            "Fixed duplicate/chained messages issue",
+            "Broadcast now sends messages correctly without repeating",
+            "Improved message delivery reliability"
           ]
         },
         {
@@ -44,7 +56,40 @@
           "items": [
             "All messages now in English only",
             "Reduced emoji usage for cleaner interface",
+            "Dynamic dot spinner animation",
+            "History page: Coming Soon placeholder",
             "Admin dashboard status controls removed (dev only)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "v3.27.0",
+      "version": "3.27.0",
+      "date": "2026-01-03",
+      "title": "AI Support System Overhaul",
+      "highlights": [
+        "Improved AI responses",
+        "DM bot for support",
+        "Welcome message update",
+        "Support API fixes"
+      ],
+      "changes": [
+        {
+          "category": "AI Intelligence",
+          "items": [
+            "Updated system prompt with complete feature list",
+            "AI properly answers feature questions",
+            "Improved keyword detection"
+          ]
+        },
+        {
+          "category": "Support System",
+          "items": [
+            "DM bot directly for AI support",
+            "Welcome message shows AI support info",
+            "Fixed messages in Admin Support Dashboard",
+            "Fixed Discord DM sending on developer reply"
           ]
         }
       ]
@@ -53,12 +98,12 @@
       "id": "v3.8.0",
       "version": "3.8.0",
       "date": "2025-12-13",
-      "title": "Messaging & User Tracking Overhaul",
+      "title": "Messaging & User Tracking",
       "highlights": [
         "Broadcast to DM Users",
-        "@everyone/@here mention options",
+        "@everyone/@here mention",
         "Persistent user database",
-        "Maintenance mode persists across restarts"
+        "Maintenance persists"
       ],
       "changes": [
         {
@@ -66,8 +111,7 @@
           "items": [
             "3 target types: All Servers, Specific Channel, DM Users",
             "@everyone and @here mention options",
-            "Channel permission indicators",
-            "Voice/Stage channel visibility"
+            "Channel permission indicators"
           ]
         },
         {
@@ -75,16 +119,7 @@
           "items": [
             "Persistent user database in JSON",
             "Users stored even after leaving server",
-            "Manual delete from dashboard only",
             "Sync function to refresh users"
-          ]
-        },
-        {
-          "category": "Maintenance Mode",
-          "items": [
-            "CRITICAL: Maintenance now persists across bot restarts",
-            "State saved to config/maintenance_state.json",
-            "Loaded on bot startup"
           ]
         }
       ]
@@ -95,28 +130,19 @@
       "date": "2025-12-13",
       "title": "Multi-Factor Authentication",
       "highlights": [
-        "Passkey (WebAuthn) biometric authentication",
-        "TOTP Authenticator App support",
-        "OTP via Discord DM or Email",
-        "Bank-level security"
+        "Passkey (WebAuthn) biometric",
+        "TOTP Authenticator",
+        "OTP via Discord DM",
+        "OTP via Email"
       ],
       "changes": [
         {
-          "category": "Authentication Methods",
+          "category": "Authentication",
           "items": [
-            "Passkey (WebAuthn) - fingerprint/Face ID default",
+            "Passkey (WebAuthn) - fingerprint/Face ID",
             "TOTP Authenticator - Google Authenticator, Authy",
-            "OTP via Discord DM - existing method",
-            "OTP via Email - new method"
-          ]
-        },
-        {
-          "category": "API Endpoints",
-          "items": [
-            "Passkey registration (register + complete)",
-            "Passkey authentication (authenticate + complete)",
-            "TOTP setup with QR code generation",
-            "TOTP verification"
+            "OTP via Discord DM",
+            "OTP via Email"
           ]
         }
       ]
@@ -125,53 +151,20 @@
       "id": "v3.6.0",
       "version": "3.6.0",
       "date": "2025-12-13",
-      "title": "Maintenance, Bans & Support System",
+      "title": "Maintenance & Ban System",
       "highlights": [
-        "Maintenance Mode with progress tracking",
-        "User & Server Ban Management",
-        "Support Dashboard for Admin",
-        "Phase 3-6 Complete"
+        "Maintenance Mode",
+        "User & Server Bans",
+        "Support Dashboard"
       ],
       "changes": [
         {
-          "category": "Maintenance System",
+          "category": "Admin Features",
           "items": [
-            "Maintenance Mode page with progress stages",
-            "Real-time progress percentage slider",
-            "Maintenance history log",
-            "Status Page integration"
-          ]
-        },
-        {
-          "category": "Ban Management",
-          "items": [
+            "Maintenance Mode with progress tracking",
             "User ban with reason and duration",
             "Server ban with auto-leave on reinvite",
-            "Ban list with search and filter",
-            "Unban/Reban functionality"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "v3.5.0",
-      "version": "3.5.0",
-      "date": "2025-12-13",
-      "title": "Developer Dashboard Major Upgrade",
-      "highlights": [
-        "Complete Developer Dashboard redesign",
-        "Real-time System Monitoring",
-        "Bot Controls: Shutdown, Restart, Pause",
-        "Server & User Management"
-      ],
-      "changes": [
-        {
-          "category": "Developer Dashboard",
-          "items": [
-            "Dashboard overview with system stats",
-            "Real-time Console with log filtering",
-            "System Monitoring with live metrics",
-            "Bot Controls with maintenance mode"
+            "Support Dashboard for Admin"
           ]
         }
       ]
