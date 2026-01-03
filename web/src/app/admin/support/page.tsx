@@ -589,24 +589,15 @@ export default function SupportPage() {
                                 "p-4 border-t shrink-0",
                                 isDark ? "border-white/10" : "border-gray-200"
                             )}>
-                                {/* Status Change */}
-                                <div className="flex gap-2 mb-3 flex-wrap">
-                                    {(["pending", "in_progress", "resolved", "closed"] as const).map(status => (
-                                        <button
-                                            key={status}
-                                            onClick={() => updateStatus(selectedTicket.id, status)}
-                                            className={cn(
-                                                "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                                                selectedTicket.status === status
-                                                    ? `${STATUS_COLORS[status]?.bg} ${STATUS_COLORS[status]?.text}`
-                                                    : isDark
-                                                        ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                            )}
-                                        >
-                                            {STATUS_COLORS[status]?.label}
-                                        </button>
-                                    ))}
+                                {/* Status display (read-only for admin) */}
+                                <div className="mb-3">
+                                    <span className={cn(
+                                        "text-xs",
+                                        isDark ? "text-white/50" : "text-gray-500"
+                                    )}>
+                                        Status: {STATUS_COLORS[selectedTicket.status]?.label || selectedTicket.status}
+                                        {" "}<span className="italic">(managed by developer)</span>
+                                    </span>
                                 </div>
 
                                 {/* Reply */}
@@ -616,7 +607,7 @@ export default function SupportPage() {
                                             type="text"
                                             value={replyText}
                                             onChange={(e) => setReplyText(e.target.value)}
-                                            placeholder="Ketik balasan..."
+                                            placeholder="Type reply..."
                                             onKeyDown={(e) => e.key === "Enter" && handleSendReply()}
                                             className={cn(
                                                 "flex-1 px-4 py-2 rounded-xl outline-none transition-colors",
@@ -635,7 +626,7 @@ export default function SupportPage() {
                                             ) : (
                                                 <Send className="w-4 h-4" />
                                             )}
-                                            Kirim
+                                            Send
                                         </button>
                                     </div>
                                 )}
