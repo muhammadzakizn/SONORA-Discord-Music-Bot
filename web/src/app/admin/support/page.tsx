@@ -50,11 +50,11 @@ interface SupportTicket {
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-    pending: { bg: "bg-amber-500/20", text: "text-amber-400", label: "Menunggu" },
-    in_progress: { bg: "bg-blue-500/20", text: "text-blue-400", label: "Ditangani" },
-    waiting_user: { bg: "bg-purple-500/20", text: "text-purple-400", label: "Menunggu User" },
-    resolved: { bg: "bg-green-500/20", text: "text-green-400", label: "Selesai" },
-    closed: { bg: "bg-zinc-500/20", text: "text-zinc-400", label: "Ditutup" },
+    pending: { bg: "bg-amber-500/20", text: "text-amber-400", label: "Pending" },
+    in_progress: { bg: "bg-blue-500/20", text: "text-blue-400", label: "In Progress" },
+    waiting_user: { bg: "bg-purple-500/20", text: "text-purple-400", label: "Waiting User" },
+    resolved: { bg: "bg-green-500/20", text: "text-green-400", label: "Resolved" },
+    closed: { bg: "bg-zinc-500/20", text: "text-zinc-400", label: "Closed" },
 };
 
 const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
@@ -65,9 +65,9 @@ const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
-    feedback: "💡 Feedback",
-    issue: "🐛 Bug Report",
-    live: "💬 Live Support",
+    feedback: "Feedback",
+    issue: "Bug Report",
+    live: "Live Support",
 };
 
 export default function SupportPage() {
@@ -271,12 +271,12 @@ export default function SupportPage() {
                             "block text-sm font-medium mb-2",
                             isDark ? "text-white/70" : "text-gray-700"
                         )}>
-                            Cari Tiket Berdasarkan ID
+                            Search Ticket by ID
                         </label>
                         <div className="flex gap-2">
                             <input
                                 type="text"
-                                placeholder="Contoh: SNRA-AB12-CD34"
+                                placeholder="Example: SNRA-AB12-CD34"
                                 value={ticketIdSearch}
                                 onChange={(e) => setTicketIdSearch(e.target.value)}
                                 onKeyDown={(e) => e.key === "Enter" && searchTicketById()}
@@ -297,7 +297,7 @@ export default function SupportPage() {
                                 ) : (
                                     <Search className="w-4 h-4" />
                                 )}
-                                Cari
+                                Search
                             </button>
                         </div>
                     </div>
@@ -307,9 +307,9 @@ export default function SupportPage() {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: "Menunggu", value: stats.pending, color: "amber" },
-                    { label: "Ditangani", value: stats.inProgress, color: "blue" },
-                    { label: "Selesai", value: stats.resolved, color: "green" },
+                    { label: "Pending", value: stats.pending, color: "amber" },
+                    { label: "In Progress", value: stats.inProgress, color: "blue" },
+                    { label: "Resolved", value: stats.resolved, color: "green" },
                     { label: "Total", value: stats.total, color: "purple" },
                 ].map((stat, index) => (
                     <motion.div
@@ -373,7 +373,7 @@ export default function SupportPage() {
                                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                             )}
                         >
-                            {status === "all" ? "Semua" : STATUS_COLORS[status]?.label || status}
+                            {status === "all" ? "All" : STATUS_COLORS[status]?.label || status}
                         </button>
                     ))}
                 </div>
@@ -399,8 +399,8 @@ export default function SupportPage() {
                         isDark ? "text-white/50" : "text-gray-500"
                     )}>
                         <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                        <p>Tidak ada tiket</p>
-                        <p className="text-sm mt-1">Tiket baru akan muncul di sini</p>
+                        <p>No tickets found</p>
+                        <p className="text-sm mt-1">New tickets will appear here</p>
                     </div>
                 ) : (
                     <div className="divide-y divide-white/5">

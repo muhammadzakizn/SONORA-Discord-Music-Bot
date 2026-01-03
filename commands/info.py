@@ -26,13 +26,13 @@ class WebsiteView(discord.ui.View):
         ))
 
 
-class AskAIModal(discord.ui.Modal, title="Tanya AI Support"):
+class AskAIModal(discord.ui.Modal, title="Ask AI Support"):
     """Modal for asking AI questions"""
     
     question = discord.ui.TextInput(
-        label="Pertanyaan kamu",
+        label="Your question",
         style=discord.TextStyle.paragraph,
-        placeholder="Contoh: Bagaimana cara menggunakan /play?",
+        placeholder="Example: How do I use /play?",
         max_length=500,
         required=True
     )
@@ -50,16 +50,16 @@ class AskAIModal(discord.ui.Modal, title="Tanya AI Support"):
             )
             
             embed = discord.Embed(
-                title="💬 Jawaban AI",
+                title="AI Response",
                 description=response,
                 color=0x7B1E3C
             )
-            embed.set_footer(text="Butuh bantuan lebih? DM bot ini langsung!")
+            embed.set_footer(text="Need more help? DM this bot directly!")
             
             await interaction.followup.send(embed=embed)
         except Exception as e:
             await interaction.followup.send(
-                "Maaf, AI sedang tidak tersedia. Coba DM bot ini langsung untuk bantuan."
+                "Sorry, AI is currently unavailable. Try DMing this bot directly for help."
             )
 
 
@@ -69,22 +69,22 @@ class HelpView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(
-            label="📖 Dokumentasi",
+            label="Docs",
             url="https://sonora.muhammadzakizn.com/docs",
             style=discord.ButtonStyle.link
         ))
         self.add_item(discord.ui.Button(
-            label="💬 Support Server",
+            label="Support",
             url="https://sonora.muhammadzakizn.com/support",
             style=discord.ButtonStyle.link
         ))
         self.add_item(discord.ui.Button(
-            label="🌐 Website",
+            label="Website",
             url="https://sonora.muhammadzakizn.com",
             style=discord.ButtonStyle.link
         ))
     
-    @discord.ui.button(label="🤖 Tanya AI", style=discord.ButtonStyle.primary, row=1)
+    @discord.ui.button(label="Ask AI", style=discord.ButtonStyle.primary, row=1)
     async def ask_ai_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Open AI question modal"""
         await interaction.response.send_modal(AskAIModal())
