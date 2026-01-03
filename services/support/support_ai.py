@@ -117,10 +117,30 @@ IMPORTANT:
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.api_key)
-            self._model = genai.GenerativeModel('gemini-1.5-flash')
-            self._initialized = True
-            logger.info("Gemini AI initialized for support")
-            return True
+            
+            # Try different model names (API versions vary)
+            model_names = [
+                'gemini-2.0-flash',      # Latest 2026
+                'gemini-1.5-flash',      # Previous version
+                'gemini-pro',            # Fallback
+                'models/gemini-2.0-flash-001',  # With prefix
+                'models/gemini-1.5-flash-latest',
+            ]
+            
+            for model_name in model_names:
+                try:
+                    self._model = genai.GenerativeModel(model_name)
+                    # Test if model works
+                    test_response = self._model.generate_content("Hi", generation_config={"max_output_tokens": 5})
+                    self._initialized = True
+                    logger.info(f"Gemini AI initialized for support (model: {model_name})")
+                    return True
+                except Exception as model_error:
+                    logger.debug(f"Model {model_name} not available: {model_error}")
+                    continue
+            
+            logger.error("No Gemini model available")
+            return False
         except ImportError:
             logger.error("google-generativeai not installed. Run: pip install google-generativeai")
             return False
