@@ -521,7 +521,7 @@ class YouTubeDownloader(BaseDownloader):
                 '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
                 '--no-playlist',
                 '--geo-bypass',
-                '--socket-timeout', '45',
+                '--socket-timeout', '100',
                 '--no-check-certificate',
                 '--extractor-args', 'youtube:player_client=ios,web',
             ]
@@ -536,7 +536,7 @@ class YouTubeDownloader(BaseDownloader):
                 except:
                     pass
             
-            stdout, stderr, returncode = await self._run_command(command, timeout=45)
+            stdout, stderr, returncode = await self._run_command(command, timeout=100)
             
             if returncode != 0:
                 logger.warning(f"Failed to get stream URL: {stderr}")
@@ -624,7 +624,7 @@ class YouTubeDownloader(BaseDownloader):
                 '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
                 '--no-playlist',
                 '--geo-bypass',
-                '--socket-timeout', '45',
+                '--socket-timeout', '100',
                 '--no-check-certificate',
                 '--extractor-args', 'youtube:player_client=ios,web',
                 '--remote-components', 'ejs:github',  # Enable EJS challenge solver
@@ -1030,7 +1030,7 @@ class YouTubeDownloader(BaseDownloader):
             '-o', output_template,
             '--no-playlist',
             '--geo-bypass',
-            '--socket-timeout', '30',
+            '--socket-timeout', '100',
             '--retries', '3',
             '--no-check-certificate',
             # ios,web client works with Deno for signature solving
