@@ -18,20 +18,42 @@ class ControlCommands(commands.Cog):
         self.bot = bot
         logger.info("Control commands initialized")
     
+    def _check_voice_channel(self, interaction: discord.Interaction) -> tuple[bool, str | None]:
+        """
+        Check if user is in same voice channel as bot.
+        Returns (is_valid, error_message)
+        """
+        # Check if user is in a voice channel
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            return False, "You must be in a voice channel to control playback"
+        
+        # Check if bot is in a voice channel
+        connection = self.bot.voice_manager.get_connection(interaction.guild.id)
+        if not connection or not connection.is_connected():
+            return False, "Bot is not connected to a voice channel"
+        
+        # Check if user is in the SAME voice channel as bot
+        bot_channel = connection.connection.channel
+        user_channel = interaction.user.voice.channel
+        
+        if bot_channel.id != user_channel.id:
+            return False, f"You must be in **{bot_channel.name}** to control playback"
+        
+        return True, None
+    
     @app_commands.command(name="pause", description="Pause current playback")
     async def pause(self, interaction: discord.Interaction):
         """Pause playback"""
-        connection = self.bot.voice_manager.get_connection(interaction.guild.id)
-        
-        if not connection or not connection.is_connected():
+        # Check voice channel
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
             await interaction.response.send_message(
-                embed=EmbedBuilder.create_error(
-                    "Not Playing",
-                    "Bot is not connected to voice channel"
-                ),
+                embed=EmbedBuilder.create_error("Access Denied", error_msg),
                 ephemeral=True
             )
             return
+        
+        connection = self.bot.voice_manager.get_connection(interaction.guild.id)
         
         if connection.is_paused():
             await interaction.response.send_message(
@@ -54,7 +76,7 @@ class ControlCommands(commands.Cog):
         await interaction.response.send_message(
             embed=EmbedBuilder.create_success(
                 "Paused",
-                "⏸️ Playback paused"
+                "Playback paused"
             )
         )
         
@@ -63,17 +85,16 @@ class ControlCommands(commands.Cog):
     @app_commands.command(name="resume", description="Resume playback")
     async def resume(self, interaction: discord.Interaction):
         """Resume playback"""
-        connection = self.bot.voice_manager.get_connection(interaction.guild.id)
-        
-        if not connection or not connection.is_connected():
+        # Check voice channel
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
             await interaction.response.send_message(
-                embed=EmbedBuilder.create_error(
-                    "Not Playing",
-                    "Bot is not connected to voice channel"
-                ),
+                embed=EmbedBuilder.create_error("Access Denied", error_msg),
                 ephemeral=True
             )
             return
+        
+        connection = self.bot.voice_manager.get_connection(interaction.guild.id)
         
         if not connection.is_paused():
             await interaction.response.send_message(
@@ -96,7 +117,7 @@ class ControlCommands(commands.Cog):
         await interaction.response.send_message(
             embed=EmbedBuilder.create_success(
                 "Resumed",
-                "▶️ Playback resumed"
+                "Playback resumed"
             )
         )
         
@@ -105,17 +126,16 @@ class ControlCommands(commands.Cog):
     @app_commands.command(name="stop", description="Stop playback and disconnect")
     async def stop(self, interaction: discord.Interaction):
         """Stop playback"""
-        connection = self.bot.voice_manager.get_connection(interaction.guild.id)
-        
-        if not connection or not connection.is_connected():
+        # Check voice channel
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
             await interaction.response.send_message(
-                embed=EmbedBuilder.create_error(
-                    "Not Playing",
-                    "Bot is not connected to voice channel"
-                ),
+                embed=EmbedBuilder.create_error("Access Denied", error_msg),
                 ephemeral=True
             )
             return
+        
+        connection = self.bot.voice_manager.get_connection(interaction.guild.id)
         
         # CLEANUP: Delete opus streaming files before stopping
         if hasattr(self.bot, 'players') and interaction.guild.id in self.bot.players:
@@ -156,17 +176,16 @@ class ControlCommands(commands.Cog):
     @app_commands.command(name="skip", description="Skip current track")
     async def skip(self, interaction: discord.Interaction):
         """Skip current track"""
-        connection = self.bot.voice_manager.get_connection(interaction.guild.id)
-        
-        if not connection or not connection.is_connected():
+        # Check voice channel
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
             await interaction.response.send_message(
-                embed=EmbedBuilder.create_error(
-                    "Not Playing",
-                    "Bot is not connected to voice channel"
-                ),
+                embed=EmbedBuilder.create_error("Access Denied", error_msg),
                 ephemeral=True
             )
             return
+        
+        connection = self.bot.voice_manager.get_connection(interaction.guild.id)
         
         if not connection.is_playing():
             await interaction.response.send_message(
@@ -183,7 +202,7 @@ class ControlCommands(commands.Cog):
         await interaction.response.send_message(
             embed=EmbedBuilder.create_success(
                 "Skipped",
-                "⏭️ Skipped current track"
+                "Skipped current track"
             )
         )
         

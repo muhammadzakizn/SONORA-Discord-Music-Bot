@@ -27,113 +27,133 @@ class MediaPlayerView(discord.ui.View):
         self.bot = bot
         self.guild_id = guild_id
     
+    def _check_voice_channel(self, interaction: discord.Interaction) -> tuple[bool, str]:
+        """Check if user is in same voice channel as bot"""
+        # Check if user is in a voice channel
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            return False, "You must be in a voice channel to control playback"
+        
+        # Check if bot is in a voice channel
+        connection = self.bot.voice_manager.get_connection(self.guild_id)
+        if not connection or not connection.is_connected():
+            return False, "Bot is not connected to a voice channel"
+        
+        # Check if user is in the SAME voice channel as bot
+        bot_channel = connection.connection.channel
+        user_channel = interaction.user.voice.channel
+        
+        if bot_channel.id != user_channel.id:
+            return False, f"You must be in **{bot_channel.name}** to control playback"
+        
+        return True, ""
+    
     @discord.ui.select(
-        placeholder="🎵 Menu Kontrol",
+        placeholder="Menu Kontrol",
         options=[
             discord.SelectOption(
-                label="⏸️ Pause",
+                label="Pause",
                 value="pause",
                 description="Pause playback"
             ),
             discord.SelectOption(
-                label="▶️ Resume",
+                label="Resume",
                 value="resume",
                 description="Resume playback"
             ),
             discord.SelectOption(
-                label="⏭️ Skip",
+                label="Skip",
                 value="skip",
-                description="Skip lagu sekarang"
+                description="Skip current song"
             ),
             discord.SelectOption(
-                label="⏹️ Stop",
+                label="Stop",
                 value="stop",
                 description="Stop & disconnect"
             ),
             discord.SelectOption(
-                label="🔊 Volume Up",
+                label="Volume Up",
                 value="volume_up",
-                description="Naikkan volume 10%"
+                description="Increase volume 10%"
             ),
             discord.SelectOption(
-                label="🔉 Volume Down",
+                label="Volume Down",
                 value="volume_down",
-                description="Turunkan volume 10%"
+                description="Decrease volume 10%"
             ),
             discord.SelectOption(
-                label="🔇 Mute",
+                label="Mute",
                 value="mute",
                 description="Mute/Unmute audio"
             ),
             discord.SelectOption(
-                label="🔄 Volume Reset",
+                label="Volume Reset",
                 value="volume_reset",
-                description="Reset volume ke 100%"
+                description="Reset volume to 100%"
             ),
             discord.SelectOption(
-                label="🎚️ Volume Control",
+                label="Volume Control",
                 value="volume_control",
                 description="Open volume slider"
             ),
             discord.SelectOption(
-                label="🎛️ Equalizer",
+                label="Equalizer",
                 value="equalizer",
                 description="Adjust EQ settings"
             ),
             discord.SelectOption(
-                label="📋 Queue",
+                label="Queue",
                 value="queue",
-                description="Lihat queue"
+                description="View queue"
             ),
             discord.SelectOption(
-                label="🎤 Lyrics",
+                label="Lyrics",
                 value="lyrics",
-                description="Kontrol lirik"
+                description="Lyrics control"
             ),
             discord.SelectOption(
-                label="🗑️ Clear Queue",
+                label="Clear Queue",
                 value="clear",
-                description="Hapus semua queue"
+                description="Clear all queue"
             ),
             discord.SelectOption(
-                label="🔀 Shuffle",
+                label="Shuffle",
                 value="shuffle",
                 description="Shuffle queue"
             ),
             discord.SelectOption(
-                label="🔁 Loop Queue",
+                label="Loop Queue",
                 value="loop_queue",
                 description="Toggle loop queue"
             ),
             discord.SelectOption(
-                label="🔂 Loop Track",
+                label="Loop Track",
                 value="loop_track",
                 description="Toggle loop track"
             ),
             discord.SelectOption(
-                label="ℹ️ Now Playing",
+                label="Now Playing",
                 value="now_playing",
-                description="Info lagu sekarang"
+                description="Current song info"
             ),
             discord.SelectOption(
-                label="📊 Stats",
+                label="Stats",
                 value="stats",
-                description="Statistik bot"
+                description="Bot statistics"
             ),
             discord.SelectOption(
-                label="💖 Donate",
+                label="Donate",
                 value="donate",
-                description="Support developer SONORA"
+                description="Support developer"
             ),
             discord.SelectOption(
-                label="🌐 Website",
+                label="Website",
                 value="website",
-                description="Fitur-fitur website SONORA"
+                description="SONORA website features"
             ),
             discord.SelectOption(
-                label="❓ Help",
+                label="Help",
                 value="help",
-                description="Panduan menggunakan bot"
+                description="Bot usage guide"
             ),
         ]
     )
@@ -150,15 +170,22 @@ class MediaPlayerView(discord.ui.View):
             # Get voice connection
             connection = self.bot.voice_manager.get_connection(self.guild_id)
             
+            # Voice channel check required for playback controls
+            if action in ("pause", "resume", "skip", "stop", "volume_up", "volume_down", "mute", "volume_reset", "clear", "shuffle"):
+                is_valid, error_msg = self._check_voice_channel(interaction)
+                if not is_valid:
+                    await interaction.response.send_message(f"Access Denied: {error_msg}", ephemeral=True, delete_after=5)
+                    return
+            
             if action == "pause":
                 if connection and connection.is_playing():
                     connection.connection.pause()
                     # Also update player's is_paused state so update loop pauses
                     if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
                         self.bot.players[self.guild_id].is_paused = True
-                    await interaction.response.send_message("⏸️ Paused", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Paused", ephemeral=True, delete_after=3)
                 else:
-                    await interaction.response.send_message("❌ Tidak ada yang diputar", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=3)
             
             elif action == "resume":
                 if connection and connection.is_paused():
@@ -166,16 +193,16 @@ class MediaPlayerView(discord.ui.View):
                     # Also update player's is_paused state so update loop resumes
                     if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
                         self.bot.players[self.guild_id].is_paused = False
-                    await interaction.response.send_message("▶️ Resumed", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Resumed", ephemeral=True, delete_after=3)
                 else:
-                    await interaction.response.send_message("❌ Playback tidak di-pause", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Playback not paused", ephemeral=True, delete_after=3)
             
             elif action == "skip":
                 if connection and connection.is_playing():
                     connection.connection.stop()
-                    await interaction.response.send_message("⏭️ Skipped", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Skipped", ephemeral=True, delete_after=3)
                 else:
-                    await interaction.response.send_message("❌ Tidak ada yang diputar", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=3)
             
             elif action == "stop":
                 if connection:
@@ -196,9 +223,9 @@ class MediaPlayerView(discord.ui.View):
                             player.update_task.cancel()
                     
                     await connection.disconnect()
-                    await interaction.response.send_message("⏹️ Stopped & queue cleared", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Stopped & queue cleared", ephemeral=True, delete_after=3)
                 else:
-                    await interaction.response.send_message("❌ Bot tidak connected", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Bot not connected", ephemeral=True, delete_after=3)
             
             elif action == "volume_up":
                 volume_cog = self.bot.get_cog('VolumeCommands')
@@ -351,7 +378,7 @@ class MediaPlayerView(discord.ui.View):
                     queue_cog.queues[self.guild_id] = []
                     await interaction.response.send_message(f"🗑️ Cleared {count} tracks dari queue", ephemeral=True, delete_after=3)
                 else:
-                    await interaction.response.send_message("❌ Queue system tidak tersedia", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Queue system not available", ephemeral=True, delete_after=3)
             
             elif action == "mute":
                 volume_cog = self.bot.get_cog('VolumeCommands')
@@ -372,9 +399,9 @@ class MediaPlayerView(discord.ui.View):
                             volume_cog.guild_volumes[self.guild_id] = saved_volume
                             await interaction.response.send_message(f"🔊 Unmuted (Volume: {saved_volume}%)", ephemeral=True, delete_after=3)
                     else:
-                        await interaction.response.send_message("❌ Volume control tidak tersedia", ephemeral=True, delete_after=3)
+                        await interaction.response.send_message("Volume control not available", ephemeral=True, delete_after=3)
                 else:
-                    await interaction.response.send_message("❌ Tidak ada yang diputar", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=3)
             
             elif action == "volume_reset":
                 volume_cog = self.bot.get_cog('VolumeCommands')
@@ -382,11 +409,11 @@ class MediaPlayerView(discord.ui.View):
                     if isinstance(connection.connection.source, discord.PCMVolumeTransformer):
                         connection.connection.source.volume = 1.0
                         volume_cog.guild_volumes[self.guild_id] = 100
-                        await interaction.response.send_message("🔄 Volume reset ke 100%", ephemeral=True, delete_after=3)
+                        await interaction.response.send_message("Volume reset to 100%", ephemeral=True, delete_after=3)
                     else:
-                        await interaction.response.send_message("❌ Volume control tidak tersedia", ephemeral=True, delete_after=3)
+                        await interaction.response.send_message("Volume control not available", ephemeral=True, delete_after=3)
                 else:
-                    await interaction.response.send_message("❌ Tidak ada yang diputar", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=3)
             
             elif action == "shuffle":
                 queue_cog = self.bot.get_cog('QueueCommands')
@@ -398,9 +425,9 @@ class MediaPlayerView(discord.ui.View):
                         queue_cog.queues[self.guild_id] = queue_items
                         await interaction.response.send_message(f"🔀 Shuffled {len(queue_items)} tracks", ephemeral=True, delete_after=3)
                     else:
-                        await interaction.response.send_message("❌ Queue terlalu sedikit untuk shuffle", ephemeral=True, delete_after=3)
+                        await interaction.response.send_message("Queue too small to shuffle", ephemeral=True, delete_after=3)
                 else:
-                    await interaction.response.send_message("❌ Queue system tidak tersedia", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("Queue system not available", ephemeral=True, delete_after=3)
             
             elif action == "loop_queue":
                 # Initialize loop state if not exists
