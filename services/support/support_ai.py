@@ -118,16 +118,11 @@ IMPORTANT:
         try:
             # New package: google-genai
             from google import genai
-            logger.info("google-genai package found, attempting to initialize...")
+            logger.info("google-genai package found, initializing client...")
             
             self._client = genai.Client(api_key=self.api_key)
             
-            # Test with a simple prompt
-            response = self._client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents='Hi'
-            )
-            
+            # Don't test on init to save quota - just initialize
             self._model = 'gemini-2.0-flash'
             self._use_new_api = True
             self._initialized = True
