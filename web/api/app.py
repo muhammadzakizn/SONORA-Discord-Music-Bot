@@ -76,6 +76,14 @@ try:
 except ImportError as e:
     logger.warning(f"YTDLP API not available: {e}")
 
+# ==================== SUPPORT API ====================
+try:
+    from web.api.support_api import support_bp
+    app.register_blueprint(support_bp)
+    logger.info("✓ Support API blueprint registered")
+except ImportError as e:
+    logger.warning(f"Support API not available: {e}")
+
 # Global bot reference (will be set by main.py)
 _bot_instance = None
 
