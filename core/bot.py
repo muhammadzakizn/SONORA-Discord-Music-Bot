@@ -35,14 +35,11 @@ class MusicBot(commands.Bot):
         
         # Check for proxy configuration
         import os
-        import aiohttp
         proxy_url = os.getenv('DISCORD_PROXY')
         
         # Initialize bot with optional proxy
         if proxy_url:
             logger.info(f"Using proxy for Discord API: {proxy_url.split('@')[-1] if '@' in proxy_url else proxy_url}")
-            # Create connector with proxy
-            connector = aiohttp.TCPConnector()
             super().__init__(
                 command_prefix='!',
                 intents=intents,
