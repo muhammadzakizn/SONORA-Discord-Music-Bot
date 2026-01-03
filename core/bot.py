@@ -91,6 +91,21 @@ class MusicBot(commands.Bot):
                 # Get command name
                 command_name = interaction.command.name if interaction.command else ""
                 
+                # Block ALL slash commands in DM (only support via DM message, not slash command)
+                if interaction.guild is None:
+                    embed = discord.Embed(
+                        title="📛 Perintah Tidak Tersedia di DM",
+                        description=(
+                            "Slash commands hanya bisa dipakai **di dalam server**.\n"
+                            "*Slash commands can only be used **in a server**.*\n\n"
+                            "💬 **Butuh bantuan?** Kirim pesan biasa di sini untuk bicara dengan AI Support!\n"
+                            "*Need help? Just send a regular message here to chat with AI Support!*"
+                        ),
+                        color=0xFEE75C
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return False
+                
                 # Skip check for admin commands
                 if command_name not in ['admin', 'maintenance']:
                     
