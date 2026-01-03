@@ -19,7 +19,7 @@ logger = logging.getLogger('discord_music_bot.commands.support')
 
 
 class SupportCog(commands.Cog):
-    """Customer Support commands and DM handling"""
+    """Customer Support DM handling - Users just DM the bot directly"""
     
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -27,91 +27,8 @@ class SupportCog(commands.Cog):
         self.db = get_support_db()
         self._active_sessions = {}  # user_id -> session info
     
-    @app_commands.command(name="support", description="Get customer support via DM")
-    async def support(self, interaction: discord.Interaction):
-        """
-        Open support session via DM.
-        Must be used in a guild, will send DM to user.
-        """
-        # Check if used in DM
-        if isinstance(interaction.channel, discord.DMChannel):
-            await interaction.response.send_message(
-                embed=discord.Embed(
-                    title="Support",
-                    description="Kamu sudah di DM! Langsung ketik pesan kamu.",
-                    color=0x7B1E3C
-                ),
-                ephemeral=True
-            )
-            return
-        
-        # Check if user is logged in (has dashboard account)
-        user_id = str(interaction.user.id)
-        
-        # Try to send DM
-        try:
-            dm_channel = await interaction.user.create_dm()
-            
-            # Welcome message
-            embed = discord.Embed(
-                title="SONORA Support",
-                description=(
-                    f"Hai **{interaction.user.display_name}**! Selamat datang di SONORA Support.\n\n"
-                    "Aku adalah AI Assistant yang siap membantu kamu. Kamu bisa:\n\n"
-                    "💬 **Tanya apa saja** tentang SONORA\n"
-                    "💡 **Beri feedback** atau saran fitur\n"
-                    "🐛 **Laporkan masalah** yang kamu temui\n"
-                    "👨‍💻 **Hubungi developer** untuk bantuan langsung\n\n"
-                    "Ketik pesan kamu, atau klik tombol di bawah:"
-                ),
-                color=0x7B1E3C
-            )
-            embed.set_thumbnail(url=self.bot.user.display_avatar.url if self.bot.user else None)
-            embed.set_footer(text="Support SONORA • Powered by AI")
-            
-            # Create action buttons
-            view = SupportActionView(
-                on_ticket_created=self._notify_developers
-            )
-            
-            await dm_channel.send(embed=embed, view=view)
-            
-            # Mark session as active
-            self._active_sessions[user_id] = {
-                'started_at': discord.utils.utcnow(),
-                'guild_id': interaction.guild.id if interaction.guild else None
-            }
-            
-            await interaction.response.send_message(
-                embed=discord.Embed(
-                    title="Support Session Started",
-                    description=(
-                        "Cek DM kamu untuk memulai sesi support.\n"
-                        "Jika tidak menerima DM, pastikan pengaturan privasi "
-                        "Discord kamu mengizinkan pesan dari anggota server."
-                    ),
-                    color=0x7B1E3C
-                ),
-                ephemeral=True
-            )
-            
-            logger.info(f"Support session started for {interaction.user.display_name}")
-            
-        except discord.Forbidden:
-            await interaction.response.send_message(
-                embed=discord.Embed(
-                    title="Tidak Bisa Mengirim DM",
-                    description=(
-                        "Aku tidak bisa mengirim DM ke kamu.\n\n"
-                        "**Cara mengaktifkan:**\n"
-                        "1. Buka Server Settings\n"
-                        "2. Privacy Settings\n"
-                        "3. Aktifkan 'Allow DMs from server members'"
-                    ),
-                    color=0xE74C3C
-                ),
-                ephemeral=True
-            )
+    # No /support command - users just DM the bot directly
+    # Info about DM support is shown in welcome/goodbye messages
     
     async def _notify_developers(self, ticket_id: str):
         """Notify developers about new ticket"""

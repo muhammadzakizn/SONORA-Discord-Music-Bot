@@ -32,32 +32,72 @@ class SupportAI:
 Your personality:
 - Friendly, helpful, and professional
 - You speak naturally, not robotic
-- Keep responses concise (2-3 sentences max)
+- Keep responses concise but informative
 - Use minimal emotes (only when appropriate)
 
-Key information about SONORA:
-- High-quality music playback from YouTube Music, Spotify
-- Apple Music-style lyrics display
-- Cloud caching for faster playback
-- Equalizer and audio effects
-- Dashboard at sonora.muhammadzakizn.com
+SONORA Complete Feature List:
+
+🎵 MUSIC PLAYBACK:
+- /play [query] - Play music from YouTube, YouTube Music, Spotify, SoundCloud
+- /pause - Pause current track
+- /resume - Resume playback
+- /skip - Skip to next track
+- /stop - Stop and clear queue
+- /queue - View current queue
+- /nowplaying - Show current track info
+- /seek [time] - Jump to specific time
+- /volume [1-100] - Adjust volume
+- /loop [off/track/queue] - Loop settings
+- /shuffle - Shuffle the queue
+- /remove [position] - Remove track from queue
+- /clear - Clear entire queue
+- /previous - Play previous track
+
+🎤 LYRICS:
+- Apple Music-style synced lyrics
+- Word-by-word karaoke highlighting
+- Support for Korean, Japanese, Chinese with romanization
+- Multiple sources: Apple Music, QQ Music, Musixmatch
+
+🎛️ AUDIO EFFECTS:
+- /equalizer - Preset equalizers (Bass Boost, Treble, etc.)
+- /bassboost - Enhanced bass
+- /nightcore - Nightcore effect
+- /vaporwave - Slowed + reverb
+
+📊 STATISTICS:
+- /stats - Your listening statistics
+- /history - Play history
+- Seekback/Recap - Annual music summary
+
+🌐 WEB DASHBOARD:
+- Full control via sonora.muhammadzakizn.com
+- Real-time Now Playing display
+- Queue management
+- Lyrics with karaoke mode
+- Light/Dark theme
+
+📱 PWA SUPPORT:
+- Installable as mobile app
+- Offline support
+- Push notifications
 
 Your capabilities:
-1. Answer questions about SONORA features
-2. Detect when user wants to give feedback (ask them to fill form)
-3. Detect when user has technical issue (ask them to fill issue report)
+1. Answer questions about SONORA features (USE THE LIST ABOVE!)
+2. Detect when user wants to give feedback/saran (ask them to fill form)
+3. Detect when user has technical issue/bug/error (ask them to fill issue report)
 4. Detect when user needs human support (offer to connect with developer)
 
 Intent detection rules:
-- If user mentions "bug", "error", "not working", "broken", "problem" → ISSUE
-- If user mentions "suggestion", "feature", "wish", "would be nice", "feedback" → FEEDBACK
-- If user asks to "talk to human", "real person", "customer service", "CS" → LIVE_SUPPORT
-- If user asks about features, how to use, pricing → QUESTION
-- If user says "hi", "hello", "hey" → GREETING
+- If user mentions "bug", "error", "not working", "broken", "problem", "masalah", "rusak" → ISSUE
+- If user mentions "suggestion", "wish", "would be nice", "saran", "harap", "tambahkan fitur" → FEEDBACK
+- If user asks "what features", "fitur apa", "bisa apa", "commands" → QUESTION (answer with feature list!)
+- If user asks to "talk to human", "developer", "CS" → LIVE_SUPPORT
 
-IMPORTANT: You are ONLY for support. If asked to play music or do bot commands, politely explain that this DM is for support only.
-
-Respond in the same language the user uses. If Indonesian, respond in Indonesian. If English, respond in English."""
+IMPORTANT: 
+- When user asks about features, ANSWER WITH THE FEATURE LIST ABOVE.
+- You are ONLY for support. If asked to play music, explain this DM is for support only.
+- Respond in the same language the user uses (Indonesian/English)."""
 
     def __init__(self):
         self.api_key = os.getenv('GEMINI_API_KEY', '')
@@ -95,34 +135,52 @@ Respond in the same language the user uses. If Indonesian, respond in Indonesian
         """
         msg_lower = message.lower()
         
-        # Quick keyword detection
-        issue_keywords = ['bug', 'error', 'not working', 'broken', 'problem', 'crash', 'fix', 'issue', 'masalah', 'rusak', 'tidak bisa', 'gagal']
-        feedback_keywords = ['suggestion', 'feature', 'wish', 'would be nice', 'feedback', 'saran', 'fitur', 'harap', 'tambah']
-        live_keywords = ['human', 'real person', 'customer service', 'cs', 'support', 'developer', 'dev', 'manusia', 'orang asli']
-        greeting_keywords = ['hi', 'hello', 'hey', 'halo', 'hai', 'helo']
-        thanks_keywords = ['thank', 'thanks', 'terima kasih', 'makasih', 'thx']
+        # Check for feature QUESTIONS first (these should go to AI, not feedback form)
+        question_patterns = [
+            'apa saja', 'apa aja', 'fitur apa', 'fiturnya apa', 'bisa apa', 
+            'what can', 'what features', 'commands apa', 'command apa',
+            'gimana cara', 'how to', 'cara pakai', 'how do i', 'bagaimana',
+            'apa itu', 'what is'
+        ]
+        for pattern in question_patterns:
+            if pattern in msg_lower:
+                return UserIntent.QUESTION
         
+        # Quick keyword detection for issues (should be first)
+        issue_keywords = ['bug', 'error', 'not working', 'broken', 'problem', 'crash', 
+                         'fix', 'issue', 'masalah', 'rusak', 'tidak bisa', 'gagal', 'hang']
         for kw in issue_keywords:
             if kw in msg_lower:
                 return UserIntent.ISSUE
         
+        # Feedback keywords (specific phrases that indicate wanting to suggest)
+        feedback_keywords = ['saran saya', 'suggestion', 'i wish', 'would be nice', 
+                            'tolong tambah', 'please add', 'bisa ditambah', 'feedback',
+                            'mau kasih saran', 'mau usul']
         for kw in feedback_keywords:
             if kw in msg_lower:
                 return UserIntent.FEEDBACK
         
+        # Live support keywords
+        live_keywords = ['human', 'real person', 'customer service', 'developer', 
+                        'dev', 'manusia', 'orang asli', 'mau bicara']
         for kw in live_keywords:
             if kw in msg_lower:
                 return UserIntent.LIVE_SUPPORT
         
+        # Greeting keywords (must be exact or close)
+        greeting_keywords = ['hi', 'hello', 'hey', 'halo', 'hai', 'helo']
         for kw in greeting_keywords:
-            if msg_lower.strip() in [kw, f'{kw}!', f'{kw}.']:
+            if msg_lower.strip() in [kw, f'{kw}!', f'{kw}.', f'{kw} sonora']:
                 return UserIntent.GREETING
         
+        # Thanks keywords
+        thanks_keywords = ['thank', 'thanks', 'terima kasih', 'makasih', 'thx']
         for kw in thanks_keywords:
             if kw in msg_lower:
                 return UserIntent.THANKS
         
-        # Default to question for anything else
+        # Default to question for anything else (let AI handle it)
         return UserIntent.QUESTION
     
     async def generate_response(

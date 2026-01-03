@@ -228,6 +228,17 @@ class WelcomeView(ui.View):
             inline=False
         )
         
+        # AI Support info
+        embed.add_field(
+            name="💬 Butuh Bantuan? / Need Help?",
+            value=(
+                "Langsung **DM bot ini** untuk bantuan AI 24/7!\n"
+                "*Just **DM this bot** for 24/7 AI support!*\n"
+                "AI kami bisa menjawab pertanyaan, feedback, dan laporan."
+            ),
+            inline=False
+        )
+        
         embed.set_footer(
             text="Klik 🔄 Refresh untuk cek ulang perizinan | Click 🔄 Refresh to re-check permissions"
         )
