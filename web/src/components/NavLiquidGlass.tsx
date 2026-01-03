@@ -181,6 +181,10 @@ export default function NavLiquidGlass() {
                 if (target.closest?.('[data-nav-popup]')) {
                     return; // Don't hide nav when scrolling inside popups
                 }
+                // Check if scroll is from notification panel
+                if (target.closest?.('[data-notification-panel]') || target.hasAttribute?.('data-notification-panel')) {
+                    return; // Don't hide nav when scrolling inside notification panel
+                }
             }
 
             // Get scroll position from either window or scrollable container

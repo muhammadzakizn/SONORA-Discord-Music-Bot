@@ -402,8 +402,11 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
                             </div>
                         </div>
 
-                        {/* Content */}
-                        <div className="overflow-y-auto max-h-[calc(70vh-60px)]">
+                        {/* Content - with data-notification-panel to prevent auto-close on scroll */}
+                        <div
+                            className="overflow-y-auto max-h-[calc(70vh-60px)]"
+                            data-notification-panel
+                        >
                             {notifications.length === 0 ? (
                                 <div className={cn(
                                     "flex flex-col items-center justify-center py-12 px-4",
