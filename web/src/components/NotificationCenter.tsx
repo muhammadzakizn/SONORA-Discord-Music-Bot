@@ -44,12 +44,12 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
         let isScrolling = false;
         let scrollTimeout: NodeJS.Timeout;
 
-        const handleScroll = () => {
+        const markScrolling = () => {
             isScrolling = true;
             clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(() => {
                 isScrolling = false;
-            }, 150);
+            }, 300); // Increased to 300ms for trackpad momentum
         };
 
         const handleClick = (e: MouseEvent) => {
@@ -64,13 +64,17 @@ export function NotificationCenter({ isDark = true }: NotificationCenterProps) {
         if (isOpen) {
             // Use click instead of mousedown to avoid closing during scroll
             document.addEventListener('click', handleClick);
-            // Track scroll events
-            document.addEventListener('scroll', handleScroll, true);
+            // Track all scroll-related events for trackpad support
+            document.addEventListener('scroll', markScrolling, true);
+            document.addEventListener('wheel', markScrolling, { passive: true, capture: true });
+            document.addEventListener('touchmove', markScrolling, { passive: true, capture: true });
         }
 
         return () => {
             document.removeEventListener('click', handleClick);
-            document.removeEventListener('scroll', handleScroll, true);
+            document.removeEventListener('scroll', markScrolling, true);
+            document.removeEventListener('wheel', markScrolling);
+            document.removeEventListener('touchmove', markScrolling);
             clearTimeout(scrollTimeout);
         };
     }, [isOpen]);

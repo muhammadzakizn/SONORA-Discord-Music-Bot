@@ -175,7 +175,7 @@ async def with_spinner(
         result = await with_spinner(
             message=msg,
             title="Loading",
-            details="Please wait...",
+            details="Please wait",
             coro=some_async_function()
         )
     
