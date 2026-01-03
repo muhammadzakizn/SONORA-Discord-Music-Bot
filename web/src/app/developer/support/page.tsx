@@ -136,14 +136,94 @@ export default function SupportPage() {
         fetchStats();
     }, [fetchTickets, fetchStats]);
 
-    // Auto-refresh every 10 seconds
+    // WebSocket connection for real-time updates
     useEffect(() => {
+        // Dynamic import socket.io-client
+        const connectWebSocket = async () => {
+            try {
+                const { io } = await import("socket.io-client");
+                const socket = io(API_BASE, {
+                    transports: ["websocket", "polling"],
+                    autoConnect: true,
+                });
+
+                socket.on("connect", () => {
+                    console.log("Support WebSocket connected");
+                });
+
+                // New ticket notification
+                socket.on("support_new_ticket", (data) => {
+                    console.log("New ticket:", data);
+                    fetchTickets();
+                    fetchStats();
+                    // Play sound
+                    if (soundEnabled && audioRef.current) {
+                        audioRef.current.play().catch(() => { });
+                    }
+                });
+
+                // Status changed
+                socket.on("support_status_changed", (data) => {
+                    console.log("Status changed:", data);
+                    // Update ticket in list
+                    setTickets((prev) =>
+                        prev.map((t) =>
+                            t.id === data.ticket_id
+                                ? { ...t, status: data.new_status }
+                                : t
+                        )
+                    );
+                    // Update selected ticket if same
+                    if (selectedTicket?.id === data.ticket_id) {
+                        setSelectedTicket((prev) =>
+                            prev ? { ...prev, status: data.new_status } : null
+                        );
+                    }
+                    fetchStats();
+                });
+
+                // New message
+                socket.on("support_new_message", (data) => {
+                    console.log("New message:", data);
+                    // If viewing this ticket, add message
+                    if (selectedTicket?.id === data.ticket_id) {
+                        setSelectedTicket((prev) =>
+                            prev
+                                ? {
+                                    ...prev,
+                                    messages: [...prev.messages, data.message],
+                                }
+                                : null
+                        );
+                    }
+                    // Play sound for user messages
+                    if (data.message?.sender_type === "user" && soundEnabled && audioRef.current) {
+                        audioRef.current.play().catch(() => { });
+                    }
+                });
+
+                socket.on("disconnect", () => {
+                    console.log("Support WebSocket disconnected");
+                });
+
+                return () => {
+                    socket.disconnect();
+                };
+            } catch (err) {
+                console.warn("WebSocket not available, using polling:", err);
+            }
+        };
+
+        connectWebSocket();
+
+        // Fallback: Also poll every 30 seconds (reduced from 10)
         const interval = setInterval(() => {
             fetchTickets();
             fetchStats();
-        }, 10000);
+        }, 30000);
+
         return () => clearInterval(interval);
-    }, [fetchTickets, fetchStats]);
+    }, [fetchTickets, fetchStats, soundEnabled, selectedTicket?.id]);
 
     // Scroll to bottom on new messages
     useEffect(() => {

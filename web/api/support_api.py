@@ -3,6 +3,7 @@ Support API Endpoints
 
 Flask routes for customer support system.
 Handles tickets, messages, and notifications for developer dashboard.
+WebSocket events for real-time updates.
 """
 
 import logging
@@ -20,6 +21,20 @@ logger = logging.getLogger('discord_music_bot.api.support')
 
 # Create blueprint
 support_bp = Blueprint('support', __name__, url_prefix='/api/support')
+
+# SocketIO reference (set by register_support_api)
+_socketio = None
+
+
+def emit_ticket_event(event: str, data: dict):
+    """Emit WebSocket event for ticket updates"""
+    global _socketio
+    if _socketio:
+        try:
+            _socketio.emit(f'support_{event}', data)
+            logger.debug(f"Emitted support_{event}")
+        except Exception as e:
+            logger.warning(f"Failed to emit {event}: {e}")
 
 
 @support_bp.route('/tickets', methods=['GET'])
@@ -112,6 +127,13 @@ def update_ticket_status(ticket_id: str):
         if not success:
             return jsonify({'success': False, 'error': 'Ticket not found'}), 404
         
+        # Emit WebSocket event for real-time update
+        emit_ticket_event('status_changed', {
+            'ticket_id': ticket_id,
+            'new_status': new_status,
+            'assigned_to': assigned_to
+        })
+        
         return jsonify({
             'success': True,
             'message': f'Status updated to {new_status}'
@@ -190,6 +212,12 @@ def send_message(ticket_id: str):
         except Exception as e:
             logger.warning(f"Error sending DM: {e}")
         
+        # Emit WebSocket event for real-time chat
+        emit_ticket_event('new_message', {
+            'ticket_id': ticket_id,
+            'message': message.to_dict()
+        })
+        
         return jsonify({
             'success': True,
             'message': message.to_dict(),
@@ -233,7 +261,17 @@ def get_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-def register_support_api(app):
-    """Register support blueprint with Flask app"""
+def register_support_api(app, socketio=None):
+    """Register support blueprint with Flask app and SocketIO"""
+    global _socketio
+    _socketio = socketio
     app.register_blueprint(support_bp)
-    logger.info("Support API endpoints registered")
+    logger.info(f"Support API endpoints registered (WebSocket: {socketio is not None})")
+
+
+def emit_new_ticket(ticket):
+    """Called by bot when new ticket is created"""
+    emit_ticket_event('new_ticket', {
+        'ticket': ticket.to_dict() if hasattr(ticket, 'to_dict') else ticket
+    })
+
