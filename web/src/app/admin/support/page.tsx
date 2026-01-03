@@ -1,162 +1,190 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Headphones,
     Search,
-    Filter,
     Clock,
     CheckCircle,
     AlertCircle,
     MessageSquare,
     User,
-    Calendar,
     ChevronRight,
     RefreshCw,
     Send,
     X,
-    Eye,
+    Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useSession } from "@/contexts/SessionContext";
+
+// API URL
+const API_BASE = process.env.NEXT_PUBLIC_BOT_API_URL || "http://localhost:5000";
+
+// Types matching the real API
+interface Message {
+    id: string;
+    ticket_id: string;
+    sender_type: "user" | "developer";
+    sender_id: string;
+    content: string;
+    created_at: string;
+}
 
 interface SupportTicket {
     id: string;
-    code: string;
+    user_id: string;
+    user_name: string;
+    ticket_type: "feedback" | "issue" | "live";
+    status: "pending" | "in_progress" | "waiting_user" | "resolved" | "closed";
     subject: string;
-    category: string;
-    status: "open" | "in_progress" | "resolved" | "closed";
-    priority: "low" | "medium" | "high" | "urgent";
-    createdAt: string;
-    updatedAt: string;
-    userName: string;
-    userEmail: string;
-    messages: {
-        id: string;
-        sender: "user" | "admin";
-        content: string;
-        timestamp: string;
-    }[];
+    description: string;
+    priority: "low" | "normal" | "high" | "urgent";
+    assigned_to: string | null;
+    messages: Message[];
+    created_at: string;
+    updated_at: string;
+    resolved_at: string | null;
 }
 
-const STATUS_COLORS = {
-    open: { bg: "bg-blue-500/20", text: "text-blue-400", label: "Open" },
-    in_progress: { bg: "bg-yellow-500/20", text: "text-yellow-400", label: "In Progress" },
-    resolved: { bg: "bg-green-500/20", text: "text-green-400", label: "Resolved" },
-    closed: { bg: "bg-zinc-500/20", text: "text-zinc-400", label: "Closed" },
+const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+    pending: { bg: "bg-amber-500/20", text: "text-amber-400", label: "Menunggu" },
+    in_progress: { bg: "bg-blue-500/20", text: "text-blue-400", label: "Ditangani" },
+    waiting_user: { bg: "bg-purple-500/20", text: "text-purple-400", label: "Menunggu User" },
+    resolved: { bg: "bg-green-500/20", text: "text-green-400", label: "Selesai" },
+    closed: { bg: "bg-zinc-500/20", text: "text-zinc-400", label: "Ditutup" },
 };
 
-const PRIORITY_COLORS = {
+const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
     low: { bg: "bg-zinc-500/20", text: "text-zinc-400" },
-    medium: { bg: "bg-blue-500/20", text: "text-blue-400" },
+    normal: { bg: "bg-blue-500/20", text: "text-blue-400" },
     high: { bg: "bg-orange-500/20", text: "text-orange-400" },
     urgent: { bg: "bg-rose-500/20", text: "text-rose-400" },
 };
 
+const TYPE_LABELS: Record<string, string> = {
+    feedback: "💡 Feedback",
+    issue: "🐛 Bug Report",
+    live: "💬 Live Support",
+};
+
 export default function SupportPage() {
     const { isDark } = useSettings();
-    const [tickets, setTickets] = useState<SupportTicket[]>([
-        {
-            id: "1",
-            code: "SONORA-001",
-            subject: "Bot not responding to /play command",
-            category: "Bug Report",
-            status: "open",
-            priority: "high",
-            createdAt: "2024-12-12T10:00:00Z",
-            updatedAt: "2024-12-12T10:00:00Z",
-            userName: "MusicFan#1234",
-            userEmail: "user@example.com",
-            messages: [
-                { id: "m1", sender: "user", content: "The bot is not responding when I use /play command. It was working fine yesterday.", timestamp: "2024-12-12T10:00:00Z" },
-            ],
-        },
-        {
-            id: "2",
-            code: "SONORA-002",
-            subject: "Feature request: Playlist saving",
-            category: "Feature Request",
-            status: "in_progress",
-            priority: "medium",
-            createdAt: "2024-12-11T14:00:00Z",
-            updatedAt: "2024-12-12T09:00:00Z",
-            userName: "DJPro#5678",
-            userEmail: "djpro@example.com",
-            messages: [
-                { id: "m1", sender: "user", content: "Would be great to have playlist saving feature!", timestamp: "2024-12-11T14:00:00Z" },
-                { id: "m2", sender: "admin", content: "Thank you for the suggestion! We're looking into implementing this.", timestamp: "2024-12-12T09:00:00Z" },
-            ],
-        },
-        {
-            id: "3",
-            code: "SONORA-003",
-            subject: "How to change volume?",
-            category: "Question",
-            status: "resolved",
-            priority: "low",
-            createdAt: "2024-12-10T08:00:00Z",
-            updatedAt: "2024-12-10T09:30:00Z",
-            userName: "NewUser#9999",
-            userEmail: "newuser@example.com",
-            messages: [
-                { id: "m1", sender: "user", content: "How do I change the volume of the bot?", timestamp: "2024-12-10T08:00:00Z" },
-                { id: "m2", sender: "admin", content: "You can use the /volume command followed by a number (0-100) to adjust volume.", timestamp: "2024-12-10T09:30:00Z" },
-            ],
-        },
-    ]);
+    const { user, isDeveloper } = useSession();
+    const [tickets, setTickets] = useState<SupportTicket[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<string>("all");
     const [search, setSearch] = useState("");
     const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
     const [replyText, setReplyText] = useState("");
     const [isSending, setIsSending] = useState(false);
 
-    const filteredTickets = tickets.filter(ticket => {
-        const matchesSearch =
-            ticket.subject.toLowerCase().includes(search.toLowerCase()) ||
-            ticket.code.toLowerCase().includes(search.toLowerCase()) ||
-            ticket.userName.toLowerCase().includes(search.toLowerCase());
+    // Fetch tickets from real API
+    const fetchTickets = useCallback(async () => {
+        try {
+            const url = filter === "all"
+                ? `${API_BASE}/api/support/tickets`
+                : `${API_BASE}/api/support/tickets?status=${filter}`;
 
-        const matchesFilter = filter === "all" || ticket.status === filter;
+            const res = await fetch(url);
+            const data = await res.json();
 
-        return matchesSearch && matchesFilter;
-    });
+            if (data.success) {
+                setTickets(data.tickets || []);
+                setError(null);
+            } else {
+                setError(data.error || "Failed to fetch tickets");
+            }
+        } catch (err) {
+            setError("Unable to connect to support API");
+            console.error("Fetch error:", err);
+        } finally {
+            setLoading(false);
+        }
+    }, [filter]);
 
-    const handleStatusChange = (ticketId: string, newStatus: SupportTicket["status"]) => {
-        setTickets(prev => prev.map(t =>
-            t.id === ticketId ? { ...t, status: newStatus, updatedAt: new Date().toISOString() } : t
-        ));
-        if (selectedTicket?.id === ticketId) {
-            setSelectedTicket(prev => prev ? { ...prev, status: newStatus } : null);
+    // Initial fetch and refresh
+    useEffect(() => {
+        fetchTickets();
+    }, [fetchTickets]);
+
+    // Auto-refresh every 15 seconds
+    useEffect(() => {
+        const interval = setInterval(fetchTickets, 15000);
+        return () => clearInterval(interval);
+    }, [fetchTickets]);
+
+    // Update status
+    const updateStatus = async (ticketId: string, newStatus: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/support/tickets/${ticketId}/status`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchTickets();
+                if (selectedTicket?.id === ticketId) {
+                    setSelectedTicket(prev => prev ? { ...prev, status: newStatus as SupportTicket["status"] } : null);
+                }
+            }
+        } catch (err) {
+            console.error("Update status error:", err);
         }
     };
 
+    // Send reply
     const handleSendReply = async () => {
         if (!replyText.trim() || !selectedTicket) return;
 
         setIsSending(true);
-        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+            const res = await fetch(`${API_BASE}/api/support/tickets/${selectedTicket.id}/message`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    content: replyText,
+                    sender_id: user?.id || "admin"
+                }),
+            });
+            const data = await res.json();
 
-        const newMessage = {
-            id: Date.now().toString(),
-            sender: "admin" as const,
-            content: replyText,
-            timestamp: new Date().toISOString(),
-        };
-
-        setTickets(prev => prev.map(t =>
-            t.id === selectedTicket.id
-                ? { ...t, messages: [...t.messages, newMessage], updatedAt: new Date().toISOString() }
-                : t
-        ));
-
-        setSelectedTicket(prev => prev ? { ...prev, messages: [...prev.messages, newMessage] } : null);
-        setReplyText("");
-        setIsSending(false);
+            if (data.success) {
+                setReplyText("");
+                // Refresh ticket to get new message
+                const ticketRes = await fetch(`${API_BASE}/api/support/tickets/${selectedTicket.id}`);
+                const ticketData = await ticketRes.json();
+                if (ticketData.success) {
+                    setSelectedTicket(ticketData.ticket);
+                }
+                fetchTickets();
+            }
+        } catch (err) {
+            console.error("Send reply error:", err);
+        } finally {
+            setIsSending(false);
+        }
     };
 
+    // Filter tickets
+    const filteredTickets = tickets.filter(ticket => {
+        if (search) {
+            return (
+                ticket.subject.toLowerCase().includes(search.toLowerCase()) ||
+                ticket.id.toLowerCase().includes(search.toLowerCase()) ||
+                ticket.user_name.toLowerCase().includes(search.toLowerCase())
+            );
+        }
+        return true;
+    });
+
+    // Stats
     const stats = {
-        open: tickets.filter(t => t.status === "open").length,
+        pending: tickets.filter(t => t.status === "pending").length,
         inProgress: tickets.filter(t => t.status === "in_progress").length,
         resolved: tickets.filter(t => t.status === "resolved").length,
         total: tickets.length,
@@ -169,9 +197,9 @@ export default function SupportPage() {
                 <div className="flex items-center gap-3">
                     <div className={cn(
                         "p-2 rounded-xl",
-                        isDark ? "bg-purple-500/20" : "bg-purple-500/10"
+                        isDark ? "bg-[#7B1E3C]/20" : "bg-[#7B1E3C]/10"
                     )}>
-                        <Headphones className="w-6 h-6 text-purple-400" />
+                        <Headphones className="w-6 h-6 text-[#7B1E3C]" />
                     </div>
                     <div>
                         <h1 className={cn(
@@ -185,14 +213,32 @@ export default function SupportPage() {
                         </p>
                     </div>
                 </div>
+                <button
+                    onClick={fetchTickets}
+                    className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-xl transition-colors",
+                        isDark ? "bg-white/10 hover:bg-white/20" : "bg-black/5 hover:bg-black/10"
+                    )}
+                >
+                    <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+                    Refresh
+                </button>
             </div>
+
+            {/* Error message */}
+            {error && (
+                <div className="p-4 rounded-xl bg-red-500/20 text-red-400 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5" />
+                    {error}
+                </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: "Open", value: stats.open, color: "blue" },
-                    { label: "In Progress", value: stats.inProgress, color: "yellow" },
-                    { label: "Resolved", value: stats.resolved, color: "green" },
+                    { label: "Menunggu", value: stats.pending, color: "amber" },
+                    { label: "Ditangani", value: stats.inProgress, color: "blue" },
+                    { label: "Selesai", value: stats.resolved, color: "green" },
                     { label: "Total", value: stats.total, color: "purple" },
                 ].map((stat, index) => (
                     <motion.div
@@ -207,10 +253,10 @@ export default function SupportPage() {
                     >
                         <p className={cn(
                             "text-2xl font-bold",
+                            stat.color === "amber" && "text-amber-400",
                             stat.color === "blue" && "text-blue-400",
-                            stat.color === "yellow" && "text-yellow-400",
                             stat.color === "green" && "text-green-400",
-                            stat.color === "purple" && "text-purple-400"
+                            stat.color === "purple" && "text-[#7B1E3C]"
                         )}>
                             {stat.value}
                         </p>
@@ -243,20 +289,20 @@ export default function SupportPage() {
                     />
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                    {["all", "open", "in_progress", "resolved", "closed"].map(status => (
+                    {["all", "pending", "in_progress", "resolved", "closed"].map(status => (
                         <button
                             key={status}
                             onClick={() => setFilter(status)}
                             className={cn(
-                                "px-3 py-2 rounded-lg text-sm font-medium transition-colors capitalize",
+                                "px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                                 filter === status
-                                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                                    ? "bg-[#7B1E3C] text-white"
                                     : isDark
                                         ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
                                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                             )}
                         >
-                            {status === "in_progress" ? "In Progress" : status === "all" ? "All" : status}
+                            {status === "all" ? "Semua" : STATUS_COLORS[status]?.label || status}
                         </button>
                     ))}
                 </div>
@@ -271,13 +317,19 @@ export default function SupportPage() {
                     isDark ? "bg-zinc-900/50 border-white/10" : "bg-white border-gray-200"
                 )}
             >
-                {filteredTickets.length === 0 ? (
+                {loading ? (
+                    <div className="p-8 text-center">
+                        <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-[#7B1E3C]" />
+                        <p className={isDark ? "text-white/50" : "text-gray-500"}>Loading tickets...</p>
+                    </div>
+                ) : filteredTickets.length === 0 ? (
                     <div className={cn(
                         "p-8 text-center",
                         isDark ? "text-white/50" : "text-gray-500"
                     )}>
                         <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                        <p>No tickets found</p>
+                        <p>Tidak ada tiket</p>
+                        <p className="text-sm mt-1">Tiket baru akan muncul di sini</p>
                     </div>
                 ) : (
                     <div className="divide-y divide-white/5">
@@ -295,24 +347,24 @@ export default function SupportPage() {
                             >
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                                             <span className={cn(
                                                 "text-xs font-mono px-2 py-0.5 rounded",
                                                 isDark ? "bg-white/10" : "bg-gray-100"
                                             )}>
-                                                {ticket.code}
+                                                {ticket.id}
                                             </span>
                                             <span className={cn(
                                                 "px-2 py-0.5 rounded-full text-xs font-medium",
-                                                STATUS_COLORS[ticket.status].bg,
-                                                STATUS_COLORS[ticket.status].text
+                                                STATUS_COLORS[ticket.status]?.bg,
+                                                STATUS_COLORS[ticket.status]?.text
                                             )}>
-                                                {STATUS_COLORS[ticket.status].label}
+                                                {STATUS_COLORS[ticket.status]?.label}
                                             </span>
                                             <span className={cn(
-                                                "px-2 py-0.5 rounded-full text-xs font-medium capitalize",
-                                                PRIORITY_COLORS[ticket.priority].bg,
-                                                PRIORITY_COLORS[ticket.priority].text
+                                                "px-2 py-0.5 rounded-full text-xs font-medium",
+                                                PRIORITY_COLORS[ticket.priority]?.bg,
+                                                PRIORITY_COLORS[ticket.priority]?.text
                                             )}>
                                                 {ticket.priority}
                                             </span>
@@ -325,13 +377,13 @@ export default function SupportPage() {
                                         </h3>
                                         <div className="flex items-center gap-4 text-xs">
                                             <span className={isDark ? "text-white/40" : "text-gray-500"}>
-                                                {ticket.userName}
+                                                {ticket.user_name}
                                             </span>
                                             <span className={isDark ? "text-white/40" : "text-gray-500"}>
-                                                {new Date(ticket.createdAt).toLocaleDateString()}
+                                                {new Date(ticket.created_at).toLocaleDateString("id-ID")}
                                             </span>
                                             <span className={isDark ? "text-white/40" : "text-gray-500"}>
-                                                {ticket.messages.length} message{ticket.messages.length !== 1 ? "s" : ""}
+                                                {ticket.messages?.length || 0} messages
                                             </span>
                                         </div>
                                     </div>
@@ -377,14 +429,17 @@ export default function SupportPage() {
                                             "text-xs font-mono px-2 py-0.5 rounded",
                                             isDark ? "bg-white/10" : "bg-gray-100"
                                         )}>
-                                            {selectedTicket.code}
+                                            {selectedTicket.id}
                                         </span>
                                         <span className={cn(
                                             "px-2 py-0.5 rounded-full text-xs font-medium",
-                                            STATUS_COLORS[selectedTicket.status].bg,
-                                            STATUS_COLORS[selectedTicket.status].text
+                                            STATUS_COLORS[selectedTicket.status]?.bg,
+                                            STATUS_COLORS[selectedTicket.status]?.text
                                         )}>
-                                            {STATUS_COLORS[selectedTicket.status].label}
+                                            {STATUS_COLORS[selectedTicket.status]?.label}
+                                        </span>
+                                        <span className="text-xs">
+                                            {TYPE_LABELS[selectedTicket.ticket_type] || selectedTicket.ticket_type}
                                         </span>
                                     </div>
                                     <h2 className={cn(
@@ -397,7 +452,7 @@ export default function SupportPage() {
                                         "text-sm mt-1",
                                         isDark ? "text-white/50" : "text-gray-500"
                                     )}>
-                                        From: {selectedTicket.userName} • {selectedTicket.category}
+                                        From: {selectedTicket.user_name}
                                     </p>
                                 </div>
                                 <button
@@ -411,20 +466,33 @@ export default function SupportPage() {
                                 </button>
                             </div>
 
+                            {/* Description */}
+                            <div className={cn(
+                                "p-4 border-b shrink-0",
+                                isDark ? "border-white/10 bg-white/5" : "border-gray-200 bg-gray-50"
+                            )}>
+                                <p className={cn(
+                                    "text-sm whitespace-pre-wrap",
+                                    isDark ? "text-white/70" : "text-gray-600"
+                                )}>
+                                    {selectedTicket.description}
+                                </p>
+                            </div>
+
                             {/* Messages */}
                             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {selectedTicket.messages.map(msg => (
+                                {(selectedTicket.messages || []).map(msg => (
                                     <div
                                         key={msg.id}
                                         className={cn(
                                             "flex",
-                                            msg.sender === "admin" ? "justify-end" : "justify-start"
+                                            msg.sender_type === "developer" ? "justify-end" : "justify-start"
                                         )}
                                     >
                                         <div className={cn(
                                             "max-w-[80%] p-3 rounded-xl",
-                                            msg.sender === "admin"
-                                                ? "bg-purple-500/20 text-purple-100"
+                                            msg.sender_type === "developer"
+                                                ? "bg-[#7B1E3C] text-white"
                                                 : isDark
                                                     ? "bg-white/10 text-white"
                                                     : "bg-gray-100 text-gray-900"
@@ -432,13 +500,13 @@ export default function SupportPage() {
                                             <p className="text-sm">{msg.content}</p>
                                             <p className={cn(
                                                 "text-xs mt-1",
-                                                msg.sender === "admin"
-                                                    ? "text-purple-300/50"
+                                                msg.sender_type === "developer"
+                                                    ? "text-white/50"
                                                     : isDark
                                                         ? "text-white/30"
                                                         : "text-gray-500"
                                             )}>
-                                                {new Date(msg.timestamp).toLocaleString()}
+                                                {new Date(msg.created_at).toLocaleString("id-ID")}
                                             </p>
                                         </div>
                                     </div>
@@ -452,52 +520,54 @@ export default function SupportPage() {
                             )}>
                                 {/* Status Change */}
                                 <div className="flex gap-2 mb-3 flex-wrap">
-                                    {(["open", "in_progress", "resolved", "closed"] as const).map(status => (
+                                    {(["pending", "in_progress", "resolved", "closed"] as const).map(status => (
                                         <button
                                             key={status}
-                                            onClick={() => handleStatusChange(selectedTicket.id, status)}
+                                            onClick={() => updateStatus(selectedTicket.id, status)}
                                             className={cn(
-                                                "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize",
+                                                "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
                                                 selectedTicket.status === status
-                                                    ? `${STATUS_COLORS[status].bg} ${STATUS_COLORS[status].text}`
+                                                    ? `${STATUS_COLORS[status]?.bg} ${STATUS_COLORS[status]?.text}`
                                                     : isDark
                                                         ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
                                                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                             )}
                                         >
-                                            {status === "in_progress" ? "In Progress" : status}
+                                            {STATUS_COLORS[status]?.label}
                                         </button>
                                     ))}
                                 </div>
 
                                 {/* Reply */}
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={replyText}
-                                        onChange={(e) => setReplyText(e.target.value)}
-                                        placeholder="Type your reply..."
-                                        onKeyDown={(e) => e.key === "Enter" && handleSendReply()}
-                                        className={cn(
-                                            "flex-1 px-4 py-2 rounded-xl outline-none transition-colors",
-                                            isDark
-                                                ? "bg-zinc-800 border border-zinc-700 text-white"
-                                                : "bg-gray-100 border border-gray-200 text-gray-900"
-                                        )}
-                                    />
-                                    <button
-                                        onClick={handleSendReply}
-                                        disabled={!replyText.trim() || isSending}
-                                        className="px-4 py-2 rounded-xl bg-purple-500 text-white font-medium hover:bg-purple-600 transition-colors disabled:opacity-50 flex items-center gap-2"
-                                    >
-                                        {isSending ? (
-                                            <RefreshCw className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                            <Send className="w-4 h-4" />
-                                        )}
-                                        Send
-                                    </button>
-                                </div>
+                                {selectedTicket.status !== "closed" && (
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={replyText}
+                                            onChange={(e) => setReplyText(e.target.value)}
+                                            placeholder="Ketik balasan..."
+                                            onKeyDown={(e) => e.key === "Enter" && handleSendReply()}
+                                            className={cn(
+                                                "flex-1 px-4 py-2 rounded-xl outline-none transition-colors",
+                                                isDark
+                                                    ? "bg-zinc-800 border border-zinc-700 text-white"
+                                                    : "bg-gray-100 border border-gray-200 text-gray-900"
+                                            )}
+                                        />
+                                        <button
+                                            onClick={handleSendReply}
+                                            disabled={!replyText.trim() || isSending}
+                                            className="px-4 py-2 rounded-xl bg-[#7B1E3C] text-white font-medium hover:bg-[#9B2E4C] transition-colors disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            {isSending ? (
+                                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Send className="w-4 h-4" />
+                                            )}
+                                            Kirim
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     </motion.div>
