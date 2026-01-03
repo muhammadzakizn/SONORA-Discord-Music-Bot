@@ -499,12 +499,18 @@ class YouTubeDownloader(BaseDownloader):
         # STEP 2: Fallback to direct yt-dlp CLI
         # ========================================
         try:
-            # Build URL for yt-dlp
+            # Build URL for yt-dlp - ALWAYS use YouTube Music search for non-YouTube URLs
             url = track_info.url
-            if not url:
-                # Need to search first
+            
+            # Check if URL is a YouTube/YouTube Music URL
+            is_youtube_url = url and ('youtube.com' in url or 'youtu.be' in url)
+            
+            if not url or not is_youtube_url:
+                # Non-YouTube URL (Spotify, Apple Music, etc.) or no URL
+                # MUST search YouTube Music with title/artist instead
                 clean_query = self._clean_search_query(track_info.artist, track_info.title)
                 url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}"
+                logger.info(f"Using YouTube Music search URL: {url}")
             
             # Build command to get stream URL only (no download)
             command = [

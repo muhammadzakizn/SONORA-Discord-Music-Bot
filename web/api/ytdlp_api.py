@@ -124,8 +124,11 @@ async def api_ytdlp_stream_url():
         downloader = get_youtube_downloader()
         
         # Create track info
-        if url:
-            # Direct URL provided - get metadata if title/artist are missing
+        # IMPORTANT: For non-YouTube URLs (Spotify, Apple Music), we need to search YouTube Music
+        is_youtube_url = url and ('youtube.com' in url or 'youtu.be' in url)
+        
+        if url and is_youtube_url:
+            # YouTube URL - get metadata if title/artist are missing
             if not title or not artist:
                 search_result = await downloader.search(url)
                 if search_result:
@@ -143,15 +146,23 @@ async def api_ytdlp_stream_url():
                     artist=artist,
                     url=url
                 )
-        else:
-            # Search first to get URL
-            search_result = await downloader.search(f"{artist} {title}")
-            if not search_result:
+        elif title:
+            # Non-YouTube URL (Spotify, Apple Music) or search by title
+            # MUST search YouTube Music with title/artist - DO NOT pass Spotify URL to yt-dlp
+            search_result = await downloader.search(f"{artist} {title}" if artist else title)
+            if search_result:
+                track_info = search_result
+                logger.info(f"[YTDLP API] Found on YouTube Music: {track_info}")
+            else:
                 return jsonify({
                     "success": False,
-                    "error": "Track not found"
+                    "error": f"Could not find '{title}' on YouTube Music"
                 }), 404
-            track_info = search_result
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Need title or YouTube URL"
+            }), 400
         
         # Get fresh stream URL
         stream_url = await downloader.get_stream_url(track_info)
@@ -217,8 +228,11 @@ async def api_ytdlp_download():
         downloader = get_youtube_downloader()
         
         # Create or search for track
-        if url:
-            # Get metadata if title/artist are missing
+        # IMPORTANT: For non-YouTube URLs (Spotify, Apple Music), we need to search YouTube Music
+        is_youtube_url = url and ('youtube.com' in url or 'youtu.be' in url)
+        
+        if url and is_youtube_url:
+            # YouTube URL - get metadata if title/artist are missing
             if not title or not artist:
                 search_result = await downloader.search(url)
                 if search_result:
@@ -236,15 +250,23 @@ async def api_ytdlp_download():
                     artist=artist,
                     url=url
                 )
-        else:
-            # Search first
-            search_result = await downloader.search(f"{artist} {title}")
-            if not search_result:
+        elif title:
+            # Non-YouTube URL (Spotify, Apple Music) or search by title
+            # MUST search YouTube Music with title/artist - DO NOT pass Spotify URL to yt-dlp
+            search_result = await downloader.search(f"{artist} {title}" if artist else title)
+            if search_result:
+                track_info = search_result
+                logger.info(f"[YTDLP API] Found on YouTube Music: {track_info}")
+            else:
                 return jsonify({
                     "success": False,
-                    "error": "Track not found"
+                    "error": f"Could not find '{title}' on YouTube Music"
                 }), 404
-            track_info = search_result
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Need title or YouTube URL"
+            }), 400
         
         # Download the file
         result = await downloader.download(track_info)
