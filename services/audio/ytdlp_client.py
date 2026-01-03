@@ -141,9 +141,12 @@ class YTDLPApiClient:
             session = await self._get_session()
             
             params = {}
-            if track_info.url:
+            # Only send URL if it's a YouTube URL - Spotify/Apple Music URLs cause DRM errors
+            is_youtube_url = track_info.url and ('youtube.com' in track_info.url or 'youtu.be' in track_info.url)
+            if is_youtube_url:
                 params["url"] = track_info.url
             else:
+                # For non-YouTube URLs, always search by title/artist
                 params["title"] = track_info.title
                 params["artist"] = track_info.artist or ""
             
@@ -189,9 +192,12 @@ class YTDLPApiClient:
             session = await self._get_session()
             
             params = {"format": audio_format}
-            if track_info.url:
+            # Only send URL if it's a YouTube URL - Spotify/Apple Music URLs cause DRM errors
+            is_youtube_url = track_info.url and ('youtube.com' in track_info.url or 'youtu.be' in track_info.url)
+            if is_youtube_url:
                 params["url"] = track_info.url
             else:
+                # For non-YouTube URLs, always search by title/artist
                 params["title"] = track_info.title
                 params["artist"] = track_info.artist or ""
             
