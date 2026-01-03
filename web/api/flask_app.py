@@ -67,6 +67,13 @@ def set_bot_instance(bot):
     except Exception as e:
         logger.warning(f"TrackStateManager connection failed: {e}")
 
+# Register Support API Blueprint
+try:
+    from web.api.support_api import register_support_api
+    register_support_api(app)
+except Exception as e:
+    logger.warning(f"Support API not loaded: {e}")
+
 
 
 def get_bot():

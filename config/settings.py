@@ -148,6 +148,9 @@ class Settings:
     # Set to true to skip MusicDL and use yt-dlp directly
     DISABLE_MUSICDL: bool = os.getenv('DISABLE_MUSICDL', 'false').lower() == 'true'
     
+    # AI Support - Google Gemini API
+    GEMINI_API_KEY: str = os.getenv('GEMINI_API_KEY', '')
+    
     # Audio Verification - Unwanted version keywords
     # Comma-separated list of keywords to reject (remix, DJ version, cover, etc.)
     # Add or remove keywords to customize what gets rejected
