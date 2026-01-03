@@ -583,8 +583,8 @@ class MusicBot(commands.Bot):
         """Called when bot is starting up"""
         logger.info("Running setup hook...")
         
-        # Cleanup cache on startup (clear downloads folder)
-        await self._startup_cleanup()
+        # Cleanup cache on startup - DISABLED to preserve local downloads
+        # await self._startup_cleanup()
         
         # Connect to database
         await self.db_manager.connect()
