@@ -249,9 +249,17 @@ class PlayCommand(commands.Cog):
                         await loader.stop_spinner()
                         
                         # Start background download for cache
+                        # Extract video_id from URL to avoid re-searching
+                        video_id = None
+                        if track_info.url:
+                            import re
+                            match = re.search(r'(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})', track_info.url)
+                            if match:
+                                video_id = match.group(1)
+                        
                         asyncio.create_task(
                             self.youtube_downloader.background_download_for_cache(
-                                track_info.artist, track_info.title
+                                track_info.artist, track_info.title, video_id
                             )
                         )
                         logger.info(f"Background: Started caching {track_info.title}")
@@ -1144,13 +1152,21 @@ class PlayCommand(commands.Cog):
                     use_streaming = True
                     logger.info(f"✓ Got stream URL for playlist first track")
                     
-                    # Start background download to FTP cache (FLAC via MusicDL)
+                    # Start background download to cloud cache
+                    # Extract video_id to avoid re-searching
+                    video_id = None
+                    if track.url:
+                        import re
+                        match = re.search(r'(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})', track.url)
+                        if match:
+                            video_id = match.group(1)
+                    
                     asyncio.create_task(
                         self.youtube_downloader.background_download_for_cache(
-                            track.artist, track.title
+                            track.artist, track.title, video_id
                         )
                     )
-                    logger.info(f"📥 Background download started: {track.title} → FTP")
+                    logger.info(f"📥 Background download started: {track.title}")
             except Exception as e:
                 logger.warning(f"Stream failed: {e}, falling back to download")
             
@@ -1396,13 +1412,21 @@ class PlayCommand(commands.Cog):
                     use_streaming = True
                     logger.info(f"✓ Got stream URL for YouTube playlist first track")
                     
-                    # Start background download to FTP cache
+                    # Start background download to cloud cache
+                    # Extract video_id to avoid re-searching
+                    video_id = None
+                    if track.url:
+                        import re
+                        match = re.search(r'(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})', track.url)
+                        if match:
+                            video_id = match.group(1)
+                    
                     asyncio.create_task(
                         self.youtube_downloader.background_download_for_cache(
-                            track.artist, track.title
+                            track.artist, track.title, video_id
                         )
                     )
-                    logger.info(f"📥 Background download started: {track.title} → FTP")
+                    logger.info(f"📥 Background download started: {track.title}")
             except Exception as e:
                 logger.warning(f"Stream failed: {e}, falling back to download")
             

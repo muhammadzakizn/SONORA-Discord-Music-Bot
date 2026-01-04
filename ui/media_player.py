@@ -1129,10 +1129,18 @@ class SynchronizedMediaPlayer:
                                 if buffer_time > 0:
                                     await asyncio.sleep(buffer_time)
                                 
-                                # Background: download to FTP cache
+                                # Background: download to cloud cache
+                                # Extract video_id from URL to avoid re-searching
+                                video_id = None
+                                if hasattr(next_item, 'url') and next_item.url:
+                                    import re
+                                    match = re.search(r'(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})', next_item.url)
+                                    if match:
+                                        video_id = match.group(1)
+                                
                                 asyncio.create_task(
                                     play_cog.youtube_downloader.background_download_for_cache(
-                                        next_item.artist, next_item.title
+                                        next_item.artist, next_item.title, video_id
                                     )
                                 )
                         except Exception as e:

@@ -705,17 +705,17 @@ class YouTubeDownloader(BaseDownloader):
             except Exception as e:
                 logger.warning(f"Failed to delete file: {e}")
     
-    async def background_download_for_cache(self, artist: str, title: str) -> None:
+    async def background_download_for_cache(self, artist: str, title: str, video_id: str = None) -> None:
         """
-        Background task: Download best quality audio and cache to FTP.
+        Background task: Download best quality audio and cache to cloud.
         
         Called while streaming to prepare high-quality file for future use.
-        Uses MusicDL to find FLAC/best quality, then uploads to FTP.
-        Verifies title matches to avoid remixes/covers.
+        Uses existing video_id if provided to AVOID re-searching.
         
         Args:
             artist: Artist name
             title: Track title
+            video_id: Optional YouTube video ID (to avoid re-searching)
         """
         try:
             from services.audio.musicdl_handler import get_musicdl_handler
@@ -809,10 +809,17 @@ class YouTubeDownloader(BaseDownloader):
                 logger.info(f"yt-dlp background download for: {artist} - {title}")
                 
                 from database.models import TrackInfo as TI
+                
+                # Use video_id if available (avoids re-searching!)
+                yt_url = None
+                if video_id:
+                    yt_url = f"https://music.youtube.com/watch?v={video_id}"
+                    logger.info(f"Using existing video ID: {video_id} (no search needed)")
+                
                 temp_track = TI(
                     title=title,
                     artist=artist,
-                    url=None  # Will search YouTube Music
+                    url=yt_url  # Uses existing URL if available
                 )
                 
                 # Use regular download (yt-dlp)
