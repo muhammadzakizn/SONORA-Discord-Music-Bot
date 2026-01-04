@@ -123,6 +123,17 @@ class RobustVoiceConnection:
                     self.reconnect_attempts = 0  # Reset counter on success
                     self.guild_id = channel.guild.id
                     
+                    # ========================================
+                    # PREMIUM AUDIO: Set max encoder bitrate (512kbps)
+                    # Apple Music Lossless-like quality
+                    # ========================================
+                    try:
+                        if hasattr(self.connection, 'encoder') and self.connection.encoder:
+                            self.connection.encoder.set_bitrate(512000)  # 512kbps max
+                            logger.info("🎵 Premium audio: Set encoder bitrate to 512kbps")
+                    except Exception as e:
+                        logger.debug(f"Could not set encoder bitrate: {e}")
+                    
                     # Start health monitoring if available
                     if self.health_monitor:
                         await self.health_monitor.start_monitoring(
