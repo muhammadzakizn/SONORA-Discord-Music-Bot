@@ -299,21 +299,12 @@ async def api_ytdlp_download():
                 download_name=safe_filename
             )
             
-            # Schedule file cleanup after 60 seconds (allow download to complete)
-            def cleanup_later():
-                import threading
-                def do_cleanup():
-                    try:
-                        time.sleep(60)
-                        if file_path.exists():
-                            file_path.unlink()
-                            logger.info(f"[YTDLP API] Cleaned up: {file_path.name}")
-                    except Exception as e:
-                        logger.warning(f"Cleanup failed: {e}")
-                
-                threading.Thread(target=do_cleanup, daemon=True).start()
-            
-            cleanup_later()
+            # DISABLED: Auto-cleanup after 60s was deleting files before playback
+            # The bot's media_player.py handles cleanup AFTER audio is played
+            # Keeping files until playback completes prevents queue tracks from being deleted
+            # def cleanup_later():
+            #     ...
+            # cleanup_later()
             
             return response
         else:
