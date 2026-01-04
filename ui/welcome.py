@@ -195,15 +195,35 @@ class WelcomeView(ui.View):
             )
         
         else:
-            embed.add_field(
-                name=f"{status_emoji} Semua Perizinan OK / All Permissions OK",
-                value=(
-                    f"✅ Bot siap digunakan dengan sempurna!\n"
-                    f"*Bot is ready to use perfectly!*\n\n"
-                    f"📢 {text_count} text channel • 🔊 {voice_count} voice channel tersedia"
-                ),
-                inline=False
-            )
+            # Check if bot has excessive permissions (admin-like access)
+            total_text = len(self.guild.text_channels)
+            total_voice = len(self.guild.voice_channels)
+            
+            # Warning if bot has access to ALL or most channels (admin permission)
+            if text_count >= total_text and text_count > 3:
+                embed.add_field(
+                    name="⚠️ Peringatan Keamanan / Security Warning",
+                    value=(
+                        f"Bot memiliki akses ke **semua {text_count} text channel**!\n"
+                        f"*Bot has access to **all {text_count} text channels**!*\n\n"
+                        "🔐 **Rekomendasi:** Cukup berikan akses ke:\n"
+                        "• 1 text channel (untuk commands)\n"
+                        "• Semua voice channel yang dibutuhkan\n\n"
+                        "*Jangan berikan hak **Administrator** atau **Moderator** - bot tidak memerlukannya.*\n"
+                        "*Don't give **Administrator** or **Moderator** permissions - bot doesn't need them.*"
+                    ),
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name=f"{status_emoji} Semua Perizinan OK / All Permissions OK",
+                    value=(
+                        f"✅ Bot siap digunakan dengan sempurna!\n"
+                        f"*Bot is ready to use perfectly!*\n\n"
+                        f"📢 {text_count}/{total_text} text channel • 🔊 {voice_count}/{total_voice} voice channel"
+                    ),
+                    inline=False
+                )
         
         # Quick start guide
         embed.add_field(

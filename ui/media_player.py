@@ -888,6 +888,7 @@ class SynchronizedMediaPlayer:
                                 "Thank you for using **SONORA**!\n\n"
                                 "If you enjoy this bot, consider supporting the developer "
                                 "to help SONORA grow with new features!\n\n"
+                                "💬 *Need help or have feedback? Use `/support` to contact us!*\n\n"
                                 "*Bot has disconnected to save bandwidth.*"
                             ),
                             color=discord.Color.from_rgb(123, 30, 60)  # Maroon
