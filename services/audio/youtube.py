@@ -552,12 +552,9 @@ class YouTubeDownloader(BaseDownloader):
             if stream_url and stream_url.startswith('http'):
                 logger.info(f"✓ Got stream URL for: {track_info.title}")
                 
-                # Test if URL is accessible (detect 403 early)
-                if await self.test_stream_url(stream_url):
-                    return stream_url
-                else:
-                    logger.warning(f"Stream URL test failed (403?), will need download")
-                    return None
+                # SKIP TEST - HEAD request causes 403 on blocked IPs
+                # Just return the URL and let playback handle any errors
+                return stream_url
             else:
                 logger.warning(f"Invalid stream URL returned: {stream_url[:100] if stream_url else 'empty'}")
                 return None
