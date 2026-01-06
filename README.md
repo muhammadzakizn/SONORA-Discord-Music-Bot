@@ -1,97 +1,204 @@
-# 🎵 SONORA Bot - BETA VERSION
-
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-3.4.0--beta-orange.svg)
-![Python](https://img.shields.io/badge/python-3.10+-green.svg)
-![License](https://img.shields.io/badge/license-MIT-orange.svg)
-![Status](https://img.shields.io/badge/status-beta-yellow.svg)
+# 🎵 SONORA
 
-**Discord Music Bot - Beta Testing Version**
+### Premium Discord Music Experience
 
-All commands use `-beta` suffix (e.g., `/play-beta`, `/pause-beta`)
+![Preview](docs/preview.jpg)
+
+[![Version](https://img.shields.io/badge/version-3.32.0-7B1E3C.svg)](https://github.com/muhammadzakizn/SONORA-Discord-Music-Bot/releases)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-sonora.muhammadzakizn.com-7B1E3C)](https://sonora.muhammadzakizn.com)
+
+**Multi-Platform Support • Lossless Audio • Real-time Lyrics**
+
+[Website](https://sonora.muhammadzakizn.com) • [Invite Bot](https://discord.com/oauth2/authorize?client_id=1443855259536461928) • [Support](https://sonora.muhammadzakizn.com/support)
 
 </div>
 
 ---
 
+## ✨ Features
+
+### 🎧 Hi-Res Audio Quality
+- **512kbps encoder bitrate** - Maximum Discord quality
+- Apple Music Lossless-like streaming
+- FLAC source support via MusicDL
+- Adaptive buffer based on network speed
+
+### 🎤 Real-Time Synced Lyrics
+- **Apple Music TTML** with per-word timing
+- Fullscreen lyrics player with WebGL animations
+- Multiple sources: Syncedlyrics, LRCLib, Musixmatch, Genius
+- Custom Lyricify API integration (QQ Music)
+
+### 🎵 Multi-Platform Support
+| Platform | Playlists | Albums | Tracks | Search |
+|----------|:---------:|:------:|:------:|:------:|
+| Spotify | ✅ | ✅ | ✅ | ✅ |
+| YouTube Music | ✅ | ✅ | ✅ | ✅ |
+| Apple Music | ✅ | ✅ | ✅ | ✅ |
+| SoundCloud | ✅ | - | ✅ | ✅ |
+
+### 🌐 Modern Web Dashboard
+- **Next.js 14** with Liquid Glass UI design
+- Real-time playback status & controls
+- **Seekback** - Apple Music Replay-style listening history
+- Admin panel for server management
+- User statistics & play history
+
+### 🧠 AI-Powered Support
+- `/support` command with AI assistant
+- Powered by Groq, DeepSeek, or Gemini
+- 24/7 automated help & feedback handling
+
+### ⚡ Performance Features
+- Smart audio caching (local + cloud FTP)
+- Pre-fetch next tracks in queue
+- IPv6 support for bypass rate limiting
+- Robust voice connection with auto-reconnect
+
+---
+
 ## 🚀 Quick Start
 
-```bash
-# Run with launcher
-python3 launcher.py
+### Prerequisites
+- Python 3.11+
+- FFmpeg
+- Node.js 18+ (for web dashboard)
 
-# Or directly
-python3 main.py
+### Installation
+
+```bash
+# Clone repository
+git clone https://github.com/muhammadzakizn/SONORA-Discord-Music-Bot.git
+cd SONORA-Discord-Music-Bot
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your tokens
+
+# Run bot
+python launcher.py
+```
+
+### Web Dashboard
+
+```bash
+cd web
+npm install
+npm run dev
 ```
 
 ---
 
-## ⚠️ Beta Commands
-
-All commands have `-beta` suffix:
+## 📋 Commands
 
 | Command | Description |
 |---------|-------------|
-| `/play-beta` | Play music |
-| `/pause-beta` | Pause playback |
-| `/resume-beta` | Resume playback |
-| `/stop-beta` | Stop and disconnect |
-| `/skip-beta` | Skip current track |
-| `/queue-beta` | View queue |
-| `/clear-beta` | Clear queue |
-| `/shuffle-beta` | Shuffle queue |
-| `/volume-beta` | Set volume |
-| `/lyrics-beta` | Show lyrics |
-| `/stats-beta` | Your statistics |
-| `/history-beta` | Play history |
+| `/play <query>` | Play music from any platform |
+| `/pause` | Pause playback |
+| `/resume` | Resume playback |
+| `/skip` | Skip current track |
+| `/stop` | Stop and disconnect |
+| `/queue` | View queue |
+| `/shuffle` | Shuffle queue |
+| `/lyrics` | Show synced lyrics |
+| `/volume <0-200>` | Adjust volume |
+| `/stats` | Your listening statistics |
+| `/support` | AI-powered help |
 
 ---
 
-## ✨ Features
+## 🛠️ Tech Stack
 
-- 🎵 Multi-source: Spotify, Apple Music, YouTube
-- 📋 Queue management with pagination
-- 🎤 Synced lyrics display
-- 🌐 Web dashboard at `http://localhost:3000`
-- 💾 Smart audio caching
+```
+Backend     Python 3.11 | discord.py | yt-dlp | FFmpeg | Flask
+Frontend    Next.js 14 | TypeScript | Tailwind CSS | Framer Motion
+Database    SQLite | AsyncIO | Aiohttp
+Lyrics      Apple Music | Lyricify | LRCLib | Syncedlyrics
+Audio       Opus 512kbps | FLAC | AAC | Adaptive Streaming
+```
 
 ---
 
 ## 📁 Project Structure
 
 ```
-SONORA-beta/
+SONORA/
 ├── main.py              # Entry point
-├── launcher.py          # Smart launcher
-├── commands/            # All commands with -beta suffix
+├── launcher.py          # Smart launcher with menu
+├── commands/            # Slash commands
 ├── services/            # Audio, lyrics, metadata services
+│   ├── audio/           # YouTube, Spotify, Apple Music handlers
+│   ├── lyrics/          # Multi-source lyrics fetchers
+│   └── voice/           # Voice connection management
 ├── web/                 # Next.js web dashboard
-├── core/                # Core bot components
-└── tests/               # 74 passing tests
+├── ui/                  # Discord UI components
+├── database/            # SQLite models & managers
+└── docs/                # Documentation & changelogs
 ```
 
 ---
 
-## ⚙️ Configuration
+## 🔧 Configuration
 
-Edit `.env`:
+Key environment variables in `.env`:
+
 ```bash
-DISCORD_TOKEN=your_beta_token
-DISCORD_CLIENT_ID=your_client_id
-WEB_DASHBOARD_PORT=5000
+# Required
+DISCORD_TOKEN=your_discord_bot_token
+
+# Music Sources
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+
+# Optional
+GENIUS_API_TOKEN=your_genius_token
+GROQ_API_KEY=your_groq_key_for_ai_support
 ```
+
+See [.env.example](.env.example) for all options.
+
+---
+
+## 📊 Stats
+
+- **75+ Tests** passing
+- **200+ Files** organized
+- **3.32.0** current version
+- Active development since 2024
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing`)
+5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 <div align="center">
 
-**SONORA Beta** - Testing new features! 🧪
+### 🌟 Star this repo if you find it useful!
+
+**Made with ❤️ by [Muhammad Zaky](https://muhammadzakizn.com)**
+
+[Website](https://sonora.muhammadzakizn.com) • [Portfolio](https://muhammadzakizn.com) • [Support](https://teer.id/muhammadzakizn)
 
 </div>
