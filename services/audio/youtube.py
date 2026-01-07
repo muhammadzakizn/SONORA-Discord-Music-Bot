@@ -271,18 +271,35 @@ class YouTubeDownloader(BaseDownloader):
             # Now parse stdout based on which path we took
             if use_smart_matching:
                 try:
+                    # Debug: Log raw stdout length and first 500 chars
+                    stdout_preview = stdout[:500] if stdout else "(empty)"
+                    logger.debug(f"ytsearch10 stdout ({len(stdout)} bytes): {stdout_preview}")
+                    
                     lines = stdout.strip().split('\n')
                     candidates = []
+                    parse_errors = 0
+                    
                     for line in lines:
-                        if line.strip():
+                        line = line.strip()
+                        if line:
+                            # Skip lines that are clearly not JSON
+                            if not line.startswith('{'):
+                                logger.debug(f"Skipping non-JSON line: {line[:100]}")
+                                continue
                             try:
                                 data = json.loads(line)
-                                candidates.append(data)
-                            except:
-                                pass
+                                # Only add if it looks like a video result
+                                if 'id' in data or 'url' in data:
+                                    candidates.append(data)
+                            except json.JSONDecodeError as e:
+                                parse_errors += 1
+                                logger.debug(f"JSON parse error: {e}")
+                    
+                    if parse_errors > 0:
+                        logger.warning(f"ytsearch10 had {parse_errors} JSON parse errors")
                     
                     if not candidates:
-                        logger.warning("No candidates found in ytsearch results")
+                        logger.warning(f"No candidates found in ytsearch10 results. Raw output preview: {stdout_preview[:200]}")
                         return None
                     
                     logger.info(f"Found {len(candidates)} candidates, filtering for best match...")
@@ -546,6 +563,91 @@ class YouTubeDownloader(BaseDownloader):
                                         )
                                 except:
                                     pass
+                            
+                            # No better match found with exact phrase - try ytsearch10 as final fallback
+                            logger.info(f"Trying ytsearch10 as final fallback for '{query}'...")
+                            fallback_query = f"ytsearch5:{query}"
+                            fallback_cmd = [
+                                'yt-dlp',
+                                '--remote-components', 'ejs:github',
+                                '--dump-json',
+                                '--flat-playlist',
+                                '--no-check-certificate',
+                                '--geo-bypass',
+                                '--extractor-args', 'youtube:player_client=ios,web',
+                                fallback_query
+                            ]
+                            if yt_cookies:
+                                fallback_cmd.extend(['--cookies', str(yt_cookies)])
+                            
+                            stdout3, stderr3, rc3 = await self._run_command(fallback_cmd, timeout=30)
+                            if rc3 == 0 and stdout3.strip():
+                                # Parse ytsearch results
+                                fb_lines = stdout3.strip().split('\n')
+                                for fb_line in fb_lines:
+                                    fb_line = fb_line.strip()
+                                    if fb_line and fb_line.startswith('{'):
+                                        try:
+                                            fb_data = json.loads(fb_line)
+                                            fb_title = fb_data.get('title', '')
+                                            fb_title_normalized = self._normalize_title(fb_title)
+                                            fb_title_words = set(fb_title_normalized.split())
+                                            fb_title_matches = query_words & fb_title_words
+                                            
+                                            if len(fb_title_matches) > 0:
+                                                # Found a matching result!
+                                                video_id3 = fb_data.get('id')
+                                                logger.info(f"✓ Found via ytsearch fallback: {fb_title} [ID: {video_id3}]")
+                                                
+                                                # Fetch full metadata
+                                                full_cmd = [
+                                                    'yt-dlp',
+                                                    '--dump-json',
+                                                    '--no-check-certificate',
+                                                    '--geo-bypass',
+                                                    f"https://music.youtube.com/watch?v={video_id3}"
+                                                ]
+                                                if yt_cookies:
+                                                    full_cmd.extend(['--cookies', str(yt_cookies)])
+                                                
+                                                stdout4, _, rc4 = await self._run_command(full_cmd, timeout=30)
+                                                if rc4 == 0:
+                                                    try:
+                                                        track_data4 = json.loads(stdout4)
+                                                    except:
+                                                        track_data4 = fb_data
+                                                else:
+                                                    track_data4 = fb_data
+                                                
+                                                title4 = (track_data4.get('track') or 
+                                                         track_data4.get('alt_title') or 
+                                                         track_data4.get('fulltitle') or 
+                                                         track_data4.get('title', 'Unknown'))
+                                                artist4 = track_data4.get('artist') or track_data4.get('creator') or track_data4.get('uploader', 'Unknown')
+                                                album4 = track_data4.get('album')
+                                                duration4 = track_data4.get('duration', 0)
+                                                
+                                                thumbnails4 = track_data4.get('thumbnails', [])
+                                                thumbnail4 = thumbnails4[-1].get('url') if thumbnails4 else None
+                                                
+                                                if ' - ' in title4 and artist4 in ['Unknown', title4.split(' - ')[0]]:
+                                                    parts = title4.split(' - ', 1)
+                                                    artist4 = parts[0].strip()
+                                                    title4 = parts[1].strip()
+                                                
+                                                ytmusic_url4 = f"https://music.youtube.com/watch?v={video_id3}" if video_id3 else None
+                                                
+                                                return TrackInfo(
+                                                    title=title4,
+                                                    artist=artist4,
+                                                    album=album4,
+                                                    duration=duration4,
+                                                    url=ytmusic_url4,
+                                                    track_id=video_id3,
+                                                    thumbnail_url=thumbnail4
+                                                )
+                                        except json.JSONDecodeError:
+                                            continue
                             
                             # No better match found - return None to avoid playing wrong song
                             logger.warning(f"❌ No matching song found for '{query}'")
