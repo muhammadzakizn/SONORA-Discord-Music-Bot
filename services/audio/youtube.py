@@ -155,10 +155,12 @@ class YouTubeDownloader(BaseDownloader):
                     logger.info(f"Using YouTube Music URL: {query}")
                 search_query = query
             else:
-                # Use music.youtube.com search URL with -I 1 to get first result only
-                # This searches music.youtube.com instead of regular youtube.com
-                search_query = f"https://music.youtube.com/search?q={query.replace(' ', '+')}"
-                logger.info(f"Using YouTube Music search: {search_query}")
+                # Use music.youtube.com search URL with SONGS FILTER
+                # sp=EgWKAQIIAQ%3D%3D filters for "Songs" section only (not videos)
+                # This ensures we get audio tracks, not music videos with intros
+                songs_filter = "EgWKAQIIAQ%3D%3D"  # YouTube Music "Songs" section filter
+                search_query = f"https://music.youtube.com/search?q={query.replace(' ', '+')}&sp={songs_filter}"
+                logger.info(f"Using YouTube Music SONGS search: {search_query}")
             
             command = [
                 'yt-dlp',
@@ -390,7 +392,8 @@ class YouTubeDownloader(BaseDownloader):
                             # Try alternative: search with quotes for exact phrase
                             logger.info(f"Retrying with exact phrase search...")
                             exact_query = f'"{query}"'
-                            exact_search_query = f"https://music.youtube.com/search?q={exact_query.replace(' ', '+')}"
+                            songs_filter = "EgWKAQIIAQ%3D%3D"
+                            exact_search_query = f"https://music.youtube.com/search?q={exact_query.replace(' ', '+')}&sp={songs_filter}"
                             
                             retry_cmd = [
                                 'yt-dlp',
@@ -713,8 +716,9 @@ class YouTubeDownloader(BaseDownloader):
                 # Non-YouTube URL (Spotify, Apple Music, etc.) or no URL
                 # MUST search YouTube Music with title/artist instead
                 clean_query = self._clean_search_query(track_info.artist, track_info.title)
-                url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}"
-                logger.info(f"Using YouTube Music search URL: {url}")
+                songs_filter = "EgWKAQIIAQ%3D%3D"  # Songs section only
+                url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}&sp={songs_filter}"
+                logger.info(f"Using YouTube Music SONGS search URL: {url}")
             
             # Build command to get stream URL only (no download)
             command = [
@@ -818,7 +822,8 @@ class YouTubeDownloader(BaseDownloader):
             url = track_info.url
             if not url:
                 clean_query = self._clean_search_query(track_info.artist, track_info.title)
-                url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}"
+                songs_filter = "EgWKAQIIAQ%3D%3D"
+                url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}&sp={songs_filter}"
             
             # Build command with proxy
             command = [
@@ -1217,11 +1222,11 @@ class YouTubeDownloader(BaseDownloader):
         if url and 'youtube.com/watch' in url and 'music.youtube.com' not in url:
             url = self._convert_to_ytmusic_url(url)
         elif not url:
-            # Force music.youtube.com search URL (not ytsearch1: which uses regular YouTube)
+            # Force music.youtube.com search URL with SONGS FILTER (not ytsearch1: which uses regular YouTube)
             clean_query = self._clean_search_query(track_info.artist, track_info.title)
-            # Use music.youtube.com search URL with proper encoding
-            url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}"
-            logger.info(f"Using YouTube Music search URL: {url}")
+            songs_filter = "EgWKAQIIAQ%3D%3D"  # Songs section only
+            url = f"https://music.youtube.com/search?q={clean_query.replace(' ', '+')}&sp={songs_filter}"
+            logger.info(f"Using YouTube Music SONGS search URL: {url}")
         
         logger.info(f"Downloading from: {url}")
         
