@@ -7,38 +7,24 @@ from config.logging_config import get_logger
 
 logger = get_logger('ui.spinner')
 
+# Custom Discord emoji for loading animation
+# Emoji must be uploaded to the bot's application in Discord Developer Portal
+LOADING_EMOJI = "<a:loading:1458442919697715250>"
+
 
 class LoadingSpinner:
     """
-    CLI-style loading spinner for Discord embed updates.
+    Loading spinner for Discord embed updates.
     
-    Uses dynamic dot animation:
-    ・・・● → ・・●・ → ・●・・ → ●・・・ (loop)
-    
-    Updates embed every 500ms (configurable) with rotating spinner.
+    Uses custom animated emoji uploaded to Discord application.
+    Updates embed message to show loading state.
     """
-    
-    # Dynamic dot spinner frames (small -> medium -> large -> medium -> small pattern)
-    SPINNER_FRAMES = [
-        "●・・・",
-        "・●・・",
-        "・・●・",
-        "・・・●",
-        "・・●・",
-        "・●・・"
-    ]
-    
-    # Alternative: Simple dots animation
-    DOTS_FRAMES = ["・", "・・", "・・・", "・・・・", "・・・", "・・"]
-    
-    # Simple line spinner
-    LINE_FRAMES = ["|", "/", "-", "\\"]
     
     def __init__(
         self, 
         message: discord.Message,
-        update_interval: float = 0.5,  # 500ms
-        spinner_type: str = "braille"  # braille, dots, or line
+        update_interval: float = 2.0,  # 2 seconds (no need to animate, emoji is GIF)
+        spinner_type: str = "emoji"  # emoji (default), braille, dots, or line
     ):
         """
         Initialize spinner.
@@ -57,34 +43,35 @@ class LoadingSpinner:
         self._current_details = ""
         self._color = discord.Color.from_rgb(52, 152, 219)  # Blue
         
-        # Select spinner frames
-        if spinner_type == "dots":
-            self.frames = self.DOTS_FRAMES
-        elif spinner_type == "line":
-            self.frames = self.LINE_FRAMES
-        else:
-            self.frames = self.SPINNER_FRAMES
-    
-    def _get_current_frame(self) -> str:
-        """Get current spinner frame and advance to next"""
-        frame = self.frames[self.frame_index]
-        self.frame_index = (self.frame_index + 1) % len(self.frames)
-        return frame
+        # Use custom emoji for loading
+        self.loading_emoji = LOADING_EMOJI
     
     async def _update_loop(self):
-        """Background loop that updates the embed"""
+        """Background loop that updates the embed (mainly for text updates)"""
+        # Initial update with emoji
+        try:
+            embed = discord.Embed(
+                title=f"{self.loading_emoji} {self._current_title}",
+                description=self._current_details,
+                color=self._color
+            )
+            await self.message.edit(embed=embed)
+        except:
+            pass
+        
+        # Keep checking for text updates
         while self.running:
             try:
-                spinner = self._get_current_frame()
+                await asyncio.sleep(self.update_interval)
                 
-                # Create embed with spinner in title
-                embed = discord.Embed(
-                    title=f"{spinner} {self._current_title}",
-                    description=self._current_details,
-                    color=self._color
-                )
-                
-                await self.message.edit(embed=embed)
+                # Only re-edit if still running
+                if self.running:
+                    embed = discord.Embed(
+                        title=f"{self.loading_emoji} {self._current_title}",
+                        description=self._current_details,
+                        color=self._color
+                    )
+                    await self.message.edit(embed=embed)
                 
             except discord.HTTPException as e:
                 if e.code == 429:  # Rate limited
@@ -94,8 +81,6 @@ class LoadingSpinner:
                     
             except Exception as e:
                 logger.debug(f"Spinner error: {e}")
-            
-            await asyncio.sleep(self.update_interval)
     
     async def start(self, title: str, details: str = "", color: discord.Color = None):
         """

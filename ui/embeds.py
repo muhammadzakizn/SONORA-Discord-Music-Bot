@@ -105,17 +105,17 @@ class EmbedBuilder:
     @staticmethod
     def create_loading(stage: str, details: Optional[str] = None) -> discord.Embed:
         """
-        Create loading embed with clean CLI-style title (no emotes)
+        Create loading embed with custom animated emoji
         
         Args:
-            stage: Loading stage name (e.g., "Buffering", "Streaming")
+            stage: Loading stage name (e.g., "Searching", "Buffering", "Streaming")
             details: Additional details
         
         Returns:
             Discord embed
         """
-        # Clean title - no emotes
-        title = stage.strip()
+        # Title with loading emoji
+        title = f"{EMOJI_LOADING} {stage.strip()}"
         
         embed = discord.Embed(
             title=title,

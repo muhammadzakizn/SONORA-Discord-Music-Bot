@@ -41,8 +41,8 @@ class PlayerState(str, Enum):
     ERROR = "error"
 
 
-# Emoji constants - use minimal/text-based indicators
-EMOJI_LOADING = ""  # No emoji for loading - use dots animation
+# Emoji constants - use custom animated emoji for loading
+EMOJI_LOADING = "<a:loading:1458442919697715250>"  # Custom animated loading GIF
 EMOJI_SUCCESS = ""  # No emoji
 EMOJI_ERROR = ""    # No emoji
 EMOJI_WARNING = ""  # No emoji
