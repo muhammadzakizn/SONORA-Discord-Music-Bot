@@ -187,61 +187,89 @@ class YouTubeDownloader(BaseDownloader):
             else:
                 logger.warning("⚠ YouTube Music cookies not found - search may fail!")
             
-            # Add search query last
-            command.append(search_query)
+            # Define search strategies for robust fallback
+            # 1. YouTube Music with Songs Filter (Best Quality)
+            # 2. YouTube Music with No Filter (Fallback 1)
+            # 3. Regular YouTube Search (Fallback 2, parses multiple results)
+            strategies = [
+                {
+                    "name": "YTMusic Songs Filter",
+                    "url_template": "https://music.youtube.com/search?q={query}&sp=EgWKAQIIAQ%3D%3D",
+                    "args": ['-I', '1'], # Single result
+                    "is_direct": True
+                },
+                {
+                    "name": "YTMusic No Filter",
+                    "url_template": "https://music.youtube.com/search?q={query}",
+                    "args": ['-I', '1'], # Single result
+                    "is_direct": True
+                },
+                {
+                    "name": "ytsearch10 with Smart Matching",
+                    "url_template": "{query}", # Handled by fallback_query logic
+                    "args": ['--flat-playlist'], # Multiple results
+                    "is_direct": False
+                }
+            ]
             
-            # Run the initial search with songs filter
-            stdout, stderr, returncode = await self._run_command(command, timeout=30)
+            track_data = None
+            use_smart_matching = False
             
-            # Track which fallback path we're on
-            use_ytsearch10 = False
-            
-            if returncode != 0:
-                logger.warning(f"yt-dlp YTMusic SONGS search failed: {stderr}")
+            for strategy in strategies:
+                logger.info(f"Trying strategy: {strategy['name']}...")
                 
-                # FALLBACK 1: Try YouTube Music WITHOUT songs filter (allow videos)
-                logger.info("Trying YouTube Music search WITHOUT songs filter...")
-                no_filter_query = f"https://music.youtube.com/search?q={query.replace(' ', '+')}"
-                no_filter_cmd = [
+                # Build command
+                query_str = query.replace(' ', '+')
+                
+                if strategy["is_direct"]:
+                    # Direct URL search
+                    current_url = strategy["url_template"].format(query=query_str)
+                    cmd_args = strategy["args"] + [current_url]
+                else:
+                    # ytsearch10
+                    use_smart_matching = True
+                    fallback_query = query if query.startswith('http') else f"ytsearch10:{query}"
+                    cmd_args = strategy["args"] + [fallback_query]
+                
+                command = [
                     'yt-dlp',
                     '--remote-components', 'ejs:github',
                     '--dump-json',
-                    '-I', '1',
                     '--no-check-certificate',
                     '--geo-bypass',
                     '--extractor-args', 'youtube:player_client=ios,web',
-                ]
+                ] + cmd_args
+                
                 if yt_cookies:
-                    no_filter_cmd.extend(['--cookies', str(yt_cookies)])
-                no_filter_cmd.append(no_filter_query)
+                    command.extend(['--cookies', str(yt_cookies)])
                 
-                stdout, stderr, returncode = await self._run_command(no_filter_cmd, timeout=30)
+                stdout, stderr, returncode = await self._run_command(command, timeout=30)
                 
-                if returncode != 0:
-                    logger.warning(f"yt-dlp YTMusic (no filter) also failed: {stderr}")
-                    
-                    # FALLBACK 2: Regular ytsearch with MULTIPLE results for filtering
-                    logger.info("Falling back to ytsearch10 with smart matching...")
-                    use_ytsearch10 = True
-                    fallback_query = query if query.startswith('http') else f"ytsearch10:{query}"
-                    fallback_cmd = [
-                        'yt-dlp',
-                        '--remote-components', 'ejs:github',
-                        '--dump-json',
-                        '--flat-playlist',  # Get multiple results as JSON lines
-                        '--no-check-certificate',
-                        '--geo-bypass',
-                        '--extractor-args', 'youtube:player_client=ios,web',
-                        fallback_query
-                    ]
-                    stdout, stderr, returncode = await self._run_command(fallback_cmd, timeout=30)
-                    
-                    if returncode != 0:
-                        logger.warning(f"yt-dlp fallback search also failed: {stderr}")
-                        return None
+                if returncode == 0:
+                    if strategy["is_direct"]:
+                        # Single JSON parsing
+                        try:
+                            track_data = json.loads(stdout)
+                            logger.info(f"✓ Strategy '{strategy['name']}' succeeded!")
+                            break # Success!
+                        except json.JSONDecodeError:
+                            logger.warning(f"Strategy '{strategy['name']}' failed JSON parsing. Retrying...")
+                            continue # Try next strategy
+                    else:
+                        # Smart matching (ytsearch10) - handle parsing later
+                        logger.info(f"✓ Strategy '{strategy['name']}' returned data. Processing candidates...")
+                        break # Move to processing
+                else:
+                    logger.warning(f"Strategy '{strategy['name']}' failed with code {returncode}: {stderr}")
+                    continue # Try next strategy
+            
+            # If all direct strategies failed and we are not on smart matching
+            if not track_data and not use_smart_matching:
+                logger.error("All search strategies failed.")
+                return None
             
             # Now parse stdout based on which path we took
-            if use_ytsearch10:
+            if use_smart_matching:
                 try:
                     lines = stdout.strip().split('\n')
                     candidates = []
@@ -397,9 +425,10 @@ class YouTubeDownloader(BaseDownloader):
                     logger.error(f"Error parsing ytsearch results: {e}")
                     return None
             else:
-                # Parse JSON output from primary YTMusic search
+                # Direct search successful (track_data populated in strategy loop)
                 try:
-                    track_data = json.loads(stdout)
+                    # track_data = json.loads(stdout) # Skipped - already done
+
                     
                     # Extract info - YouTube Music metadata fields
                     # Priority: track > alt_title > fulltitle > title
