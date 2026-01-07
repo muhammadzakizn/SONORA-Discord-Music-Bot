@@ -42,7 +42,7 @@ class PlayerState(str, Enum):
 
 
 # Emoji constants - use custom animated emoji for loading
-EMOJI_LOADING = "<a:loading:1458442919697715250>"  # Custom animated loading GIF
+EMOJI_LOADING = "<a:loading2:1458449338782187674>"  # Custom animated loading GIF (white)
 EMOJI_SUCCESS = ""  # No emoji
 EMOJI_ERROR = ""    # No emoji
 EMOJI_WARNING = ""  # No emoji
