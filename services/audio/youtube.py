@@ -263,11 +263,15 @@ class YouTubeDownloader(BaseDownloader):
                     query_normalized = self._normalize_title(query)
                     query_words = set(query_normalized.split())
                     best_candidate = None
-                    best_score = 0.0
+                    best_score = -999  # Start negative to allow penalized candidates
                     
                     for cand in candidates:
                         cand_title = cand.get('title', '')
                         cand_artist = cand.get('uploader', '') or cand.get('channel', '')
+                        cand_duration = cand.get('duration', 0) or 0
+                        
+                        title_lower = cand_title.lower()
+                        artist_lower = cand_artist.lower()
                         
                         title_normalized = self._normalize_title(cand_title)
                         artist_normalized = self._normalize_title(cand_artist)
@@ -276,7 +280,7 @@ class YouTubeDownloader(BaseDownloader):
                         artist_words = set(artist_normalized.split())
                         all_words = title_words | artist_words
                         
-                        # Score based on word overlap
+                        # Base score from word overlap
                         title_matches = query_words & title_words
                         total_matches = query_words & all_words
                         
@@ -286,10 +290,46 @@ class YouTubeDownloader(BaseDownloader):
                         title_score = len(title_matches) / len(query_words)
                         total_score = len(total_matches) / len(query_words)
                         
-                        # Weighted score: prioritize title matches
+                        # Weighted base score: prioritize title matches
                         score = (title_score * 0.7) + (total_score * 0.3)
                         
-                        logger.debug(f"Candidate: '{cand_title}' score={score:.2f} (title={title_score:.2f})")
+                        # ========================================
+                        # SMART SCORING: Prefer audio over video
+                        # ========================================
+                        
+                        # BONUS: YouTube Music auto-generated channels (best quality)
+                        if ' - topic' in artist_lower:
+                            score += 0.5
+                            logger.debug(f"  +0.5 for Topic channel: {cand_artist}")
+                        
+                        # BONUS: Official audio releases
+                        if 'official audio' in title_lower:
+                            score += 0.4
+                        elif 'audio' in title_lower and 'video' not in title_lower:
+                            score += 0.2
+                        
+                        # PENALTY: Music videos with visual intros
+                        if 'official video' in title_lower or 'official music video' in title_lower:
+                            score -= 0.5
+                            logger.debug(f"  -0.5 for Official Video: {cand_title}")
+                        elif 'music video' in title_lower:
+                            score -= 0.4
+                        
+                        # PENALTY: Lyrics/visualizer videos
+                        if 'lyrics' in title_lower or 'lyric video' in title_lower:
+                            score -= 0.3
+                        if 'visualizer' in title_lower:
+                            score -= 0.3
+                        
+                        # PENALTY: Very long duration (> 8 min could be extended/remix/video)
+                        if cand_duration > 480:
+                            score -= 0.2
+                        
+                        # PENALTY: Live recordings
+                        if 'live' in title_lower and ('concert' in title_lower or 'performance' in title_lower):
+                            score -= 0.2
+                        
+                        logger.debug(f"Candidate: '{cand_title}' final_score={score:.2f} (base={title_score:.2f})")
                         
                         if score > best_score:
                             best_score = score
