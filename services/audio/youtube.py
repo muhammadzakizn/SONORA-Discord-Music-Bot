@@ -250,6 +250,27 @@ class YouTubeDownloader(BaseDownloader):
                         # Single JSON parsing
                         try:
                             track_data = json.loads(stdout)
+                            
+                            # INLINE TITLE VALIDATION - check if result matches query
+                            if not query.startswith('http'):
+                                result_title = (track_data.get('track') or 
+                                               track_data.get('alt_title') or 
+                                               track_data.get('fulltitle') or 
+                                               track_data.get('title', ''))
+                                
+                                query_normalized = self._normalize_title(query)
+                                title_normalized = self._normalize_title(result_title)
+                                
+                                query_words = set(query_normalized.split())
+                                title_words = set(title_normalized.split())
+                                title_matches = query_words & title_words
+                                
+                                # If multi-word query has NO title overlap, try next strategy
+                                if len(query_words) >= 2 and len(title_matches) == 0:
+                                    logger.warning(f"Strategy '{strategy['name']}' returned wrong song: '{result_title}' (no match with '{query}')")
+                                    track_data = None  # Reset
+                                    continue  # Try next strategy (ytsearch10)
+                            
                             logger.info(f"✓ Strategy '{strategy['name']}' succeeded!")
                             break # Success!
                         except json.JSONDecodeError:
@@ -479,179 +500,7 @@ class YouTubeDownloader(BaseDownloader):
                     # Force YouTube Music URL
                     ytmusic_url = f"https://music.youtube.com/watch?v={video_id}" if video_id else None
                     
-                    # ========================================
-                    # VALIDATE: Reject if title doesn't match query at all
-                    # This prevents returning wrong songs from same artist
-                    # ========================================
-                    if not query.startswith('http'):  # Only validate for search queries
-                        query_normalized = self._normalize_title(query)
-                        title_normalized = self._normalize_title(title)
-                        artist_normalized = self._normalize_title(artist)
-                        
-                        query_words = set(query_normalized.split())
-                        title_words = set(title_normalized.split())
-                        artist_words = set(artist_normalized.split())
-                        
-                        # Check how many query words appear in title
-                        title_matches = query_words & title_words
-                        artist_matches = query_words & artist_words
-                        
-                        # Reject if ZERO title matches and query has 2+ words
-                        # (allows for single-word queries like "Faded" to match)
-                        if len(query_words) >= 2 and len(title_matches) == 0:
-                            # Only artist matches - probably wrong song
-                            logger.warning(f"⚠ Title mismatch! Query '{query}' → Result '{title}' (no title word overlap)")
-                            logger.warning(f"  Query words: {query_words}, Title words: {title_words}")
-                            
-                            # Try alternative: search with quotes for exact phrase
-                            logger.info(f"Retrying with exact phrase search...")
-                            exact_query = f'"{query}"'
-                            songs_filter = "EgWKAQIIAQ%3D%3D"
-                            exact_search_query = f"https://music.youtube.com/search?q={exact_query.replace(' ', '+')}&sp={songs_filter}"
-                            
-                            retry_cmd = [
-                                'yt-dlp',
-                                '--remote-components', 'ejs:github',
-                                '--dump-json',
-                                '-I', '1',
-                                '--no-check-certificate',
-                                '--geo-bypass',
-                                '--extractor-args', 'youtube:player_client=ios,web',
-                            ]
-                            if yt_cookies:
-                                retry_cmd.extend(['--cookies', str(yt_cookies)])
-                            retry_cmd.append(exact_search_query)
-                            
-                            stdout2, stderr2, rc2 = await self._run_command(retry_cmd, timeout=30)
-                            if rc2 == 0:
-                                try:
-                                    track_data2 = json.loads(stdout2)
-                                    title2 = (track_data2.get('track') or 
-                                             track_data2.get('alt_title') or 
-                                             track_data2.get('fulltitle') or 
-                                             track_data2.get('title', 'Unknown'))
-                                    title2_normalized = self._normalize_title(title2)
-                                    title2_words = set(title2_normalized.split())
-                                    title2_matches = query_words & title2_words
-                                    
-                                    if len(title2_matches) > 0:
-                                        # Better match found
-                                        artist2 = track_data2.get('artist') or track_data2.get('creator') or track_data2.get('uploader', 'Unknown')
-                                        album2 = track_data2.get('album')
-                                        duration2 = track_data2.get('duration', 0)
-                                        video_id2 = track_data2.get('id', None)
-                                        
-                                        thumbnails2 = track_data2.get('thumbnails', [])
-                                        thumbnail2 = thumbnails2[-1].get('url') if thumbnails2 else None
-                                        
-                                        if ' - ' in title2 and artist2 in ['Unknown', title2.split(' - ')[0]]:
-                                            parts = title2.split(' - ', 1)
-                                            artist2 = parts[0].strip()
-                                            title2 = parts[1].strip()
-                                        
-                                        ytmusic_url2 = f"https://music.youtube.com/watch?v={video_id2}" if video_id2 else None
-                                        logger.info(f"✓ Found better match: {title2} - {artist2}")
-                                        
-                                        return TrackInfo(
-                                            title=title2,
-                                            artist=artist2,
-                                            album=album2,
-                                            duration=duration2,
-                                            url=ytmusic_url2,
-                                            track_id=video_id2,
-                                            thumbnail_url=thumbnail2
-                                        )
-                                except:
-                                    pass
-                            
-                            # No better match found with exact phrase - try ytsearch10 as final fallback
-                            logger.info(f"Trying ytsearch10 as final fallback for '{query}'...")
-                            fallback_query = f"ytsearch5:{query}"
-                            fallback_cmd = [
-                                'yt-dlp',
-                                '--remote-components', 'ejs:github',
-                                '--dump-json',
-                                '--flat-playlist',
-                                '--no-check-certificate',
-                                '--geo-bypass',
-                                '--extractor-args', 'youtube:player_client=ios,web',
-                                fallback_query
-                            ]
-                            if yt_cookies:
-                                fallback_cmd.extend(['--cookies', str(yt_cookies)])
-                            
-                            stdout3, stderr3, rc3 = await self._run_command(fallback_cmd, timeout=30)
-                            if rc3 == 0 and stdout3.strip():
-                                # Parse ytsearch results
-                                fb_lines = stdout3.strip().split('\n')
-                                for fb_line in fb_lines:
-                                    fb_line = fb_line.strip()
-                                    if fb_line and fb_line.startswith('{'):
-                                        try:
-                                            fb_data = json.loads(fb_line)
-                                            fb_title = fb_data.get('title', '')
-                                            fb_title_normalized = self._normalize_title(fb_title)
-                                            fb_title_words = set(fb_title_normalized.split())
-                                            fb_title_matches = query_words & fb_title_words
-                                            
-                                            if len(fb_title_matches) > 0:
-                                                # Found a matching result!
-                                                video_id3 = fb_data.get('id')
-                                                logger.info(f"✓ Found via ytsearch fallback: {fb_title} [ID: {video_id3}]")
-                                                
-                                                # Fetch full metadata
-                                                full_cmd = [
-                                                    'yt-dlp',
-                                                    '--dump-json',
-                                                    '--no-check-certificate',
-                                                    '--geo-bypass',
-                                                    f"https://music.youtube.com/watch?v={video_id3}"
-                                                ]
-                                                if yt_cookies:
-                                                    full_cmd.extend(['--cookies', str(yt_cookies)])
-                                                
-                                                stdout4, _, rc4 = await self._run_command(full_cmd, timeout=30)
-                                                if rc4 == 0:
-                                                    try:
-                                                        track_data4 = json.loads(stdout4)
-                                                    except:
-                                                        track_data4 = fb_data
-                                                else:
-                                                    track_data4 = fb_data
-                                                
-                                                title4 = (track_data4.get('track') or 
-                                                         track_data4.get('alt_title') or 
-                                                         track_data4.get('fulltitle') or 
-                                                         track_data4.get('title', 'Unknown'))
-                                                artist4 = track_data4.get('artist') or track_data4.get('creator') or track_data4.get('uploader', 'Unknown')
-                                                album4 = track_data4.get('album')
-                                                duration4 = track_data4.get('duration', 0)
-                                                
-                                                thumbnails4 = track_data4.get('thumbnails', [])
-                                                thumbnail4 = thumbnails4[-1].get('url') if thumbnails4 else None
-                                                
-                                                if ' - ' in title4 and artist4 in ['Unknown', title4.split(' - ')[0]]:
-                                                    parts = title4.split(' - ', 1)
-                                                    artist4 = parts[0].strip()
-                                                    title4 = parts[1].strip()
-                                                
-                                                ytmusic_url4 = f"https://music.youtube.com/watch?v={video_id3}" if video_id3 else None
-                                                
-                                                return TrackInfo(
-                                                    title=title4,
-                                                    artist=artist4,
-                                                    album=album4,
-                                                    duration=duration4,
-                                                    url=ytmusic_url4,
-                                                    track_id=video_id3,
-                                                    thumbnail_url=thumbnail4
-                                                )
-                                        except json.JSONDecodeError:
-                                            continue
-                            
-                            # No better match found - return None to avoid playing wrong song
-                            logger.warning(f"❌ No matching song found for '{query}'")
-                            return None
+                    # Title was already validated in strategy loop, so we can proceed directly
                     
                     logger.info(f"Found on YouTube Music: {title} - {artist}")
                     
