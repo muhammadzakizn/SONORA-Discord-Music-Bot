@@ -190,30 +190,58 @@ class YouTubeDownloader(BaseDownloader):
             # Add search query last
             command.append(search_query)
             
+            # Run the initial search with songs filter
             stdout, stderr, returncode = await self._run_command(command, timeout=30)
             
+            # Track which fallback path we're on
+            use_ytsearch10 = False
+            
             if returncode != 0:
-                logger.warning(f"yt-dlp YTMusic search failed: {stderr}")
-                # Fallback to regular ytsearch with MULTIPLE results for filtering
-                logger.info("Falling back to ytsearch10 with smart matching...")
-                fallback_query = query if query.startswith('http') else f"ytsearch10:{query}"
-                fallback_cmd = [
+                logger.warning(f"yt-dlp YTMusic SONGS search failed: {stderr}")
+                
+                # FALLBACK 1: Try YouTube Music WITHOUT songs filter (allow videos)
+                logger.info("Trying YouTube Music search WITHOUT songs filter...")
+                no_filter_query = f"https://music.youtube.com/search?q={query.replace(' ', '+')}"
+                no_filter_cmd = [
                     'yt-dlp',
                     '--remote-components', 'ejs:github',
                     '--dump-json',
-                    '--flat-playlist',  # Get multiple results as JSON lines
+                    '-I', '1',
                     '--no-check-certificate',
                     '--geo-bypass',
                     '--extractor-args', 'youtube:player_client=ios,web',
-                    fallback_query
                 ]
-                stdout, stderr, returncode = await self._run_command(fallback_cmd, timeout=30)
+                if yt_cookies:
+                    no_filter_cmd.extend(['--cookies', str(yt_cookies)])
+                no_filter_cmd.append(no_filter_query)
+                
+                stdout, stderr, returncode = await self._run_command(no_filter_cmd, timeout=30)
                 
                 if returncode != 0:
-                    logger.warning(f"yt-dlp fallback search also failed: {stderr}")
-                    return None
-                
-                # Parse multiple JSON lines and find best match
+                    logger.warning(f"yt-dlp YTMusic (no filter) also failed: {stderr}")
+                    
+                    # FALLBACK 2: Regular ytsearch with MULTIPLE results for filtering
+                    logger.info("Falling back to ytsearch10 with smart matching...")
+                    use_ytsearch10 = True
+                    fallback_query = query if query.startswith('http') else f"ytsearch10:{query}"
+                    fallback_cmd = [
+                        'yt-dlp',
+                        '--remote-components', 'ejs:github',
+                        '--dump-json',
+                        '--flat-playlist',  # Get multiple results as JSON lines
+                        '--no-check-certificate',
+                        '--geo-bypass',
+                        '--extractor-args', 'youtube:player_client=ios,web',
+                        fallback_query
+                    ]
+                    stdout, stderr, returncode = await self._run_command(fallback_cmd, timeout=30)
+                    
+                    if returncode != 0:
+                        logger.warning(f"yt-dlp fallback search also failed: {stderr}")
+                        return None
+            
+            # Now parse stdout based on which path we took
+            if use_ytsearch10:
                 try:
                     lines = stdout.strip().split('\n')
                     candidates = []
