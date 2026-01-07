@@ -188,27 +188,27 @@ class YouTubeDownloader(BaseDownloader):
                 logger.warning("⚠ YouTube Music cookies not found - search may fail!")
             
             # Define search strategies for robust fallback
-            # 1. YouTube Music with Songs Filter (Best Quality)
-            # 2. YouTube Music with No Filter (Fallback 1)
-            # 3. Regular YouTube Search (Fallback 2, parses multiple results)
+            # 1. ytsearch with Smart Matching (FIRST - most reliable, filters results)
+            # 2. YouTube Music with Songs Filter (direct, best quality if works)
+            # 3. YouTube Music with No Filter (last resort)
             strategies = [
+                {
+                    "name": "ytsearch20 with Smart Matching",
+                    "url_template": "{query}",  # Handled by fallback_query logic
+                    "args": ['--flat-playlist'],  # Multiple results
+                    "is_direct": False
+                },
                 {
                     "name": "YTMusic Songs Filter",
                     "url_template": "https://music.youtube.com/search?q={query}&sp=EgWKAQIIAQ%3D%3D",
-                    "args": ['-I', '1'], # Single result
+                    "args": ['-I', '1'],  # Single result
                     "is_direct": True
                 },
                 {
                     "name": "YTMusic No Filter",
                     "url_template": "https://music.youtube.com/search?q={query}",
-                    "args": ['-I', '1'], # Single result
+                    "args": ['-I', '1'],  # Single result
                     "is_direct": True
-                },
-                {
-                    "name": "ytsearch10 with Smart Matching",
-                    "url_template": "{query}", # Handled by fallback_query logic
-                    "args": ['--flat-playlist'], # Multiple results
-                    "is_direct": False
                 }
             ]
             
@@ -226,9 +226,9 @@ class YouTubeDownloader(BaseDownloader):
                     current_url = strategy["url_template"].format(query=query_str)
                     cmd_args = strategy["args"] + [current_url]
                 else:
-                    # ytsearch10
+                    # ytsearch20 - more results for better filtering
                     use_smart_matching = True
-                    fallback_query = query if query.startswith('http') else f"ytsearch10:{query}"
+                    fallback_query = query if query.startswith('http') else f"ytsearch20:{query}"
                     cmd_args = strategy["args"] + [fallback_query]
                 
                 command = [
@@ -391,9 +391,19 @@ class YouTubeDownloader(BaseDownloader):
                         if cand_duration > 480:
                             score -= 0.2
                         
-                        # PENALTY: Live recordings
+                        # PENALTY: Live recordings (weak penalty for simple 'live' mention)
                         if 'live' in title_lower and ('concert' in title_lower or 'performance' in title_lower):
                             score -= 0.2
+                        
+                        # ========================================
+                        # CRITICAL: UNWANTED_KEYWORDS from .env
+                        # Heavy penalty to completely skip these
+                        # ========================================
+                        for keyword in Settings.UNWANTED_KEYWORDS:
+                            if keyword.strip().lower() in title_lower:
+                                score -= 10  # Massive penalty, effectively skip
+                                logger.debug(f"  -10 for UNWANTED keyword '{keyword}': {cand_title}")
+                                break  # One match is enough to disqualify
                         
                         logger.debug(f"Candidate: '{cand_title}' final_score={score:.2f} (base={title_score:.2f})")
                         
