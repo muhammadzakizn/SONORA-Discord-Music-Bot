@@ -192,14 +192,14 @@ class YouTubeDownloader(BaseDownloader):
             
             if returncode != 0:
                 logger.warning(f"yt-dlp YTMusic search failed: {stderr}")
-                # Fallback to regular ytsearch
-                logger.info("Falling back to ytsearch1...")
-                fallback_query = query if query.startswith('http') else f"ytsearch1:{query}"
+                # Fallback to regular ytsearch with MULTIPLE results for filtering
+                logger.info("Falling back to ytsearch10 with smart matching...")
+                fallback_query = query if query.startswith('http') else f"ytsearch10:{query}"
                 fallback_cmd = [
                     'yt-dlp',
                     '--remote-components', 'ejs:github',
                     '--dump-json',
-                    '--no-playlist',
+                    '--flat-playlist',  # Get multiple results as JSON lines
                     '--no-check-certificate',
                     '--geo-bypass',
                     '--extractor-args', 'youtube:player_client=ios,web',
@@ -210,10 +210,126 @@ class YouTubeDownloader(BaseDownloader):
                 if returncode != 0:
                     logger.warning(f"yt-dlp fallback search also failed: {stderr}")
                     return None
-            
-            # Parse JSON output
-            try:
-                track_data = json.loads(stdout)
+                
+                # Parse multiple JSON lines and find best match
+                try:
+                    lines = stdout.strip().split('\n')
+                    candidates = []
+                    for line in lines:
+                        if line.strip():
+                            try:
+                                data = json.loads(line)
+                                candidates.append(data)
+                            except:
+                                pass
+                    
+                    if not candidates:
+                        logger.warning("No candidates found in ytsearch results")
+                        return None
+                    
+                    logger.info(f"Found {len(candidates)} candidates, filtering for best match...")
+                    
+                    # Score each candidate
+                    query_normalized = self._normalize_title(query)
+                    query_words = set(query_normalized.split())
+                    best_candidate = None
+                    best_score = 0.0
+                    
+                    for cand in candidates:
+                        cand_title = cand.get('title', '')
+                        cand_artist = cand.get('uploader', '') or cand.get('channel', '')
+                        
+                        title_normalized = self._normalize_title(cand_title)
+                        artist_normalized = self._normalize_title(cand_artist)
+                        
+                        title_words = set(title_normalized.split())
+                        artist_words = set(artist_normalized.split())
+                        all_words = title_words | artist_words
+                        
+                        # Score based on word overlap
+                        title_matches = query_words & title_words
+                        total_matches = query_words & all_words
+                        
+                        if not query_words:
+                            continue
+                        
+                        title_score = len(title_matches) / len(query_words)
+                        total_score = len(total_matches) / len(query_words)
+                        
+                        # Weighted score: prioritize title matches
+                        score = (title_score * 0.7) + (total_score * 0.3)
+                        
+                        logger.debug(f"Candidate: '{cand_title}' score={score:.2f} (title={title_score:.2f})")
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_candidate = cand
+                    
+                    if best_candidate and best_score >= 0.3:
+                        # Get full metadata for best candidate
+                        video_id = best_candidate.get('id')
+                        logger.info(f"✓ Best match (score {best_score:.2f}): {best_candidate.get('title')} [ID: {video_id}]")
+                        
+                        # Fetch full metadata for this video
+                        full_cmd = [
+                            'yt-dlp',
+                            '--dump-json',
+                            '--no-check-certificate',
+                            '--geo-bypass',
+                            f"https://music.youtube.com/watch?v={video_id}"
+                        ]
+                        if yt_cookies:
+                            full_cmd.extend(['--cookies', str(yt_cookies)])
+                        
+                        stdout2, _, rc2 = await self._run_command(full_cmd, timeout=30)
+                        if rc2 == 0:
+                            track_data = json.loads(stdout2)
+                        else:
+                            # Use flat data as fallback
+                            track_data = best_candidate
+                        
+                        # Extract metadata and return immediately
+                        title = (track_data.get('track') or 
+                                 track_data.get('alt_title') or 
+                                 track_data.get('fulltitle') or 
+                                 track_data.get('title', 'Unknown'))
+                        artist = track_data.get('artist') or track_data.get('creator') or track_data.get('uploader', 'Unknown')
+                        album = track_data.get('album')
+                        duration = track_data.get('duration', 0)
+                        
+                        thumbnails = track_data.get('thumbnails', [])
+                        thumbnail = thumbnails[-1].get('url') if thumbnails else None
+                        
+                        # Split "Artist - Title" format if needed
+                        if ' - ' in title and artist in ['Unknown', title.split(' - ')[0]]:
+                            parts = title.split(' - ', 1)
+                            artist = parts[0].strip()
+                            title = parts[1].strip()
+                        
+                        ytmusic_url = f"https://music.youtube.com/watch?v={video_id}" if video_id else None
+                        
+                        logger.info(f"Found on YouTube: {title} - {artist}")
+                        
+                        return TrackInfo(
+                            title=title,
+                            artist=artist,
+                            album=album,
+                            duration=duration,
+                            url=ytmusic_url,
+                            track_id=video_id,
+                            thumbnail_url=thumbnail
+                        )
+                    else:
+                        logger.warning(f"No good match found (best score: {best_score:.2f})")
+                        return None
+                        
+                except Exception as e:
+                    logger.error(f"Error parsing ytsearch results: {e}")
+                    return None
+            else:
+                # Parse JSON output from primary YTMusic search
+                try:
+                    track_data = json.loads(stdout)
                 
                 # Extract info - YouTube Music metadata fields
                 # Priority: track > alt_title > fulltitle > title
