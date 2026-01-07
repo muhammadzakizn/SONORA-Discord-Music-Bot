@@ -1,8 +1,48 @@
 {
   "web_version": "3.28.0",
-  "bot_version": "3.28.0",
-  "last_updated": "2026-01-03T17:45:00+08:00",
+  "bot_version": "3.30.0",
+  "last_updated": "2026-01-07T22:12:00+08:00",
   "entries": [
+    {
+      "id": "v3.30.0",
+      "version": "3.30.0",
+      "date": "2026-01-07",
+      "title": "Smart Search & Songs Priority",
+      "highlights": [
+        "Smart search with 10 results filtering",
+        "Songs-only filter (no video intros)",
+        "Custom animated loading emoji",
+        "Improved search accuracy"
+      ],
+      "changes": [
+        {
+          "category": "Search Algorithm",
+          "items": [
+            "Fetches 10 results and scores by title word overlap",
+            "Best match automatically selected (score >= 0.3)",
+            "Prevents playing wrong songs from same artist",
+            "Example: 'Face Down' no longer returns 'Getting By'"
+          ]
+        },
+        {
+          "category": "Songs Priority",
+          "items": [
+            "All searches use YouTube Music 'Songs' section filter",
+            "Prioritizes audio tracks over music videos",
+            "No more long video intros before songs",
+            "Filter: sp=EgWKAQIIAQ%3D%3D"
+          ]
+        },
+        {
+          "category": "UI Improvements",
+          "items": [
+            "Custom animated loading emoji",
+            "Replaced text-based spinner with Discord emoji GIF",
+            "Smoother loading feedback"
+          ]
+        }
+      ]
+    },
     {
       "id": "v3.28.0",
       "version": "3.28.0",
