@@ -247,6 +247,94 @@ class YouTubeDownloader(BaseDownloader):
                 # Force YouTube Music URL
                 ytmusic_url = f"https://music.youtube.com/watch?v={video_id}" if video_id else None
                 
+                # ========================================
+                # VALIDATE: Reject if title doesn't match query at all
+                # This prevents returning wrong songs from same artist
+                # ========================================
+                if not query.startswith('http'):  # Only validate for search queries
+                    query_normalized = self._normalize_title(query)
+                    title_normalized = self._normalize_title(title)
+                    artist_normalized = self._normalize_title(artist)
+                    
+                    query_words = set(query_normalized.split())
+                    title_words = set(title_normalized.split())
+                    artist_words = set(artist_normalized.split())
+                    
+                    # Check how many query words appear in title
+                    title_matches = query_words & title_words
+                    artist_matches = query_words & artist_words
+                    
+                    # Reject if ZERO title matches and query has 2+ words
+                    # (allows for single-word queries like "Faded" to match)
+                    if len(query_words) >= 2 and len(title_matches) == 0:
+                        # Only artist matches - probably wrong song
+                        logger.warning(f"⚠ Title mismatch! Query '{query}' → Result '{title}' (no title word overlap)")
+                        logger.warning(f"  Query words: {query_words}, Title words: {title_words}")
+                        
+                        # Try alternative: search with quotes for exact phrase
+                        logger.info(f"Retrying with exact phrase search...")
+                        exact_query = f'"{query}"'
+                        exact_search_query = f"https://music.youtube.com/search?q={exact_query.replace(' ', '+')}"
+                        
+                        retry_cmd = [
+                            'yt-dlp',
+                            '--remote-components', 'ejs:github',
+                            '--dump-json',
+                            '-I', '1',
+                            '--no-check-certificate',
+                            '--geo-bypass',
+                            '--extractor-args', 'youtube:player_client=ios,web',
+                        ]
+                        if yt_cookies:
+                            retry_cmd.extend(['--cookies', str(yt_cookies)])
+                        retry_cmd.append(exact_search_query)
+                        
+                        stdout2, stderr2, rc2 = await self._run_command(retry_cmd, timeout=30)
+                        if rc2 == 0:
+                            try:
+                                track_data2 = json.loads(stdout2)
+                                title2 = (track_data2.get('track') or 
+                                         track_data2.get('alt_title') or 
+                                         track_data2.get('fulltitle') or 
+                                         track_data2.get('title', 'Unknown'))
+                                title2_normalized = self._normalize_title(title2)
+                                title2_words = set(title2_normalized.split())
+                                title2_matches = query_words & title2_words
+                                
+                                if len(title2_matches) > 0:
+                                    # Better match found
+                                    artist2 = track_data2.get('artist') or track_data2.get('creator') or track_data2.get('uploader', 'Unknown')
+                                    album2 = track_data2.get('album')
+                                    duration2 = track_data2.get('duration', 0)
+                                    video_id2 = track_data2.get('id', None)
+                                    
+                                    thumbnails2 = track_data2.get('thumbnails', [])
+                                    thumbnail2 = thumbnails2[-1].get('url') if thumbnails2 else None
+                                    
+                                    if ' - ' in title2 and artist2 in ['Unknown', title2.split(' - ')[0]]:
+                                        parts = title2.split(' - ', 1)
+                                        artist2 = parts[0].strip()
+                                        title2 = parts[1].strip()
+                                    
+                                    ytmusic_url2 = f"https://music.youtube.com/watch?v={video_id2}" if video_id2 else None
+                                    logger.info(f"✓ Found better match: {title2} - {artist2}")
+                                    
+                                    return TrackInfo(
+                                        title=title2,
+                                        artist=artist2,
+                                        album=album2,
+                                        duration=duration2,
+                                        url=ytmusic_url2,
+                                        track_id=video_id2,
+                                        thumbnail_url=thumbnail2
+                                    )
+                            except:
+                                pass
+                        
+                        # No better match found - return None to avoid playing wrong song
+                        logger.warning(f"❌ No matching song found for '{query}'")
+                        return None
+                
                 logger.info(f"Found on YouTube Music: {title} - {artist}")
                 
                 return TrackInfo(
