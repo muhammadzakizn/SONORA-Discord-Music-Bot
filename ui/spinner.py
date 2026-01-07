@@ -9,7 +9,7 @@ logger = get_logger('ui.spinner')
 
 # Custom Discord emoji for loading animation
 # Emoji must be uploaded to the bot's application in Discord Developer Portal
-LOADING_EMOJI = "<a:loading2:1458449338782187674>"
+LOADING_EMOJI = "<a:loading3:1458459715981021386>"
 
 
 class LoadingSpinner:
