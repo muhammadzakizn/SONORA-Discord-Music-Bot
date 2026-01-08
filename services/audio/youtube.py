@@ -188,14 +188,14 @@ class YouTubeDownloader(BaseDownloader):
                 logger.warning("⚠ YouTube Music cookies not found - search may fail!")
             
             # Define search strategies for robust fallback
-            # 1. YTMusic with Smart Matching (FIRST - searches music.youtube.com with filtering)
+            # 1. YTMusic with Smart Matching (FIRST - gets 10 results with full metadata)
             # 2. YouTube Music with Songs Filter (direct, single best result)
             # 3. YouTube Music with No Filter (last resort)
             strategies = [
                 {
                     "name": "YTMusic Smart Matching",
                     "url_template": "https://music.youtube.com/search?q={query}",  # Search YT Music
-                    "args": ['--flat-playlist'],  # Multiple results
+                    "args": ['-I', '1:10'],  # Get first 10 results with FULL metadata
                     "is_direct": False
                 },
                 {
