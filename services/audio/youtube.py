@@ -33,10 +33,23 @@ class YouTubeDownloader(BaseDownloader):
         # Force YouTube Music domain
         self.ytmusic_domain = "music.youtube.com"
         
-        # Initialize ytmusicapi for better search matching
+        # Initialize ytmusicapi for better search matching (with auth if available)
         if YTMUSIC_AVAILABLE:
-            self.ytmusic = YTMusic()
-            logger.info("YTMusic API initialized for improved search matching")
+            try:
+                # Try to use cookies for authenticated search (better results)
+                from config.settings import Settings
+                yt_cookies = Settings.get_yt_cookies()
+                if yt_cookies and yt_cookies.exists():
+                    # Convert Netscape cookies to ytmusicapi format
+                    # ytmusicapi can use browser cookies directly
+                    self.ytmusic = YTMusic(str(yt_cookies))
+                    logger.info(f"YTMusic API initialized with cookies: {yt_cookies}")
+                else:
+                    self.ytmusic = YTMusic()
+                    logger.warning("YTMusic API initialized WITHOUT auth - search may be limited")
+            except Exception as e:
+                logger.warning(f"Failed to init YTMusic with cookies: {e}, using unauthenticated")
+                self.ytmusic = YTMusic()
         else:
             self.ytmusic = None
             logger.warning("ytmusicapi not available - using yt-dlp search only")
