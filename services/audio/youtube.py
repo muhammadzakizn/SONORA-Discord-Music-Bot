@@ -449,6 +449,34 @@ class YouTubeDownloader(BaseDownloader):
                                 break
                         
                         # ========================================
+                        # FAN/SUBTITLE VIDEO FILTER
+                        # Block fan-made with hardcoded subs, lyric videos
+                        # ========================================
+                        import re
+                        # Hashtag patterns (fan videos often have these)
+                        if re.search(r'#\w+sub\b', title_lower):  # #mmsub, #engsub, etc
+                            score -= 8
+                            logger.debug(f"  -8 for SUBTITLE hashtag: {cand_title}")
+                        elif re.search(r'#(songs?|music|vietsub|thaisub|indsub)', title_lower):
+                            score -= 5
+                            logger.debug(f"  -5 for FAN hashtag: {cand_title}")
+                        
+                        # Multiple dashes pattern (fan edits)
+                        if '----' in title_lower or '---' in title_lower:
+                            score -= 5
+                            logger.debug(f"  -5 for DASHES pattern: {cand_title}")
+                        
+                        # Subtitle language indicators
+                        sub_patterns = ['mm sub', 'eng sub', 'viet sub', 'thai sub', 'indo sub', 'malay sub',
+                                       'mmsub', 'engsub', 'vietsub', 'thaisub', 'indsub', 'mysub',
+                                       'myanmarsub', 'korean sub', 'hansub', 'chi sub', 'jpn sub']
+                        for sp in sub_patterns:
+                            if sp in title_lower:
+                                score -= 8
+                                logger.debug(f"  -8 for SUBTITLE indicator '{sp}': {cand_title}")
+                                break
+                        
+                        # ========================================
                         # CRITICAL: UNWANTED_KEYWORDS from .env
                         # Heavy penalty to completely skip these
                         # ========================================
