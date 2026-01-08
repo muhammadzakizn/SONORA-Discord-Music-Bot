@@ -154,6 +154,10 @@ class YouTubeDownloader(BaseDownloader):
         Use spotdl url command to get YouTube URL from a search query.
         This is a fallback when ytmusicapi fails.
         
+        Flow:
+        1. Search Spotify with spotipy to get track URL
+        2. Use spotdl url with that Spotify URL to get YouTube URL
+        
         Args:
             query: Search query (e.g., "Artist - Title")
             
@@ -163,23 +167,29 @@ class YouTubeDownloader(BaseDownloader):
         logger.info(f"[SpotDL] Attempting to get YouTube URL for: {query}")
         
         try:
-            # Try 'spotdl url' command first - this searches Spotify and returns YouTube match
-            # Format: spotdl url "artist - title"
-            cmd = ['spotdl', 'url', query]
-            logger.info(f"[SpotDL] Running command: {' '.join(cmd)}")
+            # STEP 1: Search Spotify to get track URL using spotipy
+            spotify_url = await self._search_spotify_for_url(query)
             
-            stdout, stderr, returncode = await self._run_command(cmd, timeout=20)
+            if not spotify_url:
+                logger.warning(f"[SpotDL] Could not find track on Spotify: {query}")
+                return None
+            
+            logger.info(f"[SpotDL] Found Spotify URL: {spotify_url}")
+            
+            # STEP 2: Use spotdl url with the Spotify URL
+            cmd = ['spotdl', 'url', spotify_url]
+            logger.info(f"[SpotDL] Running: spotdl url {spotify_url[:50]}...")
+            
+            stdout, stderr, returncode = await self._run_command(cmd, timeout=25)
             
             logger.info(f"[SpotDL] Return code: {returncode}, stdout length: {len(stdout) if stdout else 0}")
             
             if returncode == 0 and stdout:
-                # spotdl url returns the YouTube URL directly
                 output = stdout.strip()
                 logger.info(f"[SpotDL] Raw output: {output[:200] if output else 'empty'}")
                 
-                # Check if output is a YouTube URL
+                # Extract YouTube URL from output
                 if 'youtube.com' in output or 'youtu.be' in output:
-                    # Extract URL from output (might have other text)
                     for line in output.split('\n'):
                         line = line.strip()
                         if line.startswith('http') and ('youtube.com' in line or 'youtu.be' in line):
@@ -207,6 +217,50 @@ class YouTubeDownloader(BaseDownloader):
             return None
         except Exception as e:
             logger.warning(f"[SpotDL] Error: {e}")
+            return None
+    
+    async def _search_spotify_for_url(self, query: str) -> Optional[str]:
+        """
+        Search Spotify using spotipy to get track URL.
+        
+        Args:
+            query: Search query
+            
+        Returns:
+            Spotify track URL or None
+        """
+        try:
+            import spotipy
+            from spotipy.oauth2 import SpotifyClientCredentials
+            
+            # Check if credentials are configured
+            if not Settings.SPOTIFY_CLIENT_ID or not Settings.SPOTIFY_CLIENT_SECRET:
+                logger.debug("[SpotDL] Spotify credentials not configured")
+                return None
+            
+            auth_manager = SpotifyClientCredentials(
+                client_id=Settings.SPOTIFY_CLIENT_ID,
+                client_secret=Settings.SPOTIFY_CLIENT_SECRET
+            )
+            sp = spotipy.Spotify(auth_manager=auth_manager)
+            
+            # Search for track
+            results = sp.search(q=query, type='track', limit=1)
+            
+            if results and results.get('tracks', {}).get('items'):
+                track = results['tracks']['items'][0]
+                track_url = track.get('external_urls', {}).get('spotify')
+                if track_url:
+                    logger.info(f"[SpotDL] Spotify search found: {track.get('name')} by {track.get('artists', [{}])[0].get('name')}")
+                    return track_url
+            
+            return None
+            
+        except ImportError:
+            logger.debug("[SpotDL] spotipy not installed")
+            return None
+        except Exception as e:
+            logger.debug(f"[SpotDL] Spotify search error: {e}")
             return None
     
     async def _extract_from_url(self, youtube_url: str, original_query: str) -> Optional['TrackInfo']:
