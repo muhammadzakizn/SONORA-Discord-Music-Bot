@@ -434,11 +434,12 @@ class YouTubeDownloader(BaseDownloader):
                         non_song_keywords = [
                             'making of', 'behind the scenes', 'footnotes', 'vevo footnotes',
                             'interview', 'reaction', 'reacts', 'review', 'commentary',
-                            'documentary', 'explained', 'breakdown', 'analysis',
+                            'documentary', 'explained', 'breakdown', 'break down', 'analysis',
                             'tutorial', 'how to', 'lesson', 'teaser', 'trailer',
                             'announcement', 'premiere', 'unboxing', 'podcast',
                             'q&a', 'qna', 'q & a', 'funny moments', 'compilation',
                             'shorts', '#shorts', 'tiktok', 'episode', 'ep.', ' ep ',
+                            'track-by-track', 'track by track', 'deep dive', 'origin story',
                         ]
                         for nsk in non_song_keywords:
                             if nsk in title_lower:
