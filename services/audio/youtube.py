@@ -33,23 +33,16 @@ class YouTubeDownloader(BaseDownloader):
         # Force YouTube Music domain
         self.ytmusic_domain = "music.youtube.com"
         
-        # Initialize ytmusicapi for better search matching (with auth if available)
+        # Initialize ytmusicapi for better search matching
+        # Note: ytmusicapi works without auth for searching songs
         if YTMUSIC_AVAILABLE:
             try:
-                # Try to use cookies for authenticated search (better results)
-                from config.settings import Settings
-                yt_cookies = Settings.get_youtube_cookies()  # Fixed: was get_yt_cookies
-                if yt_cookies and yt_cookies.exists():
-                    # Convert Netscape cookies to ytmusicapi format
-                    # ytmusicapi can use browser cookies directly
-                    self.ytmusic = YTMusic(str(yt_cookies))
-                    logger.info(f"YTMusic API initialized with cookies: {yt_cookies}")
-                else:
-                    self.ytmusic = YTMusic()
-                    logger.warning("YTMusic API initialized WITHOUT auth - search may be limited")
-            except Exception as e:
-                logger.warning(f"Failed to init YTMusic with cookies: {e}, using unauthenticated")
+                # Unauthenticated mode still works for songs search
                 self.ytmusic = YTMusic()
+                logger.info("YTMusic API initialized (unauthenticated - songs search OK)")
+            except Exception as e:
+                logger.error(f"Failed to init YTMusic API: {e}")
+                self.ytmusic = None
         else:
             self.ytmusic = None
             logger.warning("ytmusicapi not available - using yt-dlp search only")
@@ -606,6 +599,7 @@ class YouTubeDownloader(BaseDownloader):
         
         try:
             # Search on YouTube Music - get 10 results for better matching
+            logger.info(f"[ytmusicapi] Searching: '{query}'")
             results = await asyncio.to_thread(
                 self.ytmusic.search,
                 query,
@@ -614,7 +608,10 @@ class YouTubeDownloader(BaseDownloader):
             )
             
             if not results:
+                logger.warning(f"[ytmusicapi] Empty results for: '{query}'")
                 return None
+            
+            logger.info(f"[ytmusicapi] Found {len(results)} songs for: '{query}'")
             
             # Parse query into potential title and artist parts
             query_words = self._normalize_title(query).split()
