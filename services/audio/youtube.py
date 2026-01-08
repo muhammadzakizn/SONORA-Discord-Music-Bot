@@ -188,13 +188,13 @@ class YouTubeDownloader(BaseDownloader):
                 logger.warning("⚠ YouTube Music cookies not found - search may fail!")
             
             # Define search strategies for robust fallback
-            # 1. ytsearch with Smart Matching (FIRST - most reliable, filters results)
-            # 2. YouTube Music with Songs Filter (direct, best quality if works)
+            # 1. YTMusic with Smart Matching (FIRST - searches music.youtube.com with filtering)
+            # 2. YouTube Music with Songs Filter (direct, single best result)
             # 3. YouTube Music with No Filter (last resort)
             strategies = [
                 {
-                    "name": "ytsearch20 with Smart Matching",
-                    "url_template": "{query}",  # Handled by fallback_query logic
+                    "name": "YTMusic Smart Matching",
+                    "url_template": "https://music.youtube.com/search?q={query}",  # Search YT Music
                     "args": ['--flat-playlist'],  # Multiple results
                     "is_direct": False
                 },
@@ -226,10 +226,11 @@ class YouTubeDownloader(BaseDownloader):
                     current_url = strategy["url_template"].format(query=query_str)
                     cmd_args = strategy["args"] + [current_url]
                 else:
-                    # ytsearch20 - more results for better filtering
+                    # YouTube Music search with multiple results
                     use_smart_matching = True
-                    fallback_query = query if query.startswith('http') else f"ytsearch20:{query}"
-                    cmd_args = strategy["args"] + [fallback_query]
+                    # Use YouTube Music URL, NOT ytsearch (which is regular YouTube)
+                    ytmusic_url = strategy["url_template"].format(query=query_str)
+                    cmd_args = strategy["args"] + [ytmusic_url]
                 
                 command = [
                     'yt-dlp',
