@@ -758,6 +758,8 @@ class PlayCommand(commands.Cog):
                         f"⚠️ File cache tidak cocok\n⬇️ Mengunduh ulang..."
                     )
                 )
+                # CRITICAL: Reset cached_file so flow continues to download
+                cached_file = None
             else:
                 logger.info(f"✓ Cache verified: {track_info.title} (confidence: {verification.confidence:.2f})")
                 
@@ -844,65 +846,87 @@ class PlayCommand(commands.Cog):
         # ========================================
         # TIER 2: yt-dlp Direct Download (PRIMARY)
         # Download via yt-dlp, then upload to FTP
+        # With retry on verification failure
         # ========================================
-        try:
-            await self._safe_loader_update(loader, 
-                embed=EmbedBuilder.create_loading(
-                    "Downloading",
-                    f"📥 Downloading via yt-dlp...\n**{track_info.title}**"
-                )
-            )
-            
-            # Force yt-dlp (skip MusicDL internally)
-            result = await self.youtube_downloader._download_from_ytdlp(track_info)
-            
-            if result and result.file_path and result.file_path.exists():
-                result.source = "YouTube Music"
-                
-                # Verify downloaded file
+        MAX_DOWNLOAD_RETRIES = 2
+        for download_attempt in range(1, MAX_DOWNLOAD_RETRIES + 1):
+            try:
                 await self._safe_loader_update(loader, 
                     embed=EmbedBuilder.create_loading(
-                        "Verifying",
-                        f"✅ Memverifikasi audio...\n**{track_info.title}**"
+                        "Downloading",
+                        f"📥 Downloading via yt-dlp...\n**{track_info.title}**" + 
+                        (f"\n(Attempt {download_attempt}/{MAX_DOWNLOAD_RETRIES})" if download_attempt > 1 else "")
                     )
                 )
-                from utils.track_verifier import TrackVerifier
-                verification = await TrackVerifier.verify_track(result.file_path, track_info)
                 
-                if verification.success:
-                    logger.info(f"✓ Downloaded & verified via yt-dlp: {result.title} (confidence: {verification.confidence:.2f})")
+                # Force yt-dlp (skip MusicDL internally)
+                result = await self.youtube_downloader._download_from_ytdlp(track_info)
+                
+                if result and result.file_path and result.file_path.exists():
+                    result.source = "YouTube Music"
                     
-                    # Upload to FTP cache in background
-                    try:
-                        from services.storage import get_cloud_cache
-                        cloud_cache = get_cloud_cache()
-                        if cloud_cache.is_enabled:
-                            # Use wrapper to ensure logs are shown
-                            async def _safe_ftp_upload():
-                                try:
-                                    success = await cloud_cache.upload(result.file_path, track_info.artist, track_info.title)
-                                    if success:
-                                        logger.info(f"☁️ FTP upload complete: {track_info.title}")
-                                    else:
-                                        logger.warning(f"⚠️ FTP upload returned False: {track_info.title}")
-                                except Exception as upload_error:
-                                    logger.error(f"❌ FTP upload error: {upload_error}")
-                            
-                            asyncio.create_task(_safe_ftp_upload())
-                            logger.info(f"☁️ FTP upload started: {track_info.title}")
+                    # Verify downloaded file
+                    await self._safe_loader_update(loader, 
+                        embed=EmbedBuilder.create_loading(
+                            "Verifying",
+                            f"✅ Memverifikasi audio...\n**{track_info.title}**"
+                        )
+                    )
+                    from utils.track_verifier import TrackVerifier
+                    verification = await TrackVerifier.verify_track(result.file_path, track_info)
+                    
+                    if verification.success:
+                        logger.info(f"✓ Downloaded & verified via yt-dlp: {result.title} (confidence: {verification.confidence:.2f})")
+                        
+                        # Upload to FTP cache in background
+                        try:
+                            from services.storage import get_cloud_cache
+                            cloud_cache = get_cloud_cache()
+                            if cloud_cache.is_enabled:
+                                # Use wrapper to ensure logs are shown
+                                async def _safe_ftp_upload():
+                                    try:
+                                        success = await cloud_cache.upload(result.file_path, track_info.artist, track_info.title)
+                                        if success:
+                                            logger.info(f"☁️ FTP upload complete: {track_info.title}")
+                                        else:
+                                            logger.warning(f"⚠️ FTP upload returned False: {track_info.title}")
+                                    except Exception as upload_error:
+                                        logger.error(f"❌ FTP upload error: {upload_error}")
+                                
+                                asyncio.create_task(_safe_ftp_upload())
+                                logger.info(f"☁️ FTP upload started: {track_info.title}")
+                            else:
+                                logger.debug("FTP cache not enabled, skipping upload")
+                        except Exception as e:
+                            logger.warning(f"FTP upload setup failed: {e}")
+                        
+                        return result
+                    else:
+                        logger.warning(f"yt-dlp verification failed (attempt {download_attempt}): {verification.message}")
+                        # Delete bad file and retry
+                        try:
+                            result.file_path.unlink()
+                            logger.info(f"Deleted mismatched download: {result.file_path}")
+                        except:
+                            pass
+                        
+                        if download_attempt < MAX_DOWNLOAD_RETRIES:
+                            await self._safe_loader_update(loader, 
+                                embed=EmbedBuilder.create_loading(
+                                    "Verification Failed",
+                                    f"⚠️ Audio tidak cocok, mencoba ulang...\n**{track_info.title}**"
+                                )
+                            )
+                            continue  # Retry download
                         else:
-                            logger.debug("FTP cache not enabled, skipping upload")
-                    except Exception as e:
-                        logger.warning(f"FTP upload setup failed: {e}")
-                    
-                    return result
-                else:
-                    logger.warning(f"yt-dlp verification failed: {verification.message}")
-                    raise Exception(f"Verification failed: {verification.message}")
-        
-        except Exception as e:
-            errors.append({"source": "yt-dlp", "error": str(e)})
-            logger.warning(f"yt-dlp download failed: {e}")
+                            raise Exception(f"Verification failed after {MAX_DOWNLOAD_RETRIES} attempts: {verification.message}")
+            
+            except Exception as e:
+                errors.append({"source": f"yt-dlp (attempt {download_attempt})", "error": str(e)})
+                logger.warning(f"yt-dlp download failed (attempt {download_attempt}): {e}")
+                if download_attempt >= MAX_DOWNLOAD_RETRIES:
+                    break  # Move to TIER 3
         
         # ========================================
         # TIER 3: MusicDL (LAST RESORT)
