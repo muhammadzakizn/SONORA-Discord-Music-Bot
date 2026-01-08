@@ -273,75 +273,127 @@ class YouTubeDownloader(BaseDownloader):
             track_data = None
             use_smart_matching = False
             
-            for strategy in strategies:
-                logger.info(f"Trying strategy: {strategy['name']}...")
+            # ========================================
+            # DIRECT URL HANDLING - Skip search for URLs
+            # If user provides a direct YouTube/YTMusic URL, extract info directly
+            # ========================================
+            is_direct_url = query.startswith('http') and ('youtube.com' in query or 'youtu.be' in query or 'music.youtube.com' in query)
+            
+            if is_direct_url:
+                # Convert to YouTube Music URL for best audio quality
+                ytmusic_url = self._convert_to_ytmusic_url(query)
+                logger.info(f"Direct URL detected, extracting info from: {ytmusic_url}")
                 
-                # Build command
-                query_str = query.replace(' ', '+')
-                
-                if strategy["is_direct"]:
-                    # Direct URL search
-                    current_url = strategy["url_template"].format(query=query_str)
-                    cmd_args = strategy["args"] + [current_url]
-                else:
-                    # ytsearch - regular YouTube with smart matching
-                    use_smart_matching = True
-                    # Format: ytsearch10:query (not URL encoded)
-                    ytsearch_query = strategy["url_template"].format(query=query)
-                    cmd_args = strategy["args"] + [ytsearch_query]
-                
-                command = [
+                # Direct extraction command
+                direct_cmd = [
                     'yt-dlp',
                     '--remote-components', 'ejs:github',
                     '--dump-json',
+                    '--no-playlist',  # Don't expand playlists
                     '--no-check-certificate',
                     '--geo-bypass',
                     '--extractor-args', 'youtube:player_client=ios,web',
-                ] + cmd_args
+                ]
                 
                 if yt_cookies:
-                    command.extend(['--cookies', str(yt_cookies)])
+                    try:
+                        if yt_cookies.stat().st_size > 0:
+                            direct_cmd.extend(['--cookies', str(yt_cookies)])
+                    except:
+                        pass
                 
-                stdout, stderr, returncode = await self._run_command(command, timeout=30)
+                # Add source address if configured
+                if hasattr(Settings, 'YTDLP_SOURCE_ADDRESS') and Settings.YTDLP_SOURCE_ADDRESS:
+                    direct_cmd.extend(['--source-address', Settings.YTDLP_SOURCE_ADDRESS])
                 
-                if returncode == 0:
-                    if strategy["is_direct"]:
-                        # Single JSON parsing
-                        try:
-                            track_data = json.loads(stdout)
-                            
-                            # INLINE TITLE VALIDATION - check if result matches query
-                            if not query.startswith('http'):
-                                result_title = (track_data.get('track') or 
-                                               track_data.get('alt_title') or 
-                                               track_data.get('fulltitle') or 
-                                               track_data.get('title', ''))
-                                
-                                query_normalized = self._normalize_title(query)
-                                title_normalized = self._normalize_title(result_title)
-                                
-                                query_words = set(query_normalized.split())
-                                title_words = set(title_normalized.split())
-                                title_matches = query_words & title_words
-                                
-                                # If multi-word query has NO title overlap, try next strategy
-                                if len(query_words) >= 2 and len(title_matches) == 0:
-                                    logger.warning(f"Strategy '{strategy['name']}' returned wrong song: '{result_title}' (no match with '{query}')")
-                                    track_data = None  # Reset
-                                    continue  # Try next strategy (ytsearch10)
-                            
-                            logger.info(f"✓ Strategy '{strategy['name']}' succeeded!")
-                            break # Success!
-                        except json.JSONDecodeError:
-                            logger.warning(f"Strategy '{strategy['name']}' failed JSON parsing. Retrying...")
-                            continue # Try next strategy
-                    else:
-                        # Smart matching (ytsearch10) - handle parsing later
-                        logger.info(f"✓ Strategy '{strategy['name']}' returned data. Processing candidates...")
-                        break # Move to processing
+                direct_cmd.append(ytmusic_url)
+                
+                stdout, stderr, returncode = await self._run_command(direct_cmd, timeout=30)
+                
+                if returncode == 0 and stdout:
+                    try:
+                        track_data = json.loads(stdout)
+                        logger.info(f"✓ Direct URL extraction successful: {track_data.get('title', 'Unknown')}")
+                        # Mark as direct (no need for smart matching scoring)
+                        use_smart_matching = False
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse direct URL response: {e}")
                 else:
-                    logger.warning(f"Strategy '{strategy['name']}' failed with code {returncode}: {stderr}")
-                    continue # Try next strategy
+                    logger.warning(f"Direct URL extraction failed: {stderr[:200] if stderr else 'no output'}")
+            
+            # ========================================
+            # SEARCH STRATEGIES - Only for non-URL queries
+            # ========================================
+            if not track_data:
+                for strategy in strategies:
+                    logger.info(f"Trying strategy: {strategy['name']}...")
+                    
+                    # Build command
+                    query_str = query.replace(' ', '+')
+                    
+                    if strategy["is_direct"]:
+                        # Direct URL search
+                        current_url = strategy["url_template"].format(query=query_str)
+                        cmd_args = strategy["args"] + [current_url]
+                    else:
+                        # ytsearch - regular YouTube with smart matching
+                        use_smart_matching = True
+                        # Format: ytsearch10:query (not URL encoded)
+                        ytsearch_query = strategy["url_template"].format(query=query)
+                        cmd_args = strategy["args"] + [ytsearch_query]
+                    
+                    command = [
+                        'yt-dlp',
+                        '--remote-components', 'ejs:github',
+                        '--dump-json',
+                        '--no-check-certificate',
+                        '--geo-bypass',
+                        '--extractor-args', 'youtube:player_client=ios,web',
+                    ] + cmd_args
+                    
+                    if yt_cookies:
+                        command.extend(['--cookies', str(yt_cookies)])
+                    
+                    stdout, stderr, returncode = await self._run_command(command, timeout=30)
+                    
+                    if returncode == 0:
+                        if strategy["is_direct"]:
+                            # Single JSON parsing
+                            try:
+                                track_data = json.loads(stdout)
+                                
+                                # INLINE TITLE VALIDATION - check if result matches query
+                                if not query.startswith('http'):
+                                    result_title = (track_data.get('track') or 
+                                                   track_data.get('alt_title') or 
+                                                   track_data.get('fulltitle') or 
+                                                   track_data.get('title', ''))
+                                    
+                                    query_normalized = self._normalize_title(query)
+                                    title_normalized = self._normalize_title(result_title)
+                                    
+                                    query_words = set(query_normalized.split())
+                                    title_words = set(title_normalized.split())
+                                    title_matches = query_words & title_words
+                                    
+                                    # If multi-word query has NO title overlap, try next strategy
+                                    if len(query_words) >= 2 and len(title_matches) == 0:
+                                        logger.warning(f"Strategy '{strategy['name']}' returned wrong song: '{result_title}' (no match with '{query}')")
+                                        track_data = None  # Reset
+                                        continue  # Try next strategy (ytsearch10)
+                                
+                                logger.info(f"✓ Strategy '{strategy['name']}' succeeded!")
+                                break # Success!
+                            except json.JSONDecodeError:
+                                logger.warning(f"Strategy '{strategy['name']}' failed JSON parsing. Retrying...")
+                                continue # Try next strategy
+                        else:
+                            # Smart matching (ytsearch10) - handle parsing later
+                            logger.info(f"✓ Strategy '{strategy['name']}' returned data. Processing candidates...")
+                            break # Move to processing
+                    else:
+                        logger.warning(f"Strategy '{strategy['name']}' failed with code {returncode}: {stderr}")
+                        continue # Try next strategy
             
             # If all direct strategies failed and we are not on smart matching
             if not track_data and not use_smart_matching:
