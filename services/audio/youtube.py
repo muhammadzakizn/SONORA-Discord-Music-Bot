@@ -54,6 +54,39 @@ class YouTubeDownloader(BaseDownloader):
                     logger.info(f"YTMusic API using proxy: {proxy_url[:30]}...")
                 
                 self.ytmusic = YTMusic(**ytmusic_kwargs)
+                
+                # Force IPv6 source address if configured (same as yt-dlp)
+                # This helps when IPv4 is blocked but IPv6 works
+                if hasattr(Settings, 'YTDLP_SOURCE_ADDRESS') and Settings.YTDLP_SOURCE_ADDRESS:
+                    source_addr = Settings.YTDLP_SOURCE_ADDRESS
+                    logger.info(f"Configuring ytmusicapi to use source address: {source_addr}")
+                    
+                    try:
+                        import requests
+                        from requests.adapters import HTTPAdapter
+                        from urllib3.util.connection import create_connection as urllib3_create_connection
+                        import socket
+                        
+                        # Create custom connection that binds to specific source address
+                        class SourceAddressAdapter(HTTPAdapter):
+                            def __init__(self, source_address, *args, **kwargs):
+                                self.source_address = source_address
+                                super().__init__(*args, **kwargs)
+                            
+                            def init_poolmanager(self, *args, **kwargs):
+                                # Set source_address for all connections
+                                kwargs['source_address'] = (self.source_address, 0)
+                                super().init_poolmanager(*args, **kwargs)
+                        
+                        # Patch ytmusic's session to use our adapter
+                        if hasattr(self.ytmusic, '_session'):
+                            adapter = SourceAddressAdapter(source_addr)
+                            self.ytmusic._session.mount('https://', adapter)
+                            self.ytmusic._session.mount('http://', adapter)
+                            logger.info(f"✓ ytmusicapi bound to source: {source_addr}")
+                    except Exception as e:
+                        logger.warning(f"Could not bind ytmusicapi to source address: {e}")
+                
                 logger.info(f"YTMusic API initialized (location=US, proxy={'yes' if Settings.YOUTUBE_PROXY else 'no'})")
             except Exception as e:
                 logger.error(f"Failed to init YTMusic API: {e}")
