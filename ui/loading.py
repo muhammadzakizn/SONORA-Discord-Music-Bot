@@ -11,8 +11,10 @@ from utils.permission_fallback import edit_with_fallback, find_sendable_channel,
 
 logger = get_logger('ui.loading')
 
-# Dynamic dot spinner frames (bouncing ball effect)
-SPINNER_FRAMES = ["●・・・", "・●・・", "・・●・", "・・・●", "・・●・", "・●・・"]
+# Custom Discord emoji for loading animation (same as spinner.py)
+LOADING_EMOJI = "<a:loading3:1458459715981021386>"
+# Keep single emoji in array for compatibility
+SPINNER_FRAMES = [LOADING_EMOJI]
 
 
 class SafeLoadingManager:
