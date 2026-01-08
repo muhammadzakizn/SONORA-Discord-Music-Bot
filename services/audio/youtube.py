@@ -38,7 +38,7 @@ class YouTubeDownloader(BaseDownloader):
             try:
                 # Try to use cookies for authenticated search (better results)
                 from config.settings import Settings
-                yt_cookies = Settings.get_yt_cookies()
+                yt_cookies = Settings.get_youtube_cookies()  # Fixed: was get_yt_cookies
                 if yt_cookies and yt_cookies.exists():
                     # Convert Netscape cookies to ytmusicapi format
                     # ytmusicapi can use browser cookies directly
