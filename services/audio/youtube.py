@@ -196,28 +196,28 @@ class YouTubeDownloader(BaseDownloader):
             else:
                 logger.warning("⚠ YouTube Music cookies not found - search may fail!")
             
-            # Define search strategies for robust fallback
-            # 1. YTMusic Songs Filter (FAST - single result, best quality if works)
-            # 2. YTMusic No Filter (FAST - single result, more results available)
-            # 3. Regular ytsearch with smart filtering (FALLBACK - regular YouTube)
+            # Define search strategies - ytsearch FIRST since YTMusic fails on server
+            # 1. ytsearch20 with smart filtering (FIRST - more reliable)
+            # 2. YTMusic Songs Filter (backup - often fails JSON parsing)
+            # 3. YTMusic No Filter (last resort)
             strategies = [
+                {
+                    "name": "ytsearch20 Smart Matching",
+                    "url_template": "ytsearch20:{query}",  # Regular YouTube with smart filtering
+                    "args": ['--flat-playlist'],  # Fast flat results
+                    "is_direct": False
+                },
                 {
                     "name": "YTMusic Songs Filter",
                     "url_template": "https://music.youtube.com/search?q={query}&sp=EgWKAQIIAQ%3D%3D",
-                    "args": ['-I', '1'],  # Single result, fast
+                    "args": ['-I', '1'],  # Single result
                     "is_direct": True
                 },
                 {
                     "name": "YTMusic No Filter",
                     "url_template": "https://music.youtube.com/search?q={query}",
-                    "args": ['-I', '1'],  # Single result, fast
+                    "args": ['-I', '1'],  # Single result
                     "is_direct": True
-                },
-                {
-                    "name": "ytsearch10 Smart Matching",
-                    "url_template": "ytsearch10:{query}",  # Regular YouTube with filtering
-                    "args": ['--flat-playlist'],  # Fast flat results
-                    "is_direct": False
                 }
             ]
             
@@ -455,6 +455,29 @@ class YouTubeDownloader(BaseDownloader):
                                 score -= 10  # Massive penalty, effectively skip
                                 logger.debug(f"  -10 for UNWANTED keyword '{keyword}': {cand_title}")
                                 break  # One match is enough to disqualify
+                        
+                        # ========================================
+                        # CHANNEL SCORING: Prefer official channels
+                        # ========================================
+                        # Known reupload/cover channel patterns - heavy penalty
+                        reupload_channels = [
+                            'minimal sounds', 'piano covers', 'acoustic covers',
+                            'karaoke', 'instrumental', 'music lab', 'lyrics world',
+                            '8d audio', 'bass boosted', 'slowed reverb', 'nightcore',
+                            'chill music', 'lo-fi', 'lofi', 'remix nation', 'trap nation',
+                        ]
+                        for rc in reupload_channels:
+                            if rc in artist_lower:
+                                score -= 5  # Heavy penalty for reupload channels
+                                logger.debug(f"  -5 for REUPLOAD channel '{cand_artist}': {cand_title}")
+                                break
+                        
+                        # BONUS: Channel name contains query artist words (likely official)
+                        for qw in query_words:
+                            if len(qw) > 3 and qw in artist_lower:
+                                score += 0.3
+                                logger.debug(f"  +0.3 for artist match in channel: {cand_artist}")
+                                break
                         
                         logger.debug(f"Candidate: '{cand_title}' final_score={score:.2f} (base={title_score:.2f})")
                         
