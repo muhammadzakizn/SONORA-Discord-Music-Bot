@@ -685,6 +685,12 @@ class YouTubeDownloader(BaseDownloader):
             best_details = ""
             
             for result in results:
+                # IMPORTANT: Only accept 'song' type, skip 'video' type
+                result_type = result.get('resultType', 'song')
+                if result_type != 'song':
+                    logger.debug(f"  Skipping non-song result type: {result_type}")
+                    continue
+                
                 result_title = result.get('title', '')
                 result_artist = result['artists'][0]['name'] if result.get('artists') else ''
                 
@@ -718,9 +724,15 @@ class YouTubeDownloader(BaseDownloader):
                 elif query_as_phrase in title_normalized or title_normalized in query_as_phrase:
                     title_bonus = 0.3  # Containment
                 
+                # BONUS: " - Topic" auto-generated channels (clean audio, no video intro)
+                topic_bonus = 0.0
+                if ' - topic' in result_artist.lower():
+                    topic_bonus = 0.4  # Strong bonus for Topic channels
+                    logger.debug(f"  +0.4 Topic bonus: {result_artist}")
+                
                 # Calculate final score
-                # Prioritize: title word matches + coverage + title bonus
-                final_score = (title_coverage * 0.5) + (total_coverage * 0.3) + title_bonus
+                # Prioritize: title word matches + coverage + title bonus + topic bonus
+                final_score = (title_coverage * 0.5) + (total_coverage * 0.3) + title_bonus + topic_bonus
                 
                 # Penalize if artist words found but title words not in result title
                 if matches_in_artist and not matches_in_title:
