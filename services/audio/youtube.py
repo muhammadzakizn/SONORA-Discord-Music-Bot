@@ -160,28 +160,53 @@ class YouTubeDownloader(BaseDownloader):
         Returns:
             YouTube URL or None if not found
         """
+        logger.info(f"[SpotDL] Attempting to get YouTube URL for: {query}")
+        
         try:
-            # Build spotdl url command
+            # Try 'spotdl url' command first - this searches Spotify and returns YouTube match
+            # Format: spotdl url "artist - title"
             cmd = ['spotdl', 'url', query]
+            logger.info(f"[SpotDL] Running command: {' '.join(cmd)}")
             
-            stdout, stderr, returncode = await self._run_command(cmd, timeout=15)
+            stdout, stderr, returncode = await self._run_command(cmd, timeout=20)
+            
+            logger.info(f"[SpotDL] Return code: {returncode}, stdout length: {len(stdout) if stdout else 0}")
             
             if returncode == 0 and stdout:
                 # spotdl url returns the YouTube URL directly
-                url = stdout.strip()
-                if url.startswith('http') and ('youtube.com' in url or 'youtu.be' in url):
-                    return url
-                # Sometimes it returns multiple lines - get first URL
-                for line in url.split('\n'):
-                    line = line.strip()
-                    if line.startswith('http') and ('youtube.com' in line or 'youtu.be' in line):
-                        return line
+                output = stdout.strip()
+                logger.info(f"[SpotDL] Raw output: {output[:200] if output else 'empty'}")
+                
+                # Check if output is a YouTube URL
+                if 'youtube.com' in output or 'youtu.be' in output:
+                    # Extract URL from output (might have other text)
+                    for line in output.split('\n'):
+                        line = line.strip()
+                        if line.startswith('http') and ('youtube.com' in line or 'youtu.be' in line):
+                            logger.info(f"[SpotDL] ✓ Found YouTube URL: {line}")
+                            return line
+                        # Sometimes URL is in format: "Song Name: https://..."
+                        if 'youtube.com' in line or 'youtu.be' in line:
+                            import re
+                            url_match = re.search(r'https?://[^\s]+', line)
+                            if url_match:
+                                url = url_match.group(0)
+                                logger.info(f"[SpotDL] ✓ Extracted YouTube URL: {url}")
+                                return url
             
-            logger.debug(f"spotdl url failed: {stderr}")
+            # Log failure reason
+            if stderr:
+                logger.warning(f"[SpotDL] stderr: {stderr[:200]}")
+            else:
+                logger.warning(f"[SpotDL] No YouTube URL found in output")
+            
             return None
             
+        except FileNotFoundError:
+            logger.warning("[SpotDL] spotdl not installed! Install with: pip install spotdl")
+            return None
         except Exception as e:
-            logger.debug(f"spotdl url error: {e}")
+            logger.warning(f"[SpotDL] Error: {e}")
             return None
     
     async def _extract_from_url(self, youtube_url: str, original_query: str) -> Optional['TrackInfo']:
