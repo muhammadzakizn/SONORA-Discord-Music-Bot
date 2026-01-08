@@ -149,6 +149,110 @@ class YouTubeDownloader(BaseDownloader):
         
         return url
     
+    async def _get_youtube_url_via_spotdl(self, query: str) -> Optional[str]:
+        """
+        Use spotdl url command to get YouTube URL from a search query.
+        This is a fallback when ytmusicapi fails.
+        
+        Args:
+            query: Search query (e.g., "Artist - Title")
+            
+        Returns:
+            YouTube URL or None if not found
+        """
+        try:
+            # Build spotdl url command
+            cmd = ['spotdl', 'url', query]
+            
+            stdout, stderr, returncode = await self._run_command(cmd, timeout=15)
+            
+            if returncode == 0 and stdout:
+                # spotdl url returns the YouTube URL directly
+                url = stdout.strip()
+                if url.startswith('http') and ('youtube.com' in url or 'youtu.be' in url):
+                    return url
+                # Sometimes it returns multiple lines - get first URL
+                for line in url.split('\n'):
+                    line = line.strip()
+                    if line.startswith('http') and ('youtube.com' in line or 'youtu.be' in line):
+                        return line
+            
+            logger.debug(f"spotdl url failed: {stderr}")
+            return None
+            
+        except Exception as e:
+            logger.debug(f"spotdl url error: {e}")
+            return None
+    
+    async def _extract_from_url(self, youtube_url: str, original_query: str) -> Optional['TrackInfo']:
+        """
+        Extract track info from a YouTube URL using yt-dlp.
+        
+        Args:
+            youtube_url: YouTube URL to extract from
+            original_query: Original search query for fallback metadata
+            
+        Returns:
+            TrackInfo or None if extraction fails
+        """
+        try:
+            # Convert to YouTube Music URL for best audio
+            ytmusic_url = self._convert_to_ytmusic_url(youtube_url)
+            
+            cmd = [
+                'yt-dlp',
+                '--dump-json',
+                '--no-playlist',
+                '--no-check-certificate',
+                '--geo-bypass',
+            ]
+            
+            # Add cookies if available
+            yt_cookies = Settings.get_youtube_cookies()
+            if yt_cookies:
+                try:
+                    if yt_cookies.stat().st_size > 0:
+                        cmd.extend(['--cookies', str(yt_cookies)])
+                except:
+                    pass
+            
+            # Add source address if configured
+            if hasattr(Settings, 'YTDLP_SOURCE_ADDRESS') and Settings.YTDLP_SOURCE_ADDRESS:
+                cmd.extend(['--source-address', Settings.YTDLP_SOURCE_ADDRESS])
+            
+            cmd.append(ytmusic_url)
+            
+            stdout, stderr, returncode = await self._run_command(cmd, timeout=30)
+            
+            if returncode == 0 and stdout:
+                try:
+                    data = json.loads(stdout)
+                    
+                    # Extract metadata
+                    title = data.get('track') or data.get('title', '')
+                    artist = data.get('artist') or data.get('uploader', '') or data.get('channel', '')
+                    
+                    # Clean up artist name (remove " - Topic" suffix)
+                    if artist.endswith(' - Topic'):
+                        artist = artist[:-8]
+                    
+                    return TrackInfo(
+                        title=title,
+                        artist=artist,
+                        url=ytmusic_url,
+                        duration=int(data.get('duration', 0)),
+                        thumbnail_url=data.get('thumbnail', ''),
+                        source="YouTube Music (via SpotDL)"
+                    )
+                except json.JSONDecodeError:
+                    pass
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Extract from URL error: {e}")
+            return None
+    
     async def search(self, query: str) -> Optional[TrackInfo]:
         """
         Search for track on YouTube Music (forced)
@@ -177,11 +281,27 @@ class YouTubeDownloader(BaseDownloader):
                     if result:
                         logger.info(f"[YTMusicAPI] Found: {result.title} - {result.artist}")
                         return result
-                    logger.info("[YTMusicAPI] No results, falling back to yt-dlp")
+                    logger.info("[YTMusicAPI] No results, trying spotdl url fallback...")
                 except Exception as e:
-                    logger.warning(f"[YTMusicAPI] Search failed: {e}, falling back to yt-dlp")
+                    logger.warning(f"[YTMusicAPI] Search failed: {e}, trying spotdl url fallback...")
             else:
-                logger.warning("[YTMusicAPI] Not available (ytmusicapi not installed?), using yt-dlp")
+                logger.warning("[YTMusicAPI] Not available, trying spotdl url fallback...")
+            
+            # ========================================
+            # STEP 1.5: SpotDL URL Fallback (when ytmusicapi fails)
+            # Gets YouTube URL from Spotify matching without downloading
+            # ========================================
+            try:
+                youtube_url = await self._get_youtube_url_via_spotdl(query)
+                if youtube_url:
+                    logger.info(f"[SpotDL] Got YouTube URL: {youtube_url}")
+                    # Now extract info from this URL using yt-dlp
+                    result = await self._extract_from_url(youtube_url, query)
+                    if result:
+                        return result
+                    logger.info("[SpotDL] URL extraction failed, falling back to yt-dlp search")
+            except Exception as e:
+                logger.warning(f"[SpotDL] Fallback failed: {e}, using yt-dlp search")
         
         # ========================================
         # STEP 2: Try YTDLP API
