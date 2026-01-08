@@ -125,17 +125,73 @@ class SpotifyDownloader(BaseDownloader):
         clean_env = self._get_clean_spotdl_env()
         
         try:
-            # For direct Spotify URLs, use spotdl save command to get metadata
+            # For direct Spotify URLs, use spotipy API directly (more reliable than spotdl)
             if query.startswith('http') and 'spotify.com' in query:
+                import re
+                
+                # Extract track ID from URL
+                track_match = re.search(r'spotify\.com/track/([a-zA-Z0-9]+)', query)
+                if track_match:
+                    track_id = track_match.group(1)
+                    logger.info(f"Extracted Spotify track ID: {track_id}")
+                    
+                    try:
+                        import spotipy
+                        from spotipy.oauth2 import SpotifyClientCredentials
+                        
+                        # Initialize spotipy with Settings credentials
+                        client_id = Settings.SPOTIFY_CLIENT_ID
+                        client_secret = Settings.SPOTIFY_CLIENT_SECRET
+                        
+                        if client_id and client_secret:
+                            auth_manager = SpotifyClientCredentials(
+                                client_id=client_id,
+                                client_secret=client_secret
+                            )
+                            sp = spotipy.Spotify(auth_manager=auth_manager)
+                            
+                            # Get track info from Spotify API
+                            track = await asyncio.get_event_loop().run_in_executor(
+                                None,
+                                lambda: sp.track(track_id)
+                            )
+                            
+                            if track:
+                                # Extract artist names
+                                artists = [a['name'] for a in track.get('artists', [])]
+                                artist_str = ', '.join(artists) if artists else 'Unknown'
+                                
+                                title = track.get('name', 'Unknown')
+                                album = track.get('album', {}).get('name')
+                                duration = track.get('duration_ms', 0) / 1000  # ms to seconds
+                                
+                                logger.info(f"Found on Spotify (API): {title} - {artist_str}")
+                                
+                                return TrackInfo(
+                                    title=title,
+                                    artist=artist_str,
+                                    album=album,
+                                    duration=duration,
+                                    url=query,  # Keep original Spotify URL
+                                    track_id=track_id
+                                )
+                        else:
+                            logger.warning("Spotify API credentials not configured, trying spotdl fallback")
+                    
+                    except ImportError:
+                        logger.warning("spotipy not installed, trying spotdl fallback")
+                    except Exception as e:
+                        logger.warning(f"Spotify API failed: {e}, trying spotdl fallback")
+                
+                # Fallback to spotdl if spotipy fails
+                logger.info("Trying spotdl fallback for Spotify track...")
                 import tempfile
                 import json
                 
-                # Create temp file for spotdl save output
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.spotdl', delete=False) as f:
                     temp_file = f.name
                 
                 try:
-                    # Use spotdl save to get track metadata without downloading
                     command = [
                         'spotdl',
                         'save',
@@ -146,14 +202,9 @@ class SpotifyDownloader(BaseDownloader):
                     logger.debug(f"Running spotdl save: {' '.join(command)}")
                     stdout, stderr, returncode = await self._run_command(command, timeout=60, env=clean_env)
                     
-                    # Log output for debugging
-                    if stdout:
-                        logger.debug(f"spotdl save stdout: {stdout[:500]}")
-                    if stderr:
-                        logger.debug(f"spotdl save stderr: {stderr[:500]}")
-                    
                     if returncode != 0:
                         logger.error(f"spotdl save failed with code {returncode}: {stderr}")
+                        # Return None - will fallback to YouTube Music search
                         return None
                     
                     # Read the saved JSON metadata
@@ -164,20 +215,17 @@ class SpotifyDownloader(BaseDownloader):
                             if content.strip():
                                 data = json.loads(content)
                                 
-                                # spotdl save format: list of song objects
                                 if isinstance(data, list) and len(data) > 0:
                                     song = data[0]
                                     
-                                    # Extract track info
                                     title = song.get('name', 'Unknown')
                                     artist = song.get('artist', song.get('artists', ['Unknown'])[0] if isinstance(song.get('artists'), list) else 'Unknown')
                                     album = song.get('album_name')
                                     duration = song.get('duration', 0)
                                     url = song.get('url', query)
                                     song_id = song.get('song_id')
-                                    isrc = song.get('isrc')
                                     
-                                    logger.info(f"Found on Spotify: {title} - {artist}")
+                                    logger.info(f"Found on Spotify (spotdl): {title} - {artist}")
                                     
                                     return TrackInfo(
                                         title=title,
@@ -185,23 +233,13 @@ class SpotifyDownloader(BaseDownloader):
                                         album=album,
                                         duration=duration,
                                         url=url,
-                                        track_id=song_id,
-                                        isrc=isrc
+                                        track_id=song_id
                                     )
-                                else:
-                                    logger.warning(f"spotdl save returned empty data")
-                            else:
-                                logger.warning(f"spotdl save file is empty")
-                    else:
-                        logger.warning(f"spotdl save file not created")
-                    
                 finally:
-                    # Clean up temp file
                     import os
                     if os.path.exists(temp_file):
                         os.remove(temp_file)
                 
-                logger.warning(f"Spotify URL search failed for: {query}")
                 return None
             else:
                 # For text search queries, return None - let YouTube handle it
