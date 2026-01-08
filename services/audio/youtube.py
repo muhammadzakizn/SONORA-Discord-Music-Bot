@@ -121,15 +121,18 @@ class YouTubeDownloader(BaseDownloader):
         # ========================================
         # STEP 1: Use ytmusicapi with title matching (NON-URL ONLY)
         # ========================================
-        if not is_url and self.ytmusic:
-            try:
-                result = await self._search_ytmusic_with_matching(query)
-                if result:
-                    logger.info(f"[YTMusicAPI] Found: {result.title} - {result.artist}")
-                    return result
-                logger.info("[YTMusicAPI] No results, falling back to yt-dlp")
-            except Exception as e:
-                logger.warning(f"[YTMusicAPI] Search failed: {e}, falling back to yt-dlp")
+        if not is_url:
+            if self.ytmusic:
+                try:
+                    result = await self._search_ytmusic_with_matching(query)
+                    if result:
+                        logger.info(f"[YTMusicAPI] Found: {result.title} - {result.artist}")
+                        return result
+                    logger.info("[YTMusicAPI] No results, falling back to yt-dlp")
+                except Exception as e:
+                    logger.warning(f"[YTMusicAPI] Search failed: {e}, falling back to yt-dlp")
+            else:
+                logger.warning("[YTMusicAPI] Not available (ytmusicapi not installed?), using yt-dlp")
         
         # ========================================
         # STEP 2: Try YTDLP API
