@@ -391,9 +391,24 @@ class YouTubeDownloader(BaseDownloader):
                         if cand_duration > 480:
                             score -= 0.2
                         
-                        # PENALTY: Live recordings (weak penalty for simple 'live' mention)
-                        if 'live' in title_lower and ('concert' in title_lower or 'performance' in title_lower):
-                            score -= 0.2
+                        # ========================================
+                        # CRITICAL: LIVE DETECTION (comprehensive)
+                        # Catches: "Live On", "Live At", "Live From", "(Live)", "[Live]", "- Live"
+                        # ========================================
+                        import re
+                        live_patterns = [
+                            r'\blive\s+(on|at|from|in|@)\b',  # "Live On SNL", "Live At Hyde Park"
+                            r'\(live\b',  # "(Live...)"
+                            r'\[live\b',  # "[Live...]"
+                            r'\s-\s*live\b',  # "- Live"
+                            r'\blive\s+\d{4}',  # "Live 2025"
+                            r'\blive\s+(session|performance|concert|show|recording)',
+                        ]
+                        for pattern in live_patterns:
+                            if re.search(pattern, title_lower):
+                                score -= 10  # Heavy penalty
+                                logger.debug(f"  -10 for LIVE pattern '{pattern}': {cand_title}")
+                                break
                         
                         # ========================================
                         # CRITICAL: UNWANTED_KEYWORDS from .env
