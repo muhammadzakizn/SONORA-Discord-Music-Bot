@@ -405,11 +405,12 @@ class YouTubeDownloader(BaseDownloader):
                         import re
                         live_patterns = [
                             r'\blive\s+(on|at|from|in|@)\b',  # "Live On SNL", "Live At Hyde Park"
+                            r'\blive\s+(debut|version|performance|session|concert|show|recording)',  # "Live Debut"
                             r'\(live\b',  # "(Live...)"
                             r'\[live\b',  # "[Live...]"
                             r'\s-\s*live\b',  # "- Live"
                             r'\blive\s+\d{4}',  # "Live 2025"
-                            r'\blive\s+(session|performance|concert|show|recording)',
+                            r'\b(primavera|coachella|glastonbury|lollapalooza|festival)\b',  # Festival names
                         ]
                         for pattern in live_patterns:
                             if re.search(pattern, title_lower):
