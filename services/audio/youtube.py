@@ -332,6 +332,12 @@ class YouTubeDownloader(BaseDownloader):
                     best_candidate = None
                     best_score = -999  # Start negative to allow penalized candidates
                     
+                    # DEBUG: Log first candidate to see structure
+                    if candidates:
+                        first = candidates[0]
+                        logger.info(f"DEBUG candidate keys: {list(first.keys())[:10]}")
+                        logger.info(f"DEBUG first candidate: title={first.get('title', 'N/A')}, id={first.get('id', 'N/A')}")
+                    
                     for cand in candidates:
                         cand_title = cand.get('title', '')
                         cand_artist = cand.get('uploader', '') or cand.get('channel', '')
