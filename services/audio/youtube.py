@@ -411,6 +411,25 @@ class YouTubeDownloader(BaseDownloader):
                                 break
                         
                         # ========================================
+                        # CRITICAL: NON-SONG CONTENT FILTER
+                        # Block interviews, making-of, reactions, etc.
+                        # ========================================
+                        non_song_keywords = [
+                            'making of', 'behind the scenes', 'footnotes', 'vevo footnotes',
+                            'interview', 'reaction', 'reacts', 'review', 'commentary',
+                            'documentary', 'explained', 'breakdown', 'analysis',
+                            'tutorial', 'how to', 'lesson', 'teaser', 'trailer',
+                            'announcement', 'premiere', 'unboxing', 'podcast',
+                            'q&a', 'qna', 'q & a', 'funny moments', 'compilation',
+                            'shorts', '#shorts', 'tiktok', 'episode', 'ep.', ' ep ',
+                        ]
+                        for nsk in non_song_keywords:
+                            if nsk in title_lower:
+                                score -= 10  # Heavy penalty
+                                logger.debug(f"  -10 for NON-SONG: {cand_title}")
+                                break
+                        
+                        # ========================================
                         # CRITICAL: UNWANTED_KEYWORDS from .env
                         # Heavy penalty to completely skip these
                         # ========================================
