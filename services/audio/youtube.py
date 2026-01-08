@@ -37,9 +37,10 @@ class YouTubeDownloader(BaseDownloader):
         # Note: ytmusicapi works without auth for searching songs
         if YTMUSIC_AVAILABLE:
             try:
-                # Unauthenticated mode still works for songs search
-                self.ytmusic = YTMusic()
-                logger.info("YTMusic API initialized (unauthenticated - songs search OK)")
+                # Unauthenticated mode with US locale for best results
+                # This helps with geo-restriction issues on non-US servers
+                self.ytmusic = YTMusic(language='en', location='US')
+                logger.info("YTMusic API initialized (unauthenticated, location=US)")
             except Exception as e:
                 logger.error(f"Failed to init YTMusic API: {e}")
                 self.ytmusic = None
