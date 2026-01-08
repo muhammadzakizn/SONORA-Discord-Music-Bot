@@ -37,10 +37,24 @@ class YouTubeDownloader(BaseDownloader):
         # Note: ytmusicapi works without auth for searching songs
         if YTMUSIC_AVAILABLE:
             try:
-                # Unauthenticated mode with US locale for best results
-                # This helps with geo-restriction issues on non-US servers
-                self.ytmusic = YTMusic(language='en', location='US')
-                logger.info("YTMusic API initialized (unauthenticated, location=US)")
+                # Build ytmusicapi config with proxy if available
+                ytmusic_kwargs = {
+                    'language': 'en',
+                    'location': 'US'
+                }
+                
+                # Add proxy if configured (same as yt-dlp proxy)
+                if Settings.YOUTUBE_PROXY:
+                    # ytmusicapi uses requests-style proxy dict
+                    proxy_url = Settings.YOUTUBE_PROXY
+                    ytmusic_kwargs['proxies'] = {
+                        'http': proxy_url,
+                        'https': proxy_url
+                    }
+                    logger.info(f"YTMusic API using proxy: {proxy_url[:30]}...")
+                
+                self.ytmusic = YTMusic(**ytmusic_kwargs)
+                logger.info(f"YTMusic API initialized (location=US, proxy={'yes' if Settings.YOUTUBE_PROXY else 'no'})")
             except Exception as e:
                 logger.error(f"Failed to init YTMusic API: {e}")
                 self.ytmusic = None
