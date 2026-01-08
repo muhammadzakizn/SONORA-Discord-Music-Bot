@@ -135,9 +135,29 @@ async def api_ytdlp_stream_url():
                     track_info = search_result
                     logger.info(f"[YTDLP API] Got metadata from URL: {track_info}")
                 else:
+                    # Get basic metadata from yt-dlp dump
+                    import subprocess
+                    try:
+                        result = subprocess.run(
+                            ['yt-dlp', '--dump-json', '--no-playlist', url],
+                            capture_output=True, text=True, timeout=30
+                        )
+                        if result.returncode == 0:
+                            import json
+                            data = json.loads(result.stdout)
+                            fallback_title = data.get('title', 'Unknown')
+                            fallback_artist = data.get('artist') or data.get('uploader', 'Unknown')
+                            logger.info(f"[YTDLP API] Got fallback metadata: {fallback_title} - {fallback_artist}")
+                        else:
+                            fallback_title = title or 'Unknown'
+                            fallback_artist = artist or 'Unknown'
+                    except:
+                        fallback_title = title or 'Unknown'
+                        fallback_artist = artist or 'Unknown'
+                    
                     track_info = TrackInfo(
-                        title=title or "Stream",
-                        artist=artist or "Unknown",
+                        title=fallback_title,
+                        artist=fallback_artist,
                         url=url
                     )
             else:
@@ -239,9 +259,29 @@ async def api_ytdlp_download():
                     track_info = search_result
                     logger.info(f"[YTDLP API] Got metadata from URL: {track_info}")
                 else:
+                    # Get basic metadata from yt-dlp dump
+                    import subprocess
+                    try:
+                        result = subprocess.run(
+                            ['yt-dlp', '--dump-json', '--no-playlist', url],
+                            capture_output=True, text=True, timeout=30
+                        )
+                        if result.returncode == 0:
+                            import json
+                            data = json.loads(result.stdout)
+                            fallback_title = data.get('title', 'Unknown')
+                            fallback_artist = data.get('artist') or data.get('uploader', 'Unknown')
+                            logger.info(f"[YTDLP API] Got fallback metadata: {fallback_title} - {fallback_artist}")
+                        else:
+                            fallback_title = title or 'Unknown'
+                            fallback_artist = artist or 'Unknown'
+                    except:
+                        fallback_title = title or 'Unknown'
+                        fallback_artist = artist or 'Unknown'
+                    
                     track_info = TrackInfo(
-                        title=title or "Download",
-                        artist=artist or "Unknown",
+                        title=fallback_title,
+                        artist=fallback_artist,
                         url=url
                     )
             else:
