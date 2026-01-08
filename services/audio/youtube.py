@@ -57,7 +57,8 @@ class YouTubeDownloader(BaseDownloader):
                 
                 # Force IPv6 source address if configured (same as yt-dlp)
                 # This helps when IPv4 is blocked but IPv6 works
-                if hasattr(Settings, 'YTDLP_SOURCE_ADDRESS') and Settings.YTDLP_SOURCE_ADDRESS:
+                # NOTE: Only use source address if NOT using proxy (they conflict)
+                if not Settings.YOUTUBE_PROXY and hasattr(Settings, 'YTDLP_SOURCE_ADDRESS') and Settings.YTDLP_SOURCE_ADDRESS:
                     source_addr = Settings.YTDLP_SOURCE_ADDRESS
                     logger.info(f"Configuring ytmusicapi to use source address: {source_addr}")
                     
