@@ -7,10 +7,15 @@ class AudioSource(str, Enum):
     """Audio source types"""
     SPOTIFY = "Spotify"
     YOUTUBE_MUSIC = "YouTube Music"
+    YOUTUBE = "YouTube"  # For Lavalink
     APPLE_MUSIC = "Apple Music"
+    DEEZER = "Deezer"  # For Lavalink
+    SOUNDCLOUD = "SoundCloud"  # For Lavalink
+    TIDAL = "Tidal"  # For Lavalink
     DIRECT = "Direct URL"
     STREAMING = "Streaming"
     UNKNOWN = "Unknown"
+
 
 
 class LyricsSource(str, Enum):

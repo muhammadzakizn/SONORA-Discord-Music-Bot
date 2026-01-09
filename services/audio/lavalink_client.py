@@ -285,16 +285,29 @@ class LavalinkClient:
         else:
             source = AudioSource.UNKNOWN
         
+        # Convert milliseconds to seconds for duration
+        duration_seconds = (track.length / 1000) if track.length else 0.0
+        
+        # Get album name safely
+        album_name = None
+        if hasattr(track, 'album'):
+            if isinstance(track.album, dict):
+                album_name = track.album.get('name')
+            elif hasattr(track.album, 'name'):
+                album_name = track.album.name
+        
+        # Get artwork URL safely
+        artwork_url = getattr(track, 'artwork', None) or getattr(track, 'thumb', None) or getattr(track, 'artworkUrl', None)
+        
         return TrackInfo(
             title=track.title or original_query,
             artist=track.author or "Unknown Artist",
-            duration_ms=int(track.length) if track.length else 0,
+            duration=duration_seconds,
             url=track.uri or "",
-            thumbnail=getattr(track, 'artwork', None) or getattr(track, 'thumb', None) or "",
-            source=source,
-            album=getattr(track, 'album', {}).get('name', '') if hasattr(track, 'album') else "",
-            is_lavalink=True  # Mark as Lavalink track for player routing
+            thumbnail_url=artwork_url,
+            album=album_name
         )
+
     
     async def search_playlist(self, url: str) -> List[TrackInfo]:
         """
