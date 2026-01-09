@@ -135,15 +135,24 @@ class LavalinkClient:
             
             logger.info(f"[Lavalink] Searching: {search_query}")
             
-            # Search using wavelink
-            tracks = await wavelink.Playable.search(search_query)
+            # Use wavelink.Pool.fetch_tracks to send raw query to Lavalink
+            # This avoids wavelink adding its own search prefix
+            tracks = await wavelink.Pool.fetch_tracks(search_query)
             
             if not tracks:
                 logger.warning(f"[Lavalink] No results for: {query}")
                 return None
             
-            # Get first track
-            track = tracks[0] if isinstance(tracks, list) else tracks.tracks[0]
+            # Get first track - handle both list and Playlist response
+            if isinstance(tracks, wavelink.Playlist):
+                if not tracks.tracks:
+                    logger.warning(f"[Lavalink] Empty playlist result for: {query}")
+                    return None
+                track = tracks.tracks[0]
+            elif isinstance(tracks, list):
+                track = tracks[0]
+            else:
+                track = tracks
             
             # Convert to TrackInfo
             track_info = self._wavelink_to_trackinfo(track, query)
@@ -154,6 +163,7 @@ class LavalinkClient:
         except Exception as e:
             logger.error(f"[Lavalink] Search error: {e}")
             return None
+
     
     async def play(
         self, 
