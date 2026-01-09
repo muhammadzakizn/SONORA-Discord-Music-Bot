@@ -165,16 +165,64 @@ class PlayCommand(commands.Cog):
                             prefer_apple_artwork=True,
                             voice_channel_id=voice_channel.id
                         )
+                        # Create player UI for Lavalink playback
+                        await loader.stop_spinner()
                         
-                        # Create player UI
-                        await self._create_player_interface(
-                            interaction,
-                            metadata,
-                            loader,
-                            voice_channel,
-                            is_streaming=True
+                        # Create menu view for controls
+                        view = MediaPlayerView(self.bot, interaction.guild.id, timeout=None)
+                        
+                        # Send player message
+                        player_msg = await interaction.channel.send(
+                            embed=EmbedBuilder.create_now_playing(
+                                metadata=metadata,
+                                progress_bar="",
+                                lyrics_lines=["", "", ""],
+                                guild_id=interaction.guild.id
+                            ),
+                            view=view
                         )
+                        
+                        # Delete loader message
+                        await loader.delete()
+                        
+                        # Store player message
+                        if not hasattr(self.bot, 'player_messages'):
+                            self.bot.player_messages = {}
+                        self.bot.player_messages[interaction.guild.id] = player_msg
+                        
+                        # Get volume setting
+                        volume = 1.0
+                        volume_cog = self.bot.get_cog('VolumeCommands')
+                        if volume_cog:
+                            volume_level = volume_cog.get_volume(interaction.guild.id)
+                            volume = volume_level / 100.0
+                        
+                        # Create player for UI updates (Lavalink handles actual audio)
+                        player = SynchronizedMediaPlayer(
+                            lavalink_player.get_player(interaction.guild.id),  # wavelink.Player
+                            player_msg,
+                            metadata,
+                            bot=self.bot,
+                            guild_id=interaction.guild.id
+                        )
+                        player.is_playing = True
+                        player.is_lavalink = True
+                        
+                        # Store player reference
+                        if not hasattr(self.bot, 'players'):
+                            self.bot.players = {}
+                        self.bot.players[interaction.guild.id] = player
+                        
+                        # Set voice channel status
+                        try:
+                            status_text = f"🎵 LAVALINK: {metadata.title[:30]} - {metadata.artist[:20]}"
+                            await voice_channel.edit(status=status_text)
+                        except Exception as e:
+                            logger.debug(f"Could not set voice channel status: {e}")
+                        
+                        logger.info(f"[Lavalink] Now playing: {metadata.title} by {metadata.artist}")
                         return
+
                     else:
                         logger.warning("[Lavalink] Playback failed, falling back to legacy")
             
