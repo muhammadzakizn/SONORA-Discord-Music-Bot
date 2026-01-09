@@ -51,7 +51,7 @@ plugins:
       - "ytsearch:%QUERY%"
     sources:
       spotify: true
-      applemusic: false  # Disabled - requires Apple Developer account
+      applemusic: false
       deezer: true
       tidal: false
       yandexmusic: false
@@ -64,6 +64,8 @@ plugins:
       playlistLoadLimit: 6
       albumLoadLimit: 6
     deezer:
+      # Master decryption key (required for audio decryption)
+      masterDecryptionKey: "g4el58wc0zvf9na1"
       # Your Deezer ARL token (get from browser cookies)
       arl: "YOUR_DEEZER_ARL_TOKEN"
       formats:
