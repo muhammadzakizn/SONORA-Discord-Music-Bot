@@ -120,7 +120,66 @@ class PlayCommand(commands.Cog):
                 return
             
             # ========================================
-            # SINGLE TRACK: SMART CACHE FLOW
+            # LAVALINK PLAYBACK (when enabled)
+            # Uses Lavalink server for high-quality Deezer FLAC streaming
+            # ========================================
+            if Settings.LAVALINK_ENABLED:
+                from services.audio.lavalink_player import get_lavalink_player
+                lavalink_player = get_lavalink_player(self.bot)
+                
+                if lavalink_player and lavalink_player.is_available:
+                    logger.info(f"[Lavalink] Using LavalinkPlayer for: {track_info.title}")
+                    
+                    await loader.spinner_update(
+                        "Connecting to Lavalink",
+                        f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                        f"Streaming via Deezer FLAC..."
+                    )
+                    
+                    # Define callback for when track ends
+                    async def on_track_end():
+                        queue_cog = self.bot.get_cog('QueueCommands')
+                        if queue_cog:
+                            await queue_cog._play_next_from_queue(interaction.guild.id)
+                    
+                    # Play via Lavalink
+                    success = await lavalink_player.play(
+                        interaction.guild.id,
+                        track_info,
+                        voice_channel,
+                        on_track_end=on_track_end
+                    )
+                    
+                    if success:
+                        # Fetch metadata for UI
+                        await loader.spinner_update(
+                            "Processing",
+                            "Fetching artwork and lyrics..."
+                        )
+                        
+                        metadata = await self.metadata_processor.process(
+                            track_info,
+                            None,  # No audio_result for streaming
+                            requested_by=interaction.user.display_name,
+                            requested_by_id=interaction.user.id,
+                            prefer_apple_artwork=True,
+                            voice_channel_id=voice_channel.id
+                        )
+                        
+                        # Create player UI
+                        await self._create_player_interface(
+                            interaction,
+                            metadata,
+                            loader,
+                            voice_channel,
+                            is_streaming=True
+                        )
+                        return
+                    else:
+                        logger.warning("[Lavalink] Playback failed, falling back to legacy")
+            
+            # ========================================
+            # LEGACY FLOW: SMART CACHE FLOW
             # Priority: Local Cache → Rclone Cache → Stream + Background Download
             # ========================================
             stream_url = None
@@ -128,6 +187,7 @@ class PlayCommand(commands.Cog):
             use_streaming = False
             cached = False
             
+
             # STEP 0: Check LOCAL Cache first (fastest!)
             try:
                 from services.audio.cache import get_cache_manager

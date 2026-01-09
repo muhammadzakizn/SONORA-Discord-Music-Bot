@@ -11,7 +11,14 @@ from core.error_handler import BotErrorHandler
 from services.voice.manager import VoiceManager
 from database.db_manager import get_db_manager
 
+# Optional wavelink import for Lavalink
+try:
+    import wavelink
+except ImportError:
+    wavelink = None
+
 logger = get_logger('bot')
+
 
 
 class MusicBot(commands.Bot):
@@ -380,10 +387,33 @@ class MusicBot(commands.Bot):
                     connected = await init_lavalink(self)
                     if connected:
                         logger.info("✓ Lavalink connected - using Deezer FLAC for audio")
+                        
+                        # Initialize LavalinkPlayer
+                        from services.audio.lavalink_player import get_lavalink_player
+                        self.lavalink_player = get_lavalink_player(self)
+                        logger.info("✓ LavalinkPlayer initialized")
                     else:
                         logger.warning("Lavalink connection failed - using legacy audio")
                 except Exception as e:
                     logger.warning(f"Lavalink init error: {e} - using legacy audio")
+
+        # Wavelink events for Lavalink
+        @self.event
+        async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
+            """Handle track end from Lavalink"""
+            if Settings.LAVALINK_ENABLED:
+                try:
+                    from services.audio.lavalink_player import get_lavalink_player
+                    player = get_lavalink_player()
+                    if player:
+                        await player.handle_track_end(payload.player, payload.track, payload.reason)
+                except Exception as e:
+                    logger.error(f"Wavelink track end error: {e}")
+        
+        @self.event
+        async def on_wavelink_track_exception(payload: wavelink.TrackExceptionEventPayload):
+            """Handle track exception from Lavalink"""
+            logger.error(f"[Lavalink] Track exception: {payload.exception}")
 
 
         
