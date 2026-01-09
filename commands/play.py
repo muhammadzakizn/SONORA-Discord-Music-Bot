@@ -511,6 +511,32 @@ class PlayCommand(commands.Cog):
         """
         url_type = URLValidator.get_url_type(query)
         
+        # ========================================
+        # LAVALINK PRIORITY (when enabled)
+        # Uses Deezer FLAC for highest quality
+        # ========================================
+        if Settings.LAVALINK_ENABLED:
+            try:
+                from services.audio.lavalink_client import get_lavalink_client
+                lavalink = get_lavalink_client()
+                
+                if lavalink and lavalink.is_available:
+                    logger.info(f"[Lavalink] Searching: {query}")
+                    track_info = await lavalink.search(query)
+                    
+                    if track_info:
+                        logger.info(f"[Lavalink] Found: {track_info.title} by {track_info.artist}")
+                        return track_info
+                    else:
+                        logger.warning(f"[Lavalink] No results, falling back to legacy...")
+                else:
+                    logger.warning("[Lavalink] Not available, using legacy search")
+            except Exception as e:
+                logger.warning(f"[Lavalink] Error: {e}, falling back to legacy")
+        
+        # ========================================
+        # LEGACY FALLBACK (Spotify/YouTube)
+        # ========================================
         if url_type == 'spotify':
             # Search on Spotify
             return await self.spotify_downloader.search(query)
@@ -558,6 +584,7 @@ class PlayCommand(commands.Cog):
             
             logger.error(f"No results found for: {query}")
             return None
+
     
     async def _safe_loader_update(self, loader: Optional[SafeLoadingManager], *args, **kwargs):
         """Safely update loader only if it exists (handles None for auto-play from queue)"""

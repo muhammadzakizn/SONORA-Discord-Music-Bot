@@ -372,6 +372,19 @@ class MusicBot(commands.Bot):
                 logger.info("✓ Auth API connected to bot for Discord DM MFA")
             except Exception as e:
                 logger.warning(f"Auth API not available: {e}")
+            
+            # Initialize Lavalink if enabled
+            if Settings.LAVALINK_ENABLED:
+                try:
+                    from services.audio.lavalink_client import init_lavalink
+                    connected = await init_lavalink(self)
+                    if connected:
+                        logger.info("✓ Lavalink connected - using Deezer FLAC for audio")
+                    else:
+                        logger.warning("Lavalink connection failed - using legacy audio")
+                except Exception as e:
+                    logger.warning(f"Lavalink init error: {e} - using legacy audio")
+
 
         
         @self.event
