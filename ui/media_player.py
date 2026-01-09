@@ -1013,6 +1013,91 @@ class SynchronizedMediaPlayer:
             # Initialize loading message variable
             loading_msg = None
             
+            # ========================================
+            # LAVALINK PATH: Use LavalinkPlayer for queue playback
+            # ========================================
+            from config.settings import Settings
+            if Settings.LAVALINK_ENABLED:
+                try:
+                    from services.audio.lavalink_player import get_lavalink_player
+                    lavalink_player = get_lavalink_player()
+                    
+                    if lavalink_player and lavalink_player.is_available:
+                        logger.info(f"[Lavalink] Playing next from queue: {next_item.title}")
+                        
+                        # Play via Lavalink
+                        success = await lavalink_player.play(
+                            self.guild_id,
+                            next_item if isinstance(next_item, TrackInfo) else TrackInfo(
+                                title=next_item.title,
+                                artist=next_item.artist,
+                                duration=next_item.duration,
+                                url=getattr(next_item, 'url', None)
+                            ),
+                            target_voice_channel or self.voice.channel,
+                            on_track_end=lambda: self._play_next_from_queue()
+                        )
+                        
+                        if success:
+                            # Process metadata for UI
+                            play_cog = self.bot.get_cog('PlayCommand')
+                            if play_cog and isinstance(next_item, TrackInfo):
+                                next_metadata = await play_cog.metadata_processor.process(
+                                    next_item,
+                                    None,
+                                    requested_by=getattr(next_item, 'requested_by', 'Queue'),
+                                    requested_by_id=getattr(next_item, 'requested_by_id', 0),
+                                    prefer_apple_artwork=True,
+                                    voice_channel_id=getattr(next_item, 'voice_channel_id', None)
+                                )
+                            else:
+                                next_metadata = next_item
+                            
+                            # Create player UI
+                            from .menu_view import MediaPlayerView
+                            view = MediaPlayerView(self.bot, self.guild_id, timeout=None)
+                            
+                            try:
+                                await self.message.delete()
+                            except:
+                                pass
+                            
+                            player_msg = await self.message.channel.send(
+                                embed=EmbedBuilder.create_now_playing(
+                                    metadata=next_metadata,
+                                    current_time=0,
+                                    volume=100,
+                                    loop_mode="off"
+                                ),
+                                view=view
+                            )
+                            
+                            # Create new player for UI updates
+                            new_player = SynchronizedMediaPlayer(
+                                self.bot,
+                                next_metadata,
+                                voice=self.voice,
+                                message=player_msg,
+                                volume=1.0,
+                                guild_id=self.guild_id
+                            )
+                            new_player.is_playing = True
+                            new_player.is_lavalink = True
+                            
+                            if hasattr(self.bot, 'players'):
+                                self.bot.players[self.guild_id] = new_player
+                            
+                            logger.info(f"[Lavalink] Now playing: {next_metadata.title}")
+                            return
+                        else:
+                            logger.warning("[Lavalink] Queue playback failed, falling back")
+                except Exception as e:
+                    logger.error(f"[Lavalink] Queue playback error: {e}")
+            
+            # ========================================
+            # LEGACY PATH: Download/stream via yt-dlp
+            # ========================================
+            
             # CHECK: Use pre-fetched metadata if available (INSTANT PLAYBACK!)
             if self.prefetched_metadata and self.prefetched_metadata.title == next_item.title:
                 logger.info(f"⚡ Using pre-fetched track (instant playback): {next_item.title}")
@@ -1022,6 +1107,7 @@ class SynchronizedMediaPlayer:
             elif isinstance(next_item, TrackInfo):
                 # Need to download and process this track
                 logger.info(f"Processing next track: {next_item.title}")
+
                 
                 # ========================================
                 # SHOW LOADING MESSAGE - Let user know bot is processing
