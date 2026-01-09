@@ -172,6 +172,27 @@ class Settings:
         if kw.strip()
     ]
     
+    # =================================
+    # LAVALINK SETTINGS
+    # =================================
+    # Lavalink - High-quality audio streaming server
+    # When enabled, uses Lavalink + Deezer FLAC as primary audio source
+    # When disabled, falls back to yt-dlp/spotdl (legacy)
+    LAVALINK_ENABLED: bool = os.getenv('LAVALINK_ENABLED', 'false').lower() == 'true'
+    LAVALINK_HOST: str = os.getenv('LAVALINK_HOST', 'localhost')
+    LAVALINK_PORT: int = int(os.getenv('LAVALINK_PORT', '2333'))
+    LAVALINK_PASSWORD: str = os.getenv('LAVALINK_PASSWORD', 'youshallnotpass')
+    LAVALINK_SECURE: bool = os.getenv('LAVALINK_SECURE', 'false').lower() == 'true'
+    
+    # Deezer ARL Token (for FLAC streaming via LavaSrc plugin)
+    # Get from browser: F12 → Application → Cookies → arl
+    DEEZER_ARL: str = os.getenv('DEEZER_ARL', '')
+    
+    # Default search source when using Lavalink
+    # Options: dzsearch (Deezer), ytsearch (YouTube), ytmsearch (YouTube Music)
+    LAVALINK_DEFAULT_SOURCE: str = os.getenv('LAVALINK_DEFAULT_SOURCE', 'dzsearch')
+    
+
     @classmethod
     def get_cache_path(cls) -> Path:
         """Get the active cache path - Rclone mount or local downloads"""

@@ -12,6 +12,11 @@ aiohttp>=3.9.0
 spotdl>=4.2.0
 yt-dlp>=2024.01.01
 gamdl>=1.8.0
+ytmusicapi>=1.3.0
+
+# Lavalink (High-Quality Audio Streaming)
+wavelink>=3.0.0
+
 
 # Lyrics
 lyricsgenius>=3.0.1
