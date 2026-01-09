@@ -139,20 +139,36 @@ class LavalinkClient:
             # This avoids wavelink adding its own search prefix
             tracks = await wavelink.Pool.fetch_tracks(search_query)
             
+            # Debug: log the response type and content
+            logger.info(f"[Lavalink] Response type: {type(tracks).__name__}")
+            
             if not tracks:
                 logger.warning(f"[Lavalink] No results for: {query}")
                 return None
             
-            # Get first track - handle both list and Playlist response
-            if isinstance(tracks, wavelink.Playlist):
-                if not tracks.tracks:
-                    logger.warning(f"[Lavalink] Empty playlist result for: {query}")
-                    return None
+            # Get first track - handle various response types
+            track = None
+            
+            # Handle different wavelink response types
+            if hasattr(tracks, 'tracks') and tracks.tracks:
+                # Playlist or Search result with tracks attribute
                 track = tracks.tracks[0]
-            elif isinstance(tracks, list):
+                logger.info(f"[Lavalink] Got {len(tracks.tracks)} tracks from search")
+            elif isinstance(tracks, list) and len(tracks) > 0:
+                # Direct list of tracks
                 track = tracks[0]
-            else:
+                logger.info(f"[Lavalink] Got list with {len(tracks)} tracks")
+            elif hasattr(tracks, 'title'):
+                # Single track object
                 track = tracks
+                logger.info(f"[Lavalink] Got single track")
+            else:
+                logger.warning(f"[Lavalink] Unknown response format: {tracks}")
+                return None
+            
+            if not track:
+                logger.warning(f"[Lavalink] Could not extract track from response")
+                return None
             
             # Convert to TrackInfo
             track_info = self._wavelink_to_trackinfo(track, query)
@@ -161,7 +177,9 @@ class LavalinkClient:
             return track_info
             
         except Exception as e:
+            import traceback
             logger.error(f"[Lavalink] Search error: {e}")
+            logger.debug(f"[Lavalink] Traceback: {traceback.format_exc()}")
             return None
 
     
