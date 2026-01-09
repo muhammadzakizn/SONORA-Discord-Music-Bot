@@ -222,7 +222,21 @@ class PlayCommand(commands.Cog):
                 )
                 
                 try:
-                    stream_url = await self.youtube_downloader.get_stream_url(track_info)
+                    # Try Lavalink first for high-quality Deezer streaming
+                    if Settings.LAVALINK_ENABLED:
+                        from services.audio.lavalink_client import get_lavalink_client
+                        lavalink = get_lavalink_client()
+                        
+                        if lavalink and lavalink.is_available:
+                            stream_url = await lavalink.get_stream_url(track_info)
+                            if stream_url:
+                                logger.info(f"[Lavalink] Using Deezer stream for: {track_info.title}")
+                    
+                    # Fallback to yt-dlp if Lavalink didn't provide stream URL
+                    if not stream_url:
+                        logger.info(f"Falling back to yt-dlp for stream URL")
+                        stream_url = await self.youtube_downloader.get_stream_url(track_info)
+
                     if stream_url:
                         use_streaming = True
                         logger.info(f"Got stream URL, measuring network speed...")

@@ -229,10 +229,7 @@ class LavalinkClient:
     
     async def get_stream_url(self, track_info: TrackInfo) -> Optional[str]:
         """
-        Get direct stream URL for track (for legacy player compatibility).
-        
-        Note: Lavalink typically handles streaming internally, 
-        but this provides URL for hybrid mode.
+        Get direct stream URL for track via Lavalink/Deezer.
         
         Args:
             track_info: Track information
@@ -244,18 +241,42 @@ class LavalinkClient:
             return None
         
         try:
-            tracks = await wavelink.Playable.search(track_info.url)
+            # Build search query
+            if track_info.url and track_info.url.startswith('http'):
+                # Direct URL
+                search_query = track_info.url
+            else:
+                # Search by title and artist on Deezer
+                source = Settings.LAVALINK_DEFAULT_SOURCE
+                search_query = f"{source}:{track_info.artist} {track_info.title}"
             
-            if tracks:
-                track = tracks[0] if isinstance(tracks, list) else tracks.tracks[0]
-                # wavelink tracks have uri attribute
-                return track.uri
+            logger.info(f"[Lavalink] Getting stream URL: {search_query}")
             
-            return None
+            # Fetch tracks from Lavalink
+            tracks = await wavelink.Pool.fetch_tracks(search_query)
+            
+            if not tracks:
+                logger.warning(f"[Lavalink] No tracks found for stream URL")
+                return None
+            
+            # Get first track
+            if hasattr(tracks, 'tracks') and tracks.tracks:
+                track = tracks.tracks[0]
+            elif isinstance(tracks, list) and len(tracks) > 0:
+                track = tracks[0]
+            else:
+                logger.warning(f"[Lavalink] Could not extract track for stream URL")
+                return None
+            
+            # Return the track URI as stream URL
+            stream_url = track.uri
+            logger.info(f"[Lavalink] Got stream URL: {stream_url[:50] if stream_url else 'None'}...")
+            return stream_url
             
         except Exception as e:
             logger.error(f"[Lavalink] Get stream URL error: {e}")
             return None
+
     
     def _wavelink_to_trackinfo(
         self, 
