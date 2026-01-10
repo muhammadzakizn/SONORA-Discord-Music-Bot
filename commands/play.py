@@ -229,7 +229,7 @@ class PlayCommand(commands.Cog):
                         
                         # Set voice channel status
                         try:
-                            status_text = f"🎵 LAVALINK: {metadata.title[:30]} - {metadata.artist[:20]}"
+                            status_text = f"🎵 Listening: {metadata.title[:30]} - {metadata.artist[:20]}"
                             await voice_channel.edit(status=status_text)
                         except Exception as e:
                             logger.debug(f"Could not set voice channel status: {e}")
