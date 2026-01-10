@@ -351,6 +351,10 @@ class PlayCommand(commands.Cog):
                         # LAZY LOAD LYRICS IN BACKGROUND (Apple Music first for syllable timing)
                         async def load_lyrics_background():
                             try:
+                                # Wait 3 seconds for audio stream to stabilize before fetching lyrics
+                                # This prevents stuttering at the beginning of playback
+                                await asyncio.sleep(3)
+                                
                                 from database.models import TrackInfo as TrackInfoModel
                                 
                                 track_info_obj = TrackInfoModel(
@@ -359,6 +363,7 @@ class PlayCommand(commands.Cog):
                                 )
                                 
                                 lyrics_result = None
+
                                 
                                 # Try Apple Music first (has syllable-level timing for dashboard)
                                 try:
