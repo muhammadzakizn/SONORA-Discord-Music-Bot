@@ -301,13 +301,48 @@ class SynchronizedMediaPlayer:
                 if self.metadata.stream_url:
                     await self.start_from_stream(self.metadata.stream_url, volume=volume)
                 elif self.is_lavalink and self.lavalink_player:
-                    # Re-fetch stream from Lavalink
+                    # Re-fetch stream from Lavalink - replay the current track
                     logger.info(f"[Loop] Re-streaming via Lavalink")
-                    # For Lavalink, we need to replay through wavelink
-                    # The track should still be in lavalink_player
-                    pass  # Lavalink handles this differently
+                    
+                    # Create TrackInfo from current metadata for Lavalink search
+                    from database.models import TrackInfo
+                    track_info = TrackInfo(
+                        title=self.metadata.title,
+                        artist=self.metadata.artist,
+                        duration=self.metadata.duration
+                    )
+                    
+                    # Get voice channel from current connection
+                    voice_channel = None
+                    if self.voice and hasattr(self.voice, 'channel'):
+                        voice_channel = self.voice.channel
+                    
+                    if voice_channel:
+                        # Replay via Lavalink
+                        success = await self.lavalink_player.play(
+                            self.guild_id,
+                            track_info,
+                            voice_channel,
+                            on_track_end=lambda: self._play_next_from_queue()
+                        )
+                        
+                        if success:
+                            self.is_playing = True
+                            self.start_time = time.time()
+                            
+                            # Restart update loop
+                            if self.update_task:
+                                self.update_task.cancel()
+                            self.update_task = asyncio.create_task(self._update_loop())
+                            
+                            logger.info(f"[Loop] Lavalink replay started: {self.metadata.title}")
+                        else:
+                            logger.warning("[Loop] Lavalink replay failed")
+                    else:
+                        logger.warning("[Loop] No voice channel for Lavalink replay")
                 else:
                     logger.warning("[Loop] No stream URL available for replay")
+
             
             logger.info(f"[Loop] Replay started: {self.metadata.title}")
             
