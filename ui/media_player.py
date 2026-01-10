@@ -1111,7 +1111,7 @@ class SynchronizedMediaPlayer:
                                 ))
                         
                         embed = discord.Embed(
-                            title="Goodbye!",
+                            title="👋 Goodbye!",
                             description=(
                                 f"Finished playing: **{self.metadata.title}**\n\n"
                                 "Thank you for using **SONORA**!\n\n"
@@ -1124,9 +1124,20 @@ class SynchronizedMediaPlayer:
                         )
                         embed.set_footer(text="SONORA - Premium Discord Music Bot")
                         
-                        await self.message.edit(embed=embed, view=SupportView())
-                    except discord.HTTPException:
-                        pass  # Message no longer exists or cannot be edited
+                        # Delete old player message first
+                        try:
+                            await self.message.delete()
+                        except discord.HTTPException:
+                            pass  # Message already deleted
+                        
+                        # Send new goodbye message
+                        try:
+                            await self.message.channel.send(embed=embed, view=SupportView())
+                        except discord.HTTPException:
+                            pass  # Channel not accessible
+                    except Exception as e:
+                        logger.debug(f"Goodbye message error: {e}")
+
                     
                     return
             
@@ -1386,7 +1397,7 @@ class SynchronizedMediaPlayer:
                         loading_embed = EmbedBuilder.create_loading(
                             "⏭️ Loading Next Track...",
                             f"**{next_item.title}**\n*{next_item.artist}*\n\n"
-                            f"📡 Getting stream URL..."
+                            f" Getting stream URL..."
                         )
                         loading_msg = await self.message.channel.send(embed=loading_embed)
                 except discord.HTTPException:
