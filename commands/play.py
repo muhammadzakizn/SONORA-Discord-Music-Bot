@@ -287,15 +287,17 @@ class PlayCommand(commands.Cog):
                         view = MediaPlayerView(self.bot, interaction.guild.id, timeout=None)
                         
                         # Send player message with "Loading lyrics" indicator
+                        from ui.spinner import LOADING_EMOJI
                         player_msg = await interaction.channel.send(
                             embed=EmbedBuilder.create_now_playing(
                                 metadata=metadata,
                                 progress_bar="",
-                                lyrics_lines=["", "⏳ Loading lyrics...", ""],
+                                lyrics_lines=["", f"{LOADING_EMOJI} Loading lyrics...", ""],
                                 guild_id=interaction.guild.id
                             ),
                             view=view
                         )
+
                         
                         # Delete loader message
                         await loader.delete()
@@ -356,7 +358,9 @@ class PlayCommand(commands.Cog):
                                 # Try Apple Music first (has syllable-level timing for dashboard)
                                 try:
                                     from services.lyrics.applemusic import AppleMusicFetcher
-                                    apple_fetcher = AppleMusicFetcher()
+                                    from config.settings import Settings
+                                    cookies_path = str(Settings.APPLE_MUSIC_COOKIES) if Settings.APPLE_MUSIC_COOKIES.exists() else None
+                                    apple_fetcher = AppleMusicFetcher(cookies_path=cookies_path)
                                     lyrics_result = await apple_fetcher.fetch(track_info_obj)
                                     if lyrics_result and lyrics_result.lines:
                                         logger.info(f"[Lavalink] Apple Music lyrics: {len(lyrics_result.lines)} lines")
@@ -364,6 +368,7 @@ class PlayCommand(commands.Cog):
                                         metadata.apple_lyrics = lyrics_result
                                 except Exception as e:
                                     logger.debug(f"[Lavalink] Apple Music lyrics failed: {e}")
+
                                 
                                 # Fallback to SyncedLyrics if Apple Music failed
                                 if not lyrics_result or not lyrics_result.lines:
