@@ -55,13 +55,13 @@ plugins:
     allowDirectVideoIds: true
     allowDirectPlaylistIds: true
     clients:
-      - MUSIC
+      - TVHTML5EMBEDDED  # OAuth-compatible
       - WEB
     oauth:
       enabled: true
-      skipInitialization: true
       # After getting token from device code, add here:
       # refreshToken: "YOUR_TOKEN"
+
 
 
   lavasrc:
