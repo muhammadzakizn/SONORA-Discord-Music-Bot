@@ -7,7 +7,7 @@ server:
 lavalink:
   plugins:
     # LavaSrc for Deezer/Spotify support
-    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.0.1"
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.5.0"
       repository: "https://maven.topi.wtf/releases"
   server:
     password: "youshallnotpass"
@@ -30,8 +30,8 @@ lavalink:
       rotation: true
       channelMix: true
       lowPass: true
-    bufferDurationMs: 400
-    frameBufferDurationMs: 5000
+    bufferDurationMs: 2000
+    frameBufferDurationMs: 10000
     opusEncodingQuality: 10
     resamplingQuality: HIGH
     trackStuckThresholdMs: 10000
@@ -69,8 +69,8 @@ plugins:
       # Your Deezer ARL token (get from browser cookies)
       arl: "YOUR_DEEZER_ARL_TOKEN"
       formats:
-        - FLAC
         - MP3_320
+        - FLAC
         - MP3_128
 
 logging:
