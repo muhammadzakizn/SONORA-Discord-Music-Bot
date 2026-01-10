@@ -33,19 +33,40 @@ class MediaPlayerView(discord.ui.View):
         if not interaction.user.voice or not interaction.user.voice.channel:
             return False, "You must be in a voice channel to control playback"
         
-        # Check if bot is in a voice channel
-        connection = self.bot.voice_manager.get_connection(self.guild_id)
-        if not connection or not connection.is_connected():
-            return False, "Bot is not connected to a voice channel"
-        
-        # Check if user is in the SAME voice channel as bot
-        bot_channel = connection.connection.channel
         user_channel = interaction.user.voice.channel
         
-        if bot_channel.id != user_channel.id:
-            return False, f"You must be in **{bot_channel.name}** to control playback"
+        # Check 1: voice_manager connection (legacy FFmpeg)
+        connection = self.bot.voice_manager.get_connection(self.guild_id)
+        if connection and connection.is_connected():
+            bot_channel = connection.connection.channel
+            if bot_channel.id != user_channel.id:
+                return False, f"You must be in **{bot_channel.name}** to control playback"
+            return True, ""
         
-        return True, ""
+        # Check 2: Lavalink/wavelink player connection
+        from services.audio.lavalink_player import get_lavalink_player
+        lavalink_player = get_lavalink_player()
+        if lavalink_player:
+            wl_player = lavalink_player.get_player(self.guild_id)
+            if wl_player and wl_player.connected:
+                bot_channel = wl_player.channel
+                if bot_channel and bot_channel.id != user_channel.id:
+                    return False, f"You must be in **{bot_channel.name}** to control playback"
+                return True, ""
+        
+        # Check 3: Discord voice_client (fallback)
+        guild = interaction.guild
+        if guild and guild.voice_client:
+            vc = guild.voice_client
+            # wavelink Player has .channel, Discord VoiceClient has .channel too
+            bot_channel = getattr(vc, 'channel', None)
+            if bot_channel:
+                if bot_channel.id != user_channel.id:
+                    return False, f"You must be in **{bot_channel.name}** to control playback"
+                return True, ""
+        
+        return False, "Bot is not connected to a voice channel"
+
     
     @discord.ui.select(
         placeholder="Menu Kontrol",
@@ -178,54 +199,103 @@ class MediaPlayerView(discord.ui.View):
                     return
             
             if action == "pause":
+                # Try legacy connection first
                 if connection and connection.is_playing():
                     connection.connection.pause()
-                    # Also update player's is_paused state so update loop pauses
                     if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
                         self.bot.players[self.guild_id].is_paused = True
-                    await interaction.response.send_message("Paused", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("⏸️ Paused", ephemeral=True, delete_after=3)
                 else:
+                    # Try Lavalink player
+                    from services.audio.lavalink_player import get_lavalink_player
+                    lavalink_player = get_lavalink_player()
+                    if lavalink_player:
+                        wl_player = lavalink_player.get_player(self.guild_id)
+                        if wl_player and wl_player.playing:
+                            await wl_player.pause(True)
+                            if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                                self.bot.players[self.guild_id].is_paused = True
+                            await interaction.response.send_message("⏸️ Paused", ephemeral=True, delete_after=3)
+                            return
                     await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=3)
             
             elif action == "resume":
+                # Try legacy connection first
                 if connection and connection.is_paused():
                     connection.connection.resume()
-                    # Also update player's is_paused state so update loop resumes
                     if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
                         self.bot.players[self.guild_id].is_paused = False
-                    await interaction.response.send_message("Resumed", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("▶️ Resumed", ephemeral=True, delete_after=3)
                 else:
+                    # Try Lavalink player
+                    from services.audio.lavalink_player import get_lavalink_player
+                    lavalink_player = get_lavalink_player()
+                    if lavalink_player:
+                        wl_player = lavalink_player.get_player(self.guild_id)
+                        if wl_player and wl_player.paused:
+                            await wl_player.pause(False)
+                            if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                                self.bot.players[self.guild_id].is_paused = False
+                            await interaction.response.send_message("▶️ Resumed", ephemeral=True, delete_after=3)
+                            return
                     await interaction.response.send_message("Playback not paused", ephemeral=True, delete_after=3)
             
             elif action == "skip":
+                # Try legacy connection first
                 if connection and connection.is_playing():
                     connection.connection.stop()
-                    await interaction.response.send_message("Skipped", ephemeral=True, delete_after=3)
+                    await interaction.response.send_message("⏭️ Skipped", ephemeral=True, delete_after=3)
                 else:
+                    # Try Lavalink player
+                    from services.audio.lavalink_player import get_lavalink_player
+                    lavalink_player = get_lavalink_player()
+                    if lavalink_player:
+                        wl_player = lavalink_player.get_player(self.guild_id)
+                        if wl_player and (wl_player.playing or wl_player.paused):
+                            await wl_player.stop()
+                            await interaction.response.send_message("⏭️ Skipped", ephemeral=True, delete_after=3)
+                            return
                     await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=3)
+
             
             elif action == "stop":
+                # Clear queue for this guild
+                queue_cog = self.bot.get_cog('QueueCommands')
+                if queue_cog and self.guild_id in queue_cog.queues:
+                    queue_cog.queues[self.guild_id].clear()
+                    logger.info(f"Queue cleared for guild {self.guild_id}")
+                
+                # Cancel prefetch and mark player as stopped
+                if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                    player = self.bot.players[self.guild_id]
+                    player.is_playing = False
+                    player._transitioning_to_next = False
+                    if hasattr(player, 'prefetch_task') and player.prefetch_task:
+                        player.prefetch_task.cancel()
+                    if hasattr(player, 'update_task') and player.update_task:
+                        player.update_task.cancel()
+                
+                stopped = False
+                
+                # Try legacy connection first
                 if connection:
-                    # Clear queue for this guild
-                    queue_cog = self.bot.get_cog('QueueCommands')
-                    if queue_cog and self.guild_id in queue_cog.queues:
-                        queue_cog.queues[self.guild_id].clear()
-                        logger.info(f"Queue cleared for guild {self.guild_id}")
-                    
-                    # Cancel prefetch and mark player as stopped
-                    if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
-                        player = self.bot.players[self.guild_id]
-                        player.is_playing = False
-                        player._transitioning_to_next = False
-                        if player.prefetch_task:
-                            player.prefetch_task.cancel()
-                        if player.update_task:
-                            player.update_task.cancel()
-                    
                     await connection.disconnect()
-                    await interaction.response.send_message("Stopped & queue cleared", ephemeral=True, delete_after=3)
+                    stopped = True
+                else:
+                    # Try Lavalink player
+                    from services.audio.lavalink_player import get_lavalink_player
+                    lavalink_player = get_lavalink_player()
+                    if lavalink_player:
+                        wl_player = lavalink_player.get_player(self.guild_id)
+                        if wl_player and wl_player.connected:
+                            await wl_player.disconnect()
+                            stopped = True
+                
+                if stopped:
+                    await interaction.response.send_message("⏹️ Stopped & queue cleared", ephemeral=True, delete_after=3)
                 else:
                     await interaction.response.send_message("Bot not connected", ephemeral=True, delete_after=3)
+
             
             elif action == "volume_up":
                 volume_cog = self.bot.get_cog('VolumeCommands')
