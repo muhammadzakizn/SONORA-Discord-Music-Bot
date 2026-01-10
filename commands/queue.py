@@ -349,22 +349,40 @@ class QueueCommands(commands.Cog):
             )
             return
         
-        # Convert to 0-indexed
+        # Convert to 0-indexed (within user's tracks)
         from_idx = from_position - 1
         to_idx = to_position - 1
         
-        # Get the track to move
-        track_to_move = user_tracks[from_idx]
+        # Get the actual queue index of the track to move
+        actual_from_idx = user_indices[from_idx]
         
-        # Remove from old position
-        user_tracks.pop(from_idx)
+        # Get the track to move
+        track_to_move = all_queue[actual_from_idx]
+        
+        # Remove from queue
+        all_queue.pop(actual_from_idx)
+        
+        # Update user_indices after removal (indices after actual_from_idx shift down by 1)
+        updated_indices = []
+        for idx in user_indices:
+            if idx > actual_from_idx:
+                updated_indices.append(idx - 1)
+            elif idx < actual_from_idx:
+                updated_indices.append(idx)
+            # Skip the removed index
+        
+        # Calculate new insertion position in the global queue
+        if to_idx >= len(updated_indices):
+            # Insert at end of user's tracks
+            if updated_indices:
+                actual_to_idx = updated_indices[-1] + 1
+            else:
+                actual_to_idx = 0
+        else:
+            actual_to_idx = updated_indices[to_idx]
         
         # Insert at new position
-        user_tracks.insert(to_idx, track_to_move)
-        
-        # Put back in all_queue
-        for i, idx in enumerate(user_indices):
-            all_queue[idx] = user_tracks[i]
+        all_queue.insert(actual_to_idx, track_to_move)
         
         await interaction.response.send_message(
             embed=EmbedBuilder.create_success(
@@ -376,6 +394,7 @@ class QueueCommands(commands.Cog):
         )
         
         logger.info(f"Moved track '{track_to_move.title}' from pos {from_position} to {to_position} in VC {user_voice_channel_id}")
+
 
 
 async def setup(bot: commands.Bot):
