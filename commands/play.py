@@ -341,20 +341,37 @@ class PlayCommand(commands.Cog):
                         
                         logger.info(f"[Lavalink] Now playing: {metadata.title} by {metadata.artist}")
                         
-                        # LAZY LOAD LYRICS IN BACKGROUND
+                        # LAZY LOAD LYRICS IN BACKGROUND (Apple Music first for syllable timing)
                         async def load_lyrics_background():
                             try:
-                                # Fetch lyrics using SyncedLyricsFetcher
-                                from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
-                                from database.models import TrackInfo
+                                from database.models import TrackInfo as TrackInfoModel
                                 
-                                fetcher = SyncedLyricsFetcher()
-                                track_info_obj = TrackInfo(
+                                track_info_obj = TrackInfoModel(
                                     title=track_info.title,
                                     artist=track_info.artist
                                 )
                                 
-                                lyrics_result = await fetcher.fetch(track_info_obj)
+                                lyrics_result = None
+                                
+                                # Try Apple Music first (has syllable-level timing for dashboard)
+                                try:
+                                    from services.lyrics.applemusic import AppleMusicFetcher
+                                    apple_fetcher = AppleMusicFetcher()
+                                    lyrics_result = await apple_fetcher.fetch(track_info_obj)
+                                    if lyrics_result and lyrics_result.lines:
+                                        logger.info(f"[Lavalink] Apple Music lyrics: {len(lyrics_result.lines)} lines")
+                                        # Store in apple_lyrics for dashboard syllable display
+                                        metadata.apple_lyrics = lyrics_result
+                                except Exception as e:
+                                    logger.debug(f"[Lavalink] Apple Music lyrics failed: {e}")
+                                
+                                # Fallback to SyncedLyrics if Apple Music failed
+                                if not lyrics_result or not lyrics_result.lines:
+                                    from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
+                                    fetcher = SyncedLyricsFetcher()
+                                    lyrics_result = await fetcher.fetch(track_info_obj)
+                                    if lyrics_result and lyrics_result.lines:
+                                        logger.info(f"[Lavalink] SyncedLyrics: {len(lyrics_result.lines)} lines")
                                 
                                 if lyrics_result and lyrics_result.lines:
                                     # Update metadata with lyrics
@@ -363,7 +380,7 @@ class PlayCommand(commands.Cog):
                                     # Update player's metadata
                                     player.metadata = metadata
                                     
-                                    logger.info(f"[Lavalink] Lyrics loaded: {len(lyrics_result.lines)} lines")
+                                    logger.info(f"[Lavalink] Lyrics loaded for dashboard")
                                 else:
                                     logger.info(f"[Lavalink] No lyrics found for: {track_info.title}")
                             except Exception as e:
@@ -371,6 +388,7 @@ class PlayCommand(commands.Cog):
                         
                         # Start background lyrics task
                         asyncio.create_task(load_lyrics_background())
+
 
                         
                         return
