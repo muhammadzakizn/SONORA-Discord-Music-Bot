@@ -120,12 +120,10 @@ class PlayCommand(commands.Cog):
                 return
             
             # ========================================
-            # LAVALINK PLAYBACK (DISABLED - Deezer 403 issue)
-            # Re-enable after fixing Deezer ARL auth:
-            # if Settings.LAVALINK_ENABLED:
+            # LAVALINK PLAYBACK (when enabled)
+            # Uses Lavalink server for high-quality Deezer FLAC streaming
             # ========================================
-            if False:  # DISABLED - Deezer 403 auth issue, using legacy yt-dlp instead
-
+            if Settings.LAVALINK_ENABLED:
                 from services.audio.lavalink_player import get_lavalink_player
                 lavalink_player = get_lavalink_player(self.bot)
                 
