@@ -47,6 +47,23 @@ lavalink:
     gc-warnings: true
 
 plugins:
+  # YouTube plugin OAuth configuration
+  # Required for YouTube playback to work reliably
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    # OAuth tokens - run Lavalink once, follow device code prompt, then add refreshToken here
+    # Use a BURNER Google account! Don't use your main account!
+    clients:
+      - MUSIC
+      - WEB
+      - ANDROID_TESTSUITE
+    oauth:
+      enabled: true
+      # refreshToken: "YOUR_REFRESH_TOKEN_HERE"  # Uncomment after getting token
+
   lavasrc:
     providers:
       # Search priority: ISRC first (exact match), then Deezer, then YouTube Music
