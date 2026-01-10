@@ -130,11 +130,64 @@ class PlayCommand(commands.Cog):
                 if lavalink_player and lavalink_player.is_available:
                     logger.info(f"[Lavalink] Using LavalinkPlayer for: {track_info.title}")
                     
+                    # CHECK IF ALREADY PLAYING - ADD TO QUEUE INSTEAD
+                    if lavalink_player.is_playing(interaction.guild.id):
+                        # Bot is already playing, add to queue
+                        queue_cog = self.bot.get_cog('QueueCommands')
+                        if queue_cog:
+                            # Create quick metadata for queue
+                            from database.models import MetadataInfo
+                            from config.constants import AudioSource, ArtworkSource, LyricsSource
+                            
+                            artwork_url = track_info.artwork_url if hasattr(track_info, 'artwork_url') and track_info.artwork_url else None
+                            
+                            queue_metadata = MetadataInfo(
+                                title=track_info.title,
+                                artist=track_info.artist,
+                                duration=track_info.duration or 0,
+                                audio_source=AudioSource.STREAMING,
+                                artwork_url=artwork_url,
+                                artwork_source=ArtworkSource.DEEZER if artwork_url else ArtworkSource.NONE,
+                                lyrics_source=LyricsSource.NONE,
+                                lyrics_lines=[],
+                                has_synced_lyrics=False,
+                                requested_by=interaction.user.display_name,
+                                requested_by_id=interaction.user.id,
+                                voice_channel_id=voice_channel.id,
+                                is_lavalink=True  # Mark as Lavalink track
+                            )
+                            
+                            # Store track_info in metadata for later playback
+                            queue_metadata.lavalink_track_info = track_info
+                            
+                            # Add to queue
+                            position = queue_cog.add_to_queue(interaction.guild.id, queue_metadata)
+                            
+                            # Delete loader
+                            await loader.delete()
+                            
+                            # Show queued message
+                            embed = EmbedBuilder.create_success(
+                                "Added to Queue",
+                                f"**{track_info.title}**\n*{track_info.artist}*\n\n"
+                                f"📋 Position in queue: **#{position}**\n"
+                                f"⏱️ Duration: **{TimeFormatter.format_seconds(track_info.duration or 0)}**"
+                            )
+                            
+                            if artwork_url:
+                                embed.set_thumbnail(url=artwork_url)
+                            
+                            await interaction.followup.send(embed=embed, ephemeral=False)
+                            logger.info(f"[Lavalink] Added to queue: {track_info.title} (position #{position})")
+                            return
+                    
+                    # NOT PLAYING - START NEW PLAYBACK
                     await loader.spinner_update(
                         "Finding Audio",
                         f"**{track_info.title}** - *{track_info.artist}*\n\n"
                         f"Preparing high-quality stream..."
                     )
+
 
                     
                     # Define callback for when track ends
