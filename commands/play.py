@@ -782,15 +782,17 @@ class PlayCommand(commands.Cog):
             view = MediaPlayerView(self.bot, interaction.guild.id, timeout=None)
             
             # Send NEW player message with menu (fresh at bottom of chat)
+            from ui.spinner import LOADING_EMOJI
             player_msg = await interaction.channel.send(
                 embed=EmbedBuilder.create_now_playing(
                     metadata=metadata,
                     progress_bar="",
-                    lyrics_lines=["", "", ""],
+                    lyrics_lines=["", f"{LOADING_EMOJI} Loading lyrics...", ""],
                     guild_id=interaction.guild.id
                 ),
                 view=view
             )
+
             
             # Store player message for future deletion
             self.bot.player_messages[interaction.guild.id] = player_msg
@@ -2355,15 +2357,17 @@ class PlayCommand(commands.Cog):
                 # Delete loader and send player
                 await loader.delete()
                 
+                from ui.spinner import LOADING_EMOJI
                 player_msg = await interaction.channel.send(
                     embed=EmbedBuilder.create_now_playing(
                         metadata=first_track,
                         progress_bar="",
-                        lyrics_lines=["", "Loading lyrics...", ""],
+                        lyrics_lines=["", f"{LOADING_EMOJI} Loading lyrics...", ""],
                         guild_id=guild_id
                     ),
                     view=view
                 )
+
                 
                 # Create synchronized player
                 wl_player = lavalink_player.get_player(guild_id)
