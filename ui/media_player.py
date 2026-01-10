@@ -1268,6 +1268,15 @@ class SynchronizedMediaPlayer:
                         )
                         
                         if success:
+                            # ========================================
+                            # CHECK PRE-PROCESSOR CACHE FOR METADATA
+                            # ========================================
+                            from services.audio.queue_preprocessor import get_preprocessor
+                            preprocessor = get_preprocessor(self.bot)
+                            
+                            # Use pre-cached metadata if available
+                            cached_data = preprocessor.get_cached(next_item) if preprocessor else None
+                            
                             # Process metadata for UI
                             play_cog = self.bot.get_cog('PlayCommand')
                             if play_cog and isinstance(next_item, TrackInfo):
@@ -1281,6 +1290,18 @@ class SynchronizedMediaPlayer:
                                 )
                             else:
                                 next_metadata = next_item
+                            
+                            # Apply pre-cached data if available
+                            if cached_data:
+                                if cached_data.artwork_url and not next_metadata.artwork_url:
+                                    next_metadata.artwork_url = cached_data.artwork_url
+                                    logger.info(f"[PreProcessor] Using cached artwork")
+                                if cached_data.lyrics and not next_metadata.lyrics:
+                                    next_metadata.lyrics = cached_data.lyrics
+                                    logger.info(f"[PreProcessor] Using cached lyrics")
+                                if cached_data.apple_lyrics and not getattr(next_metadata, 'apple_lyrics', None):
+                                    next_metadata.apple_lyrics = cached_data.apple_lyrics
+                                    logger.info(f"[PreProcessor] Using cached Apple lyrics")
                             
                             # Create player UI
                             from .menu_view import MediaPlayerView
@@ -1312,12 +1333,24 @@ class SynchronizedMediaPlayer:
                             )
                             new_player.is_playing = True
                             new_player.is_lavalink = True
+                            new_player.lavalink_player = lavalink_player
+                            new_player.start_time = time.time()
+                            
+                            # Start update loop for progress bar
+                            new_player.update_task = asyncio.create_task(new_player._update_loop())
                             
                             if hasattr(self.bot, 'players'):
                                 self.bot.players[self.guild_id] = new_player
                             
+                            # ========================================
+                            # TRIGGER PRE-PROCESSING FOR NEXT 3 TRACKS
+                            # ========================================
+                            if preprocessor:
+                                asyncio.create_task(preprocessor.queue_for_processing(self.guild_id))
+                            
                             logger.info(f"[Lavalink] Now playing: {next_metadata.title}")
                             return
+
                         else:
                             logger.warning("[Lavalink] Queue playback failed, falling back")
                 except Exception as e:
