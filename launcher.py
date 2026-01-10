@@ -47,8 +47,11 @@ os.environ['CLOUDFLARE_TUNNEL_TOKEN'] = "eyJhIjoiYzAxZjBkYjYzMDY0YjJjOWFhMmQ3NjI
 WEB_PORT = 9072  # Port for web dashboard (legacy, now on Vercel)
 BOT_API_PORT = 9072  # Port for bot API (use public port since Vercel needs access)
 LYRICIFY_API_PORT = 5050  # Port for LyricifyApi C# microservice
+LAVALINK_PORT = 2333  # Port for Lavalink server
 WEB_DIR = Path('web')
 LYRICIFY_DIR = Path('LyricifyApi')
+LAVALINK_DIR = Path('lavalink')
+
 
 # Colors - disabled on Windows for compatibility
 class Colors:
@@ -192,11 +195,49 @@ def run_production():
     # Python command - 'python' on Windows, 'python3' on Linux/macOS
     python_cmd = 'python' if os.name == 'nt' else 'python3'
     
+    # Start Lavalink server (if enabled and available)
+    proc_lavalink = None
+    lavalink_jar = LAVALINK_DIR / 'Lavalink.jar'
+    lavalink_config = LAVALINK_DIR / 'application.yml'
+    
+    if lavalink_jar.exists() and lavalink_config.exists():
+        # Check if Java is available
+        import shutil
+        java_path = shutil.which('java')
+        
+        if java_path:
+            print(f"{Colors.CYAN}Starting Lavalink server...{Colors.END}")
+            try:
+                proc_lavalink = subprocess.Popen(
+                    ['java', '-jar', 'Lavalink.jar'],
+                    cwd=str(LAVALINK_DIR),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                # Wait for Lavalink to start (it takes a few seconds)
+                time.sleep(8)
+                if proc_lavalink.poll() is None:
+                    print(f"{Colors.GREEN}[OK] Lavalink started on port {LAVALINK_PORT}{Colors.END}")
+                else:
+                    print(f"{Colors.YELLOW}[!]  Lavalink failed to start{Colors.END}")
+                    proc_lavalink = None
+            except Exception as e:
+                print(f"{Colors.YELLOW}[!]  Lavalink error: {e}{Colors.END}")
+                proc_lavalink = None
+        else:
+            print(f"{Colors.YELLOW}[!]  Java not found - Lavalink disabled{Colors.END}")
+            print(f"{Colors.YELLOW}     Install Java 17+: https://adoptium.net{Colors.END}")
+    else:
+        print(f"{Colors.YELLOW}[!]  Lavalink not configured - streaming disabled{Colors.END}")
+        if not lavalink_jar.exists():
+            print(f"{Colors.YELLOW}     Missing: {lavalink_jar}{Colors.END}")
+    
     # Start Bot with API on public port (accessible from Vercel)
     print(f"{Colors.CYAN}Starting Discord Bot with API...{Colors.END}")
     proc_bot = subprocess.Popen([python_cmd, 'main.py'], env=env)
     time.sleep(3)
     print(f"{Colors.GREEN}[OK] Bot started with API on port {BOT_API_PORT}{Colors.END}")
+
     
     # Start LyricifyApi C# microservice (for QQ Music syllable lyrics)
     proc_lyricify = None
@@ -338,8 +379,11 @@ def run_production():
         print(f"{Colors.CYAN}  [P] Bot API (HTTPS): https://api-sonora.muhammadzakizn.com{Colors.END}")
     else:
         print(f"{Colors.CYAN}  [P] Bot API (HTTP):  http://waguri.caliphdev.com:{BOT_API_PORT}{Colors.END}")
+    if proc_lavalink:
+        print(f"{Colors.CYAN}  [L] Lavalink: localhost:{LAVALINK_PORT} (Deezer FLAC streaming){Colors.END}")
     print(f"{Colors.YELLOW}  Press Ctrl+C to stop all services{Colors.END}")
     print(f"{Colors.GREEN}{Colors.BOLD}═══════════════════════════════════════════════════════════{Colors.END}\n")
+
     
     try:
         while True:
@@ -404,6 +448,8 @@ def run_production():
             proc_tunnel.terminate()
         if proc_lyricify is not None:
             proc_lyricify.terminate()
+        if proc_lavalink is not None:
+            proc_lavalink.terminate()
         try:
             proc_bot.wait(timeout=5)
             if proc_web is not None:
@@ -412,6 +458,8 @@ def run_production():
                 proc_tunnel.wait(timeout=3)
             if proc_lyricify is not None:
                 proc_lyricify.wait(timeout=3)
+            if proc_lavalink is not None:
+                proc_lavalink.wait(timeout=5)
         except:
             proc_bot.kill()
             if proc_web is not None:
@@ -420,6 +468,8 @@ def run_production():
                 proc_tunnel.kill()
             if proc_lyricify is not None:
                 proc_lyricify.kill()
+            if proc_lavalink is not None:
+                proc_lavalink.kill()
         # Clean up signal files
         for sig_file in [restart_signal_file, Path('.dashboard_restart')]:
             try:
@@ -427,6 +477,7 @@ def run_production():
             except:
                 pass
         print(f"{Colors.GREEN}✅ All services stopped.{Colors.END}")
+
 
 def run_bot_only():
     """Run SONORA Bot only"""
