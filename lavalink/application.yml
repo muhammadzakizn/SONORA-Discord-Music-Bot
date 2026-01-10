@@ -6,9 +6,13 @@ server:
 
 lavalink:
   plugins:
+    # YouTube Source plugin (required by LavaSrc)
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.5"
+      repository: "https://maven.lavalink.dev/releases"
     # LavaSrc for Deezer/Spotify support
     - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.5.0"
       repository: "https://maven.topi.wtf/releases"
+
   server:
     password: "youshallnotpass"
     sources:
