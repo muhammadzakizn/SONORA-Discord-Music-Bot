@@ -17,7 +17,7 @@ lavalink:
   server:
     password: "youshallnotpass"
     sources:
-      youtube: true
+      youtube: false  # Disabled - using youtube-plugin instead
       bandcamp: true
       soundcloud: true
       twitch: true
