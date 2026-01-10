@@ -45,12 +45,49 @@ class PlayCommand(commands.Cog):
         
         logger.info("Play command initialized")
     
-    @app_commands.command(name="play", description="Play music from Spotify, YouTube, or search query")
+    async def play_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ) -> list[app_commands.Choice[str]]:
+        """Autocomplete for /play - search Deezer for suggestions"""
+        if len(current) < 2:
+            return []
+        
+        try:
+            # Use Lavalink to search Deezer
+            from services.audio.lavalink_player import get_lavalink_player
+            lavalink = get_lavalink_player()
+            
+            if lavalink and lavalink.is_available:
+                import wavelink
+                # Search using Deezer prefix
+                tracks = await wavelink.Pool.fetch_tracks(f"dzsearch:{current}")
+                
+                if tracks:
+                    choices = []
+                    for track in tracks[:10]:  # Max 10 suggestions
+                        # Format: "Title - Artist"
+                        label = f"{track.title[:40]} - {track.author[:25]}"
+                        if len(label) > 100:
+                            label = label[:97] + "..."
+                        choices.append(app_commands.Choice(name=label, value=track.title))
+                    return choices
+            
+            return []
+        except Exception as e:
+            logger.debug(f"Autocomplete error: {e}")
+            return []
+    
+    @app_commands.command(name="play", description="Play music from Spotify, YouTube, Deezer, or search")
+    @app_commands.describe(query="Song name, URL (YouTube, Spotify, Deezer, Apple Music)")
+    @app_commands.autocomplete(query=play_autocomplete)
     async def play(
         self,
         interaction: discord.Interaction,
         query: str
     ):
+
         """
         Play command - Main entry point
         
@@ -1382,6 +1419,25 @@ class PlayCommand(commands.Cog):
             if is_already_playing:
                 logger.info(f"✓ Bot is already playing, will queue all tracks from new playlist")
             
+            # Check 4: Lavalink player check
+            from services.audio.lavalink_player import get_lavalink_player
+            lavalink_player = get_lavalink_player()
+            if lavalink_player and lavalink_player.is_playing(guild_id):
+                is_already_playing = True
+                logger.info(f"[PlayCheck] Already playing via Lavalink")
+            
+            # TRY LAVALINK FIRST for supported URLs (Deezer, Spotify, YT, Apple Music)
+            if lavalink_player and lavalink_player.is_available:
+                try:
+                    await self._handle_playlist_lavalink(
+                        interaction, url, loader, voice_channel, queue_cog,
+                        lavalink_player, is_already_playing
+                    )
+                    return
+                except Exception as e:
+                    logger.warning(f"[Lavalink] Playlist load failed, falling back: {e}")
+
+            
             # SPOTIFY: Use progressive loading for faster playback
             if url_type == 'spotify':
                 await self._handle_spotify_playlist_progressive(
@@ -2116,7 +2172,210 @@ class PlayCommand(commands.Cog):
             )
         
         logger.info(f"✓ Playlist complete: {len(tracks)} tracks")
-
+    
+    async def _handle_playlist_lavalink(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+        loader: SafeLoadingManager,
+        voice_channel: discord.VoiceChannel,
+        queue_cog,
+        lavalink_player,
+        is_already_playing: bool = False
+    ) -> None:
+        """
+        Handle playlist/album via Lavalink (wavelink)
+        Supports: Spotify, Deezer, YouTube, Apple Music playlists/albums
+        """
+        import wavelink
+        from database.models import TrackInfo, MetadataInfo
+        from config.constants import AudioSource, ArtworkSource
+        
+        guild_id = interaction.guild.id
+        
+        await self._safe_loader_update(loader, 
+            embed=EmbedBuilder.create_loading(
+                "Loading Playlist via Lavalink",
+                f"Fetching tracks from: `{url[:50]}...`"
+            )
+        )
+        
+        # Check for unsupported platforms
+        unsupported_platforms = ['yandex', 'vk.com', 'vk.ru', 'tidal']
+        if any(p in url.lower() for p in unsupported_platforms):
+            await self._safe_loader_update(loader,
+                embed=EmbedBuilder.create_error(
+                    "Platform Not Supported",
+                    f"This platform is not currently supported.\n\n"
+                    f"**Supported platforms:**\n"
+                    f"• Spotify\n"
+                    f"• YouTube / YouTube Music\n"
+                    f"• Deezer\n"
+                    f"• Apple Music\n\n"
+                    f"Try searching with `/play [song name]` instead."
+                )
+            )
+            return
+        
+        # Load tracks via wavelink
+        try:
+            result = await wavelink.Pool.fetch_tracks(url)
+        except Exception as e:
+            logger.error(f"[Lavalink] Failed to fetch tracks: {e}")
+            raise  # Fall back to legacy handler
+        
+        if not result:
+            raise ValueError("No tracks found")
+        
+        # Check if it's a playlist or single track
+        tracks_list = []
+        playlist_name = "Playlist"
+        
+        if isinstance(result, wavelink.Playlist):
+            tracks_list = result.tracks
+            playlist_name = result.name or "Playlist"
+            logger.info(f"[Lavalink] Loaded playlist: {playlist_name} ({len(tracks_list)} tracks)")
+        elif isinstance(result, list):
+            tracks_list = result
+            logger.info(f"[Lavalink] Loaded {len(tracks_list)} tracks")
+        else:
+            # Single track
+            tracks_list = [result]
+        
+        if not tracks_list:
+            raise ValueError("Empty playlist")
+        
+        # Convert wavelink tracks to our format and queue
+        tracks_queued = 0
+        first_track = None
+        
+        for i, wl_track in enumerate(tracks_list):
+            # Create TrackInfo
+            track_info = TrackInfo(
+                title=wl_track.title,
+                artist=wl_track.author,
+                duration=wl_track.length // 1000,  # Convert ms to seconds
+                url=wl_track.uri,
+                artwork_url=getattr(wl_track, 'artwork', None) or getattr(wl_track, 'thumbnail', None)
+            )
+            
+            # Create MetadataInfo for queue
+            metadata = MetadataInfo(
+                title=track_info.title,
+                artist=track_info.artist,
+                duration=track_info.duration,
+                audio_source=AudioSource.STREAMING,
+                artwork_url=track_info.artwork_url,
+                artwork_source=ArtworkSource.DEEZER if track_info.artwork_url else ArtworkSource.NONE,
+                requested_by=interaction.user.display_name,
+                requested_by_id=interaction.user.id,
+                voice_channel_id=voice_channel.id
+            )
+            metadata.lavalink_track_info = track_info
+            metadata.wavelink_track = wl_track  # Store wavelink track for direct playback
+            
+            if i == 0 and not is_already_playing:
+                # First track - play immediately
+                first_track = metadata
+            else:
+                # Queue the rest
+                queue_cog.add_to_queue(guild_id, metadata)
+                tracks_queued += 1
+            
+            # Update progress every 20 tracks
+            if i % 20 == 0 and i > 0:
+                await self._safe_loader_update(loader,
+                    embed=EmbedBuilder.create_loading(
+                        "Loading Playlist",
+                        f"Processing: {i}/{len(tracks_list)} tracks..."
+                    )
+                )
+        
+        # Play first track if not already playing
+        if first_track and not is_already_playing:
+            # Define callback for when track ends
+            async def on_track_end():
+                if hasattr(self.bot, 'players') and guild_id in self.bot.players:
+                    player = self.bot.players[guild_id]
+                    if hasattr(player, '_play_next_from_queue'):
+                        await player._play_next_from_queue()
+            
+            # Get wavelink track from first item
+            wl_track_first = tracks_list[0]
+            
+            success = await lavalink_player.play_wavelink_track(
+                guild_id,
+                wl_track_first,
+                voice_channel,
+                on_track_end=on_track_end
+            )
+            
+            if success:
+                # Create player UI
+                from ui.media_player import SynchronizedMediaPlayer
+                from ui.menu_view import MediaPlayerView
+                
+                view = MediaPlayerView(self.bot, guild_id)
+                
+                # Delete loader and send player
+                await loader.delete()
+                
+                player_msg = await interaction.channel.send(
+                    embed=EmbedBuilder.create_now_playing(
+                        metadata=first_track,
+                        progress_bar="",
+                        lyrics_lines=["", "Loading lyrics...", ""],
+                        guild_id=guild_id
+                    ),
+                    view=view
+                )
+                
+                # Create synchronized player
+                wl_player = lavalink_player.get_player(guild_id)
+                player = SynchronizedMediaPlayer(
+                    wl_player,
+                    player_msg,
+                    first_track,
+                    bot=self.bot,
+                    guild_id=guild_id
+                )
+                player.is_playing = True
+                player.is_lavalink = True
+                player.lavalink_player = lavalink_player
+                player.start_time = time.time()
+                player.update_task = asyncio.create_task(player._update_loop())
+                
+                if not hasattr(self.bot, 'players'):
+                    self.bot.players = {}
+                self.bot.players[guild_id] = player
+                
+                # Send playlist info
+                await interaction.channel.send(
+                    embed=EmbedBuilder.create_success(
+                        f"🎵 {playlist_name}",
+                        f"**Now playing:** {first_track.title}\n"
+                        f"**Queued:** {tracks_queued} tracks\n\n"
+                        f"Use `/queue` to see the queue"
+                    ),
+                    delete_after=15
+                )
+            else:
+                logger.warning("[Lavalink] Failed to play first track")
+                raise ValueError("Failed to play first track")
+        else:
+            # Already playing - just show queued message
+            await loader.delete()
+            await interaction.channel.send(
+                embed=EmbedBuilder.create_success(
+                    f"🎵 Added to Queue",
+                    f"**{playlist_name}**\n"
+                    f"**Queued:** {tracks_queued + 1} tracks\n\n"
+                    f"Use `/queue` to see the queue"
+                ),
+                delete_after=15
+            )
+        
+        logger.info(f"[Lavalink] Playlist loaded: {playlist_name} ({tracks_queued} queued)")
 
 async def setup(bot: commands.Bot):
     """Setup function for cog"""

@@ -169,6 +169,50 @@ class LavalinkPlayer:
         source = Settings.LAVALINK_DEFAULT_SOURCE
         return f"{source}:{track_info.artist} {track_info.title}"
     
+    async def play_wavelink_track(
+        self,
+        guild_id: int,
+        wl_track: wavelink.Playable,
+        voice_channel: discord.VoiceChannel,
+        on_track_end: Optional[Callable] = None
+    ) -> bool:
+        """
+        Play a pre-loaded wavelink track directly (no re-searching).
+        Used for playlist items and cached tracks.
+        """
+        if not self.is_available:
+            return False
+        
+        try:
+            # Connect to voice channel
+            player = await self.connect(voice_channel)
+            if not player:
+                logger.error("[LavalinkPlayer] Failed to connect to voice channel")
+                return False
+            
+            # Store callback
+            if on_track_end:
+                self._on_track_end_callbacks[guild_id] = on_track_end
+            
+            # Create TrackInfo from wavelink track
+            track_info = TrackInfo(
+                title=wl_track.title,
+                artist=wl_track.author,
+                duration=wl_track.length // 1000 if wl_track.length else 0
+            )
+            self._current_tracks[guild_id] = track_info
+            
+            # Play directly
+            await player.play(wl_track)
+            
+            logger.info(f"[LavalinkPlayer] Playing: {wl_track.title} by {wl_track.author}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"[LavalinkPlayer] play_wavelink_track error: {e}")
+            return False
+
+    
     async def stop(self, guild_id: int) -> bool:
         """Stop playback"""
         player = self._players.get(guild_id)

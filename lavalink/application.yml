@@ -45,33 +45,40 @@ lavalink:
 plugins:
   lavasrc:
     providers:
-      # Search priority: Deezer first, then YouTube Music
-      - "dzsearch:%QUERY%"
-      - "ytmsearch:%QUERY%"
-      - "ytsearch:%QUERY%"
+      # Search priority: ISRC first (exact match), then Deezer, then YouTube Music
+      - "dzisrc:%ISRC%"       # Deezer ISRC (exact match)
+      - "dzsearch:%QUERY%"    # Deezer search
+      - "ytmsearch:%QUERY%"   # YouTube Music fallback
+      - "ytsearch:%QUERY%"    # YouTube fallback
     sources:
-      spotify: true
-      applemusic: false
-      deezer: true
-      tidal: false
-      yandexmusic: false
-      flowerytts: false
-      youtube: true
+      spotify: true           # Enable Spotify (playlists, albums, tracks - audio via Deezer)
+      applemusic: true        # Enable Apple Music (playlists, albums - audio via Deezer)
+      deezer: true            # Enable Deezer (direct audio)
+      youtube: true           # Enable YouTube/YouTube Music
+      tidal: false            # Disable (requires paid token)
+      yandexmusic: false      # Disabled
+      vkmusic: false          # Disabled
+      flowerytts: false       # Disabled
     spotify:
       clientId: "YOUR_SPOTIFY_CLIENT_ID"
       clientSecret: "YOUR_SPOTIFY_CLIENT_SECRET"
       countryCode: "US"
-      playlistLoadLimit: 6
-      albumLoadLimit: 6
+      playlistLoadLimit: 10   # 10 pages x 100 = 1000 tracks max
+      albumLoadLimit: 10      # 10 pages x 50 = 500 tracks max
+      resolveArtistsInSearch: true
+    applemusic:
+      countryCode: "US"
+      # mediaAPIToken: "YOUR_APPLE_MUSIC_TOKEN"  # Optional - works without for search/playlists
+      playlistLoadLimit: 10
+      albumLoadLimit: 10
     deezer:
-      # Master decryption key (required for audio decryption)
       masterDecryptionKey: "g4el58wc0zvf9na1"
-      # Your Deezer ARL token (get from browser cookies)
       arl: "YOUR_DEEZER_ARL_TOKEN"
       formats:
         - MP3_320
         - FLAC
         - MP3_128
+
 
 logging:
   file:
