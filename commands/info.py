@@ -217,15 +217,17 @@ class InfoCommands(commands.Cog):
         )
         
         embed.add_field(
-            name="📋 Queue Management",
+            name="📋 Queue & Loop",
             value=(
                 "`/queue` - Lihat antrian\n"
                 "`/shuffle` - Acak antrian\n"
                 "`/clear` - Hapus antrian\n"
-                "`/loop` - Toggle loop mode"
+                "`/loop track|queue|off` - Loop mode\n"
+                "`/move` - Pindahkan lagu di queue"
             ),
             inline=True
         )
+
         
         embed.add_field(
             name="🔊 Audio Settings",
