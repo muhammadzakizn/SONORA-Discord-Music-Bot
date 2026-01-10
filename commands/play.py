@@ -120,15 +120,60 @@ class PlayCommand(commands.Cog):
                 return
             
             # ========================================
-            # LAVALINK PLAYBACK (when enabled)
+            # UNIVERSAL CACHE CHECK (saves bandwidth!)
+            # Check local/rclone cache BEFORE streaming
+            # ========================================
+            cache_path = None
+            try:
+                from services.audio.cache import get_cache_manager
+                from config.settings import Settings as CacheSettings
+                cache_mgr = get_cache_manager(CacheSettings.DOWNLOADS_DIR)
+                
+                # Check local cache by title/artist
+                cached_file = cache_mgr.find_by_title_artist(track_info.title, track_info.artist)
+                if cached_file and cached_file.exists():
+                    cache_path = cached_file
+                    logger.info(f"[Cache] Found in local cache: {cache_path.name}")
+            except Exception as e:
+                logger.debug(f"[Cache] Local check failed: {e}")
+            
+            # Check rclone cache if local not found
+            if not cache_path:
+                try:
+                    from services.audio.rclone_cache import get_rclone_cache
+                    rclone = get_rclone_cache()
+                    if rclone:
+                        rclone_file = await rclone.find_and_copy(track_info.title, track_info.artist)
+                        if rclone_file:
+                            cache_path = rclone_file
+                            logger.info(f"[Cache] Found in rclone cache: {cache_path.name}")
+                except Exception as e:
+                    logger.debug(f"[Cache] Rclone check failed: {e}")
+            
+            # If cached, use legacy FFmpeg playback (skip Lavalink = save bandwidth!)
+            if cache_path:
+                logger.info(f"[Cache] Using cached file instead of streaming (bandwidth saved!)")
+                # Force use legacy flow with cached file
+                # Set audio_result to simulate cache hit
+                from services.audio.cache import CacheResult, CacheStatus
+                audio_result = CacheResult(
+                    status=CacheStatus.LOCAL_HIT,
+                    path=cache_path,
+                    source="local_cache"
+                )
+                # Skip to LEGACY FLOW below (will be handled there)
+            
+            # ========================================
+            # LAVALINK PLAYBACK (when enabled and no cache)
             # Uses Lavalink server for high-quality Deezer FLAC streaming
             # ========================================
-            if Settings.LAVALINK_ENABLED:
+            if Settings.LAVALINK_ENABLED and not cache_path:
                 from services.audio.lavalink_player import get_lavalink_player
                 lavalink_player = get_lavalink_player(self.bot)
                 
                 if lavalink_player and lavalink_player.is_available:
                     logger.info(f"[Lavalink] Using LavalinkPlayer for: {track_info.title}")
+
                     
                     # CHECK IF ALREADY PLAYING - ADD TO QUEUE INSTEAD
                     if lavalink_player.is_playing(interaction.guild.id):
