@@ -120,10 +120,13 @@ class PlayCommand(commands.Cog):
                 return
             
             # ========================================
-            # LAVALINK PLAYBACK (when enabled)
-            # Uses Lavalink server for high-quality Deezer FLAC streaming
+            # LAVALINK PLAYBACK (DISABLED)
+            # Deezer API requires Premium account for streaming access
+            # Error: "License token has no sufficient rights on requested media"
+            # Using legacy yt-dlp (YouTube Music) instead - works with free accounts
             # ========================================
-            if Settings.LAVALINK_ENABLED:
+            if False:  # Settings.LAVALINK_ENABLED (requires Deezer Premium)
+
                 from services.audio.lavalink_player import get_lavalink_player
                 lavalink_player = get_lavalink_player(self.bot)
                 
