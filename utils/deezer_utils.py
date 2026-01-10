@@ -120,23 +120,34 @@ def _extract_arl_from_content(content: str) -> Optional[str]:
     return None
 
 
-def update_lavalink_config(lavalink_dir: Path) -> bool:
+def update_lavalink_config(lavalink_path) -> bool:
     """
     Update Lavalink application.yml with Deezer ARL from cookie file.
     
     Call this before starting Lavalink server to inject the ARL.
     
     Args:
-        lavalink_dir: Path to Lavalink directory containing application.yml
+        lavalink_path: Path to Lavalink directory OR direct path to application.yml
         
     Returns:
         True if config was updated successfully
     """
-    config_path = lavalink_dir / 'application.yml'
+    from pathlib import Path
+    
+    # Convert string to Path
+    if isinstance(lavalink_path, str):
+        lavalink_path = Path(lavalink_path)
+    
+    # Check if path is file or directory
+    if lavalink_path.suffix == '.yml' or lavalink_path.suffix == '.yaml':
+        config_path = lavalink_path
+    else:
+        config_path = lavalink_path / 'application.yml'
     
     if not config_path.exists():
         logger.error(f"Lavalink config not found: {config_path}")
         return False
+
     
     arl = get_deezer_arl()
     if not arl:
