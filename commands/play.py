@@ -2270,8 +2270,9 @@ class PlayCommand(commands.Cog):
                 artist=wl_track.author,
                 duration=wl_track.length // 1000,  # Convert ms to seconds
                 url=wl_track.uri,
-                artwork_url=getattr(wl_track, 'artwork', None) or getattr(wl_track, 'thumbnail', None)
+                thumbnail_url=getattr(wl_track, 'artwork', None) or getattr(wl_track, 'thumbnail', None)
             )
+
             
             # Create MetadataInfo for queue
             metadata = MetadataInfo(
@@ -2279,12 +2280,13 @@ class PlayCommand(commands.Cog):
                 artist=track_info.artist,
                 duration=track_info.duration,
                 audio_source=AudioSource.STREAMING,
-                artwork_url=track_info.artwork_url,
-                artwork_source=ArtworkSource.DEEZER if track_info.artwork_url else ArtworkSource.NONE,
+                artwork_url=track_info.thumbnail_url,
+                artwork_source=ArtworkSource.DEEZER if track_info.thumbnail_url else ArtworkSource.NONE,
                 requested_by=interaction.user.display_name,
                 requested_by_id=interaction.user.id,
                 voice_channel_id=voice_channel.id
             )
+
             metadata.lavalink_track_info = track_info
             metadata.wavelink_track = wl_track  # Store wavelink track for direct playback
             
