@@ -1316,11 +1316,11 @@ class SynchronizedMediaPlayer:
                                 embed=EmbedBuilder.create_now_playing(
                                     metadata=next_metadata,
                                     current_time=0,
-                                    volume=100,
-                                    loop_mode="off"
+                                    guild_id=self.guild_id
                                 ),
                                 view=view
                             )
+
                             
                             # Create new player for UI updates
                             new_player = SynchronizedMediaPlayer(
@@ -1355,6 +1355,12 @@ class SynchronizedMediaPlayer:
                             logger.warning("[Lavalink] Queue playback failed, falling back")
                 except Exception as e:
                     logger.error(f"[Lavalink] Queue playback error: {e}")
+                    # Even if UI fails, audio may be playing - return to prevent legacy fallback
+                    # Check if Lavalink player is actually playing
+                    if lavalink_player and lavalink_player.is_playing(self.guild_id):
+                        logger.info("[Lavalink] Audio playing despite UI error, not falling back")
+                        return
+
             
             # ========================================
             # LEGACY PATH: Download/stream via yt-dlp
