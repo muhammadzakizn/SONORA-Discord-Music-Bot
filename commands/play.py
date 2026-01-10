@@ -1404,10 +1404,17 @@ class PlayCommand(commands.Cog):
                 is_already_playing = True
                 logger.info(f"[PlayCheck] Already playing via voice_manager")
             
-            # Check 2: Discord's actual voice client (fallback)
-            elif discord_voice_client and discord_voice_client.is_connected() and discord_voice_client.is_playing():
-                is_already_playing = True
-                logger.info(f"[PlayCheck] Already playing via Discord voice_client")
+            # Check 2: Discord's actual voice client or wavelink Player (fallback)
+            elif discord_voice_client:
+                # wavelink Player uses .connected property, Discord VoiceClient uses .is_connected()
+                is_connected = getattr(discord_voice_client, 'connected', None) or \
+                               (hasattr(discord_voice_client, 'is_connected') and discord_voice_client.is_connected())
+                is_playing = getattr(discord_voice_client, 'playing', None) or \
+                             (hasattr(discord_voice_client, 'is_playing') and callable(discord_voice_client.is_playing) and discord_voice_client.is_playing())
+                if is_connected and is_playing:
+                    is_already_playing = True
+                    logger.info(f"[PlayCheck] Already playing via voice_client")
+
             
             # Check 3: Check if we have an active player
             elif hasattr(self.bot, 'players') and guild_id in self.bot.players:
