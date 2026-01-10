@@ -129,15 +129,24 @@ def api_health():
         }), 503
     
     try:
+        # Count active voice connections - handle both VoiceClient and wavelink.Player
+        def is_vc_connected(vc):
+            if hasattr(vc, 'is_connected'):
+                return vc.is_connected()
+            elif hasattr(vc, 'connected'):
+                return vc.connected
+            return False
+        
         return jsonify({
             "status": "healthy",
             "online": True,
             "latency": round(bot.latency * 1000, 2),
             "guilds": len(bot.guilds),
-            "active_voice": len([vc for vc in bot.voice_clients if vc.is_connected()]),
+            "active_voice": len([vc for vc in bot.voice_clients if is_vc_connected(vc)]),
             "version": getattr(bot, 'version', '1.0.0'),
             "uptime": time.time() - bot._start_time if hasattr(bot, '_start_time') else 0
         })
+
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return jsonify({
