@@ -148,14 +148,12 @@ class PlayCommand(commands.Cog):
                                 audio_source=AudioSource.STREAMING,
                                 artwork_url=artwork_url,
                                 artwork_source=ArtworkSource.DEEZER if artwork_url else ArtworkSource.NONE,
-                                lyrics_source=LyricsSource.NONE,
-                                lyrics_lines=[],
-                                has_synced_lyrics=False,
+                                lyrics=None,
                                 requested_by=interaction.user.display_name,
                                 requested_by_id=interaction.user.id,
-                                voice_channel_id=voice_channel.id,
-                                is_lavalink=True  # Mark as Lavalink track
+                                voice_channel_id=voice_channel.id
                             )
+
                             
                             # Store track_info in metadata for later playback
                             queue_metadata.lavalink_track_info = track_info
@@ -229,13 +227,12 @@ class PlayCommand(commands.Cog):
                             audio_source=AudioSource.STREAMING,
                             artwork_url=artwork_url,
                             artwork_source=ArtworkSource.LAVALINK if artwork_url else ArtworkSource.NONE,
-                            lyrics_source=LyricsSource.NONE,  # Will be loaded lazily
-                            lyrics_lines=[],
-                            has_synced_lyrics=False,
+                            lyrics=None,  # Will be loaded lazily
                             requested_by=interaction.user.display_name,
                             requested_by_id=interaction.user.id,
                             voice_channel_id=voice_channel.id
                         )
+
                         
                         # Stop spinner and show player immediately
                         await loader.stop_spinner()
