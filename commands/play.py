@@ -392,14 +392,20 @@ class PlayCommand(commands.Cog):
                             asyncio.create_task(preprocessor.queue_for_processing(interaction.guild.id))
 
                         
-                        # LAZY LOAD LYRICS IN BACKGROUND (Apple Music first for syllable timing)
+                        # LAZY LOAD LYRICS IN BACKGROUND (completely non-blocking)
+                        # Uses ThreadPoolExecutor to avoid blocking the event loop
                         async def load_lyrics_background():
                             try:
-                                # Wait 3 seconds for audio stream to stabilize before fetching lyrics
-                                # This prevents stuttering at the beginning of playback
-                                await asyncio.sleep(3)
+                                # Wait 5 seconds for audio stream to fully stabilize
+                                await asyncio.sleep(5)
+                                
+                                # Check if still playing this track
+                                if not player.is_playing:
+                                    return
                                 
                                 from database.models import TrackInfo as TrackInfoModel
+                                from concurrent.futures import ThreadPoolExecutor
+                                import functools
                                 
                                 track_info_obj = TrackInfoModel(
                                     title=track_info.title,
@@ -407,39 +413,51 @@ class PlayCommand(commands.Cog):
                                 )
                                 
                                 lyrics_result = None
-
                                 
-                                # Try Apple Music first (has syllable-level timing for dashboard)
-                                try:
-                                    from services.lyrics.applemusic import AppleMusicFetcher
-                                    from config.settings import Settings
-                                    cookies_path = str(Settings.APPLE_MUSIC_COOKIES) if Settings.APPLE_MUSIC_COOKIES.exists() else None
-                                    apple_fetcher = AppleMusicFetcher(cookies_path=cookies_path)
-                                    lyrics_result = await apple_fetcher.fetch(track_info_obj)
-                                    if lyrics_result and lyrics_result.lines:
-                                        logger.info(f"[Lavalink] Apple Music lyrics: {len(lyrics_result.lines)} lines")
-                                        # Store in apple_lyrics for dashboard syllable display
-                                        metadata.apple_lyrics = lyrics_result
-                                except Exception as e:
-                                    logger.debug(f"[Lavalink] Apple Music lyrics failed: {e}")
-
+                                # Define sync function to run in thread pool
+                                def fetch_lyrics_sync():
+                                    import asyncio
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
+                                    try:
+                                        # Try Apple Music first
+                                        try:
+                                            from services.lyrics.applemusic import AppleMusicFetcher
+                                            from config.settings import Settings
+                                            cookies_path = str(Settings.APPLE_MUSIC_COOKIES) if Settings.APPLE_MUSIC_COOKIES.exists() else None
+                                            apple_fetcher = AppleMusicFetcher(cookies_path=cookies_path)
+                                            result = loop.run_until_complete(apple_fetcher.fetch(track_info_obj))
+                                            if result and result.lines:
+                                                return ('apple', result)
+                                        except Exception as e:
+                                            pass
+                                        
+                                        # Fallback to SyncedLyrics
+                                        try:
+                                            from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
+                                            fetcher = SyncedLyricsFetcher()
+                                            result = loop.run_until_complete(fetcher.fetch(track_info_obj))
+                                            if result and result.lines:
+                                                return ('synced', result)
+                                        except Exception:
+                                            pass
+                                        
+                                        return None
+                                    finally:
+                                        loop.close()
                                 
-                                # Fallback to SyncedLyrics if Apple Music failed
-                                if not lyrics_result or not lyrics_result.lines:
-                                    from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
-                                    fetcher = SyncedLyricsFetcher()
-                                    lyrics_result = await fetcher.fetch(track_info_obj)
-                                    if lyrics_result and lyrics_result.lines:
-                                        logger.info(f"[Lavalink] SyncedLyrics: {len(lyrics_result.lines)} lines")
+                                # Run in thread pool (truly non-blocking)
+                                loop = asyncio.get_event_loop()
+                                with ThreadPoolExecutor(max_workers=1) as executor:
+                                    result = await loop.run_in_executor(executor, fetch_lyrics_sync)
                                 
-                                if lyrics_result and lyrics_result.lines:
-                                    # Update metadata with lyrics
+                                if result:
+                                    source, lyrics_result = result
                                     metadata.lyrics = lyrics_result
-                                    
-                                    # Update player's metadata
+                                    if source == 'apple':
+                                        metadata.apple_lyrics = lyrics_result
                                     player.metadata = metadata
-                                    
-                                    logger.info(f"[Lavalink] Lyrics loaded for dashboard")
+                                    logger.info(f"[Lavalink] {source.title()} lyrics: {len(lyrics_result.lines)} lines")
                                 else:
                                     logger.info(f"[Lavalink] No lyrics found for: {track_info.title}")
                             except Exception as e:
@@ -447,6 +465,7 @@ class PlayCommand(commands.Cog):
                         
                         # Start background lyrics task
                         asyncio.create_task(load_lyrics_background())
+
 
 
                         
