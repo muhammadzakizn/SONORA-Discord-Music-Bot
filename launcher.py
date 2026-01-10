@@ -222,19 +222,24 @@ def run_production():
         if java_path:
             print(f"{Colors.CYAN}Starting Lavalink server...{Colors.END}")
             try:
-                # Don't suppress output - show Lavalink logs
+                # Create log file for Lavalink output (keeps console clean)
+                lavalink_log = LAVALINK_DIR / 'lavalink.log'
+                lavalink_log_file = open(lavalink_log, 'w')
+                
                 proc_lavalink = subprocess.Popen(
                     ['java', '-jar', 'Lavalink.jar'],
                     cwd=str(LAVALINK_DIR),
-                    # Let Lavalink output show in console
-                    stdout=None,  # Show stdout
-                    stderr=subprocess.STDOUT  # Merge stderr to stdout
+                    # Redirect to log file to keep console clean
+                    stdout=lavalink_log_file,
+                    stderr=subprocess.STDOUT
                 )
                 # Wait for Lavalink to start (it takes ~15 seconds)
                 print(f"{Colors.CYAN}   Waiting for Lavalink to initialize (15s)...{Colors.END}")
+                print(f"{Colors.CYAN}   Logs: {lavalink_log}{Colors.END}")
                 time.sleep(15)
                 if proc_lavalink.poll() is None:
                     print(f"{Colors.GREEN}[OK] Lavalink started on port {LAVALINK_PORT}{Colors.END}")
+
 
                 else:
                     print(f"{Colors.YELLOW}[!]  Lavalink failed to start{Colors.END}")

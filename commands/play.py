@@ -262,7 +262,8 @@ class PlayCommand(commands.Cog):
 
                         
                         # Use artwork from Lavalink/Deezer if available
-                        artwork_url = track_info.artwork_url if hasattr(track_info, 'artwork_url') and track_info.artwork_url else None
+                        artwork_url = track_info.thumbnail_url if hasattr(track_info, 'thumbnail_url') and track_info.thumbnail_url else None
+
                         
                         # Create basic metadata for immediate display
                         metadata = MetadataInfo(
@@ -343,35 +344,34 @@ class PlayCommand(commands.Cog):
                         # LAZY LOAD LYRICS IN BACKGROUND
                         async def load_lyrics_background():
                             try:
-                                # Fetch lyrics using existing lyrics system
-                                from services.audio.lyrics import get_lyrics_provider
-                                lyrics_provider = get_lyrics_provider()
+                                # Fetch lyrics using SyncedLyricsFetcher
+                                from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
+                                from database.models import TrackInfo
                                 
-                                if lyrics_provider:
-                                    lyrics_result = await lyrics_provider.get_lyrics(
-                                        track_info.title, 
-                                        track_info.artist,
-                                        track_info.duration or 0
-                                    )
+                                fetcher = SyncedLyricsFetcher()
+                                track_info_obj = TrackInfo(
+                                    title=track_info.title,
+                                    artist=track_info.artist
+                                )
+                                
+                                lyrics_result = await fetcher.fetch(track_info_obj)
+                                
+                                if lyrics_result and lyrics_result.lines:
+                                    # Update metadata with lyrics
+                                    metadata.lyrics = lyrics_result
                                     
-                                    if lyrics_result and lyrics_result.lines:
-                                        # Update metadata with lyrics
-                                        metadata.lyrics_lines = lyrics_result.lines
-                                        metadata.has_synced_lyrics = lyrics_result.has_timing
-                                        metadata.lyrics_source = lyrics_result.source
-                                        metadata.smart_lyrics = getattr(lyrics_result, 'smart_lyrics', None)
-                                        
-                                        # Update player's metadata
-                                        player.metadata = metadata
-                                        
-                                        logger.info(f"[Lavalink] Lyrics loaded: {len(lyrics_result.lines)} lines")
-                                    else:
-                                        logger.info(f"[Lavalink] No lyrics found for: {track_info.title}")
+                                    # Update player's metadata
+                                    player.metadata = metadata
+                                    
+                                    logger.info(f"[Lavalink] Lyrics loaded: {len(lyrics_result.lines)} lines")
+                                else:
+                                    logger.info(f"[Lavalink] No lyrics found for: {track_info.title}")
                             except Exception as e:
                                 logger.error(f"[Lavalink] Background lyrics load failed: {e}")
                         
                         # Start background lyrics task
                         asyncio.create_task(load_lyrics_background())
+
                         
                         return
 
