@@ -131,10 +131,11 @@ class PlayCommand(commands.Cog):
                     logger.info(f"[Lavalink] Using LavalinkPlayer for: {track_info.title}")
                     
                     await loader.spinner_update(
-                        "Connecting to Lavalink",
+                        "Finding Audio",
                         f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                        f"Streaming via Deezer FLAC..."
+                        f"Preparing high-quality stream..."
                     )
+
                     
                     # Define callback for when track ends
                     async def on_track_end():
