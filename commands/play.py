@@ -385,6 +385,13 @@ class PlayCommand(commands.Cog):
                         
                         logger.info(f"[Lavalink] Now playing: {metadata.title} by {metadata.artist}")
                         
+                        # TRIGGER PRE-PROCESSOR for next tracks in queue
+                        from services.audio.queue_preprocessor import get_preprocessor
+                        preprocessor = get_preprocessor(self.bot)
+                        if preprocessor:
+                            asyncio.create_task(preprocessor.queue_for_processing(interaction.guild.id))
+
+                        
                         # LAZY LOAD LYRICS IN BACKGROUND (Apple Music first for syllable timing)
                         async def load_lyrics_background():
                             try:
@@ -2356,7 +2363,12 @@ class PlayCommand(commands.Cog):
                     self.bot.players = {}
                 self.bot.players[guild_id] = player
                 
-                # Send playlist info
+                # TRIGGER PRE-PROCESSOR for remaining queued tracks
+                from services.audio.queue_preprocessor import get_preprocessor
+                preprocessor = get_preprocessor(self.bot)
+                if preprocessor:
+                    asyncio.create_task(preprocessor.queue_for_processing(guild_id))
+
                 await interaction.channel.send(
                     embed=EmbedBuilder.create_success(
                         f"🎵 {playlist_name}",
