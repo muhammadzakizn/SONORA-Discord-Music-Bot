@@ -805,11 +805,13 @@ class MusicBot(commands.Bot):
             await self.load_extension('commands.play')
             await self.load_extension('commands.control')
             await self.load_extension('commands.queue')
+            await self.load_extension('commands.loop')  # Loop track/queue
             await self.load_extension('commands.volume')
             await self.load_extension('commands.stats')
             await self.load_extension('commands.admin')
             await self.load_extension('commands.lyrics')
             await self.load_extension('commands.info')
+
             await self.load_extension('commands.donate')
             await self.load_extension('commands.support')  # AI Support system
             

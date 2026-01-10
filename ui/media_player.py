@@ -208,6 +208,113 @@ class SynchronizedMediaPlayer:
             self.is_playing = False
             raise
     
+    async def _replay_current_track_with_cache(self) -> None:
+        """
+        Replay current track using cache if available (for LOOP_TRACK mode).
+        Checks local cache first to save bandwidth.
+        """
+        try:
+            if not self.metadata:
+                logger.warning("[Loop] No metadata to replay")
+                return
+            
+            logger.info(f"[Loop] Replaying: {self.metadata.title}")
+            
+            # Reset playback state
+            self.start_time = None
+            self.is_paused = False
+            self._transitioning_to_next = False
+            
+            # Stop current audio if playing
+            if self.voice and hasattr(self.voice, 'stop'):
+                try:
+                    self.voice.stop()
+                except Exception:
+                    pass
+            
+            # Get volume
+            volume = 1.0
+            volume_cog = self.bot.get_cog('VolumeCommands') if self.bot else None
+            if volume_cog:
+                volume_level = volume_cog.get_volume(self.guild_id)
+                volume = volume_level / 100.0
+            
+            # CHECK CACHE FIRST (saves bandwidth on loop!)
+            cache_path = None
+            
+            # 1. Check if we have audio_path from previous play
+            if self.metadata.audio_path and self.metadata.audio_path.exists():
+                cache_path = self.metadata.audio_path
+                logger.info(f"[Loop] Using existing audio_path cache: {cache_path.name}")
+            else:
+                # 2. Check local cache by title/artist
+                try:
+                    from services.audio.cache import get_cache_manager
+                    from config.settings import Settings
+                    cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
+                    
+                    cached_file = cache_mgr.find_by_title_artist(
+                        self.metadata.title, 
+                        self.metadata.artist
+                    )
+                    if cached_file:
+                        cache_path = cached_file
+                        logger.info(f"[Loop] Found in local cache: {cache_path.name}")
+                except Exception as e:
+                    logger.debug(f"[Loop] Cache check failed: {e}")
+            
+            # 3. Check rclone cache if local not found
+            if not cache_path:
+                try:
+                    from services.audio.rclone_cache import get_rclone_cache
+                    rclone = get_rclone_cache()
+                    if rclone:
+                        rclone_file = await rclone.find_and_copy(
+                            self.metadata.title,
+                            self.metadata.artist
+                        )
+                        if rclone_file:
+                            cache_path = rclone_file
+                            logger.info(f"[Loop] Found in rclone cache: {cache_path.name}")
+                except Exception as e:
+                    logger.debug(f"[Loop] Rclone check failed: {e}")
+            
+            # Play from cache or stream
+            if cache_path and cache_path.exists():
+                # Use FFmpeg local playback (no bandwidth!)
+                logger.info(f"[Loop] Playing from cache (no bandwidth used)")
+                
+                audio_source = discord.FFmpegPCMAudio(str(cache_path))
+                audio_source = discord.PCMVolumeTransformer(audio_source, volume=volume)
+                
+                self.start_time = time.time()
+                self.is_playing = True
+                
+                def after_callback(error):
+                    self._on_end(error)
+                
+                self.voice.play(audio_source, after=after_callback)
+            else:
+                # No cache - need to re-stream (uses bandwidth)
+                logger.info(f"[Loop] No cache found, re-streaming")
+                
+                if self.metadata.stream_url:
+                    await self.start_from_stream(self.metadata.stream_url, volume=volume)
+                elif self.is_lavalink and self.lavalink_player:
+                    # Re-fetch stream from Lavalink
+                    logger.info(f"[Loop] Re-streaming via Lavalink")
+                    # For Lavalink, we need to replay through wavelink
+                    # The track should still be in lavalink_player
+                    pass  # Lavalink handles this differently
+                else:
+                    logger.warning("[Loop] No stream URL available for replay")
+            
+            logger.info(f"[Loop] Replay started: {self.metadata.title}")
+            
+        except Exception as e:
+            logger.error(f"[Loop] Replay failed: {e}", exc_info=True)
+
+    
     def set_volume(self, volume: float) -> bool:
         """
         Set playback volume
@@ -834,8 +941,33 @@ class SynchronizedMediaPlayer:
                 logger.debug("Queue system not available")
                 return
             
+            # ========================================
+            # LOOP MODE HANDLING
+            # ========================================
+            loop_cog = self.bot.get_cog('LoopCommands')
+            loop_mode = None
+            if loop_cog:
+                from commands.loop import LoopMode
+                loop_mode = loop_cog.get_loop_mode(self.guild_id)
+            
+            # LOOP_TRACK: Replay current track
+            if loop_mode == LoopMode.TRACK if loop_mode else False:
+                logger.info(f"[Loop] LOOP_TRACK: Replaying {self.metadata.title}")
+                
+                # Check cache first for bandwidth savings
+                await self._replay_current_track_with_cache()
+                return
+            
+            # LOOP_QUEUE: Add finished track to end of queue before getting next
+            if loop_mode == LoopMode.QUEUE if loop_mode else False:
+                if self.metadata:
+                    # Add current track to end of queue
+                    queue_cog.add_to_queue(self.guild_id, self.metadata)
+                    logger.info(f"[Loop] LOOP_QUEUE: Added {self.metadata.title} to end of queue")
+            
             # Get next track from queue
             next_item = queue_cog.get_next(self.guild_id)
+
             
             if not next_item:
                 logger.info("Queue is empty, waiting 5s before disconnect...")
