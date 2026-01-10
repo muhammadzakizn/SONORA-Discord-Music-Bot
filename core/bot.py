@@ -412,8 +412,60 @@ class MusicBot(commands.Bot):
         
         @self.event
         async def on_wavelink_track_exception(payload: wavelink.TrackExceptionEventPayload):
-            """Handle track exception from Lavalink"""
+            """Handle track exception from Lavalink - fallback to yt-dlp"""
             logger.error(f"[Lavalink] Track exception: {payload.exception}")
+            
+            # Try to fallback to yt-dlp if we have player info
+            try:
+                guild_id = payload.player.guild.id
+                
+                # Check if we have the player and metadata
+                if hasattr(self, 'players') and guild_id in self.players:
+                    player = self.players[guild_id]
+                    metadata = player.metadata
+                    
+                    if metadata:
+                        logger.info(f"[Lavalink] Attempting yt-dlp fallback for: {metadata.title}")
+                        
+                        # Get play cog and try to get stream URL from yt-dlp
+                        play_cog = self.get_cog('PlayCommand')
+                        if play_cog and hasattr(play_cog, 'youtube_downloader'):
+                            from database.models import TrackInfo
+                            
+                            # Create TrackInfo from metadata
+                            track_info = TrackInfo(
+                                title=metadata.title,
+                                artist=metadata.artist,
+                                duration=metadata.duration
+                            )
+                            
+                            # Get stream URL from yt-dlp
+                            stream_url = await play_cog.youtube_downloader.get_stream_url(track_info)
+                            
+                            if stream_url:
+                                logger.info(f"[Fallback] Got yt-dlp stream URL, starting playback")
+                                
+                                # Get volume
+                                volume = 1.0
+                                volume_cog = self.get_cog('VolumeCommands')
+                                if volume_cog:
+                                    volume_level = volume_cog.get_volume(guild_id)
+                                    volume = volume_level / 100.0
+                                
+                                # Start streaming
+                                await player.start_from_stream(stream_url, volume=volume)
+                                logger.info(f"[Fallback] Now playing via yt-dlp: {metadata.title}")
+                            else:
+                                logger.error(f"[Fallback] Could not get yt-dlp stream URL")
+                        else:
+                            logger.warning("[Fallback] PlayCommand cog not available")
+                    else:
+                        logger.warning("[Fallback] No metadata available for fallback")
+                else:
+                    logger.warning("[Fallback] No player found for fallback")
+            except Exception as e:
+                logger.error(f"[Fallback] Failed: {e}", exc_info=True)
+
 
 
         
