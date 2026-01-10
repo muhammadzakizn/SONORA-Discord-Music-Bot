@@ -301,8 +301,13 @@ class LavalinkPlayer:
         Handle track end event.
         Called from wavelink event in bot.py
         """
+        # Null safety checks
+        if player is None or not hasattr(player, 'guild') or player.guild is None:
+            logger.warning("[LavalinkPlayer] Track ended but player/guild is None")
+            return
+        
         guild_id = player.guild.id
-        logger.info(f"[LavalinkPlayer] Track ended: {track.title} (reason: {reason})")
+        logger.info(f"[LavalinkPlayer] Track ended: {track.title if track else 'Unknown'} (reason: {reason})")
         
         # Clear current track
         if guild_id in self._current_tracks:
@@ -315,6 +320,7 @@ class LavalinkPlayer:
                 await callback()
             except Exception as e:
                 logger.error(f"[LavalinkPlayer] Track end callback error: {e}")
+
 
 
 # Global instance

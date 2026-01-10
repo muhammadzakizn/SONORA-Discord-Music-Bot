@@ -403,12 +403,18 @@ class MusicBot(commands.Bot):
             """Handle track end from Lavalink"""
             if Settings.LAVALINK_ENABLED:
                 try:
+                    # Null check for player
+                    if payload.player is None:
+                        logger.debug("Wavelink track end: player is None, skipping")
+                        return
+                    
                     from services.audio.lavalink_player import get_lavalink_player
                     player = get_lavalink_player()
                     if player:
                         await player.handle_track_end(payload.player, payload.track, payload.reason)
                 except Exception as e:
                     logger.error(f"Wavelink track end error: {e}")
+
         
         @self.event
         async def on_wavelink_track_exception(payload: wavelink.TrackExceptionEventPayload):
