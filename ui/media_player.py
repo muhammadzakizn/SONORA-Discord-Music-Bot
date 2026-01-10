@@ -228,9 +228,15 @@ class SynchronizedMediaPlayer:
             # Stop current audio if playing
             if self.voice and hasattr(self.voice, 'stop'):
                 try:
-                    self.voice.stop()
+                    import asyncio
+                    import inspect
+                    stop_result = self.voice.stop()
+                    # If it's a coroutine, schedule it (don't await in sync context)
+                    if inspect.iscoroutine(stop_result):
+                        asyncio.create_task(stop_result)
                 except Exception:
                     pass
+
             
             # Get volume
             volume = 1.0
@@ -298,8 +304,9 @@ class SynchronizedMediaPlayer:
                 # No cache - need to re-stream (uses bandwidth)
                 logger.info(f"[Loop] No cache found, re-streaming")
                 
-                if self.metadata.stream_url:
-                    await self.start_from_stream(self.metadata.stream_url, volume=volume)
+                stream_url = getattr(self.metadata, 'stream_url', None)
+                if stream_url:
+                    await self.start_from_stream(stream_url, volume=volume)
                 elif self.is_lavalink and self.lavalink_player:
                     # Re-fetch stream from Lavalink - replay the current track
                     logger.info(f"[Loop] Re-streaming via Lavalink")
@@ -1395,7 +1402,7 @@ class SynchronizedMediaPlayer:
                 try:
                     if hasattr(self.message, 'channel'):
                         loading_embed = EmbedBuilder.create_loading(
-                            "⏭️ Loading Next Track...",
+                            " Loading Next Track...",
                             f"**{next_item.title}**\n*{next_item.artist}*\n\n"
                             f" Getting stream URL..."
                         )

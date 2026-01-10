@@ -1800,8 +1800,19 @@ def api_developer_stats():
         # Count active users (users in voice channels with bot)
         active_users = 0
         for vc in bot.voice_clients:
-            if vc.is_connected() and vc.channel:
+            # Support both VoiceClient.is_connected() and Lavalink Player.connected
+            is_connected = False
+            try:
+                if hasattr(vc, 'is_connected') and callable(vc.is_connected):
+                    is_connected = vc.is_connected()
+                elif hasattr(vc, 'connected'):
+                    is_connected = vc.connected
+            except Exception:
+                pass
+            
+            if is_connected and hasattr(vc, 'channel') and vc.channel:
                 active_users += len([m for m in vc.channel.members if not m.bot])
+
         
         # Track statistics (simulated - can be connected to real DB)
         tracks_played = 0
