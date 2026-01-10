@@ -242,15 +242,20 @@ def api_guild_detail(guild_id: int):
         is_actually_playing = False
         is_paused = False
         
-        # Check if voice connection is actually playing/paused
-        if connection and connection.connection:
-            is_actually_playing = connection.connection.is_playing()
-            is_paused = connection.connection.is_paused()
-        
-        # Return track info if player has metadata (even if paused or buffering)
-        # This fixes the issue where Now Playing doesn't show during streaming
+        # Check if player exists and is Lavalink or FFmpeg
         if hasattr(bot, 'players') and guild_id in bot.players:
             player = bot.players[guild_id]
+            
+            if player.is_lavalink and player.lavalink_player:
+                # Lavalink: get state from lavalink_player
+                is_actually_playing = player.lavalink_player.is_playing(guild_id)
+                is_paused = player.lavalink_player.is_paused(guild_id)
+            elif connection and connection.connection:
+                # FFmpeg: get state from voice connection
+                is_actually_playing = connection.connection.is_playing()
+                is_paused = connection.connection.is_paused()
+            
+            # Return track info if player has metadata
             if player.metadata:
                 # Debug artwork URL
                 logger.debug(f"[API] Artwork URL for {player.metadata.title}: {player.metadata.artwork_url}")
@@ -263,9 +268,10 @@ def api_guild_detail(guild_id: int):
                     "artwork_url": player.metadata.artwork_url,
                     "audio_source": player.metadata.audio_source,
                     "requested_by": player.metadata.requested_by,
-                    "is_playing": is_actually_playing,
-                    "is_paused": is_paused
+                    "is_playing": is_actually_playing or player.is_playing,  # Use player state as fallback
+                    "is_paused": is_paused or player.is_paused
                 }
+
         
         # Get queue
         queue = []

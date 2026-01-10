@@ -328,6 +328,10 @@ class PlayCommand(commands.Cog):
                         player.is_playing = True
                         player.is_lavalink = True
                         player.lavalink_player = lavalink_player  # Store reference for controls
+                        player.start_time = time.time()  # Track start time for fallback
+                        
+                        # Start update loop for progress bar and lyrics
+                        player.update_task = asyncio.create_task(player._update_loop())
                         
                         # Store player reference
                         if not hasattr(self.bot, 'players'):

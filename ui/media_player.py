@@ -329,28 +329,61 @@ class SynchronizedMediaPlayer:
     
     async def pause(self) -> bool:
         """Pause playback"""
-        logger.info(f"🔍 Pause called - current state: is_playing={self.is_playing}, is_paused={self.is_paused}")
+        logger.info(f"Pause called - current state: is_playing={self.is_playing}, is_paused={self.is_paused}, is_lavalink={self.is_lavalink}")
+        
+        # Use Lavalink pause if using Lavalink
+        if self.is_lavalink and self.lavalink_player and self.guild_id:
+            success = await self.lavalink_player.pause(self.guild_id)
+            if success:
+                self.is_paused = True
+                logger.info("Playback paused via Lavalink")
+                return True
+            logger.warning("Lavalink pause failed")
+            return False
+        
+        # Legacy FFmpeg pause
         if OptimizedAudioPlayer.pause(self.voice):
             self.is_paused = True
-            logger.info(f"✅ Playback paused - is_paused set to: {self.is_paused}")
+            logger.info(f"Playback paused - is_paused set to: {self.is_paused}")
             return True
-        logger.warning("❌ Pause failed - voice client not playing")
+        logger.warning("Pause failed - voice client not playing")
         return False
+
     
     async def resume(self) -> bool:
         """Resume playback"""
-        logger.info(f"🔍 Resume called - current state: is_playing={self.is_playing}, is_paused={self.is_paused}")
+        logger.info(f"Resume called - current state: is_playing={self.is_playing}, is_paused={self.is_paused}, is_lavalink={self.is_lavalink}")
+        
+        # Use Lavalink resume if using Lavalink
+        if self.is_lavalink and self.lavalink_player and self.guild_id:
+            success = await self.lavalink_player.resume(self.guild_id)
+            if success:
+                self.is_paused = False
+                logger.info("Playback resumed via Lavalink")
+                return True
+            logger.warning("Lavalink resume failed")
+            return False
+        
+        # Legacy FFmpeg resume
         if OptimizedAudioPlayer.resume(self.voice):
             self.is_paused = False
-            logger.info(f"✅ Playback resumed - is_paused set to: {self.is_paused}")
+            logger.info(f"Playback resumed - is_paused set to: {self.is_paused}")
             return True
-        logger.warning("❌ Resume failed - voice client not paused")
+        logger.warning("Resume failed - voice client not paused")
         return False
+
     
     async def stop(self) -> None:
         """Stop playback and cancel background tasks"""
         self.is_playing = False
-        OptimizedAudioPlayer.stop(self.voice)
+        
+        # Use Lavalink stop if using Lavalink
+        if self.is_lavalink and self.lavalink_player and self.guild_id:
+            await self.lavalink_player.stop(self.guild_id)
+            logger.info("Playback stopped via Lavalink")
+        else:
+            # Legacy FFmpeg stop
+            OptimizedAudioPlayer.stop(self.voice)
         
         if self.update_task:
             self.update_task.cancel()
@@ -360,6 +393,7 @@ class SynchronizedMediaPlayer:
             logger.debug("Pre-fetch task cancelled")
         
         logger.info("Playback stopped")
+
     
     async def _update_loop(self) -> None:
         """
@@ -397,11 +431,15 @@ class SynchronizedMediaPlayer:
                 
                 # Update every 1 second (smooth enough, rate limit safe)
                 if now - last_update >= update_interval:
-                    # Calculate current time with millisecond precision
-                    if self.start_time:
+                    # Calculate current time - use Lavalink position or system time
+                    if self.is_lavalink and self.lavalink_player and self.guild_id:
+                        # Get position from Lavalink (in milliseconds)
+                        current_time = self.lavalink_player.get_position(self.guild_id) / 1000.0
+                    elif self.start_time:
                         current_time = now - self.start_time
                     else:
                         current_time = 0
+
                     
                     # Check if finished
                     # Convert duration to float if string
@@ -608,6 +646,11 @@ class SynchronizedMediaPlayer:
     
     def get_current_time(self) -> float:
         """Get current playback time"""
+        # Use Lavalink position if using Lavalink
+        if self.is_lavalink and self.lavalink_player and self.guild_id:
+            return self.lavalink_player.get_position(self.guild_id) / 1000.0
+        
+        # Legacy FFmpeg timing
         if self.start_time and self.is_playing and not self.is_paused:
             # Calculate actual playback time, accounting for pauses
             if not hasattr(self, '_pause_start_time'):
@@ -620,6 +663,7 @@ class SynchronizedMediaPlayer:
             # Return the time when paused
             return self._paused_at_time
         return 0.0
+
     
     def _cleanup_audio_file(self) -> None:
         """
