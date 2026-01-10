@@ -32,8 +32,11 @@ class ArtworkSource(str, Enum):
     APPLE_MUSIC = "Apple Music"
     SPOTIFY = "Spotify"
     YOUTUBE = "YouTube Music"
+    DEEZER = "Deezer"
+    LAVALINK = "Lavalink"
     EMBEDDED = "Embedded"
     NONE = "No Artwork"
+
 
 
 class PlayerState(str, Enum):

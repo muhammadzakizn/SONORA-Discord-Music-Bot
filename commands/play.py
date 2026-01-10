@@ -159,32 +159,43 @@ class PlayCommand(commands.Cog):
                     )
                     
                     if success:
-                        # Fetch metadata for UI
-                        await loader.spinner_update(
-                            "Processing",
-                            "Fetching artwork and lyrics..."
-                        )
+                        # Create quick metadata from Lavalink track info
+                        # This enables instant player display without waiting for lyrics/artwork fetch
+                        from database.models import MetadataInfo
+                        from config.constants import AudioSource, ArtworkSource, LyricsSource
+
                         
-                        metadata = await self.metadata_processor.process(
-                            track_info,
-                            None,  # No audio_result for streaming
+                        # Use artwork from Lavalink/Deezer if available
+                        artwork_url = track_info.artwork_url if hasattr(track_info, 'artwork_url') and track_info.artwork_url else None
+                        
+                        # Create basic metadata for immediate display
+                        metadata = MetadataInfo(
+                            title=track_info.title,
+                            artist=track_info.artist,
+                            duration=track_info.duration or 0,
+                            audio_source=AudioSource.STREAMING,
+                            artwork_url=artwork_url,
+                            artwork_source=ArtworkSource.LAVALINK if artwork_url else ArtworkSource.NONE,
+                            lyrics_source=LyricsSource.NONE,  # Will be loaded lazily
+                            lyrics_lines=[],
+                            has_synced_lyrics=False,
                             requested_by=interaction.user.display_name,
                             requested_by_id=interaction.user.id,
-                            prefer_apple_artwork=True,
                             voice_channel_id=voice_channel.id
                         )
-                        # Create player UI for Lavalink playback
+                        
+                        # Stop spinner and show player immediately
                         await loader.stop_spinner()
                         
                         # Create menu view for controls
                         view = MediaPlayerView(self.bot, interaction.guild.id, timeout=None)
                         
-                        # Send player message
+                        # Send player message with "Loading lyrics" indicator
                         player_msg = await interaction.channel.send(
                             embed=EmbedBuilder.create_now_playing(
                                 metadata=metadata,
                                 progress_bar="",
-                                lyrics_lines=["", "", ""],
+                                lyrics_lines=["", "⏳ Loading lyrics...", ""],
                                 guild_id=interaction.guild.id
                             ),
                             view=view
@@ -209,7 +220,6 @@ class PlayCommand(commands.Cog):
                         wl_player = lavalink_player.get_player(interaction.guild.id)
                         
                         # Create player for UI updates (Lavalink handles actual audio)
-                        # Pass wavelink.Player as voice - SynchronizedMediaPlayer will detect is_lavalink
                         player = SynchronizedMediaPlayer(
                             wl_player,  # wavelink.Player acts as voice for Lavalink
                             player_msg,
@@ -220,7 +230,6 @@ class PlayCommand(commands.Cog):
                         player.is_playing = True
                         player.is_lavalink = True
                         player.lavalink_player = lavalink_player  # Store reference for controls
-
                         
                         # Store player reference
                         if not hasattr(self.bot, 'players'):
@@ -235,7 +244,42 @@ class PlayCommand(commands.Cog):
                             logger.debug(f"Could not set voice channel status: {e}")
                         
                         logger.info(f"[Lavalink] Now playing: {metadata.title} by {metadata.artist}")
+                        
+                        # LAZY LOAD LYRICS IN BACKGROUND
+                        async def load_lyrics_background():
+                            try:
+                                # Fetch lyrics using existing lyrics system
+                                from services.audio.lyrics import get_lyrics_provider
+                                lyrics_provider = get_lyrics_provider()
+                                
+                                if lyrics_provider:
+                                    lyrics_result = await lyrics_provider.get_lyrics(
+                                        track_info.title, 
+                                        track_info.artist,
+                                        track_info.duration or 0
+                                    )
+                                    
+                                    if lyrics_result and lyrics_result.lines:
+                                        # Update metadata with lyrics
+                                        metadata.lyrics_lines = lyrics_result.lines
+                                        metadata.has_synced_lyrics = lyrics_result.has_timing
+                                        metadata.lyrics_source = lyrics_result.source
+                                        metadata.smart_lyrics = getattr(lyrics_result, 'smart_lyrics', None)
+                                        
+                                        # Update player's metadata
+                                        player.metadata = metadata
+                                        
+                                        logger.info(f"[Lavalink] Lyrics loaded: {len(lyrics_result.lines)} lines")
+                                    else:
+                                        logger.info(f"[Lavalink] No lyrics found for: {track_info.title}")
+                            except Exception as e:
+                                logger.error(f"[Lavalink] Background lyrics load failed: {e}")
+                        
+                        # Start background lyrics task
+                        asyncio.create_task(load_lyrics_background())
+                        
                         return
+
 
                     else:
                         logger.warning("[Lavalink] Playback failed, falling back to legacy")
