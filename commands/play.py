@@ -138,9 +138,16 @@ class PlayCommand(commands.Cog):
                     
                     # Define callback for when track ends
                     async def on_track_end():
-                        queue_cog = self.bot.get_cog('QueueCommands')
-                        if queue_cog:
-                            await queue_cog._play_next_from_queue(interaction.guild.id)
+                        # Get the player from bot.players and call its _play_next_from_queue
+                        if hasattr(self.bot, 'players') and interaction.guild.id in self.bot.players:
+                            player = self.bot.players[interaction.guild.id]
+                            if hasattr(player, '_play_next_from_queue'):
+                                await player._play_next_from_queue()
+                            else:
+                                logger.warning("[Lavalink] Player has no _play_next_from_queue method")
+                        else:
+                            logger.warning("[Lavalink] No player found for track end callback")
+
                     
                     # Play via Lavalink
                     success = await lavalink_player.play(
@@ -197,9 +204,13 @@ class PlayCommand(commands.Cog):
                             volume_level = volume_cog.get_volume(interaction.guild.id)
                             volume = volume_level / 100.0
                         
+                        # Get the wavelink player (it IS the voice connection for Lavalink)
+                        wl_player = lavalink_player.get_player(interaction.guild.id)
+                        
                         # Create player for UI updates (Lavalink handles actual audio)
+                        # Pass wavelink.Player as voice - SynchronizedMediaPlayer will detect is_lavalink
                         player = SynchronizedMediaPlayer(
-                            lavalink_player.get_player(interaction.guild.id),  # wavelink.Player
+                            wl_player,  # wavelink.Player acts as voice for Lavalink
                             player_msg,
                             metadata,
                             bot=self.bot,
@@ -207,6 +218,8 @@ class PlayCommand(commands.Cog):
                         )
                         player.is_playing = True
                         player.is_lavalink = True
+                        player.lavalink_player = lavalink_player  # Store reference for controls
+
                         
                         # Store player reference
                         if not hasattr(self.bot, 'players'):

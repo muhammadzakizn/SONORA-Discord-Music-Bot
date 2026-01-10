@@ -56,12 +56,30 @@ class SynchronizedMediaPlayer:
         self.start_time: Optional[float] = None
         self.is_playing = False
         self.is_paused = False
+        self.is_lavalink = False  # Set to True when using Lavalink
+        self.lavalink_player = None  # LavalinkPlayer reference
         self._transitioning_to_next = False  # Prevent double-call of _play_next_from_queue
         self.update_task: Optional[asyncio.Task] = None
         self.prefetch_task: Optional[asyncio.Task] = None  # Background pre-fetching
         self.prefetched_metadata: Optional[MetadataInfo] = None  # Cache for next track
         
         logger.debug(f"SynchronizedMediaPlayer initialized for: {metadata.title}")
+    
+    def voice_is_connected(self) -> bool:
+        """Check if voice is connected (handles both discord.VoiceClient and wavelink.Player)"""
+        if self.voice is None:
+            return False
+        
+        # wavelink.Player uses .connected property
+        if hasattr(self.voice, 'connected'):
+            return self.voice.connected
+        
+        # discord.VoiceClient uses .is_connected() method
+        if hasattr(self.voice, 'is_connected'):
+            return self.voice.is_connected() if hasattr(self.voice, 'is_connected') else getattr(self.voice, 'connected', False)
+        
+        return False
+
     
     async def start(self, volume: float = 1.0) -> None:
         """
@@ -801,7 +819,7 @@ class SynchronizedMediaPlayer:
                     logger.debug(f"Cache touch failed: {e}")
             
             # Check if voice is still connected
-            if not self.voice or not self.voice.is_connected():
+            if not self.voice or not self.voice_is_connected():
                 logger.info("Voice not connected, skipping next track")
                 self._transitioning_to_next = False
                 return
@@ -842,7 +860,7 @@ class SynchronizedMediaPlayer:
                     
                     # Disconnect from voice
                     try:
-                        if self.voice and self.voice.is_connected():
+                        if self.voice and self.voice_is_connected():
                             await self.voice.disconnect()
                             logger.info("✓ Disconnected from voice channel")
                     except Exception as e:
