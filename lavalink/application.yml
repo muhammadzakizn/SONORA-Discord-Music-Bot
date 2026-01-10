@@ -57,11 +57,12 @@ plugins:
     clients:
       - MUSIC
       - WEB
-      - ANDROID_TESTSUITE
     oauth:
       enabled: true
-      # After first run, add your refresh token here:
-      # refreshToken: "YOUR_REFRESH_TOKEN"
+      skipInitialization: true
+      # After getting token from device code, add here:
+      # refreshToken: "YOUR_TOKEN"
+
 
   lavasrc:
 
