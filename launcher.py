@@ -200,6 +200,20 @@ def run_production():
     lavalink_jar = LAVALINK_DIR / 'Lavalink.jar'
     lavalink_config = LAVALINK_DIR / 'application.yml'
     
+    # Auto-download Lavalink.jar if not present
+    if not lavalink_jar.exists() and lavalink_config.exists():
+        print(f"{Colors.CYAN}Downloading Lavalink.jar...{Colors.END}")
+        try:
+            import urllib.request
+            lavalink_url = "https://github.com/lavalink-devs/Lavalink/releases/download/4.0.8/Lavalink.jar"
+            # Ensure lavalink directory exists
+            LAVALINK_DIR.mkdir(parents=True, exist_ok=True)
+            urllib.request.urlretrieve(lavalink_url, str(lavalink_jar))
+            print(f"{Colors.GREEN}[OK] Lavalink.jar downloaded{Colors.END}")
+        except Exception as e:
+            print(f"{Colors.YELLOW}[!]  Failed to download Lavalink.jar: {e}{Colors.END}")
+            print(f"{Colors.YELLOW}     Manual download: https://github.com/lavalink-devs/Lavalink/releases{Colors.END}")
+    
     if lavalink_jar.exists() and lavalink_config.exists():
         # Check if Java is available
         import shutil
@@ -215,7 +229,8 @@ def run_production():
                     stderr=subprocess.DEVNULL
                 )
                 # Wait for Lavalink to start (it takes a few seconds)
-                time.sleep(8)
+                print(f"{Colors.CYAN}   Waiting for Lavalink to initialize (10s)...{Colors.END}")
+                time.sleep(10)
                 if proc_lavalink.poll() is None:
                     print(f"{Colors.GREEN}[OK] Lavalink started on port {LAVALINK_PORT}{Colors.END}")
                 else:
@@ -227,10 +242,9 @@ def run_production():
         else:
             print(f"{Colors.YELLOW}[!]  Java not found - Lavalink disabled{Colors.END}")
             print(f"{Colors.YELLOW}     Install Java 17+: https://adoptium.net{Colors.END}")
-    else:
-        print(f"{Colors.YELLOW}[!]  Lavalink not configured - streaming disabled{Colors.END}")
-        if not lavalink_jar.exists():
-            print(f"{Colors.YELLOW}     Missing: {lavalink_jar}{Colors.END}")
+    elif not lavalink_jar.exists():
+        print(f"{Colors.YELLOW}[!]  Lavalink.jar not found - streaming disabled{Colors.END}")
+
     
     # Start Bot with API on public port (accessible from Vercel)
     print(f"{Colors.CYAN}Starting Discord Bot with API...{Colors.END}")
