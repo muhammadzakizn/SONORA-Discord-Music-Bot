@@ -253,6 +253,15 @@ class SynchronizedMediaPlayer:
                 f"🎵 Streaming: {self.metadata.title[:30]} - {self.metadata.artist[:20]}"
             )
             
+            # CRITICAL: Force refresh the view (buttons)
+            # If fallback happened after 'Goodbye' message (SupportView), we must restore controls
+            from ui.menu_view import PlayerControlView
+            if self.message:
+                try:
+                    await self.message.edit(view=PlayerControlView(self))
+                except Exception as e:
+                    logger.warning(f"Failed to refresh player view: {e}")
+            
             logger.info(f"🌐 Stream playback started: {self.metadata.title}")
         
         except Exception as e:

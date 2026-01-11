@@ -367,20 +367,23 @@ class YouTubeDownloader(BaseDownloader):
                 logger.warning("[YTMusicAPI] Not available, trying spotdl url fallback...")
             
             # ========================================
-            # STEP 1.5: SpotDL URL Fallback (when ytmusicapi fails)
-            # Gets YouTube URL from Spotify matching without downloading
+            # STEP 1.5: SpotDL URL Fallback - DISABLED for speed
+            # SpotDL takes too long (20-30s) and often fails.
+            # We skip straight to optimized yt-dlp search.
             # ========================================
-            try:
-                youtube_url = await self._get_youtube_url_via_spotdl(query)
-                if youtube_url:
-                    logger.info(f"[SpotDL] Got YouTube URL: {youtube_url}")
-                    # Now extract info from this URL using yt-dlp
-                    result = await self._extract_from_url(youtube_url, query)
-                    if result:
-                        return result
-                    logger.info("[SpotDL] URL extraction failed, falling back to yt-dlp search")
-            except Exception as e:
-                logger.warning(f"[SpotDL] Fallback failed: {e}, using yt-dlp search")
+            # try:
+            #     youtube_url = await self._get_youtube_url_via_spotdl(query)
+            #     if youtube_url:
+            #         logger.info(f"[SpotDL] Got YouTube URL: {youtube_url}")
+            #         # Now extract info from this URL using yt-dlp
+            #         result = await self._extract_from_url(youtube_url, query)
+            #         if result:
+            #             return result
+            #         logger.info("[SpotDL] URL extraction failed, falling back to yt-dlp search")
+            # except Exception as e:
+            #     logger.warning(f"[SpotDL] Fallback failed: {e}, using yt-dlp search")
+            
+            logger.info("[YTMusicAPI] No results, skipping SpotDL (too slow), using direct yt-dlp search")
         
         # ========================================
         # STEP 2: Try YTDLP API
