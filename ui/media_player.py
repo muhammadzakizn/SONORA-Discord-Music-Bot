@@ -1383,10 +1383,39 @@ class SynchronizedMediaPlayer:
             loading_msg = None
             
             # ========================================
+            # CACHE CHECK: Prioritize Local/Rclone over Lavalink
+            # ========================================
+            force_legacy = False
+            try:
+                # Check Local Cache
+                from config.settings import Settings
+                from services.audio.cache import get_cache_manager
+                cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
+                cached_path = cache_mgr.is_file_cached(next_item.artist, next_item.title)
+                
+                if cached_path:
+                    # Found locally - use Legacy Player
+                    force_legacy = True
+                    if not getattr(next_item, 'audio_path', None):
+                        next_item.audio_path = cached_path
+                    logger.info(f"💾 Found in Local Cache: {next_item.title} - Forcing Legacy Player")
+                
+                # Check Cloud Cache (if not local)
+                elif not force_legacy:
+                    from services.storage import get_cloud_cache
+                    cloud_cache = get_cloud_cache()
+                    if cloud_cache.is_enabled and await cloud_cache.exists(next_item.artist, next_item.title):
+                        force_legacy = True
+                        logger.info(f"☁️ Found in FTP Cloud Cache: {next_item.title} - Forcing Legacy Player")
+                        
+            except Exception as e:
+                logger.warning(f"Failed to check cache for priority: {e}")
+
+            # ========================================
             # LAVALINK PATH: Use LavalinkPlayer for queue playback
             # ========================================
             from config.settings import Settings
-            if Settings.LAVALINK_ENABLED:
+            if Settings.LAVALINK_ENABLED and not force_legacy:
                 try:
                     from services.audio.lavalink_player import get_lavalink_player
                     lavalink_player = get_lavalink_player()
