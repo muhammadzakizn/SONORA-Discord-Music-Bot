@@ -74,13 +74,30 @@ class LavalinkPlayer:
         guild_id = voice_channel.guild.id
         
         try:
-            # Check if already connected
+            # Check if already connected via our cache
             existing_player = self._players.get(guild_id)
             if existing_player and existing_player.connected:
                 # Move to new channel if different
-                if existing_player.channel.id != voice_channel.id:
+                if existing_player.channel and existing_player.channel.id != voice_channel.id:
                     await existing_player.move_to(voice_channel)
                 return existing_player
+            
+            # Also check via guild.voice_client (might be connected but not in cache)
+            guild = voice_channel.guild
+            if guild.voice_client and isinstance(guild.voice_client, wavelink.Player):
+                player = guild.voice_client
+                self._players[guild_id] = player
+                if player.channel and player.channel.id != voice_channel.id:
+                    await player.move_to(voice_channel)
+                logger.info(f"[LavalinkPlayer] Reusing existing connection in {voice_channel.guild.name}")
+                return player
+            
+            # Disconnect existing non-wavelink connection if any
+            if guild.voice_client:
+                try:
+                    await guild.voice_client.disconnect(force=True)
+                except Exception:
+                    pass
             
             # Connect via wavelink
             player: wavelink.Player = await voice_channel.connect(cls=wavelink.Player)
@@ -92,6 +109,7 @@ class LavalinkPlayer:
         except Exception as e:
             logger.error(f"[LavalinkPlayer] Connect error: {e}")
             return None
+
     
     async def play(
         self,

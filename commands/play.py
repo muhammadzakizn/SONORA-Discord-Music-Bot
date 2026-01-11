@@ -157,6 +157,20 @@ class PlayCommand(commands.Cog):
                 )
                 return
             
+            # Check track duration limit (15 minutes max)
+            from config.constants import MAX_TRACK_DURATION
+            if track_info.duration and track_info.duration > MAX_TRACK_DURATION:
+                await self._safe_loader_update(loader, 
+                    embed=EmbedBuilder.create_error(
+                        "Track Too Long",
+                        f"**{track_info.title}** is {int(track_info.duration // 60)} minutes long.\n"
+                        f"Maximum allowed duration is **{MAX_TRACK_DURATION // 60} minutes**.\n\n"
+                        "Try a shorter version or a different track."
+                    )
+                )
+                return
+
+            
             # ========================================
             # UNIVERSAL CACHE CHECK (saves bandwidth!)
             # Check local/rclone cache BEFORE streaming

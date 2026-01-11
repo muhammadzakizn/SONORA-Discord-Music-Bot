@@ -75,6 +75,9 @@ COLOR_PLAYING = 0x1DB954  # Spotify green
 DISCORD_EMBED_EDIT_LIMIT = 5  # edits per 5 seconds
 DISCORD_RATE_LIMIT_CODE = 429
 
+# Track Limits
+MAX_TRACK_DURATION = 900  # 15 minutes in seconds
+
 # Audio quality presets
 AUDIO_QUALITY_PRESETS = {
     'low': {'bitrate': 128, 'sample_rate': 44100},

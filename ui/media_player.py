@@ -1150,7 +1150,17 @@ class SynchronizedMediaPlayer:
             
             logger.info(f"Auto-playing next from queue: {next_item.title}")
             
+            # Check duration limit
+            from config.constants import MAX_TRACK_DURATION
+            track_duration = getattr(next_item, 'duration', 0) or 0
+            if track_duration > MAX_TRACK_DURATION:
+                logger.info(f"⏭️ Skipping: Track '{next_item.title}' exceeds {MAX_TRACK_DURATION // 60} minute limit ({int(track_duration // 60)} min)")
+                # Skip to next in queue recursively
+                await self._play_next_from_queue()
+                return
+            
             # CRITICAL: Check voice channel status (FIFO + Empty VC skip logic)
+
             voice_channel_id = getattr(next_item, 'voice_channel_id', None)
             requested_by_id = getattr(next_item, 'requested_by_id', None)
             
