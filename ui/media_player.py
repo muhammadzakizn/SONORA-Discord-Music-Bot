@@ -155,30 +155,50 @@ class SynchronizedMediaPlayer:
             logger.info(f"Starting stream playback: {self.metadata.title}")
             
             # CRITICAL: Handle Wavelink Player (fallback scenario)
-            # If we are using a Wavelink player, we must switch to a standard VoiceClient
-            # because FFmpegPCMAudio requires a standard client.
-            import wavelink
-            if isinstance(self.voice, wavelink.Player):
+            # Check if voice is a Wavelink player (by type name to avoid import issues)
+            is_wavelink = False
+            if self.voice:
+                type_name = type(self.voice).__name__
+                module_name = type(self.voice).__module__
+                if 'wavelink' in module_name or type_name == 'Player':
+                    is_wavelink = True
+            
+            if is_wavelink:
                 logger.info("[Stream] Detected Wavelink player during fallback - Switching to standard VoiceClient...")
                 try:
                     # Get channel and guild info
-                    channel = self.voice.channel
-                    guild = self.voice.guild
+                    channel = getattr(self.voice, 'channel', None)
+                    guild = getattr(self.voice, 'guild', None)
                     
-                    # Disconnect Wavelink player
-                    await self.voice.disconnect()
+                    if not channel and self.channel_id:
+                        # Try to get channel from stored ID validation
+                        guild_obj = self.bot.get_guild(self.guild_id) if self.bot else None
+                        if guild_obj:
+                            channel = guild_obj.get_channel(self.channel_id)
+
+                    # Disconnect Wavelink player safely
+                    if hasattr(self.voice, 'disconnect'):
+                        await self.voice.disconnect()
                     
                     # Connect with standard VoiceClient
                     # We need to wait a bit for Discord to register the disconnect
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(1.5)
                     
                     if channel:
+                        # Connect using standard VoiceClient
                         self.voice = await channel.connect(cls=discord.VoiceClient)
                         logger.info(f"[Stream] Successfully switched to standard VoiceClient in {channel.name}")
                         
                         # Update bot's voice manager if available
                         if self.bot and hasattr(self.bot, 'voice_manager'):
-                            self.bot.voice_manager.connections[guild.id] = self.voice
+                            self.bot.voice_manager.connections[guild.id if guild else self.guild_id] = self.voice
+                        
+                        # Update player's voice reference
+                        self.is_lavalink = False
+                    else:
+                        logger.error("[Stream] Could not determine voice channel to reconnect to")
+                        raise Exception("Could not determine voice channel")
+                        
                 except Exception as e:
                     logger.error(f"[Stream] Failed to switch voice client: {e}")
                     raise e
