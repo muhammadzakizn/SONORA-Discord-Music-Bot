@@ -255,10 +255,12 @@ class SynchronizedMediaPlayer:
             
             # CRITICAL: Force refresh the view (buttons)
             # If fallback happened after 'Goodbye' message (SupportView), we must restore controls
-            from ui.menu_view import PlayerControlView
-            if self.message:
+            # Use MediaPlayerView from menu_view.py
+            from ui.menu_view import MediaPlayerView
+            if self.message and self.bot and self.guild_id:
                 try:
-                    await self.message.edit(view=PlayerControlView(self))
+                    # Re-attach view with NO timeout so it stays active
+                    await self.message.edit(view=MediaPlayerView(self.bot, self.guild_id, timeout=None))
                 except Exception as e:
                     logger.warning(f"Failed to refresh player view: {e}")
             
