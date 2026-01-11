@@ -1463,13 +1463,13 @@ class SynchronizedMediaPlayer:
 
                             
                             # Create new player for UI updates
+                            # Fix: Correct args match __init__ signature (voice_client, message, metadata, bot, guild_id)
                             new_player = SynchronizedMediaPlayer(
-                                self.bot,
+                                self.voice,
+                                player_msg,
                                 next_metadata,
-                                voice=self.voice,
-                                message=player_msg,
-                                volume=1.0,
-                                guild_id=self.guild_id
+                                self.bot,
+                                self.guild_id
                             )
                             new_player.is_playing = True
                             new_player.is_lavalink = True
