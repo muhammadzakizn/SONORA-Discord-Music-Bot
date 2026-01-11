@@ -64,6 +64,7 @@ class SynchronizedMediaPlayer:
         self.prefetched_metadata: Optional[MetadataInfo] = None  # Cache for next track
         self.lyrics_loading = True  # Whether lyrics are still being fetched
         self.lyrics_fetched = False  # Whether lyrics fetch attempt is complete
+        self.fallback_in_progress = False  # Prevent disconnect during yt-dlp fallback
         
         logger.debug(f"SynchronizedMediaPlayer initialized for: {metadata.title}")
     
@@ -1086,6 +1087,18 @@ class SynchronizedMediaPlayer:
                         queue_cog.queues[self.guild_id].insert(0, next_item_check)
                     # Continue to play next
                 else:
+                    # Check if fallback is in progress - don't disconnect yet
+                    if self.fallback_in_progress:
+                        logger.info("Fallback in progress, waiting longer...")
+                        await asyncio.sleep(10)  # Wait more for fallback
+                        # Check again
+                        next_item_check = queue_cog.get_next(self.guild_id) if queue_cog else None
+                        if next_item_check or self.is_playing:
+                            logger.info("Playback resumed during fallback")
+                            if next_item_check and self.guild_id in queue_cog.queues:
+                                queue_cog.queues[self.guild_id].insert(0, next_item_check)
+                            return
+                    
                     # Still empty, disconnect
                     logger.info("No new commands, disconnecting to save bandwidth...")
                     

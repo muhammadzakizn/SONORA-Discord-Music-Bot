@@ -433,6 +433,9 @@ class MusicBot(commands.Bot):
                     if metadata:
                         logger.info(f"[Lavalink] Attempting yt-dlp fallback for: {metadata.title}")
                         
+                        # Set flag to prevent disconnect during fallback
+                        player.fallback_in_progress = True
+                        
                         # Get play cog and try to get stream URL from yt-dlp
                         play_cog = self.get_cog('PlayCommand')
                         if play_cog and hasattr(play_cog, 'youtube_downloader'):
@@ -465,12 +468,19 @@ class MusicBot(commands.Bot):
                                 logger.error(f"[Fallback] Could not get yt-dlp stream URL")
                         else:
                             logger.warning("[Fallback] PlayCommand cog not available")
+                        
+                        # Clear fallback flag
+                        player.fallback_in_progress = False
                     else:
                         logger.warning("[Fallback] No metadata available for fallback")
                 else:
                     logger.warning("[Fallback] No player found for fallback")
             except Exception as e:
+                # Clear flag on error too
+                if hasattr(self, 'players') and guild_id in self.players:
+                    self.players[guild_id].fallback_in_progress = False
                 logger.error(f"[Fallback] Failed: {e}", exc_info=True)
+
 
 
 
