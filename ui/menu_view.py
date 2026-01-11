@@ -38,8 +38,17 @@ class MediaPlayerView(discord.ui.View):
         # Check 1: voice_manager connection (legacy FFmpeg)
         connection = self.bot.voice_manager.get_connection(self.guild_id)
         if connection and connection.is_connected():
-            bot_channel = connection.connection.channel
-            if bot_channel.id != user_channel.id:
+            # Support both raw VoiceClient and legacy wrapper
+            # Standard VoiceClient has .channel property
+            if hasattr(connection.connection, 'channel'):
+                bot_channel = connection.connection.channel
+            elif hasattr(connection, 'channel'):
+                bot_channel = connection.channel
+            else:
+                # Fallback for legacy wrapper structure
+                bot_channel = getattr(connection.connection, 'channel', None)
+            
+            if bot_channel and bot_channel.id != user_channel.id:
                 return False, f"You must be in **{bot_channel.name}** to control playback"
             return True, ""
         

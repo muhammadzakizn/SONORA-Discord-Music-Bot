@@ -1137,16 +1137,29 @@ class SynchronizedMediaPlayer:
                     # Continue to play next
                 else:
                     # Check if fallback is in progress - don't disconnect yet
-                    if self.fallback_in_progress:
-                        logger.info("Fallback in progress, waiting longer...")
-                        await asyncio.sleep(10)  # Wait more for fallback
-                        # Check again
-                        next_item_check = queue_cog.get_next(self.guild_id) if queue_cog else None
-                        if next_item_check or self.is_playing:
-                            logger.info("Playback resumed during fallback")
-                            if next_item_check and self.guild_id in queue_cog.queues:
-                                queue_cog.queues[self.guild_id].insert(0, next_item_check)
+                    # Loop wait for fallback (yt-dlp can be slow)
+                    fallback_wait_start = time.time()
+                    while self.fallback_in_progress:
+                        # Safety timeout: 120 seconds max wait
+                        if time.time() - fallback_wait_start > 120:
+                            logger.warning("Fallback timeout (120s), proceeding to disconnect")
+                            break
+                        
+                        logger.debug("Fallback in progress, waiting...")
+                        await asyncio.sleep(2)
+                        
+                        # Check if playing started
+                        if self.is_playing:
+                            logger.info("Playback resumed during fallback wait")
                             return
+
+                    # Check again if something was queued or playing started
+                    next_item_check = queue_cog.get_next(self.guild_id) if queue_cog else None
+                    if next_item_check or self.is_playing:
+                        logger.info("Playback resumed or new track queued")
+                        if next_item_check and self.guild_id in queue_cog.queues:
+                            queue_cog.queues[self.guild_id].insert(0, next_item_check)
+                        return
                     
                     # Still empty, disconnect
                     logger.info("No new commands, disconnecting to save bandwidth...")
