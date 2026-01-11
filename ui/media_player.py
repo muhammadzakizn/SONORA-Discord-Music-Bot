@@ -154,6 +154,35 @@ class SynchronizedMediaPlayer:
         try:
             logger.info(f"Starting stream playback: {self.metadata.title}")
             
+            # CRITICAL: Handle Wavelink Player (fallback scenario)
+            # If we are using a Wavelink player, we must switch to a standard VoiceClient
+            # because FFmpegPCMAudio requires a standard client.
+            import wavelink
+            if isinstance(self.voice, wavelink.Player):
+                logger.info("[Stream] Detected Wavelink player during fallback - Switching to standard VoiceClient...")
+                try:
+                    # Get channel and guild info
+                    channel = self.voice.channel
+                    guild = self.voice.guild
+                    
+                    # Disconnect Wavelink player
+                    await self.voice.disconnect()
+                    
+                    # Connect with standard VoiceClient
+                    # We need to wait a bit for Discord to register the disconnect
+                    await asyncio.sleep(1)
+                    
+                    if channel:
+                        self.voice = await channel.connect(cls=discord.VoiceClient)
+                        logger.info(f"[Stream] Successfully switched to standard VoiceClient in {channel.name}")
+                        
+                        # Update bot's voice manager if available
+                        if self.bot and hasattr(self.bot, 'voice_manager'):
+                            self.bot.voice_manager.connections[guild.id] = self.voice
+                except Exception as e:
+                    logger.error(f"[Stream] Failed to switch voice client: {e}")
+                    raise e
+
             # Check if we need to use proxy for playback
             # When YOUTUBE_PROXY is set, YouTube blocks direct access to googlevideo.com
             # So we route through our local YTDLP API which proxies the audio
