@@ -264,6 +264,9 @@ class SynchronizedMediaPlayer:
                 except Exception as e:
                     logger.warning(f"Failed to refresh player view: {e}")
             
+            # Notify dashboard that playback started (fixes 'Unknown Track' on dashboard)
+            await self._notify_dashboard_playing()
+            
             logger.info(f"🌐 Stream playback started: {self.metadata.title}")
         
         except Exception as e:
@@ -599,9 +602,19 @@ class SynchronizedMediaPlayer:
                             logger.debug("Player message no longer exists, stopping updates")
                             self.is_playing = False
                             break
-                        else:
-                            logger.error(f"Failed to update player: {e}")
+                    except Exception as e:
+                        logger.error(f"Failed to update player: {e}")
                 
+                # Update dashboard sync time (for lyrics scrolling)
+                try:
+                    from web.api.track_state import get_track_state_manager
+                    state_manager = get_track_state_manager()
+                    # Only update if we have meaningful time
+                    if current_time > 0:
+                        state_manager.update_time(self.guild_id, current_time)
+                except Exception as e:
+                    logger.debug(f"Failed to update dashboard time: {e}")
+
                 # Sleep with shorter interval for more responsive updates
                 await asyncio.sleep(0.2)  # Check status every 200ms for precision
         
