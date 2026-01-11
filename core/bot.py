@@ -408,6 +408,16 @@ class MusicBot(commands.Bot):
                         logger.debug("Wavelink track end: player is None, skipping")
                         return
                     
+                    # CRITICAL: Check if fallback is in progress
+                    # If we are falling back to yt-dlp, we disconnect wavelink manually.
+                    # This triggers track_end, which we MUST ignore to avoid double playback/skipping.
+                    guild_id = payload.player.guild.id
+                    if hasattr(self, 'players') and guild_id in self.players:
+                        managed_player = self.players[guild_id]
+                        if getattr(managed_player, 'fallback_in_progress', False):
+                            logger.info(f"Ignoring Wavelink track_end (fallback in progress) for guild {guild_id}")
+                            return
+                    
                     from services.audio.lavalink_player import get_lavalink_player
                     player = get_lavalink_player()
                     if player:
@@ -501,6 +511,15 @@ class MusicBot(commands.Bot):
             if member.id == self.user.id and before.channel and not after.channel:
                 logger.info(f"Bot left voice channel in guild {member.guild.id}")
                 
+                # CRITICAL Fix for Fallback: Check if this is an intentional disconnect
+                # When upgrading from Wavelink to Standard VoiceClient during fallback, 
+                # we disconnect intentionally. We MUST NOT cleanup in this case.
+                if hasattr(self, 'players') and member.guild.id in self.players:
+                    player = self.players[member.guild.id]
+                    if getattr(player, 'fallback_in_progress', False):
+                        logger.info(f"Bot left channel for fallback switch (intentional) - Skipping cleanup")
+                        return
+
                 # Cleanup connection
                 connection = self.voice_manager.get_connection(member.guild.id)
                 if connection:

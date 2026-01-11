@@ -444,14 +444,12 @@ class YouTubeDownloader(BaseDownloader):
             else:
                 logger.warning("⚠ YouTube Music cookies not found - search may fail!")
             
-            # Define search strategies - ytsearch FIRST since YTMusic fails on server
-            # 1. ytsearch20 with smart filtering (FIRST - more reliable)
-            # 2. YTMusic Songs Filter (backup - often fails JSON parsing)
-            # 3. YTMusic No Filter (last resort)
+            # Define search strategies - ytsearch10 with smart filtering (FIRST)
+            # Reduced from 20 to 12 to speed up fallback
             strategies = [
                 {
-                    "name": "ytsearch20 Smart Matching",
-                    "url_template": "ytsearch20:{query}",  # Regular YouTube with smart filtering
+                    "name": "ytsearch12 Smart Matching",
+                    "url_template": "ytsearch12:{query}",  # Regular YouTube with smart filtering
                     "args": ['--flat-playlist'],  # Fast flat results
                     "is_direct": False
                 },
@@ -478,6 +476,16 @@ class YouTubeDownloader(BaseDownloader):
             # ========================================
             is_direct_url = query.startswith('http') and ('youtube.com' in query or 'youtu.be' in query or 'music.youtube.com' in query)
             
+            # Common optimization flags for all commands
+            optimization_flags = [
+                '--no-playlist', 
+                '--no-check-certificate',
+                '--geo-bypass',
+                '--force-ipv4',  # Fix slow IPv6 resolution
+                '--concurrent-fragments', '4',  # Faster dashboard buffering
+                '--prefer-free-formats',  # Often faster to resolve
+            ]
+            
             if is_direct_url:
                 # Convert to YouTube Music URL for best audio quality
                 ytmusic_url = self._convert_to_ytmusic_url(query)
@@ -488,11 +496,8 @@ class YouTubeDownloader(BaseDownloader):
                     'yt-dlp',
                     '--remote-components', 'ejs:github',
                     '--dump-json',
-                    '--no-playlist',  # Don't expand playlists
-                    '--no-check-certificate',
-                    '--geo-bypass',
                     '--extractor-args', 'youtube:player_client=ios,web',
-                ]
+                ] + optimization_flags
                 
                 if yt_cookies:
                     try:
@@ -507,7 +512,7 @@ class YouTubeDownloader(BaseDownloader):
                 
                 direct_cmd.append(ytmusic_url)
                 
-                stdout, stderr, returncode = await self._run_command(direct_cmd, timeout=30)
+                stdout, stderr, returncode = await self._run_command(direct_cmd, timeout=25)  # Reduced timeout
                 
                 if returncode == 0 and stdout:
                     try:
@@ -537,7 +542,7 @@ class YouTubeDownloader(BaseDownloader):
                     else:
                         # ytsearch - regular YouTube with smart matching
                         use_smart_matching = True
-                        # Format: ytsearch10:query (not URL encoded)
+                        # Format: ytsearch12:query (not URL encoded)
                         ytsearch_query = strategy["url_template"].format(query=query)
                         cmd_args = strategy["args"] + [ytsearch_query]
                     
@@ -545,15 +550,13 @@ class YouTubeDownloader(BaseDownloader):
                         'yt-dlp',
                         '--remote-components', 'ejs:github',
                         '--dump-json',
-                        '--no-check-certificate',
-                        '--geo-bypass',
                         '--extractor-args', 'youtube:player_client=ios,web',
-                    ] + cmd_args
+                    ] + optimization_flags + cmd_args
                     
                     if yt_cookies:
                         command.extend(['--cookies', str(yt_cookies)])
                     
-                    stdout, stderr, returncode = await self._run_command(command, timeout=30)
+                    stdout, stderr, returncode = await self._run_command(command, timeout=25)  # Reduced timeout
                     
                     if returncode == 0:
                         if strategy["is_direct"]:
