@@ -339,12 +339,12 @@ class PlayCommand(commands.Cog):
                         view = MediaPlayerView(self.bot, interaction.guild.id, timeout=None)
                         
                         # Send player message with "Loading lyrics" indicator
-                        from ui.spinner import LOADING_EMOJI
+                        from config.constants import EMOJI_LOADING
                         player_msg = await interaction.channel.send(
                             embed=EmbedBuilder.create_now_playing(
                                 metadata=metadata,
                                 progress_bar="",
-                                lyrics_lines=["", f"{LOADING_EMOJI} Loading lyrics...", ""],
+                                lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
                                 guild_id=interaction.guild.id
                             ),
                             view=view
@@ -804,12 +804,12 @@ class PlayCommand(commands.Cog):
             view = MediaPlayerView(self.bot, interaction.guild.id, timeout=None)
             
             # Send NEW player message with menu (fresh at bottom of chat)
-            from ui.spinner import LOADING_EMOJI
+            from config.constants import EMOJI_LOADING
             player_msg = await interaction.channel.send(
                 embed=EmbedBuilder.create_now_playing(
                     metadata=metadata,
                     progress_bar="",
-                    lyrics_lines=["", f"{LOADING_EMOJI} Loading lyrics...", ""],
+                    lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
                     guild_id=interaction.guild.id
                 ),
                 view=view
@@ -2379,12 +2379,12 @@ class PlayCommand(commands.Cog):
                 # Delete loader and send player
                 await loader.delete()
                 
-                from ui.spinner import LOADING_EMOJI
+                from config.constants import EMOJI_LOADING
                 player_msg = await interaction.channel.send(
                     embed=EmbedBuilder.create_now_playing(
                         metadata=first_track,
                         progress_bar="",
-                        lyrics_lines=["", f"{LOADING_EMOJI} Loading lyrics...", ""],
+                        lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
                         guild_id=guild_id
                     ),
                     view=view

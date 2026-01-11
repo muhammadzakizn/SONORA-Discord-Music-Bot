@@ -565,13 +565,14 @@ class SynchronizedMediaPlayer:
             self.lyrics_fetched = True
             return self.metadata.lyrics.get_lines_at_time(current_time, count=3)
         
-        # If still loading (first 30 seconds or until marked as fetched)
+        # If still loading (until marked as fetched)
         if self.lyrics_loading and not self.lyrics_fetched:
-            from ui.spinner import LOADING_EMOJI
-            return ["", f"{LOADING_EMOJI} Loading lyrics...", ""]
+            from config.constants import EMOJI_LOADING
+            return ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
         
         # No lyrics found after fetch completed
         return ["", "", ""]
+
 
     
     def _on_end(self, error: Optional[Exception]) -> None:
