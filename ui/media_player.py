@@ -62,6 +62,8 @@ class SynchronizedMediaPlayer:
         self.update_task: Optional[asyncio.Task] = None
         self.prefetch_task: Optional[asyncio.Task] = None  # Background pre-fetching
         self.prefetched_metadata: Optional[MetadataInfo] = None  # Cache for next track
+        self.lyrics_loading = True  # Whether lyrics are still being fetched
+        self.lyrics_fetched = False  # Whether lyrics fetch attempt is complete
         
         logger.debug(f"SynchronizedMediaPlayer initialized for: {metadata.title}")
     
@@ -557,10 +559,20 @@ class SynchronizedMediaPlayer:
         Returns:
             List of 3 lyrics lines
         """
-        if not self.metadata.lyrics:
-            return ["", "", ""]
+        # If lyrics are loaded, return synced lyrics
+        if self.metadata.lyrics and self.metadata.lyrics.lines:
+            self.lyrics_loading = False
+            self.lyrics_fetched = True
+            return self.metadata.lyrics.get_lines_at_time(current_time, count=3)
         
-        return self.metadata.lyrics.get_lines_at_time(current_time, count=3)
+        # If still loading (first 30 seconds or until marked as fetched)
+        if self.lyrics_loading and not self.lyrics_fetched:
+            from ui.spinner import LOADING_EMOJI
+            return ["", f"{LOADING_EMOJI} Loading lyrics...", ""]
+        
+        # No lyrics found after fetch completed
+        return ["", "", ""]
+
     
     def _on_end(self, error: Optional[Exception]) -> None:
         """

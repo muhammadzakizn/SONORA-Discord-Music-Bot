@@ -410,8 +410,8 @@ class PlayCommand(commands.Cog):
                         # Uses ThreadPoolExecutor to avoid blocking the event loop
                         async def load_lyrics_background():
                             try:
-                                # Wait 5 seconds for audio stream to fully stabilize
-                                await asyncio.sleep(5)
+                                # Wait 3 seconds for audio stream to stabilize
+                                await asyncio.sleep(3)
                                 
                                 # Check if still playing this track
                                 if not player.is_playing:
@@ -471,10 +471,18 @@ class PlayCommand(commands.Cog):
                                     if source == 'apple':
                                         metadata.apple_lyrics = lyrics_result
                                     player.metadata = metadata
+                                    player.lyrics_loading = False
+                                    player.lyrics_fetched = True
                                     logger.info(f"[Lavalink] {source.title()} lyrics: {len(lyrics_result.lines)} lines")
                                 else:
+                                    # Mark as fetched even if no lyrics found (to hide loading indicator)
+                                    player.lyrics_loading = False
+                                    player.lyrics_fetched = True
                                     logger.info(f"[Lavalink] No lyrics found for: {track_info.title}")
                             except Exception as e:
+                                # Mark as fetched on error too
+                                player.lyrics_loading = False
+                                player.lyrics_fetched = True
                                 logger.error(f"[Lavalink] Background lyrics load failed: {e}")
                         
                         # Start background lyrics task
