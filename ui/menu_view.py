@@ -10,8 +10,9 @@ logger = get_logger('ui.menu_view')
 
 class MediaPlayerView(discord.ui.View):
     """
-    Interactive view dengan menu button untuk media player
-    Semua controls disembunyikan dalam menu dropdown
+    Interactive view dengan button controls untuk media player
+    Row 1: Icon-only buttons (Pause, Skip, Stop, Loop, Queue)
+    Row 2: Dropdown menu untuk opsi lainnya
     """
     
     def __init__(self, bot, guild_id: int, timeout: int = None):
@@ -26,6 +27,197 @@ class MediaPlayerView(discord.ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild_id = guild_id
+        self.is_paused = False
+        self.loop_mode = 0  # 0=off, 1=track, 2=queue
+    
+    # ========================================
+    # ROW 1: ICON-ONLY QUICK BUTTONS
+    # ========================================
+    
+    @discord.ui.button(emoji="⏸️", style=discord.ButtonStyle.secondary, row=0, custom_id="btn_pause")
+    async def btn_pause_resume(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Pause/Resume toggle - icon changes based on state"""
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
+            await interaction.response.send_message(f"❌ {error_msg}", ephemeral=True, delete_after=3)
+            return
+        
+        try:
+            connection = self.bot.voice_manager.get_connection(self.guild_id)
+            
+            # Try legacy connection
+            if connection:
+                if connection.is_playing():
+                    connection.connection.pause()
+                    self.is_paused = True
+                    if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                        self.bot.players[self.guild_id].is_paused = True
+                    # Update button icon to PLAY (because now paused)
+                    button.emoji = "▶️"
+                    await interaction.response.edit_message(view=self)
+                    return
+                elif connection.is_paused():
+                    connection.connection.resume()
+                    self.is_paused = False
+                    if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                        self.bot.players[self.guild_id].is_paused = False
+                    # Update button icon to PAUSE (because now playing)
+                    button.emoji = "⏸️"
+                    await interaction.response.edit_message(view=self)
+                    return
+            
+            # Try Lavalink
+            from services.audio.lavalink_player import get_lavalink_player
+            lavalink_player = get_lavalink_player()
+            if lavalink_player:
+                wl_player = lavalink_player.get_player(self.guild_id)
+                if wl_player:
+                    if wl_player.paused:
+                        await wl_player.pause(False)
+                        self.is_paused = False
+                        # Update button icon to PAUSE (because now playing)
+                        button.emoji = "⏸️"
+                        await interaction.response.edit_message(view=self)
+                    else:
+                        await wl_player.pause(True)
+                        self.is_paused = True
+                        # Update button icon to PLAY (because now paused)
+                        button.emoji = "▶️"
+                        await interaction.response.edit_message(view=self)
+                    return
+            
+            await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=2)
+        except Exception as e:
+            logger.error(f"Pause/Resume error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
+    
+    @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.secondary, row=0)
+    async def btn_skip(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Skip current track"""
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
+            await interaction.response.send_message(f"❌ {error_msg}", ephemeral=True, delete_after=3)
+            return
+        
+        try:
+            # Try Lavalink first
+            from services.audio.lavalink_player import get_lavalink_player
+            lavalink_player = get_lavalink_player()
+            if lavalink_player:
+                wl_player = lavalink_player.get_player(self.guild_id)
+                if wl_player and wl_player.playing:
+                    await wl_player.stop()
+                    await interaction.response.send_message("⏭️ Skipped", ephemeral=True, delete_after=2)
+                    return
+            
+            # Try legacy
+            connection = self.bot.voice_manager.get_connection(self.guild_id)
+            if connection and (connection.is_playing() or connection.is_paused()):
+                if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                    player = self.bot.players[self.guild_id]
+                    player.is_playing = False
+                    await player._play_next_from_queue()
+                else:
+                    connection.connection.stop()
+                await interaction.response.send_message("⏭️ Skipped", ephemeral=True, delete_after=2)
+                return
+            
+            await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=2)
+        except Exception as e:
+            logger.error(f"Skip error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
+    
+    @discord.ui.button(emoji="⏹️", style=discord.ButtonStyle.danger, row=0)
+    async def btn_stop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Stop playback and disconnect"""
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
+            await interaction.response.send_message(f"❌ {error_msg}", ephemeral=True, delete_after=3)
+            return
+        
+        try:
+            # Stop Lavalink
+            from services.audio.lavalink_player import get_lavalink_player
+            lavalink_player = get_lavalink_player()
+            if lavalink_player:
+                await lavalink_player.disconnect(self.guild_id)
+            
+            # Stop legacy
+            connection = self.bot.voice_manager.get_connection(self.guild_id)
+            if connection:
+                await connection.disconnect()
+            
+            # Clear player
+            if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                player = self.bot.players[self.guild_id]
+                player.is_playing = False
+                if hasattr(player, 'update_task') and player.update_task:
+                    player.update_task.cancel()
+            
+            # Clear queue
+            queue_cog = self.bot.get_cog('QueueCommands')
+            if queue_cog:
+                queue_cog.clear(self.guild_id)
+            
+            await interaction.response.send_message("⏹️ Stopped & Disconnected", ephemeral=True, delete_after=3)
+        except Exception as e:
+            logger.error(f"Stop error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
+    
+    @discord.ui.button(emoji="🔁", style=discord.ButtonStyle.secondary, row=0)
+    async def btn_loop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Toggle loop mode (Off -> Track -> Queue -> Off)"""
+        try:
+            loop_cog = self.bot.get_cog('LoopCommands')
+            if loop_cog:
+                from commands.loop import LoopMode
+                current = loop_cog.get_loop_mode(self.guild_id)
+                
+                # Cycle through modes
+                if current == LoopMode.OFF:
+                    loop_cog.set_loop_mode(self.guild_id, LoopMode.TRACK)
+                    await interaction.response.send_message("🔂 Loop: Track", ephemeral=True, delete_after=2)
+                elif current == LoopMode.TRACK:
+                    loop_cog.set_loop_mode(self.guild_id, LoopMode.QUEUE)
+                    await interaction.response.send_message("🔁 Loop: Queue", ephemeral=True, delete_after=2)
+                else:
+                    loop_cog.set_loop_mode(self.guild_id, LoopMode.OFF)
+                    await interaction.response.send_message("➡️ Loop: Off", ephemeral=True, delete_after=2)
+            else:
+                await interaction.response.send_message("Loop not available", ephemeral=True, delete_after=2)
+        except Exception as e:
+            logger.error(f"Loop error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
+    
+    @discord.ui.button(emoji="📋", style=discord.ButtonStyle.secondary, row=0)
+    async def btn_queue(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show queue"""
+        try:
+            queue_cog = self.bot.get_cog('QueueCommands')
+            if queue_cog and self.guild_id in queue_cog.queues:
+                queue = queue_cog.queues[self.guild_id]
+                if queue:
+                    queue_text = ""
+                    for i, item in enumerate(queue[:10], 1):
+                        title = item.title[:30] + "..." if len(item.title) > 30 else item.title
+                        queue_text += f"`{i}.` {title}\n"
+                    
+                    if len(queue) > 10:
+                        queue_text += f"\n*...and {len(queue) - 10} more*"
+                    
+                    embed = discord.Embed(
+                        title="📋 Queue",
+                        description=queue_text,
+                        color=0x7B1E3C
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=15)
+                else:
+                    await interaction.response.send_message("Queue is empty", ephemeral=True, delete_after=3)
+            else:
+                await interaction.response.send_message("Queue is empty", ephemeral=True, delete_after=3)
+        except Exception as e:
+            logger.error(f"Queue error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
     
     def _check_voice_channel(self, interaction: discord.Interaction) -> tuple[bool, str]:
         """Check if user is in same voice channel as bot"""
@@ -77,8 +269,12 @@ class MediaPlayerView(discord.ui.View):
         return False, "Bot is not connected to a voice channel"
 
     
+    # ========================================
+    # ROW 2: DROPDOWN MENU FOR MORE OPTIONS
+    # ========================================
     @discord.ui.select(
-        placeholder="Menu Kontrol",
+        placeholder="⚙️ More Options",
+        row=1,
         options=[
             discord.SelectOption(
                 label="Pause",
