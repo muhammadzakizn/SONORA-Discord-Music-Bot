@@ -341,8 +341,7 @@ class PlayCommand(commands.Cog):
                             # Try Apple Music first (with 5s timeout)
                             try:
                                 from services.lyrics.applemusic import AppleMusicFetcher
-                                from config.settings import Settings
-                                
+                                # Note: Settings already imported at module level
                                 cookies_path = str(Settings.APPLE_MUSIC_COOKIES) if Settings.APPLE_MUSIC_COOKIES.exists() else None
                                 apple_fetcher = AppleMusicFetcher(cookies_path=cookies_path)
                                 
@@ -508,7 +507,7 @@ class PlayCommand(commands.Cog):
                                         # Try Apple Music first
                                         try:
                                             from services.lyrics.applemusic import AppleMusicFetcher
-                                            from config.settings import Settings
+                                            # Note: Settings already imported at module level  
                                             cookies_path = str(Settings.APPLE_MUSIC_COOKIES) if Settings.APPLE_MUSIC_COOKIES.exists() else None
                                             apple_fetcher = AppleMusicFetcher(cookies_path=cookies_path)
                                             result = loop.run_until_complete(apple_fetcher.fetch(track_info_obj))
