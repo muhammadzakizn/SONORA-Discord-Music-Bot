@@ -71,7 +71,13 @@ class PlayCommand(commands.Cog):
                         label = f"{track.title[:40]} - {track.author[:25]}"
                         if len(label) > 100:
                             label = label[:97] + "..."
-                        choices.append(app_commands.Choice(name=label, value=track.title))
+                        # Use Deezer URL as value for exact match (no re-search needed)
+                        # This ensures user gets EXACTLY the track they selected
+                        track_value = getattr(track, 'uri', None) or f"{track.title} - {track.author}"
+                        # Discord limits value to 100 chars
+                        if len(track_value) > 100:
+                            track_value = track_value[:100]
+                        choices.append(app_commands.Choice(name=label, value=track_value))
                     return choices
             
             return []
