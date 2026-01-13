@@ -250,10 +250,13 @@ def api_guild_detail(guild_id: int):
                 # Lavalink: get state from lavalink_player
                 is_actually_playing = player.lavalink_player.is_playing(guild_id)
                 is_paused = player.lavalink_player.is_paused(guild_id)
-            elif connection and connection.connection:
+            elif connection:
                 # FFmpeg: get state from voice connection
-                is_actually_playing = connection.connection.is_playing()
-                is_paused = connection.connection.is_paused()
+                # Handle both wrapper (connection.connection) and raw VoiceClient
+                vc = getattr(connection, 'connection', connection)  # Wrapper or raw
+                if hasattr(vc, 'is_playing'):
+                    is_actually_playing = vc.is_playing()
+                    is_paused = vc.is_paused() if hasattr(vc, 'is_paused') else False
             
             # Return track info if player has metadata
             if player.metadata:
@@ -324,13 +327,14 @@ def api_guild_lyrics(guild_id: int):
         # Get source preference
         source_pref = request.args.get('source', 'auto').lower()
         
-        # Check if playing
+        # Check if playing - handle both wrapper and raw VoiceClient
         connection = bot.voice_manager.get_connection(guild_id)
-        if not connection or not connection.connection:
+        if not connection:
             return jsonify({"error": "Not playing", "lyrics": None}), 200
         
-        is_playing = connection.connection.is_playing()
-        is_paused = connection.connection.is_paused()
+        vc = getattr(connection, 'connection', connection)  # Wrapper or raw
+        is_playing = vc.is_playing() if hasattr(vc, 'is_playing') else False
+        is_paused = vc.is_paused() if hasattr(vc, 'is_paused') else False
         
         if not is_playing and not is_paused:
             return jsonify({"error": "Not playing", "lyrics": None}), 200
