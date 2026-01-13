@@ -184,8 +184,8 @@ class PlayCommand(commands.Cog):
             cache_path = None
             try:
                 from services.audio.cache import get_cache_manager
-                from config.settings import Settings as CacheSettings
-                cache_mgr = get_cache_manager(CacheSettings.DOWNLOADS_DIR)
+                # Note: Settings already imported at top of file
+                cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
                 
                 # Check local cache by title/artist
                 cached_file = cache_mgr.find_by_title_artist(track_info.title, track_info.artist)
