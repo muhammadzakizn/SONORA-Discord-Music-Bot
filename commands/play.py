@@ -313,17 +313,73 @@ class PlayCommand(commands.Cog):
                     )
                     
                     if success:
-                        # Create quick metadata from Lavalink track info
-                        # This enables instant player display without waiting for lyrics/artwork fetch
+                        # ========================================
+                        # PRE-FETCH LYRICS BEFORE SHOWING PLAYER
+                        # This prevents stutter from concurrent processing
+                        # ========================================
+                        await loader.spinner_update(
+                            "Preparing Lyrics",
+                            f"**{track_info.title}** - *{track_info.artist}*\n\n"
+                            f"🎵 Audio ready, loading lyrics..."
+                        )
+                        
                         from database.models import MetadataInfo
                         from config.constants import AudioSource, ArtworkSource, LyricsSource
-
                         
                         # Use artwork from Lavalink/Deezer if available
                         artwork_url = track_info.thumbnail_url if hasattr(track_info, 'thumbnail_url') and track_info.thumbnail_url else None
-
                         
-                        # Create basic metadata for immediate display
+                        # PRE-FETCH LYRICS (with timeout)
+                        lyrics_result = None
+                        try:
+                            from database.models import TrackInfo as TrackInfoModel
+                            track_info_obj = TrackInfoModel(
+                                title=track_info.title,
+                                artist=track_info.artist
+                            )
+                            
+                            # Try Apple Music first (with 5s timeout)
+                            try:
+                                from services.lyrics.applemusic import AppleMusicFetcher
+                                from config.settings import Settings
+                                
+                                cookies_path = str(Settings.APPLE_MUSIC_COOKIES) if Settings.APPLE_MUSIC_COOKIES.exists() else None
+                                apple_fetcher = AppleMusicFetcher(cookies_path=cookies_path)
+                                
+                                lyrics_result = await asyncio.wait_for(
+                                    apple_fetcher.fetch(track_info_obj),
+                                    timeout=5.0
+                                )
+                                
+                                if lyrics_result and lyrics_result.lines:
+                                    logger.info(f"📝 [Lyrics] Apple Music: {len(lyrics_result.lines)} lines")
+                            except asyncio.TimeoutError:
+                                logger.debug("[Lyrics] Apple Music timeout, trying SyncedLyrics...")
+                            except Exception as e:
+                                logger.debug(f"[Lyrics] Apple Music failed: {e}")
+                            
+                            # Fallback to SyncedLyrics
+                            if not lyrics_result:
+                                try:
+                                    from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
+                                    fetcher = SyncedLyricsFetcher()
+                                    
+                                    lyrics_result = await asyncio.wait_for(
+                                        fetcher.fetch(track_info_obj),
+                                        timeout=5.0
+                                    )
+                                    
+                                    if lyrics_result and lyrics_result.lines:
+                                        logger.info(f"📝 [Lyrics] SyncedLyrics: {len(lyrics_result.lines)} lines")
+                                except asyncio.TimeoutError:
+                                    logger.debug("[Lyrics] SyncedLyrics timeout")
+                                except Exception as e:
+                                    logger.debug(f"[Lyrics] SyncedLyrics failed: {e}")
+                                    
+                        except Exception as e:
+                            logger.warning(f"[Lyrics] Pre-fetch error: {e}")
+                        
+                        # Create metadata with lyrics (if found)
                         metadata = MetadataInfo(
                             title=track_info.title,
                             artist=track_info.artist,
@@ -331,31 +387,35 @@ class PlayCommand(commands.Cog):
                             audio_source=AudioSource.STREAMING,
                             artwork_url=artwork_url,
                             artwork_source=ArtworkSource.LAVALINK if artwork_url else ArtworkSource.NONE,
-                            lyrics=None,  # Will be loaded lazily
+                            lyrics=lyrics_result,  # Already loaded!
                             requested_by=interaction.user.display_name,
                             requested_by_id=interaction.user.id,
                             voice_channel_id=voice_channel.id
                         )
-
                         
-                        # Stop spinner and show player immediately
+                        # Stop spinner and show player
                         await loader.stop_spinner()
                         
                         # Create menu view for controls
                         view = MediaPlayerView(self.bot, interaction.guild.id, timeout=None)
                         
-                        # Send player message with "Loading lyrics" indicator
-                        from config.constants import EMOJI_LOADING
+                        # Determine initial lyrics display
+                        if lyrics_result and hasattr(lyrics_result, 'lines') and lyrics_result.lines:
+                            # Show first 3 lines of lyrics
+                            initial_lyrics = ["", lyrics_result.lines[0].text if lyrics_result.lines else "", ""]
+                        else:
+                            initial_lyrics = ["", "♪ No lyrics available", ""]
+                        
+                        # Send player message with lyrics already loaded
                         player_msg = await interaction.channel.send(
                             embed=EmbedBuilder.create_now_playing(
                                 metadata=metadata,
                                 progress_bar="",
-                                lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
+                                lyrics_lines=initial_lyrics,
                                 guild_id=interaction.guild.id
                             ),
                             view=view
                         )
-
                         
                         # Delete loader message
                         await loader.delete()
@@ -412,10 +472,15 @@ class PlayCommand(commands.Cog):
                             asyncio.create_task(preprocessor.queue_for_processing(interaction.guild.id))
 
                         
-                        # LAZY LOAD LYRICS IN BACKGROUND (completely non-blocking)
+                        # LAZY LOAD LYRICS IN BACKGROUND (only if pre-fetch failed)
                         # Uses ThreadPoolExecutor to avoid blocking the event loop
                         async def load_lyrics_background():
                             try:
+                                # Skip if lyrics were already pre-fetched
+                                if lyrics_result and hasattr(lyrics_result, 'lines') and lyrics_result.lines:
+                                    logger.debug("[Lyrics] Already loaded, skipping background fetch")
+                                    return
+                                
                                 # Wait 3 seconds for audio stream to stabilize
                                 await asyncio.sleep(3)
                                 

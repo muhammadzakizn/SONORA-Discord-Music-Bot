@@ -77,14 +77,26 @@ class QueuePreProcessor:
         
         queue = queue_cog.queues[guild_id]
         
+        if not queue:
+            logger.debug("📋 [PreProcessor] Queue is empty, nothing to pre-process")
+            return
+        
         # Get next N tracks to pre-process
         tracks_to_process = queue[:self._max_prefetch]
+        queued_count = 0
         
-        for metadata in tracks_to_process:
+        logger.info(f"📋 [PreProcessor] Queue has {len(queue)} tracks, preparing next {len(tracks_to_process)}...")
+        
+        for i, metadata in enumerate(tracks_to_process):
             track_id = self._get_track_id(metadata)
             
             # Skip if already cached or processing
             if track_id in self._cache:
+                cached = self._cache[track_id]
+                if cached.is_ready:
+                    logger.debug(f"  ✓ {i+1}. {metadata.title} - Already ready")
+                else:
+                    logger.debug(f"  ⏳ {i+1}. {metadata.title} - Processing...")
                 continue
             
             # Create entry and queue
@@ -94,7 +106,11 @@ class QueuePreProcessor:
             )
             
             await self._processing_queue.put((track_id, metadata))
-            logger.debug(f"[PreProcessor] Queued: {metadata.title}")
+            queued_count += 1
+            logger.info(f"  📥 {i+1}. {metadata.title} - Queued for processing")
+        
+        if queued_count > 0:
+            logger.info(f"📋 [PreProcessor] Added {queued_count} tracks to processing queue")
     
     async def _worker_loop(self):
         """Background worker that processes tracks"""
@@ -119,44 +135,127 @@ class QueuePreProcessor:
                 await asyncio.sleep(1)
     
     async def _process_track(self, track_id: str, metadata):
-        """Process a single track - fetch metadata"""
+        """Process a single track - fetch metadata AND prepare audio"""
         try:
-            logger.info(f"[PreProcessor] Processing: {metadata.title}")
+            logger.info(f"🔄 [PreProcessor] Starting: {metadata.title} by {metadata.artist}")
             
             cached = self._cache.get(track_id)
             if not cached:
                 return
             
-            # 1. Fetch artwork (if not already set)
+            # ========================================
+            # STEP 1: Check/Prepare Audio Cache
+            # ========================================
+            audio_path = await self._prepare_audio_cache(metadata)
+            if audio_path:
+                cached.cached_audio_path = audio_path
+                logger.info(f"✓ [PreProcessor] Audio ready: {metadata.title}")
+            
+            # ========================================
+            # STEP 2: Fetch artwork (if not already set)
+            # ========================================
             if not metadata.artwork_url:
                 artwork_url = await self._fetch_artwork(metadata)
                 if artwork_url:
                     cached.artwork_url = artwork_url
                     metadata.artwork_url = artwork_url
+                    logger.info(f"🎨 [PreProcessor] Artwork fetched: {metadata.title}")
             else:
                 cached.artwork_url = metadata.artwork_url
             
-            # 2. Fetch lyrics (Apple Music first, then SyncedLyrics)
+            # ========================================
+            # STEP 3: Fetch lyrics (Apple Music first, then SyncedLyrics)
+            # ========================================
             lyrics, apple_lyrics = await self._fetch_lyrics(metadata)
             if lyrics:
                 cached.lyrics = lyrics
                 metadata.lyrics = lyrics
+                logger.info(f"📝 [PreProcessor] Lyrics fetched: {metadata.title} ({len(getattr(lyrics, 'lines', [])) if lyrics else 0} lines)")
             if apple_lyrics:
                 cached.apple_lyrics = apple_lyrics
                 metadata.apple_lyrics = apple_lyrics
             
-            # 3. Optional: Check/warm cache for loop mode
-            # (Skip for now - uses bandwidth)
-            
             cached.is_processing = False
             cached.is_ready = True
             
-            logger.info(f"[PreProcessor] Ready: {metadata.title} (artwork: {'✓' if cached.artwork_url else '✗'}, lyrics: {'✓' if cached.lyrics else '✗'})")
+            logger.info(f"✅ [PreProcessor] READY: {metadata.title} | Audio: {'✓' if audio_path else '✗'} | Art: {'✓' if cached.artwork_url else '✗'} | Lyrics: {'✓' if cached.lyrics else '✗'}")
             
         except Exception as e:
-            logger.error(f"[PreProcessor] Process error: {e}")
+            logger.error(f"❌ [PreProcessor] Process error for {metadata.title}: {e}")
             if track_id in self._cache:
                 self._cache[track_id].is_processing = False
+    
+    async def _prepare_audio_cache(self, metadata) -> Optional[Path]:
+        """Check/download audio to local cache, upload to rclone"""
+        try:
+            from config.settings import Settings
+            from services.audio.cache import get_cache_manager
+            
+            cache_mgr = get_cache_manager(Settings.DOWNLOADS_DIR)
+            
+            # Step 1: Check local cache
+            local_path = cache_mgr.is_file_cached(metadata.artist, metadata.title)
+            if local_path and local_path.exists():
+                logger.info(f"💾 [PreProcessor] Found in local cache: {metadata.title}")
+                return local_path
+            
+            # Step 2: Check rclone/cloud cache
+            try:
+                from services.storage import get_cloud_cache
+                cloud_cache = get_cloud_cache()
+                
+                if cloud_cache and cloud_cache.is_enabled:
+                    if await cloud_cache.exists(metadata.artist, metadata.title):
+                        # Download from cloud to local
+                        local_dest = Settings.DOWNLOADS_DIR / f"{metadata.artist} - {metadata.title}.opus"
+                        if await cloud_cache.download(metadata.artist, metadata.title, local_dest):
+                            logger.info(f"☁️ [PreProcessor] Downloaded from rclone: {metadata.title}")
+                            return local_dest
+            except Exception as e:
+                logger.debug(f"[PreProcessor] Cloud cache check failed: {e}")
+            
+            # Step 3: Download via yt-dlp (background, non-blocking)
+            try:
+                play_cog = self.bot.get_cog('PlayCommand')
+                if play_cog and hasattr(play_cog, 'youtube_downloader'):
+                    from database.models import TrackInfo as TI
+                    track_info = TI(
+                        title=metadata.title,
+                        artist=metadata.artist,
+                        duration=getattr(metadata, 'duration', 0)
+                    )
+                    
+                    audio_result = await play_cog._download_with_fallback(track_info, None)
+                    
+                    if audio_result and audio_result.file_path and audio_result.file_path.exists():
+                        logger.info(f"⬇️ [PreProcessor] Downloaded: {metadata.title}")
+                        
+                        # Upload to cloud cache in background
+                        try:
+                            from services.storage import get_cloud_cache
+                            cloud_cache = get_cloud_cache()
+                            if cloud_cache and cloud_cache.is_enabled:
+                                asyncio.create_task(
+                                    cloud_cache.upload(
+                                        audio_result.file_path,
+                                        metadata.artist,
+                                        metadata.title
+                                    )
+                                )
+                                logger.info(f"☁️ [PreProcessor] Uploading to rclone: {metadata.title}")
+                        except Exception as e:
+                            logger.debug(f"[PreProcessor] Cloud upload failed: {e}")
+                        
+                        return audio_result.file_path
+                        
+            except Exception as e:
+                logger.warning(f"[PreProcessor] Download failed for {metadata.title}: {e}")
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"[PreProcessor] Audio cache error: {e}")
+            return None
     
     async def _fetch_artwork(self, metadata) -> Optional[str]:
         """Fetch artwork URL from Deezer/iTunes"""

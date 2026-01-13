@@ -1100,18 +1100,20 @@ class SynchronizedMediaPlayer:
             
             # Check if voice is still connected
             if not self.voice or not self.voice_is_connected():
-                logger.info("Voice not connected, skipping next track")
+                logger.info("🔇 Voice not connected, skipping next track")
                 self._transitioning_to_next = False
                 return
             
-            # Check if player was stopped
-            if not self.is_playing and not self._transitioning_to_next:
-                logger.info("Player stopped, skipping next track")
-                return
+            # REMOVED: Broken race condition check
+            # Old code: if not self.is_playing and not self._transitioning_to_next
+            # This was WRONG because is_playing is already False when track ends!
+            # The _transitioning_to_next flag is set in _on_end BEFORE this function runs.
+            
+            logger.info("📋 [Queue] Processing next track from queue...")
             
             queue_cog = self.bot.get_cog('QueueCommands')
             if not queue_cog:
-                logger.debug("Queue system not available")
+                logger.warning("📋 [Queue] Queue system not available!")
                 return
             
             # ========================================
