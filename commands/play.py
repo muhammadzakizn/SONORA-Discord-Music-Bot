@@ -314,71 +314,16 @@ class PlayCommand(commands.Cog):
                     
                     if success:
                         # ========================================
-                        # PRE-FETCH LYRICS BEFORE SHOWING PLAYER
-                        # This prevents stutter from concurrent processing
+                        # SHOW PLAYER IMMEDIATELY - LYRICS IN BACKGROUND
+                        # No extra loading spinner, just show player right away
                         # ========================================
-                        await loader.spinner_update(
-                            "Preparing Lyrics",
-                            f"**{track_info.title}** - *{track_info.artist}*\n\n"
-                            f"🎵 Audio ready, loading lyrics..."
-                        )
-                        
                         from database.models import MetadataInfo
                         from config.constants import AudioSource, ArtworkSource, LyricsSource
                         
                         # Use artwork from Lavalink/Deezer if available
                         artwork_url = track_info.thumbnail_url if hasattr(track_info, 'thumbnail_url') and track_info.thumbnail_url else None
                         
-                        # PRE-FETCH LYRICS (with timeout)
-                        lyrics_result = None
-                        try:
-                            from database.models import TrackInfo as TrackInfoModel
-                            track_info_obj = TrackInfoModel(
-                                title=track_info.title,
-                                artist=track_info.artist
-                            )
-                            
-                            # Try Apple Music first (with 5s timeout)
-                            try:
-                                from services.lyrics.applemusic import AppleMusicFetcher
-                                # Note: Settings already imported at module level
-                                cookies_path = str(Settings.APPLE_MUSIC_COOKIES) if Settings.APPLE_MUSIC_COOKIES.exists() else None
-                                apple_fetcher = AppleMusicFetcher(cookies_path=cookies_path)
-                                
-                                lyrics_result = await asyncio.wait_for(
-                                    apple_fetcher.fetch(track_info_obj),
-                                    timeout=5.0
-                                )
-                                
-                                if lyrics_result and lyrics_result.lines:
-                                    logger.info(f"📝 [Lyrics] Apple Music: {len(lyrics_result.lines)} lines")
-                            except asyncio.TimeoutError:
-                                logger.debug("[Lyrics] Apple Music timeout, trying SyncedLyrics...")
-                            except Exception as e:
-                                logger.debug(f"[Lyrics] Apple Music failed: {e}")
-                            
-                            # Fallback to SyncedLyrics
-                            if not lyrics_result:
-                                try:
-                                    from services.lyrics.syncedlyrics_fetcher import SyncedLyricsFetcher
-                                    fetcher = SyncedLyricsFetcher()
-                                    
-                                    lyrics_result = await asyncio.wait_for(
-                                        fetcher.fetch(track_info_obj),
-                                        timeout=5.0
-                                    )
-                                    
-                                    if lyrics_result and lyrics_result.lines:
-                                        logger.info(f"📝 [Lyrics] SyncedLyrics: {len(lyrics_result.lines)} lines")
-                                except asyncio.TimeoutError:
-                                    logger.debug("[Lyrics] SyncedLyrics timeout")
-                                except Exception as e:
-                                    logger.debug(f"[Lyrics] SyncedLyrics failed: {e}")
-                                    
-                        except Exception as e:
-                            logger.warning(f"[Lyrics] Pre-fetch error: {e}")
-                        
-                        # Create metadata with lyrics (if found)
+                        # Create metadata (without lyrics for now)
                         metadata = MetadataInfo(
                             title=track_info.title,
                             artist=track_info.artist,
@@ -386,31 +331,25 @@ class PlayCommand(commands.Cog):
                             audio_source=AudioSource.STREAMING,
                             artwork_url=artwork_url,
                             artwork_source=ArtworkSource.LAVALINK if artwork_url else ArtworkSource.NONE,
-                            lyrics=lyrics_result,  # Already loaded!
+                            lyrics=None,  # Will be loaded in background
                             requested_by=interaction.user.display_name,
                             requested_by_id=interaction.user.id,
                             voice_channel_id=voice_channel.id
                         )
                         
-                        # Stop spinner and show player
+                        # Stop spinner and show player immediately
                         await loader.stop_spinner()
                         
                         # Create menu view for controls
                         view = MediaPlayerView(self.bot, interaction.guild.id, timeout=None)
                         
-                        # Determine initial lyrics display
-                        if lyrics_result and hasattr(lyrics_result, 'lines') and lyrics_result.lines:
-                            # Show first 3 lines of lyrics
-                            initial_lyrics = ["", lyrics_result.lines[0].text if lyrics_result.lines else "", ""]
-                        else:
-                            initial_lyrics = ["", "♪ No lyrics available", ""]
-                        
-                        # Send player message with lyrics already loaded
+                        # Send player message with "Loading lyrics" text
+                        from config.constants import EMOJI_LOADING
                         player_msg = await interaction.channel.send(
                             embed=EmbedBuilder.create_now_playing(
                                 metadata=metadata,
                                 progress_bar="",
-                                lyrics_lines=initial_lyrics,
+                                lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
                                 guild_id=interaction.guild.id
                             ),
                             view=view
@@ -471,20 +410,12 @@ class PlayCommand(commands.Cog):
                             asyncio.create_task(preprocessor.queue_for_processing(interaction.guild.id))
 
                         
-                        # LAZY LOAD LYRICS IN BACKGROUND (only if pre-fetch failed)
-                        # Uses ThreadPoolExecutor to avoid blocking the event loop
-                        # Capture lyrics_result value at definition time
-                        prefetched_lyrics = lyrics_result
-                        
+                        # LAZY LOAD LYRICS IN BACKGROUND
+                        # Player shows "Loading lyrics..." while this runs
                         async def load_lyrics_background():
                             try:
-                                # Skip if lyrics were already pre-fetched
-                                if prefetched_lyrics and hasattr(prefetched_lyrics, 'lines') and prefetched_lyrics.lines:
-                                    logger.debug("[Lyrics] Already loaded, skipping background fetch")
-                                    return
-                                
-                                # Wait 3 seconds for audio stream to stabilize
-                                await asyncio.sleep(3)
+                                # Wait 2 seconds for audio stream to stabilize
+                                await asyncio.sleep(2)
                                 
                                 # Check if still playing this track
                                 if not player.is_playing:
