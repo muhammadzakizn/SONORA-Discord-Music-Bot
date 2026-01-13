@@ -23,7 +23,7 @@ class EmbedBuilder:
         guild_id: int = None
     ) -> discord.Embed:
         """
-        Create now playing embed
+        Create now playing embed - FlaviBot style
         
         Args:
             metadata: Track metadata
@@ -34,54 +34,51 @@ class EmbedBuilder:
         Returns:
             Discord embed
         """
+        # Format duration
+        duration_str = ""
+        if metadata.duration and metadata.duration > 0:
+            mins = int(metadata.duration // 60)
+            secs = int(metadata.duration % 60)
+            duration_str = f"`{mins:02d}:{secs:02d}`"
+        
+        # Build description - FlaviBot style
+        description_parts = []
+        
+        # Title and artist with duration
+        if duration_str:
+            description_parts.append(f"**{metadata.title}** - *{metadata.artist}* - {duration_str}")
+        else:
+            description_parts.append(f"**{metadata.title}** - *{metadata.artist}*")
+        
+        # Requester info in blockquote
+        if metadata.requested_by_id and metadata.requested_by_id > 0:
+            description_parts.append(f"> Requested by <@{metadata.requested_by_id}>")
+        elif metadata.requested_by:
+            description_parts.append(f"> Requested by {metadata.requested_by}")
+        
+        # Lyrics (if available)
+        if lyrics_lines and any(lyrics_lines):
+            lyrics_text = "\n".join(l for l in lyrics_lines if l)
+            if lyrics_text.strip():
+                description_parts.append("")  # Empty line
+                description_parts.append(lyrics_text)
+        
+        # Progress bar
+        if progress_bar:
+            description_parts.append("")  # Empty line
+            description_parts.append(progress_bar)
+        
         embed = discord.Embed(
-            title="NOW PLAYING",
+            title="Now Playing",
+            description="\n".join(description_parts),
             color=COLOR_PLAYING
         )
-        
-        # Track info
-        embed.add_field(
-            name=metadata.title,
-            value=f"*{metadata.artist}*",
-            inline=False
-        )
-        
-        # Lyrics (3 lines) - dengan spacing atas
-        if lyrics_lines and any(lyrics_lines):
-            lyrics_text = "\n".join(lyrics_lines)
-            embed.add_field(
-                name="\u200b",  # Zero-width space as spacer
-                value=lyrics_text if lyrics_text.strip() else "\u200b",
-                inline=False
-            )
-        
-        # Progress
-        if progress_bar:
-            embed.add_field(
-                name="",
-                value=progress_bar,
-                inline=False
-            )
         
         # Artwork
         if metadata.artwork_url:
             embed.set_thumbnail(url=metadata.artwork_url)
         
-        # Requested by (as field so mention works - footer doesn't render mentions)
-        if metadata.requested_by_id and metadata.requested_by_id > 0:
-            embed.add_field(
-                name="",
-                value=f"Requested by <@{metadata.requested_by_id}>",
-                inline=False
-            )
-        elif metadata.requested_by:
-            embed.add_field(
-                name="",
-                value=f"Requested by {metadata.requested_by}",
-                inline=False
-            )
-        
-        # Footer - only EQ indicator
+        # EQ indicator in footer (if not flat)
         footer_text = ""
         if guild_id:
             from services.audio.equalizer import get_equalizer_manager, EqualizerPresets
@@ -95,7 +92,7 @@ class EmbedBuilder:
                     if eq_settings == preset and preset_name != "Flat":
                         eq_name = preset_name
                         break
-                footer_text = f"🎚️ {eq_name}"
+                footer_text = f"EQ: {eq_name}"
         
         if footer_text:
             embed.set_footer(text=footer_text)

@@ -31,10 +31,10 @@ class MediaPlayerView(discord.ui.View):
         self.loop_mode = 0  # 0=off, 1=track, 2=queue
     
     # ========================================
-    # ROW 1: ICON-ONLY QUICK BUTTONS
+    # ROW 1: QUICK BUTTONS (icon + label)
     # ========================================
     
-    @discord.ui.button(emoji="⏸️", style=discord.ButtonStyle.secondary, row=0, custom_id="btn_pause")
+    @discord.ui.button(label="Pause", emoji="⏸", style=discord.ButtonStyle.secondary, row=0, custom_id="btn_pause")
     async def btn_pause_resume(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Pause/Resume toggle - icon changes based on state"""
         is_valid, error_msg = self._check_voice_channel(interaction)
@@ -91,7 +91,7 @@ class MediaPlayerView(discord.ui.View):
             logger.error(f"Pause/Resume error: {e}")
             await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
     
-    @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="Skip", emoji="⏭", style=discord.ButtonStyle.secondary, row=0)
     async def btn_skip(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Skip current track"""
         is_valid, error_msg = self._check_voice_channel(interaction)
@@ -127,7 +127,7 @@ class MediaPlayerView(discord.ui.View):
             logger.error(f"Skip error: {e}")
             await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
     
-    @discord.ui.button(emoji="⏹️", style=discord.ButtonStyle.danger, row=0)
+    @discord.ui.button(label="Stop", emoji="⏹", style=discord.ButtonStyle.danger, row=0)
     async def btn_stop(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Stop playback and disconnect"""
         is_valid, error_msg = self._check_voice_channel(interaction)
@@ -164,7 +164,7 @@ class MediaPlayerView(discord.ui.View):
             logger.error(f"Stop error: {e}")
             await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
     
-    @discord.ui.button(emoji="🔁", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="Loop", emoji="🔁", style=discord.ButtonStyle.secondary, row=0)
     async def btn_loop(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Toggle loop mode (Off -> Track -> Queue -> Off)"""
         try:
@@ -189,7 +189,7 @@ class MediaPlayerView(discord.ui.View):
             logger.error(f"Loop error: {e}")
             await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
     
-    @discord.ui.button(emoji="📋", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="Queue", emoji="📋", style=discord.ButtonStyle.secondary, row=0)
     async def btn_queue(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Show queue"""
         try:
