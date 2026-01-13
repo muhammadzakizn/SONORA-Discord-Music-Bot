@@ -473,10 +473,13 @@ class PlayCommand(commands.Cog):
                         
                         # LAZY LOAD LYRICS IN BACKGROUND (only if pre-fetch failed)
                         # Uses ThreadPoolExecutor to avoid blocking the event loop
+                        # Capture lyrics_result value at definition time
+                        prefetched_lyrics = lyrics_result
+                        
                         async def load_lyrics_background():
                             try:
                                 # Skip if lyrics were already pre-fetched
-                                if lyrics_result and hasattr(lyrics_result, 'lines') and lyrics_result.lines:
+                                if prefetched_lyrics and hasattr(prefetched_lyrics, 'lines') and prefetched_lyrics.lines:
                                     logger.debug("[Lyrics] Already loaded, skipping background fetch")
                                     return
                                 
@@ -495,8 +498,6 @@ class PlayCommand(commands.Cog):
                                     title=track_info.title,
                                     artist=track_info.artist
                                 )
-                                
-                                lyrics_result = None
                                 
                                 # Define sync function to run in thread pool
                                 def fetch_lyrics_sync():
@@ -536,14 +537,14 @@ class PlayCommand(commands.Cog):
                                     result = await loop.run_in_executor(executor, fetch_lyrics_sync)
                                 
                                 if result:
-                                    source, lyrics_result = result
-                                    metadata.lyrics = lyrics_result
+                                    source, bg_lyrics_result = result
+                                    metadata.lyrics = bg_lyrics_result
                                     if source == 'apple':
-                                        metadata.apple_lyrics = lyrics_result
+                                        metadata.apple_lyrics = bg_lyrics_result
                                     player.metadata = metadata
                                     player.lyrics_loading = False
                                     player.lyrics_fetched = True
-                                    logger.info(f"[Lavalink] {source.title()} lyrics: {len(lyrics_result.lines)} lines")
+                                    logger.info(f"[Lavalink] {source.title()} lyrics: {len(bg_lyrics_result.lines)} lines")
                                 else:
                                     # Mark as fetched even if no lyrics found (to hide loading indicator)
                                     player.lyrics_loading = False
