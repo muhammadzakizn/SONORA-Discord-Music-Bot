@@ -53,6 +53,27 @@ class RobustVoiceConnection:
             f"timeout={self.timeout}s, max_reconnects={self.max_reconnects}"
         )
     
+    def _check_connected(self, client) -> bool:
+        """
+        Check if a voice client is connected.
+        Works for both discord.VoiceClient (.is_connected()) and wavelink.Player (.connected)
+        """
+        if client is None:
+            return False
+        
+        # Try wavelink.Player .connected property first
+        if hasattr(client, 'connected'):
+            return client.connected
+        
+        # Try discord.VoiceClient .is_connected() method
+        if hasattr(client, 'is_connected'):
+            try:
+                return client.is_connected()
+            except Exception:
+                return False
+        
+        return False
+    
     async def connect(self, channel: VoiceChannel) -> discord.VoiceClient:
         """
         Connect to voice channel dengan retry logic dan timeout handling
@@ -384,7 +405,8 @@ class RobustVoiceConnection:
         try:
             actual_voice_client = guild.voice_client
             
-            if actual_voice_client and actual_voice_client.is_connected():
+            # Use helper that works for both VoiceClient and wavelink.Player
+            if actual_voice_client and self._check_connected(actual_voice_client):
                 # Discord says we're connected
                 if self.connection != actual_voice_client:
                     logger.warning("Connection state mismatch, syncing...")
