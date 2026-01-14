@@ -899,7 +899,7 @@ class PlayCommand(commands.Cog):
                 voice_channel_name = interaction.user.voice.channel.name
             
             # Create Components v2 player (FlaviBot style)
-            from config.constants import EMOJI_LOADING
+            # from config.constants import EMOJI_LOADING (Already imported globally)
             from ui.components_v2 import MediaPlayerComponentsV2
             # Determine initial lyrics lines
             initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
@@ -1795,7 +1795,7 @@ class PlayCommand(commands.Cog):
             
             # Create Components v2 player (FlaviBot style)
             from ui.components_v2 import MediaPlayerComponentsV2
-            from config.constants import EMOJI_LOADING
+            # from config.constants import EMOJI_LOADING (Already imported globally)
             # Determine initial lyrics lines
             initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
             if metadata.lyrics:
@@ -2068,7 +2068,7 @@ class PlayCommand(commands.Cog):
             
             # Create Components v2 player (FlaviBot style)
             from ui.components_v2 import MediaPlayerComponentsV2
-            from config.constants import EMOJI_LOADING
+            # from config.constants import EMOJI_LOADING (Already imported globally)
             # Determine initial lyrics lines
             initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
             if metadata.lyrics:
@@ -2313,7 +2313,7 @@ class PlayCommand(commands.Cog):
         
         # Create Components v2 player (FlaviBot style)
         from ui.components_v2 import MediaPlayerComponentsV2
-        from config.constants import EMOJI_LOADING
+        # from config.constants import EMOJI_LOADING (Already imported globally)
         # Determine initial lyrics lines
         initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
         if metadata.lyrics:
