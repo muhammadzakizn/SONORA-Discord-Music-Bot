@@ -93,6 +93,60 @@ class SynchronizedMediaPlayer:
             volume: Initial volume (0.0 to 2.0, default: 1.0)
         """
         try:
+            # ========================================
+            # CRITICAL: Handle Lavalink -> Legacy transition
+            # If self.voice is wavelink.Player but we need native playback for cached file,
+            # we need to get/create native VoiceClient
+            # ========================================
+            voice_client = self.voice
+            
+            # Check if voice is wavelink.Player (has 'connected' property but no native 'play' method for FFmpeg)
+            is_wavelink = hasattr(self.voice, 'connected') and not hasattr(self.voice, 'is_connected')
+            
+            if is_wavelink and self.bot and self.guild_id:
+                logger.info("Transitioning from Lavalink to native VoiceClient for cached file playback")
+                
+                # Get the voice channel from wavelink player
+                voice_channel = getattr(self.voice, 'channel', None)
+                
+                # Disconnect wavelink player first
+                try:
+                    from services.audio.lavalink_player import get_lavalink_player
+                    lavalink_player = get_lavalink_player()
+                    if lavalink_player:
+                        await lavalink_player.disconnect(self.guild_id)
+                except Exception as e:
+                    logger.warning(f"Failed to disconnect Lavalink: {e}")
+                
+                await asyncio.sleep(0.5)  # Wait for disconnect
+                
+                # Connect with native VoiceClient
+                if voice_channel:
+                    guild = self.bot.get_guild(self.guild_id)
+                    if guild:
+                        # Check if already connected with native client
+                        existing_vc = guild.voice_client
+                        if existing_vc and existing_vc.is_connected():
+                            voice_client = existing_vc
+                            logger.info("Using existing native VoiceClient")
+                        else:
+                            # Connect natively
+                            try:
+                                voice_client = await voice_channel.connect(cls=discord.VoiceClient, timeout=10)
+                                logger.info(f"Connected native VoiceClient to {voice_channel.name}")
+                            except discord.ClientException:
+                                # Already connected, get existing
+                                voice_client = guild.voice_client
+                                if voice_client:
+                                    logger.info("Retrieved existing native VoiceClient")
+                        
+                        # Update self.voice for future use
+                        self.voice = voice_client
+                        self.is_lavalink = False
+                else:
+                    logger.error("No voice channel found for native connection")
+                    raise ConnectionError("Cannot find voice channel for native playback")
+            
             # Create audio source with volume control and equalizer
             audio_source = OptimizedAudioPlayer.create_audio_source(
                 self.metadata.audio_path,
@@ -112,9 +166,9 @@ class SynchronizedMediaPlayer:
             self.is_paused = False
             self._transitioning_to_next = False  # Reset transition flag
             
-            # Start playback
+            # Start playback using the correct voice client
             await OptimizedAudioPlayer.play_audio(
-                self.voice,
+                voice_client,  # Use potentially updated voice_client
                 audio_source,
                 after_callback=self._on_end
             )

@@ -114,7 +114,7 @@ class OptimizedAudioPlayer:
         Play audio with error handling
         
         Args:
-            voice_client: Discord voice client
+            voice_client: Discord voice client or wavelink Player
             audio_source: Audio source to play
             after_callback: Callback function after playback ends
         
@@ -122,14 +122,26 @@ class OptimizedAudioPlayer:
             Exception if playback fails
         """
         try:
-            # Verify voice client is connected
-            if not voice_client.is_connected():
+            # Handle wavelink.Player vs discord.VoiceClient
+            # wavelink.Player uses 'connected' property, VoiceClient uses 'is_connected()' method
+            is_connected = False
+            if hasattr(voice_client, 'is_connected'):
+                # Check if it's a method (VoiceClient) or property (Player)
+                if callable(getattr(voice_client, 'is_connected', None)):
+                    is_connected = voice_client.is_connected()
+                else:
+                    is_connected = voice_client.is_connected
+            elif hasattr(voice_client, 'connected'):
+                is_connected = voice_client.connected
+            
+            if not is_connected:
                 raise ConnectionError("Voice client is not connected")
             
-            # Stop any current playback
-            if voice_client.is_playing():
-                voice_client.stop()
-                await asyncio.sleep(0.5)  # Wait for stop
+            # Stop any current playback (only for native VoiceClient)
+            if hasattr(voice_client, 'is_playing') and callable(getattr(voice_client, 'is_playing', None)):
+                if voice_client.is_playing():
+                    voice_client.stop()
+                    await asyncio.sleep(0.5)  # Wait for stop
             
             # Create wrapper for callback with error handling
             def safe_callback(error):
@@ -142,10 +154,12 @@ class OptimizedAudioPlayer:
                     except Exception as e:
                         logger.error(f"Callback error: {e}", exc_info=True)
             
-            # Start playback
-            voice_client.play(audio_source, after=safe_callback)
-            
-            logger.info("Audio playback started")
+            # Start playback (only works with native VoiceClient)
+            if hasattr(voice_client, 'play') and callable(getattr(voice_client, 'play', None)):
+                voice_client.play(audio_source, after=safe_callback)
+                logger.info("Audio playback started")
+            else:
+                raise TypeError(f"Voice client {type(voice_client).__name__} does not support native play()")
         
         except Exception as e:
             logger.error(f"Failed to play audio: {e}", exc_info=True)

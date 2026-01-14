@@ -343,8 +343,8 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
                     self.bot.players[self.guild_id].is_playing = False
                 
                 queue_cog = self.bot.get_cog('QueueCommands')
-                if queue_cog:
-                    queue_cog.clear(self.guild_id)
+                if queue_cog and hasattr(queue_cog, 'queues') and self.guild_id in queue_cog.queues:
+                    queue_cog.queues[self.guild_id].clear()  # Clear the queue list directly
             
             await interaction.response.send_message("⏹️ Stopped", ephemeral=True, delete_after=3)
         except Exception as e:
