@@ -135,8 +135,8 @@ class MediaPlayerComponentsV2:
         view.add_item(stop_btn)
         view.add_item(loop_btn)
         
-        # Add Command Menu (Row 1)
-        view.add_command_menu()
+        # NOTE: Dropdown menu removed - it had no callback handler and caused "interaction failed"
+        # Users can use /help to see all commands
         
         return embed, view
 

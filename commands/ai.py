@@ -58,21 +58,12 @@ class AIHelpers:
             from services.support.support_ai import get_support_ai
             ai = get_support_ai()
             
-            # Prepare context
-            context = (
-                "You are SONORA AI Assistant, a helpful bot that answers questions about "
-                "SONORA Discord music bot, music technology, audio, Discord, and general tech topics. "
-                "Keep answers concise (max 500 words). Use simple language. "
-                "If asked about SONORA features, explain: music playback, synchronized lyrics, "
-                "queue management, multi-platform support (Deezer, Spotify, YouTube Music)."
-            )
-            
-            response = await ai.get_response(
-                user_id=str(user_id),
+            # generate_response returns (response_text, intent)
+            response_text, intent = await ai.generate_response(
                 message=question,
-                context={"system_prompt": context}
+                user_name=f"User_{user_id}"  # Simple user name
             )
-            return response, None
+            return response_text, None
             
         except Exception as e:
             logger.error(f"AI response error: {e}", exc_info=True)

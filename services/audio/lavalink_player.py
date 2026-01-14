@@ -311,28 +311,25 @@ class LavalinkPlayer:
     
     def get_position(self, guild_id: int) -> int:
         """
-        Get current playback position in ms (with estimation for real-time accuracy).
+        Get current playback position in ms.
         
-        Wavelink's player.position is cached and not real-time.
-        We estimate the real position by adding elapsed time since last Lavalink update.
+        Note: We return the raw Lavalink position without estimation
+        because Apple Music lyrics timestamps may be slightly ahead.
+        If lyrics are still misaligned, apply a negative offset.
         """
         player = self._players.get(guild_id)
         if not player:
             return 0
             
-        # Base position from Lavalink
+        # Return raw position from Lavalink
+        # Subtract 4 seconds offset because lyrics timestamps are ahead of audio
         base_position = player.position
         
-        # For more accurate timing, estimate based on elapsed time
-        # player.last_update is timestamp of last position update from Lavalink
-        if hasattr(player, 'last_update') and player.last_update and not player.paused:
-            import time
-            elapsed_since_update = (time.time() * 1000) - (player.last_update.timestamp() * 1000)
-            # Cap estimation to avoid drift issues (max 5 seconds ahead)
-            elapsed_since_update = min(elapsed_since_update, 5000)
-            return int(base_position + elapsed_since_update)
+        # Apply lyrics offset (negative = lyrics appear later to match audio)
+        LYRICS_OFFSET_MS = -4000  # Lyrics are 4 seconds ahead, so delay them
+        adjusted_position = max(0, base_position + LYRICS_OFFSET_MS)
         
-        return base_position
+        return adjusted_position
     
     def get_current_track(self, guild_id: int) -> Optional[TrackInfo]:
         """Get current track info"""
