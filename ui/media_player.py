@@ -14,7 +14,7 @@ from services.audio.file_registry import get_audio_registry
 from utils.formatters import ProgressBarFormatter
 from .embeds import EmbedBuilder
 from .loading import SafeLoadingManager
-from .components_v2 import create_media_player_v2
+from .components_v2 import MediaPlayerComponentsV2
 from config.logging_config import get_logger
 
 logger = get_logger('ui.media_player')
@@ -669,18 +669,26 @@ class SynchronizedMediaPlayer:
                         length=12  # Shortened from 20 to 12 for mobile
                     )
                     
-                    # Build embed
-                    embed = EmbedBuilder.create_now_playing(
+                    # Build UI using MediaPlayerComponentsV2 (Standard Embed + View)
+                    # Get voice channel name if possible
+                    voice_channel_name = None
+                    if self.voice and hasattr(self.voice, 'channel') and self.voice.channel:
+                        voice_channel_name = self.voice.channel.name
+                        
+                    embed, view = MediaPlayerComponentsV2.create_now_playing_view(
                         metadata=self.metadata,
-                        current_time=current_time,
                         progress_bar=progress_bar,
                         lyrics_lines=lyrics_lines,
-                        guild_id=self.guild_id
+                        guild_id=self.guild_id,
+                        voice_channel_name=voice_channel_name,
+                        is_paused=self.is_paused,
+                        bot=self.bot
                     )
                     
                     # Update message
+                    # Only edit if content changed to avoid rate limits? (Discord handles this mostly)
                     try:
-                        await self.message.edit(embed=embed)
+                        await self.message.edit(embed=embed, view=view)
                         last_update = now
                     except discord.NotFound:
                         # Message was deleted, stop updating

@@ -422,25 +422,26 @@ class PlayCommand(commands.Cog):
                             voice_channel_name = interaction.user.voice.channel.name
                         
                         # Create Components v2 player (FlaviBot style)
-                        from config.constants import EMOJI_LOADING
-                        
+                        from ui.media_player import MediaPlayerComponentsV2
                         # Determine initial lyrics lines
                         initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
                         if metadata.lyrics:
                             initial_lyrics = metadata.lyrics.get_lines_at_time(0, 3)
                         
-                        layout_view = create_media_player_v2(
-                            metadata=metadata,
-                            progress_bar="",
-                            lyrics_lines=initial_lyrics,
-                            guild_id=interaction.guild.id,
-                            voice_channel_name=voice_channel_name,
-                            is_paused=False,
-                            bot=self.bot
-                        )
-                        
-                        # Send player message with Components v2
-                        player_msg = await interaction.channel.send(view=layout_view)
+                        # Create UI
+                        if MediaPlayerComponentsV2:
+                            # Returns (Embed, View)
+                            embed, view = MediaPlayerComponentsV2.create_now_playing_view(
+                                metadata=metadata,
+                                lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                                guild_id=interaction.guild.id,
+                                voice_channel_name=voice_channel_name,
+                                is_paused=False, # We are about to resume
+                                bot=self.bot
+                            )
+                            
+                            # Send new player message with EMBED and VIEW
+                            player_msg = await interaction.channel.send(embed=embed, view=view)
                         
                         # RESUME PLAYBACK NOW that UI is ready
                         await lavalink_player.resume(interaction.guild.id)
@@ -886,7 +887,6 @@ class PlayCommand(commands.Cog):
                     except Exception as e:
                         logger.debug(f"Could not delete old player message: {e}")
             else:
-                # Initialize player_messages dict if not exists
                 self.bot.player_messages = {}
             
             # CRITICAL: Wait for audio buffer ready
@@ -899,18 +899,25 @@ class PlayCommand(commands.Cog):
             
             # Create Components v2 player (FlaviBot style)
             from config.constants import EMOJI_LOADING
-            layout_view = create_media_player_v2(
-                metadata=metadata,
-                progress_bar="",
-                lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
-                guild_id=interaction.guild.id,
-                voice_channel_name=voice_channel_name,
-                is_paused=False,
-                bot=self.bot
-            )
+            from ui.media_player import MediaPlayerComponentsV2
+            # Determine initial lyrics lines
+            initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
+            if metadata.lyrics:
+                initial_lyrics = metadata.lyrics.get_lines_at_time(0, 3)
             
-            # Send player message with Components v2
-            player_msg = await interaction.channel.send(view=layout_view)
+            # Create UI
+            if MediaPlayerComponentsV2:
+                embed, view = MediaPlayerComponentsV2.create_now_playing_view(
+                    metadata=metadata,
+                    lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                    guild_id=interaction.guild.id,
+                    voice_channel_name=voice_channel_name,
+                    is_paused=False,
+                    bot=self.bot
+                )
+                
+                # Send player message with Components v2
+                player_msg = await interaction.channel.send(embed=embed, view=view)
 
             
             # Store player message for future deletion
@@ -1786,16 +1793,24 @@ class PlayCommand(commands.Cog):
                 voice_channel_name = interaction.user.voice.channel.name
             
             # Create Components v2 player (FlaviBot style)
-            layout_view = create_media_player_v2(
-                metadata=metadata,
-                progress_bar="",
-                lyrics_lines=["", "", ""],
-                guild_id=guild_id,
-                voice_channel_name=voice_channel_name,
-                is_paused=False,
-                bot=self.bot
-            )
-            player_msg = await interaction.channel.send(view=layout_view)
+            from ui.media_player import MediaPlayerComponentsV2
+            from config.constants import EMOJI_LOADING
+            # Determine initial lyrics lines
+            initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
+            if metadata.lyrics:
+                initial_lyrics = metadata.lyrics.get_lines_at_time(0, 3)
+            
+            # Create UI
+            if MediaPlayerComponentsV2:
+                embed, view = MediaPlayerComponentsV2.create_now_playing_view(
+                    metadata=metadata,
+                    lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                    guild_id=guild_id,
+                    voice_channel_name=voice_channel_name,
+                    is_paused=False,
+                    bot=self.bot
+                )
+                player_msg = await interaction.channel.send(embed=embed, view=view)
             self.bot.player_messages[guild_id] = player_msg
             
             # Get volume
@@ -2051,16 +2066,24 @@ class PlayCommand(commands.Cog):
                 voice_channel_name = interaction.user.voice.channel.name
             
             # Create Components v2 player (FlaviBot style)
-            layout_view = create_media_player_v2(
-                metadata=metadata,
-                progress_bar="",
-                lyrics_lines=["", "", ""],
-                guild_id=guild_id,
-                voice_channel_name=voice_channel_name,
-                is_paused=False,
-                bot=self.bot
-            )
-            player_msg = await interaction.channel.send(view=layout_view)
+            from ui.media_player import MediaPlayerComponentsV2
+            from config.constants import EMOJI_LOADING
+            # Determine initial lyrics lines
+            initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
+            if metadata.lyrics:
+                initial_lyrics = metadata.lyrics.get_lines_at_time(0, 3)
+            
+            # Create UI
+            if MediaPlayerComponentsV2:
+                embed, view = MediaPlayerComponentsV2.create_now_playing_view(
+                    metadata=metadata,
+                    lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                    guild_id=guild_id,
+                    voice_channel_name=voice_channel_name,
+                    is_paused=False,
+                    bot=self.bot
+                )
+                player_msg = await interaction.channel.send(embed=embed, view=view)
             self.bot.player_messages[guild_id] = player_msg
             
             # Get volume
@@ -2288,16 +2311,24 @@ class PlayCommand(commands.Cog):
         voice_channel_name = voice_channel.name if voice_channel else None
         
         # Create Components v2 player (FlaviBot style)
-        layout_view = create_media_player_v2(
-            metadata=metadata,
-            progress_bar="",
-            lyrics_lines=["", "", ""],
-            guild_id=guild_id,
-            voice_channel_name=voice_channel_name,
-            is_paused=False,
-            bot=self.bot
-        )
-        player_msg = await interaction.channel.send(view=layout_view)
+        from ui.media_player import MediaPlayerComponentsV2
+        from config.constants import EMOJI_LOADING
+        # Determine initial lyrics lines
+        initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
+        if metadata.lyrics:
+            initial_lyrics = metadata.lyrics.get_lines_at_time(0, 3)
+        
+        # Create UI
+        if MediaPlayerComponentsV2:
+            embed, view = MediaPlayerComponentsV2.create_now_playing_view(
+                metadata=metadata,
+                lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                guild_id=guild_id,
+                voice_channel_name=voice_channel_name,
+                is_paused=False,
+                bot=self.bot
+            )
+            player_msg = await interaction.channel.send(embed=embed, view=view)
         self.bot.player_messages[guild_id] = player_msg
         
         # Get volume
@@ -2481,7 +2512,7 @@ class PlayCommand(commands.Cog):
             
             if success:
                 # Create player UI
-                from ui.media_player import SynchronizedMediaPlayer
+                from ui.media_player import SynchronizedMediaPlayer, MediaPlayerComponentsV2
                 
                 # Get voice channel name
                 voice_channel_name = None
@@ -2491,18 +2522,17 @@ class PlayCommand(commands.Cog):
                 # Delete loader and send player
                 await loader.delete()
                 
-                # Create Components v2 player (FlaviBot style)
-                from config.constants import EMOJI_LOADING
-                layout_view = create_media_player_v2(
-                    metadata=first_track,
-                    progress_bar="",
-                    lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
-                    guild_id=guild_id,
-                    voice_channel_name=voice_channel_name,
-                    is_paused=False,
-                    bot=self.bot
-                )
-                player_msg = await interaction.channel.send(view=layout_view)
+                # Create UI
+                if MediaPlayerComponentsV2:
+                    embed, view = MediaPlayerComponentsV2.create_now_playing_view(
+                        metadata=first_track, # Uses MetadataInfo here but var name is track_info
+                        lyrics_lines=None, # Lyrics will be loaded in background
+                        guild_id=interaction.guild.id,
+                        voice_channel_name=voice_channel_name,
+                        is_paused=False,
+                        bot=self.bot
+                    )
+                    player_msg = await interaction.channel.send(embed=embed, view=view)
 
                 
                 # Create synchronized player
