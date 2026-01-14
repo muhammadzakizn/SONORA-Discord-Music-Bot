@@ -99,24 +99,27 @@ class MediaPlayerComponentsV2:
             accent_colour=discord.Colour(COLOR_PLAYING)
         )
         
-        # Add: space + requester
+        # Add requester (with vertical bar prefix)
         if requester_text:
-            container.add_item(discord.ui.TextDisplay(content=""))  # Single space
             container.add_item(discord.ui.TextDisplay(content=f"│ {requester_text}"))
         
-        # Add: double space + lyrics
-        if lyrics_text:
-            container.add_item(discord.ui.TextDisplay(content=""))  # Space 1
-            container.add_item(discord.ui.TextDisplay(content=""))  # Space 2
-            container.add_item(discord.ui.TextDisplay(content=lyrics_text))
+        # Add separator before lyrics area
+        container.add_item(discord.ui.Separator(spacing=discord.ui.SeparatorSpacing.small))
         
-        # Add: double space + progress bar
+        # Add lyrics if present
+        if lyrics_text:
+            container.add_item(discord.ui.TextDisplay(content=lyrics_text))
+        else:
+            container.add_item(discord.ui.TextDisplay(content="-# 🎵"))
+        
+        # Add separator before progress
+        container.add_item(discord.ui.Separator(spacing=discord.ui.SeparatorSpacing.small))
+        
+        # Add progress bar if present
         if progress_bar:
-            container.add_item(discord.ui.TextDisplay(content=""))  # Space 1
-            container.add_item(discord.ui.TextDisplay(content=""))  # Space 2
             container.add_item(discord.ui.TextDisplay(content=progress_bar))
         
-        # Add: space before controls (separator)
+        # Add separator before controls
         container.add_item(discord.ui.Separator())
         
         # Add favorites section with Like button (if not already used in main section)
