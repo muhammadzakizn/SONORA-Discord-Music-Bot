@@ -1,7 +1,6 @@
 """
 Discord Components V2 helper for SONORA media player
 Re-implemented using Standard Embeds + View to ensure API compatibility
-Matches FlaviBot style using Markdown formatting in Embed
 """
 
 import discord
@@ -16,7 +15,6 @@ logger = get_logger('ui.components_v2')
 class MediaPlayerComponentsV2:
     """
     Build Standard Embed + View layout for media player
-    Matches FlaviBot visuals using standard Discord Embed
     """
     
     @staticmethod
@@ -36,69 +34,63 @@ class MediaPlayerComponentsV2:
             (discord.Embed, discord.ui.View)
         """
         
-        # 1. Create Embed (The "Container")
-        # =================================
+        # 1. Create Embed
+        # ===============
         embed = discord.Embed(
             color=discord.Color(COLOR_PLAYING)
         )
         
-        # Title & Artist
-        # FlaviBot style: **[Title](URL)** - `Duration`
-        #                 *Artist*
+        # Title: "Now Playing"
+        embed.title = "Now Playing"
         
-        track_url = "https://sonora.muhammadzakizn.com" # Default
+        # Build description
+        description_parts = []
+        
+        # Track Title (bold, linked if possible)
+        track_url = "https://sonora.muhammadzakizn.com"
         if hasattr(metadata, 'lavalink_track_info') and hasattr(metadata.lavalink_track_info, 'uri'):
             track_url = metadata.lavalink_track_info.uri
             
-        description_parts = []
+        description_parts.append(f"**[{metadata.title}]({track_url})**")
         
-        # Line 1: Title
-        description_parts.append(f"### [{metadata.title}]({track_url})")
+        # Artist
+        description_parts.append(f"{metadata.artist}")
         
-        # Line 2: Artist
-        description_parts.append(f"**{metadata.artist}**")
+        description_parts.append("")  # Spacer
         
-        description_parts.append("") # Spacer
+        # Lyrics (plain text, no code block - so bold ** ** works)
+        if lyrics_lines:
+            lyrics_text = "\n".join(l for l in lyrics_lines if l and l.strip())
+            if lyrics_text:
+                description_parts.append(lyrics_text)
+                description_parts.append("")  # Spacer
         
-        # Line 3: Requester & Voice Channel
+        # Progress Bar (fix comma issue - ensure clean format)
+        if progress_bar:
+            # Remove any stray commas from progress bar
+            clean_progress = progress_bar.replace(",", "").replace("`", "").strip()
+            description_parts.append(f"`{clean_progress}`")
+            description_parts.append("")  # Spacer
+        
+        # Requested by & Connected in (at bottom of description)
         requester_text = "Unknown"
         if metadata.requested_by_id and metadata.requested_by_id > 0:
             requester_text = f"<@{metadata.requested_by_id}>"
         elif metadata.requested_by:
             requester_text = metadata.requested_by
             
-        description_parts.append(f"> Requested by {requester_text}")
+        description_parts.append(f"Requested by {requester_text}")
         
         if voice_channel_name:
-            description_parts.append(f"> Connected in 🔊 **{voice_channel_name}**")
-            
-        description_parts.append("") # Spacer
-        
-        # Line 4: Lyrics (or Loading status)
-        # Using footer for lyrics to keep main area clean, OR inside description?
-        # FlaviBot puts it in footer/status.
-        
-        # But user likes them in body?
-        # Let's put current lyric line in body for visibility
-        
-        if lyrics_lines:
-            # Join clean lines
-            lyrics_text = "\n".join(l for l in lyrics_lines if l.strip())
-            if lyrics_text:
-                description_parts.append(f"```text\n{lyrics_text}\n```")
-        
-        # Line 5: Progress Bar
-        if progress_bar:
-             description_parts.append(f"`{progress_bar}`")
+            description_parts.append(f"Connected in 🔊 **{voice_channel_name}**")
         
         embed.description = "\n".join(description_parts)
         
-        # Thumbnail
+        # Thumbnail (artwork)
         if metadata.artwork_url:
             embed.set_thumbnail(url=metadata.artwork_url)
-            
-        # Footer
-        embed.set_footer(text="SONORA Premium • High Quality Audio")
+        
+        # NO footer (user requested to remove "SONORA Premium...")
         
         
         # 2. Create View (Controls)
@@ -110,9 +102,9 @@ class MediaPlayerComponentsV2:
         play_emoji = discord.PartialEmoji(name="play", id=1460800090586353928)
         stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
         loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
-        skip_emoji = "⏭" # Unicode fallback since custom skip emoji is missing
+        skip_emoji = "⏭"  # Unicode fallback
         
-        # Buttons
+        # Buttons (Row 0)
         pause_btn = discord.ui.Button(
             emoji=pause_emoji if not is_paused else play_emoji,
             style=discord.ButtonStyle.secondary,
@@ -143,8 +135,8 @@ class MediaPlayerComponentsV2:
         view.add_item(stop_btn)
         view.add_item(loop_btn)
         
-        # Add Dropdown (Row 1)
-        view.add_selection_menu()
+        # Add Command Menu (Row 1)
+        view.add_command_menu()
         
         return embed, view
 
@@ -157,23 +149,63 @@ class MediaPlayerView(discord.ui.View):
         self.bot = bot
         self.guild_id = guild_id
         
-    def add_selection_menu(self):
-        """Add settings selection menu (Filters, etc)"""
+    def add_command_menu(self):
+        """Add bot commands dropdown menu"""
         select = discord.ui.Select(
-            placeholder="✨ Audio Effects & Settings...",
+            placeholder="📋 Commands & Help...",
             min_values=1,
             max_values=1,
-            custom_id=f"sel_settings_{self.guild_id}",
-            row=1, # Explicit row
+            custom_id=f"sel_commands_{self.guild_id}",
+            row=1,
             options=[
-                discord.SelectOption(label="Reset Effects", value="filter_clear", emoji="🔄", description="Remove all audio filters"),
-                discord.SelectOption(label="Bass Boost", value="filter_bass", emoji="🔊", description="Heavy bass boost"),
-                discord.SelectOption(label="Nightcore", value="filter_nightcore", emoji="🌙", description="Higher pitch & speed"),
-                discord.SelectOption(label="Vaporwave", value="filter_vaporwave", emoji="🌊", description="Slowed & reverb"),
-                discord.SelectOption(label="8D Audio", value="filter_8d", emoji="🎧", description="Immersive 3D audio"),
-                discord.SelectOption(label="Loop Track", value="loop_track", emoji="🔂", description="Repeat current song"),
-                discord.SelectOption(label="Loop Queue", value="loop_queue", emoji="🔁", description="Repeat entire queue"),
-                discord.SelectOption(label="Lyrics Toggle", value="toggle_lyrics", emoji="📝", description="Show/Hide lyrics"),
+                discord.SelectOption(
+                    label="/play",
+                    value="cmd_play",
+                    emoji="▶️",
+                    description="Play a song or playlist"
+                ),
+                discord.SelectOption(
+                    label="/queue",
+                    value="cmd_queue",
+                    emoji="📜",
+                    description="View current queue"
+                ),
+                discord.SelectOption(
+                    label="/skip",
+                    value="cmd_skip",
+                    emoji="⏭️",
+                    description="Skip to next song"
+                ),
+                discord.SelectOption(
+                    label="/stop",
+                    value="cmd_stop",
+                    emoji="⏹️",
+                    description="Stop playback and disconnect"
+                ),
+                discord.SelectOption(
+                    label="/loop",
+                    value="cmd_loop",
+                    emoji="🔁",
+                    description="Toggle loop mode"
+                ),
+                discord.SelectOption(
+                    label="/volume",
+                    value="cmd_volume",
+                    emoji="🔊",
+                    description="Adjust volume"
+                ),
+                discord.SelectOption(
+                    label="/lyrics",
+                    value="cmd_lyrics",
+                    emoji="📝",
+                    description="View full lyrics"
+                ),
+                discord.SelectOption(
+                    label="/help",
+                    value="cmd_help",
+                    emoji="❓",
+                    description="Show all commands"
+                ),
             ]
         )
         self.add_item(select)
