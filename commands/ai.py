@@ -1,7 +1,5 @@
 """
-AI Command - Ask AI Questions via Modal
-
-Uses slash command + modal to ask AI questions without Message Content Intent.
+AI Command - Ask AI Questions via Modal or Text Command
 """
 
 import discord
@@ -9,8 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 import logging
 import time
-import os
-from typing import Dict
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger('discord_music_bot.commands.ai')
 
@@ -28,43 +25,35 @@ BLOCKED_KEYWORDS = [
     'hack', 'crack', 'pirate', 'illegal'
 ]
 
+class AIHelpers:
+    """Helper methods for AI commands"""
+    
+    @staticmethod
+    def check_rate_limit(user_id: int) -> Optional[int]:
+        """Check rate limit. Returns remaining seconds or None if allowed."""
+        now = time.time()
+        if user_id in _rate_limits:
+            elapsed = now - _rate_limits[user_id]
+            if elapsed < RATE_LIMIT_SECONDS:
+                return int(RATE_LIMIT_SECONDS - elapsed)
+        _rate_limits[user_id] = now
+        return None
 
-class AIQuestionModal(discord.ui.Modal, title="Ask AI"):
-    """Modal for asking AI questions"""
-    
-    question = discord.ui.TextInput(
-        label="Your Question",
-        placeholder="e.g., How does Bluetooth send audio between devices?",
-        style=discord.TextStyle.paragraph,
-        max_length=500,
-        required=True
-    )
-    
-    async def on_submit(self, interaction: discord.Interaction):
-        question_text = self.question.value.lower()
-        
-        # Check for blocked topics
+    @staticmethod
+    def check_blocked_topic(text: str) -> bool:
+        """Check if text contains blocked keywords"""
+        text_lower = text.lower()
         for keyword in BLOCKED_KEYWORDS:
-            if keyword in question_text:
-                await interaction.response.send_message(
-                    embed=discord.Embed(
-                        title="❌ Restricted Topic",
-                        description=(
-                            "This topic is not allowed. Please ask about:\n"
-                            "- SONORA features and usage\n"
-                            "- Music and audio technology\n"
-                            "- General tech questions\n"
-                            "- Discord bot development"
-                        ),
-                        color=0xE74C3C
-                    ),
-                    ephemeral=True
-                )
-                return
-        
-        # Get AI response
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        
+            if keyword in text_lower:
+                return True
+        return False
+
+    @staticmethod
+    async def get_ai_response_content(user_id: int, question: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Get AI response.
+        Returns: (Response Text, Error Message)
+        """
         try:
             from services.support.support_ai import get_support_ai
             ai = get_support_ai()
@@ -79,50 +68,94 @@ class AIQuestionModal(discord.ui.Modal, title="Ask AI"):
             )
             
             response = await ai.get_response(
-                user_id=str(interaction.user.id),
-                message=self.question.value,
+                user_id=str(user_id),
+                message=question,
                 context={"system_prompt": context}
             )
-            
-            # Create response embed
-            embed = discord.Embed(
-                title="🤖 AI Response",
-                color=0x7B1E3C
-            )
-            embed.add_field(
-                name="📝 Your Question",
-                value=self.question.value[:256],
-                inline=False
-            )
-            embed.add_field(
-                name="💬 Answer",
-                value=response[:1024] if len(response) > 1024 else response,
-                inline=False
-            )
-            
-            # If response is too long, add continuation
-            if len(response) > 1024:
-                remaining = response[1024:2048]
-                embed.add_field(name="(continued)", value=remaining, inline=False)
-            
-            embed.set_footer(text="SONORA AI • Powered by Gemini")
-            
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            return response, None
             
         except Exception as e:
             logger.error(f"AI response error: {e}", exc_info=True)
-            await interaction.followup.send(
+            return None, "Sorry, I couldn't process your question right now. Please try again later."
+
+    @staticmethod
+    def create_response_embed(question: str, response: str) -> discord.Embed:
+        """Create standard AI response embed"""
+        embed = discord.Embed(
+            title="🤖 AI Response",
+            color=0x7B1E3C
+        )
+        embed.add_field(
+            name="📝 Your Question",
+            value=question[:256],
+            inline=False
+        )
+        
+        # Split response logic
+        content_limit = 1024
+        first_chunk = response[:content_limit]
+        
+        embed.add_field(
+            name="💬 Answer",
+            value=first_chunk,
+            inline=False
+        )
+        
+        if len(response) > content_limit:
+            remaining = response[content_limit:2048]
+            if remaining:
+                embed.add_field(name="(continued)", value=remaining, inline=False)
+        
+        embed.set_footer(text="SONORA AI • Powered by Gemini")
+        return embed
+
+
+class AIQuestionModal(discord.ui.Modal, title="Ask AI"):
+    """Modal for asking AI questions via Slash Command"""
+    
+    question = discord.ui.TextInput(
+        label="Your Question",
+        placeholder="e.g., How does Bluetooth send audio between devices?",
+        style=discord.TextStyle.paragraph,
+        max_length=500,
+        required=True
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        question_text = self.question.value
+        
+        # Check blocked
+        if AIHelpers.check_blocked_topic(question_text):
+            await interaction.response.send_message(
                 embed=discord.Embed(
-                    title="❌ AI Unavailable",
-                    description="Sorry, I couldn't process your question right now. Please try again later.",
+                    title="❌ Restricted Topic",
+                    description="This topic is not allowed.",
                     color=0xE74C3C
                 ),
                 ephemeral=True
             )
+            return
+            
+        # Defer
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        
+        # Get Response
+        response, error = await AIHelpers.get_ai_response_content(interaction.user.id, question_text)
+        
+        if error:
+            await interaction.followup.send(
+                embed=discord.Embed(title="❌ AI Unavailable", description=error, color=0xE74C3C),
+                ephemeral=True
+            )
+            return
+            
+        # Send Embed
+        embed = AIHelpers.create_response_embed(question_text, response)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 class AICog(commands.Cog):
-    """AI Assistant - /ai command for questions"""
+    """AI Assistant - /ai command and . prefix"""
     
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -132,24 +165,65 @@ class AICog(commands.Cog):
         """Open modal to ask AI a question"""
         
         # Check rate limit
-        user_id = interaction.user.id
-        now = time.time()
-        
-        if user_id in _rate_limits:
-            elapsed = now - _rate_limits[user_id]
-            if elapsed < RATE_LIMIT_SECONDS:
-                remaining = int(RATE_LIMIT_SECONDS - elapsed)
-                await interaction.response.send_message(
-                    f"⏱️ Please wait **{remaining} seconds** before asking another question.",
-                    ephemeral=True
-                )
-                return
-        
-        # Update rate limit
-        _rate_limits[user_id] = now
-        
+        retry_after = AIHelpers.check_rate_limit(interaction.user.id)
+        if retry_after:
+            await interaction.response.send_message(
+                f"⏱️ Please wait **{retry_after} seconds** before asking another question.",
+                ephemeral=True
+            )
+            return
+            
         # Show modal
         await interaction.response.send_modal(AIQuestionModal())
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Listen for messages starting with . to trigger AI"""
+        # Ignore bots and self
+        if message.author.bot:
+            return
+            
+        # Check prefix
+        if not message.content.startswith('.'):
+            return
+            
+        # Get query (strip . and whitespace)
+        query = message.content[1:].strip()
+        
+        # Ignore empty or if it looks like a command (implied check: simple length check or just pass)
+        # Note: Valid commands like .play are handled by bot.process_commands separately?
+        # Actually, on_message listener runs BEFORE process_commands if not careful, or in parallel.
+        # But if the global prefix is '!', then '.play' is NOT a command for the bot core.
+        # So we can safely handle ALL '.' messages here.
+        if not query:
+            return
+            
+        # Rate Limit Check
+        retry_after = AIHelpers.check_rate_limit(message.author.id)
+        if retry_after:
+            await message.add_reaction("⏱️")
+            # Optionally send timed delete message
+            return
+            
+        # Check blocked
+        if AIHelpers.check_blocked_topic(query):
+            await message.add_reaction("❌")
+            return
+            
+        # Indicate typing
+        async with message.channel.typing():
+            response, error = await AIHelpers.get_ai_response_content(message.author.id, query)
+            
+            if error:
+                await message.reply(
+                    embed=discord.Embed(title="❌ Error", description=error, color=0xE74C3C),
+                    mention_author=False
+                )
+                return
+            
+            # Send standard embed
+            embed = AIHelpers.create_response_embed(query, response)
+            await message.reply(embed=embed, mention_author=False)
 
 
 async def setup(bot: commands.Bot):
