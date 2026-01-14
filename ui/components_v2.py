@@ -100,7 +100,7 @@ class MediaPlayerComponentsV2:
             container.add_item(discord.ui.TextDisplay(content=f"│ {requester_text}"))
         
         # Add separator before lyrics area
-        container.add_item(discord.ui.Separator(spacing=discord.ui.SeparatorSpacing.small))
+        container.add_item(discord.ui.Separator())
         
         # Add lyrics if present
         if lyrics_text:
@@ -109,7 +109,7 @@ class MediaPlayerComponentsV2:
             container.add_item(discord.ui.TextDisplay(content="-# 🎵"))
         
         # Add separator before progress
-        container.add_item(discord.ui.Separator(spacing=discord.ui.SeparatorSpacing.small))
+        container.add_item(discord.ui.Separator())
         
         # Add progress bar if present
         if progress_bar:
