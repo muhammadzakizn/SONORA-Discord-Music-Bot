@@ -178,31 +178,49 @@ class AICog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        """Listen for messages starting with . to trigger AI"""
-        # Ignore bots and self
+        """Listen for messages triggering AI (dot prefix, mention, or reply)"""
+        # Ignore bots
         if message.author.bot:
             return
             
-        # Check prefix
-        if not message.content.startswith('.'):
-            return
-            
-        # Get query (strip . and whitespace)
-        query = message.content[1:].strip()
+        # Determine Trigger and Query
+        query = ""
+        is_trigger = False
         
-        # Ignore empty or if it looks like a command (implied check: simple length check or just pass)
-        # Note: Valid commands like .play are handled by bot.process_commands separately?
-        # Actually, on_message listener runs BEFORE process_commands if not careful, or in parallel.
-        # But if the global prefix is '!', then '.play' is NOT a command for the bot core.
-        # So we can safely handle ALL '.' messages here.
-        if not query:
+        # 1. Check Dot Prefix
+        if message.content.startswith('.'):
+            query = message.content[1:].strip()
+            is_trigger = True
+            
+        # 2. Check Mention
+        elif self.bot.user in message.mentions:
+            # Remove mention from content
+            query = message.content.replace(f'<@{self.bot.user.id}>', '').replace(f'<@!{self.bot.user.id}>', '').strip()
+            is_trigger = True
+            
+        # 3. Check Reply to Bot
+        elif message.reference:
+            try:
+                # Try getting cached message first
+                ref_msg = message.reference.cached_message
+                if not ref_msg and message.reference.message_id:
+                    # Fetch if not cached
+                    ref_msg = await message.channel.fetch_message(message.reference.message_id)
+                
+                if ref_msg and ref_msg.author.id == self.bot.user.id:
+                    query = message.content.strip()
+                    is_trigger = True
+            except Exception:
+                pass # Ignore fetch errors
+
+        # If not triggered or empty query, ignore
+        if not is_trigger or not query:
             return
             
         # Rate Limit Check
         retry_after = AIHelpers.check_rate_limit(message.author.id)
         if retry_after:
             await message.add_reaction("⏱️")
-            # Optionally send timed delete message
             return
             
         # Check blocked
