@@ -305,12 +305,14 @@ class PlayCommand(commands.Cog):
                             logger.warning("[Lavalink] No player found for track end callback")
 
                     
-                    # Play via Lavalink
+                    
+                    # Play via Lavalink (PAUSED initially to sync with UI)
                     success = await lavalink_player.play(
                         interaction.guild.id,
                         track_info,
                         voice_channel,
-                        on_track_end=on_track_end
+                        on_track_end=on_track_end,
+                        paused=True  # <--- Start PAUSED
                     )
                     
                     if success:
@@ -360,6 +362,9 @@ class PlayCommand(commands.Cog):
                         
                         # Send player message with Components v2
                         player_msg = await interaction.channel.send(view=layout_view)
+                        
+                        # RESUME PLAYBACK NOW that UI is ready
+                        await lavalink_player.resume(interaction.guild.id)
                         
                         # Delete loader message
                         await loader.delete()

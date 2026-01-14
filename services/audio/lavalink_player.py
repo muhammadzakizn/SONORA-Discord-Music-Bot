@@ -116,7 +116,8 @@ class LavalinkPlayer:
         guild_id: int,
         track_info: TrackInfo,
         voice_channel: discord.VoiceChannel,
-        on_track_end: Optional[Callable] = None
+        on_track_end: Optional[Callable] = None,
+        paused: bool = False
     ) -> bool:
         """
         Play a track using Lavalink.
@@ -126,6 +127,7 @@ class LavalinkPlayer:
             track_info: Track to play
             voice_channel: Voice channel to play in
             on_track_end: Callback when track ends
+            paused: Whether to start the track in a paused state.
             
         Returns:
             True if playback started successfully
@@ -167,9 +169,9 @@ class LavalinkPlayer:
             self._current_tracks[guild_id] = track_info
             
             # Play the track!
-            await player.play(track)
+            await player.play(track, paused=paused)
             
-            logger.info(f"[LavalinkPlayer] Playing: {track_info.title} by {track_info.artist}")
+            logger.info(f"[LavalinkPlayer] Playing: {track_info.title} by {track_info.artist} (Paused: {paused})")
             return True
             
         except Exception as e:
@@ -192,7 +194,8 @@ class LavalinkPlayer:
         guild_id: int,
         wl_track: wavelink.Playable,
         voice_channel: discord.VoiceChannel,
-        on_track_end: Optional[Callable] = None
+        on_track_end: Optional[Callable] = None,
+        paused: bool = False
     ) -> bool:
         """
         Play a pre-loaded wavelink track directly (no re-searching).
@@ -221,9 +224,9 @@ class LavalinkPlayer:
             self._current_tracks[guild_id] = track_info
             
             # Play directly
-            await player.play(wl_track)
+            await player.play(wl_track, paused=paused)
             
-            logger.info(f"[LavalinkPlayer] Playing: {wl_track.title} by {wl_track.author}")
+            logger.info(f"[LavalinkPlayer] Playing: {wl_track.title} by {wl_track.author} (Paused: {paused})")
             return True
             
         except Exception as e:
@@ -243,11 +246,12 @@ class LavalinkPlayer:
     async def pause(self, guild_id: int) -> bool:
         """Pause playback"""
         player = self._players.get(guild_id)
-        if player and player.playing:
+        if player:
             await player.pause(True)
             logger.info(f"[LavalinkPlayer] Paused in guild {guild_id}")
             return True
         return False
+
     
     async def resume(self, guild_id: int) -> bool:
         """Resume playback"""
