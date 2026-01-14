@@ -110,7 +110,7 @@ class MediaPlayerComponentsV2:
         play_emoji = discord.PartialEmoji(name="play", id=1460800090586353928)
         stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
         loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
-        skip_emoji = discord.PartialEmoji(name="skip", id=1460800090586353928)
+        skip_emoji = "⏭" # Unicode fallback since custom skip emoji is missing
         
         # Buttons
         pause_btn = discord.ui.Button(

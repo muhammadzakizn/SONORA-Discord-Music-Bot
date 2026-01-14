@@ -24,6 +24,7 @@ from config.settings import Settings
 from config.logging_config import get_logger
 from core.error_handler import DownloadError
 from ui.components_v2 import MediaPlayerComponentsV2
+from config.constants import EMOJI_LOADING
 
 logger = get_logger('commands.play')
 
