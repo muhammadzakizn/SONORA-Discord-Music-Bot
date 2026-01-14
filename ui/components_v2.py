@@ -114,7 +114,19 @@ class MediaPlayerComponentsV2:
         # Add progress bar if present
         if progress_bar:
             container.add_item(discord.ui.TextDisplay(content=progress_bar))
+            
+        # Add Like Button Section (Inside Container, FlaviBot Style)
+        # container.add_item(discord.ui.Separator())
+        container.add_item(discord.ui.TextDisplay(content="Add to your favorites"))
         
+        like_btn = discord.ui.Button(
+            label="Like",
+            emoji="🤍",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"act_like_{guild_id}"
+        )
+        container.add_item(like_btn)
+
         # Add separator before controls
         container.add_item(discord.ui.Separator())
         
@@ -125,15 +137,17 @@ class MediaPlayerComponentsV2:
         view.add_control_buttons(is_paused)
         
         return view
+        
+    @staticmethod
+    def create_search_results_view(results: list, user_id: int):
+        """Create view for search results"""
+        pass
 
 
 class MediaPlayerLayoutView(discord.ui.LayoutView):
-    """
-    Components V2 LayoutView for media player
-    Contains Container with Sections and ActionRow buttons
-    """
+    """Layout view for media player"""
     
-    def __init__(self, bot=None, guild_id: int = None, timeout: int = None):
+    def __init__(self, bot, guild_id: int, timeout: float = None):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild_id = guild_id
@@ -153,6 +167,10 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
         loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
         
+        # Skip emoji - using Play ID temporarily if specific Skip ID unknown
+        # User please update ID: 1460800090586353928 (Play) -> Skip ID
+        skip_emoji = discord.PartialEmoji(name="skip", id=1460800090586353928) 
+        
         # Pause/Resume (emoji only)
         pause_btn = discord.ui.Button(
             emoji=pause_emoji if not is_paused else play_emoji,
@@ -161,9 +179,9 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         )
         action_row.add_item(pause_btn)
         
-        # Skip (emoji only)
+        # Skip (emoji only, custom)
         skip_btn = discord.ui.Button(
-            emoji="⏭",
+            emoji=skip_emoji,
             style=discord.ButtonStyle.secondary,
             custom_id=f"ctrl_skip_{self.guild_id}"
         )
