@@ -156,8 +156,8 @@ class MediaPlayerView(discord.ui.View):
             
             # Clear queue
             queue_cog = self.bot.get_cog('QueueCommands')
-            if queue_cog:
-                queue_cog.clear(self.guild_id)
+            if queue_cog and hasattr(queue_cog, 'queues') and self.guild_id in queue_cog.queues:
+                queue_cog.queues[self.guild_id].clear()  # Clear the list directly
             
             await interaction.response.send_message("⏹️ Stopped & Disconnected", ephemeral=True, delete_after=3)
         except Exception as e:

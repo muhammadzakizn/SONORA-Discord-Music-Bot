@@ -333,6 +333,7 @@ class SynchronizedMediaPlayer:
         """
         Replay current track using cache if available (for LOOP_TRACK mode).
         Checks local cache first to save bandwidth.
+        Also refreshes player message to keep chat clean.
         """
         try:
             if not self.metadata:
@@ -357,7 +358,47 @@ class SynchronizedMediaPlayer:
                         asyncio.create_task(stop_result)
                 except Exception:
                     pass
-
+            
+            # ========================================
+            # REFRESH PLAYER MESSAGE (delete old, send new)
+            # This prevents chat from being cluttered
+            # ========================================
+            try:
+                if self.message and hasattr(self.message, 'channel'):
+                    # Get voice channel name
+                    voice_channel_name = None
+                    if self.voice and hasattr(self.voice, 'channel') and self.voice.channel:
+                        voice_channel_name = self.voice.channel.name
+                    
+                    # Create new Components v2 player
+                    layout_view = create_media_player_v2(
+                        metadata=self.metadata,
+                        progress_bar="",
+                        lyrics_lines=["", "🔁 Looping...", ""],
+                        guild_id=self.guild_id,
+                        voice_channel_name=voice_channel_name,
+                        is_paused=False,
+                        bot=self.bot
+                    )
+                    
+                    # Delete old message
+                    try:
+                        await self.message.delete()
+                        logger.debug("[Loop] Deleted old player message")
+                    except Exception:
+                        pass
+                    
+                    # Send new player message
+                    new_msg = await self.message.channel.send(view=layout_view)
+                    self.message = new_msg
+                    
+                    # Update stored message reference
+                    if hasattr(self.bot, 'player_messages'):
+                        self.bot.player_messages[self.guild_id] = new_msg
+                    
+                    logger.info("[Loop] Refreshed player message for loop")
+            except Exception as e:
+                logger.warning(f"[Loop] Failed to refresh player message: {e}")
             
             # Get volume
             volume = 1.0
