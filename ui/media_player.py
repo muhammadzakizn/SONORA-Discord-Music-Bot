@@ -371,7 +371,7 @@ class SynchronizedMediaPlayer:
                         voice_channel_name = self.voice.channel.name
                     
                     # Create new Components v2 player
-                    layout_view = create_media_player_v2(
+                    embed, view = MediaPlayerComponentsV2.create_now_playing_view(
                         metadata=self.metadata,
                         progress_bar="",
                         lyrics_lines=["", "🔁 Looping...", ""],
@@ -388,8 +388,8 @@ class SynchronizedMediaPlayer:
                     except Exception:
                         pass
                     
-                    # Send new player message
-                    new_msg = await self.message.channel.send(view=layout_view)
+                    # Send new message with embed + view
+                    new_msg = await self.message.channel.send(embed=embed, view=view)
                     self.message = new_msg
                     
                     # Update stored message reference
@@ -1594,7 +1594,7 @@ class SynchronizedMediaPlayer:
                                 voice_channel_name = self.voice.channel.name
                             
                             # Create Components v2 player for next track
-                            layout_view = create_media_player_v2(
+                            embed, view = MediaPlayerComponentsV2.create_now_playing_view(
                                 metadata=next_metadata,
                                 progress_bar="",
                                 lyrics_lines=["", "", ""],
@@ -1603,7 +1603,7 @@ class SynchronizedMediaPlayer:
                                 is_paused=False,
                                 bot=self.bot
                             )
-                            player_msg = await self.message.channel.send(view=layout_view)
+                            player_msg = await self.message.channel.send(embed=embed, view=view)
 
                             
                             # Create new player for UI updates
@@ -1875,7 +1875,7 @@ class SynchronizedMediaPlayer:
             
             # Send new Components v2 player message
             try:
-                layout_view = create_media_player_v2(
+                embed, view = MediaPlayerComponentsV2.create_now_playing_view(
                     metadata=next_metadata,
                     progress_bar="",
                     lyrics_lines=["", "", ""],
@@ -1884,7 +1884,7 @@ class SynchronizedMediaPlayer:
                     is_paused=False,
                     bot=self.bot
                 )
-                player_msg = await self.message.channel.send(view=layout_view)
+                player_msg = await self.message.channel.send(embed=embed, view=view)
                 self.message = player_msg
                 
                 # Store player message for future deletion
