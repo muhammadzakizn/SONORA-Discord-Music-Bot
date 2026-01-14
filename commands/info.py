@@ -240,12 +240,13 @@ class InfoCommands(commands.Cog):
         )
         
         embed.add_field(
-            name="ℹ️ Info Commands",
+            name="ℹ️ Info & Support",
             value=(
-                "`/website` - Lihat fitur web\n"
-                "`/donate` - Dukung developer\n"
-                "`/stats` - Statistik bot\n"
-                "`/support` - Minta bantuan"
+                "`/website` - View web features\n"
+                "`/support` - Contact support\n"
+                "`/ai` - Ask AI a question\n"
+                "`/stats` - Bot statistics\n"
+                "`/donate` - Support developer"
             ),
             inline=True
         )

@@ -1,252 +1,353 @@
 """
-Support Command and DM Handler
+Support Command - Modal-Based System
 
-Handles /support command in guilds and DM message handling for AI support.
+Handles /support command with button categories and modal forms.
+No AI DM chat - uses modals instead (no Message Content Intent needed).
 """
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 import logging
-import asyncio
-from typing import Optional
-
-from services.support.support_ai import get_support_ai, UserIntent
-from database.models_support import get_support_db, TicketType
-from ui.support_modals import SupportActionView, FeedbackModal, IssueReportModal, LiveSupportModal
+import time
+from typing import Optional, Dict
+from datetime import datetime, timedelta
 
 logger = logging.getLogger('discord_music_bot.commands.support')
 
+# Cooldown tracking: {user_id: {report_type: last_submit_time}}
+_cooldowns: Dict[int, Dict[str, float]] = {}
+COOLDOWN_SECONDS = 3600  # 1 hour
 
-class StartSupportView(discord.ui.View):
-    """View with button to start DM support session"""
+
+class BugReportModal(discord.ui.Modal, title="Bug Report"):
+    """Modal for bug reports"""
     
-    def __init__(self, bot: commands.Bot, user: discord.User, is_registered: bool):
-        super().__init__(timeout=300)
-        self.bot = bot
-        self.user = user
-        self.is_registered = is_registered
+    bug_title = discord.ui.TextInput(
+        label="Title",
+        placeholder="Brief description of the bug",
+        max_length=100,
+        required=True
+    )
     
-    @discord.ui.button(label="Start DM Support", style=discord.ButtonStyle.primary)
-    async def start_dm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Send DM to user to start support session"""
+    steps = discord.ui.TextInput(
+        label="Steps to Reproduce",
+        placeholder="1. Use /play command\n2. ...\n3. Bug appears",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=True
+    )
+    
+    expected = discord.ui.TextInput(
+        label="Expected Behavior",
+        placeholder="What should have happened?",
+        max_length=300,
+        required=True
+    )
+    
+    actual = discord.ui.TextInput(
+        label="Actual Behavior",
+        placeholder="What actually happened?",
+        max_length=300,
+        required=True
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await _handle_submission(interaction, "bug", {
+            "title": self.bug_title.value,
+            "steps": self.steps.value,
+            "expected": self.expected.value,
+            "actual": self.actual.value
+        })
+
+
+class FeatureRequestModal(discord.ui.Modal, title="Feature Request"):
+    """Modal for feature requests"""
+    
+    feature_title = discord.ui.TextInput(
+        label="Feature Title",
+        placeholder="Name of the feature",
+        max_length=100,
+        required=True
+    )
+    
+    description = discord.ui.TextInput(
+        label="Description",
+        placeholder="Describe the feature in detail",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=True
+    )
+    
+    use_case = discord.ui.TextInput(
+        label="Use Case",
+        placeholder="How would this feature help users?",
+        max_length=500,
+        required=True
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await _handle_submission(interaction, "feature", {
+            "title": self.feature_title.value,
+            "description": self.description.value,
+            "use_case": self.use_case.value
+        })
+
+
+class FeedbackModal(discord.ui.Modal, title="Feedback"):
+    """Modal for general feedback"""
+    
+    rating = discord.ui.TextInput(
+        label="Rating (1-5)",
+        placeholder="5",
+        max_length=1,
+        required=True
+    )
+    
+    feedback = discord.ui.TextInput(
+        label="Your Feedback",
+        placeholder="Share your thoughts about SONORA...",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=True
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await _handle_submission(interaction, "feedback", {
+            "rating": self.rating.value,
+            "feedback": self.feedback.value
+        })
+
+
+class QuestionModal(discord.ui.Modal, title="Question"):
+    """Modal for questions"""
+    
+    question = discord.ui.TextInput(
+        label="Your Question",
+        placeholder="What would you like to know?",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=True
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await _handle_submission(interaction, "question", {
+            "question": self.question.value
+        })
+
+
+async def _handle_submission(interaction: discord.Interaction, report_type: str, data: dict):
+    """Handle form submission, notify developers"""
+    user = interaction.user
+    
+    try:
+        # Save to database (optional)
         try:
-            # Create welcome DM embed
-            embed = discord.Embed(
-                title="Welcome to SONORA Support",
-                description=(
-                    "Hi! Welcome to SONORA Support.\n\n"
-                    "I'm an AI Assistant ready to help 24/7.\n\n"
-                    "Please type your question or issue below!"
-                ),
-                color=0x7B1E3C
-            )
+            from database.models_support import get_support_db
+            db = get_support_db()
             
-            if self.is_registered:
-                embed.add_field(
-                    name="Account Status",
-                    value="Registered in Dashboard",
-                    inline=False
-                )
-            
-            embed.set_footer(text="SONORA AI Support")
-            
-            # Send DM
-            await self.user.send(embed=embed)
-            
-            # Update original message
-            await interaction.response.edit_message(
-                content="Check your DM!",
-                embed=None,
-                view=None
-            )
-            
-        except discord.Forbidden:
-            await interaction.response.send_message(
-                "Cannot send DM. Please enable DMs from server members.",
-                ephemeral=True
+            ticket_id = db.create_ticket(
+                user_id=str(user.id),
+                user_name=str(user),
+                ticket_type=report_type,
+                subject=data.get('title', data.get('question', 'Feedback')),
+                description=str(data)
             )
         except Exception as e:
-            logger.error(f"Error starting DM support: {e}")
+            logger.warning(f"Could not save to database: {e}")
+            ticket_id = f"{report_type[:3].upper()}-{int(time.time())}"
+        
+        # Build notification embed
+        type_colors = {
+            "bug": 0xE74C3C,      # Red
+            "feature": 0x3498DB,   # Blue
+            "feedback": 0x2ECC71,  # Green
+            "question": 0x95A5A6   # Gray
+        }
+        
+        type_titles = {
+            "bug": "🐛 Bug Report",
+            "feature": "💡 Feature Request",
+            "feedback": "💬 Feedback",
+            "question": "❓ Question"
+        }
+        
+        embed = discord.Embed(
+            title=f"New {type_titles.get(report_type, 'Report')}",
+            color=type_colors.get(report_type, 0x7B1E3C)
+        )
+        embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
+        embed.add_field(name="Ticket ID", value=f"`{ticket_id}`", inline=True)
+        embed.add_field(name="Type", value=report_type.title(), inline=True)
+        
+        # Add data fields
+        for key, value in data.items():
+            if value:
+                embed.add_field(
+                    name=key.replace('_', ' ').title(),
+                    value=value[:1000] if len(value) > 1000 else value,
+                    inline=False
+                )
+        
+        embed.set_footer(text=f"Submitted at {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
+        
+        # Notify developers
+        import os
+        dev_ids = os.getenv('DEVELOPER_IDS', '564879374843854869').split(',')
+        
+        for dev_id in dev_ids:
+            try:
+                dev_user = await interaction.client.fetch_user(int(dev_id.strip()))
+                if dev_user:
+                    await dev_user.send(embed=embed)
+                    logger.info(f"Notified developer {dev_id}")
+            except Exception as e:
+                logger.debug(f"Could not notify dev {dev_id}: {e}")
+        
+        # Update cooldown
+        user_id = user.id
+        if user_id not in _cooldowns:
+            _cooldowns[user_id] = {}
+        _cooldowns[user_id][report_type] = time.time()
+        
+        # Confirm to user
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="✅ Submitted Successfully",
+                description=(
+                    f"Your **{report_type}** has been submitted.\n\n"
+                    f"**Ticket ID:** `{ticket_id}`\n\n"
+                    "A developer will review it soon. Thank you!"
+                ),
+                color=0x2ECC71
+            ),
+            ephemeral=True
+        )
+        
+    except Exception as e:
+        logger.error(f"Submission error: {e}", exc_info=True)
+        await interaction.response.send_message(
+            "❌ An error occurred. Please try again later.",
+            ephemeral=True
+        )
+
+
+class SupportCategoryView(discord.ui.View):
+    """View with category buttons for support"""
+    
+    def __init__(self):
+        super().__init__(timeout=300)
+    
+    def _check_cooldown(self, user_id: int, report_type: str) -> Optional[int]:
+        """Check if user is on cooldown. Returns remaining seconds or None"""
+        if user_id not in _cooldowns:
+            return None
+        
+        last_time = _cooldowns[user_id].get(report_type)
+        if not last_time:
+            return None
+        
+        elapsed = time.time() - last_time
+        if elapsed < COOLDOWN_SECONDS:
+            return int(COOLDOWN_SECONDS - elapsed)
+        
+        return None
+    
+    @discord.ui.button(label="Bug Report", emoji="🐛", style=discord.ButtonStyle.danger, row=0)
+    async def bug_report(self, interaction: discord.Interaction, button: discord.ui.Button):
+        remaining = self._check_cooldown(interaction.user.id, "bug")
+        if remaining:
             await interaction.response.send_message(
-                "Error occurred. Please try again.",
+                f"⏱️ Please wait **{remaining // 60} minutes** before submitting another bug report.",
                 ephemeral=True
             )
+            return
+        await interaction.response.send_modal(BugReportModal())
+    
+    @discord.ui.button(label="Feature Request", emoji="💡", style=discord.ButtonStyle.primary, row=0)
+    async def feature_request(self, interaction: discord.Interaction, button: discord.ui.Button):
+        remaining = self._check_cooldown(interaction.user.id, "feature")
+        if remaining:
+            await interaction.response.send_message(
+                f"⏱️ Please wait **{remaining // 60} minutes** before submitting another feature request.",
+                ephemeral=True
+            )
+            return
+        await interaction.response.send_modal(FeatureRequestModal())
+    
+    @discord.ui.button(label="Feedback", emoji="💬", style=discord.ButtonStyle.success, row=0)
+    async def feedback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        remaining = self._check_cooldown(interaction.user.id, "feedback")
+        if remaining:
+            await interaction.response.send_message(
+                f"⏱️ Please wait **{remaining // 60} minutes** before submitting more feedback.",
+                ephemeral=True
+            )
+            return
+        await interaction.response.send_modal(FeedbackModal())
+    
+    @discord.ui.button(label="Question", emoji="❓", style=discord.ButtonStyle.secondary, row=0)
+    async def question(self, interaction: discord.Interaction, button: discord.ui.Button):
+        remaining = self._check_cooldown(interaction.user.id, "question")
+        if remaining:
+            await interaction.response.send_message(
+                f"⏱️ Please wait **{remaining // 60} minutes** before asking another question.",
+                ephemeral=True
+            )
+            return
+        await interaction.response.send_modal(QuestionModal())
+
 
 class SupportCog(commands.Cog):
-    """Customer Support - /support command and DM handling"""
+    """Customer Support - /support command with modal forms"""
     
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.ai = get_support_ai()
-        self.db = get_support_db()
-        self._active_sessions = {}  # user_id -> session info
     
-    @app_commands.command(name="support", description="Minta bantuan dari AI Support")
+    @app_commands.command(name="support", description="Contact support team")
     async def support(self, interaction: discord.Interaction):
-        """Redirect user to DM for support and check database registration"""
-        user = interaction.user
+        """Send support menu with category buttons"""
         
-        # Check if user is registered in dashboard
-        is_registered = await self._check_user_registration(str(user.id))
-        
-        # Create embed for redirect
         embed = discord.Embed(
-            title="SONORA Support",
+            title="🎧 SONORA Support",
             description=(
-                "For support, please DM this bot directly.\n\n"
-                "AI Support is ready to help 24/7 with:\n"
-                "- Feature questions\n"
-                "- Bug reports\n"
-                "- Feedback & suggestions\n"
-                "- Contact developer"
+                "Need help? Choose a category below to submit your request.\n\n"
+                "**Available Categories:**\n"
+                "🐛 **Bug Report** - Report bugs or errors\n"
+                "💡 **Feature Request** - Suggest new features\n"
+                "💬 **Feedback** - Share your thoughts\n"
+                "❓ **Question** - Ask about usage\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ),
             color=0x7B1E3C
         )
         
-        if is_registered:
-            embed.add_field(
-                name="Account Status",
-                value="Registered in Dashboard",
-                inline=False
-            )
-        else:
-            embed.add_field(
-                name="Join Dashboard",
-                value=(
-                    "Don't have an account?\n"
-                    "[sonora.muhammadzakizn.com](https://sonora.muhammadzakizn.com)"
-                ),
-                inline=False
-            )
+        embed.add_field(
+            name="⚠️ Important Notice",
+            value=(
+                "• This is for **serious inquiries only**\n"
+                "• **1-hour cooldown** between submissions\n"
+                "• Abuse may result in restrictions"
+            ),
+            inline=False
+        )
         
-        embed.set_footer(text="Click button below to start DM chat")
+        embed.add_field(
+            name="🌐 Resources",
+            value=(
+                "[Website](https://sonora.muhammadzakizn.com) • "
+                "[Dashboard](https://sonora.muhammadzakizn.com/dashboard) • "
+                "[Documentation](https://sonora.muhammadzakizn.com/docs)"
+            ),
+            inline=False
+        )
         
-        # Create view with DM button
-        view = StartSupportView(self.bot, user, is_registered)
+        embed.set_footer(text="SONORA • Premium Discord Music Bot")
+        
+        view = SupportCategoryView()
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-    
-    async def _check_user_registration(self, discord_id: str) -> bool:
-        """Check if user is registered in dashboard database"""
-        try:
-            from database.db_manager import get_db_manager
-            db = get_db_manager()
-            
-            # Check if user exists in users table
-            result = db.execute_raw(
-                "SELECT id FROM users WHERE discord_id = ?",
-                (discord_id,)
-            )
-            return len(result) > 0 if result else False
-        except Exception as e:
-            logger.debug(f"Error checking user registration: {e}")
-            return False
-    
-    async def _notify_developers(self, ticket_id: str):
-        """Notify developers about new ticket"""
-        try:
-            ticket = self.db.get_ticket(ticket_id)
-            if not ticket:
-                return
-            
-            # Get developer IDs from environment
-            import os
-            dev_ids = os.getenv('DEVELOPER_IDS', '564879374843854869').split(',')
-            
-            for dev_id in dev_ids:
-                try:
-                    dev_user = await self.bot.fetch_user(int(dev_id.strip()))
-                    if dev_user:
-                        embed = discord.Embed(
-                            title="New Support Ticket",
-                            description=(
-                                f"**Ticket:** `{ticket.id}`\n"
-                                f"**Type:** {ticket.ticket_type.title()}\n"
-                                f"**User:** {ticket.user_name}\n"
-                                f"**Subject:** {ticket.subject}\n\n"
-                                f"**Description:**\n{ticket.description[:500]}"
-                            ),
-                            color=0xE74C3C if ticket.ticket_type == 'issue' else 0x3498DB
-                        )
-                        embed.set_footer(text="Check Developer Dashboard for details")
-                        
-                        await dev_user.send(embed=embed)
-                        logger.info(f"Notified developer {dev_id} about ticket {ticket_id}")
-                except Exception as e:
-                    logger.debug(f"Could not notify developer {dev_id}: {e}")
-                    
-        except Exception as e:
-            logger.error(f"Error notifying developers: {e}")
-    
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        """Handle DM messages for support"""
-        # Ignore bot messages
-        if message.author.bot:
-            return
-        
-        # Only handle DMs
-        if not isinstance(message.channel, discord.DMChannel):
-            return
-        
-        # Check if message starts with command prefix (ignore)
-        if message.content.startswith(('/', '!', '?', '.', '-')):
-            await message.reply(
-                embed=discord.Embed(
-                    title="Commands Not Available in DM",
-                    description=(
-                        "Perintah bot tidak tersedia di DM.\n\n"
-                        "Untuk support, cukup ketik pesan biasa atau gunakan tombol di atas.\n"
-                        "Untuk menggunakan bot, pergi ke server Discord."
-                    ),
-                    color=0xF39C12
-                )
-            )
-            return
-        
-        # Process with AI
-        user_id = str(message.author.id)
-        user_name = message.author.display_name
-        
-        async with message.channel.typing():
-            try:
-                response, intent = await self.ai.generate_response(
-                    message.content,
-                    user_name
-                )
-                
-                # Create response embed
-                embed = None
-                view = None
-                
-                if intent in [UserIntent.FEEDBACK, UserIntent.ISSUE, UserIntent.LIVE_SUPPORT]:
-                    # Show action buttons for these intents
-                    embed = discord.Embed(
-                        description=response,
-                        color=0x7B1E3C
-                    )
-                    view = SupportActionView(
-                        show_feedback=(intent == UserIntent.FEEDBACK),
-                        show_issue=(intent == UserIntent.ISSUE),
-                        show_live=(intent == UserIntent.LIVE_SUPPORT),
-                        on_ticket_created=self._notify_developers
-                    )
-                    await message.reply(embed=embed, view=view)
-                else:
-                    # Regular text response
-                    await message.reply(response)
-                
-                logger.debug(f"AI response to {user_name}: intent={intent.value}")
-                
-            except Exception as e:
-                logger.error(f"Error processing DM: {e}")
-                await message.reply(
-                    "Maaf, terjadi kesalahan. Coba lagi nanti atau gunakan tombol di atas."
-                )
 
 
 async def setup(bot: commands.Bot):
-    """Setup the support cog"""
     await bot.add_cog(SupportCog(bot))
-    logger.info("Support cog loaded")
