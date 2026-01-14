@@ -192,10 +192,16 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         # ActionRow for control buttons
         action_row = discord.ui.ActionRow()
         
+        # Custom SONORA emoji IDs
+        pause_emoji = discord.PartialEmoji(name="pause", id=1460800072823476264)
+        play_emoji = discord.PartialEmoji(name="play", id=1460800090586353928)
+        stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
+        loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
+        
         # Pause/Resume
         pause_btn = discord.ui.Button(
             label="Pause" if not is_paused else "Play",
-            emoji="⏸" if not is_paused else "▶️",
+            emoji=pause_emoji if not is_paused else play_emoji,
             style=discord.ButtonStyle.secondary,
             custom_id=f"ctrl_pause_{self.guild_id}"
         )
@@ -204,7 +210,7 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         # Skip
         skip_btn = discord.ui.Button(
             label="Skip",
-            emoji="⏭",
+            emoji="⏭",  # Unicode skip
             style=discord.ButtonStyle.secondary,
             custom_id=f"ctrl_skip_{self.guild_id}"
         )
@@ -213,7 +219,7 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         # Stop
         stop_btn = discord.ui.Button(
             label="Stop",
-            emoji="⏹",
+            emoji=stop_emoji,
             style=discord.ButtonStyle.danger,
             custom_id=f"ctrl_stop_{self.guild_id}"
         )
@@ -222,7 +228,7 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         # Loop
         loop_btn = discord.ui.Button(
             label="Loop",
-            emoji="🔁",
+            emoji=loop_emoji,
             style=discord.ButtonStyle.secondary,
             custom_id=f"ctrl_loop_{self.guild_id}"
         )
@@ -231,7 +237,7 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         # Queue
         queue_btn = discord.ui.Button(
             label="Queue",
-            emoji="📋",
+            emoji="📋",  # Unicode queue
             style=discord.ButtonStyle.secondary,
             custom_id=f"ctrl_queue_{self.guild_id}"
         )

@@ -55,10 +55,15 @@ EMOJI_SUCCESS = ""  # No emoji
 EMOJI_ERROR = ""    # No emoji
 EMOJI_WARNING = ""  # No emoji
 EMOJI_MUSIC = ""    # No emoji
-EMOJI_PAUSE = ""
-EMOJI_PLAY = ""
-EMOJI_SKIP = ""
-EMOJI_STOP = ""
+
+# Custom SONORA control emojis (from bot's emoji library)
+EMOJI_PAUSE = "<:pause:1460800072823476264>"
+EMOJI_PLAY = "<:play:1460800090586353928>"
+EMOJI_STOP = "<:stop:1460800121217224884>"
+EMOJI_LOOP = "<:loop:1460800053483667610>"
+EMOJI_SETTINGS = "<:settings:1460800105673134090>"
+EMOJI_SKIP = "⏭"  # Unicode skip (no custom emoji yet)
+EMOJI_QUEUE = "📋"  # Unicode queue
 
 # Progress bar characters
 PROGRESS_FILLED = "█"
