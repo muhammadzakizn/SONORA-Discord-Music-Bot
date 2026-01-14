@@ -46,31 +46,16 @@ class MediaPlayerComponentsV2:
         Returns:
             discord.ui.LayoutView with all components
         """
-        # Format duration
-        duration_str = ""
-        if metadata.duration and metadata.duration > 0:
-            mins = int(metadata.duration // 60)
-            secs = int(metadata.duration % 60)
-            duration_str = f"`{mins:02d}:{secs:02d}`"
-        
-        # Build main text
-        if duration_str:
-            main_text = f"**{metadata.title}** - *{metadata.artist}* - {duration_str}"
-        else:
-            main_text = f"**{metadata.title}** - *{metadata.artist}*"
+        # Build track info (Title on one line, Artist below)
+        title_text = f"**{metadata.title}**"
+        artist_text = f"*{metadata.artist}*"
         
         # Build requester info
         requester_text = ""
         if metadata.requested_by_id and metadata.requested_by_id > 0:
-            requester_text = f"> Requested by <@{metadata.requested_by_id}>"
+            requester_text = f"Requested by <@{metadata.requested_by_id}>"
         elif metadata.requested_by:
-            requester_text = f"> Requested by {metadata.requested_by}"
-        
-        if voice_channel_name:
-            if requester_text:
-                requester_text += f"\n> Connected in 🔊 {voice_channel_name}"
-            else:
-                requester_text = f"> Connected in 🔊 {voice_channel_name}"
+            requester_text = f"Requested by {metadata.requested_by}"
         
         # Build lyrics text  
         lyrics_text = ""
@@ -96,66 +81,45 @@ class MediaPlayerComponentsV2:
             custom_id=f"btn_like_{guild_id}"
         )
         
-        # Section 1: Main info with thumbnail
+        # ========================================
+        # LAYOUT STRUCTURE (cleaner FlaviBot style)
+        # ========================================
+        
+        # Section 1: Now Playing header + Title + Artist with thumbnail
         main_section = discord.ui.Section(
             discord.ui.TextDisplay(content="### Now Playing"),
-            discord.ui.TextDisplay(content=main_text),
+            discord.ui.TextDisplay(content=title_text),
+            discord.ui.TextDisplay(content=artist_text),
             accessory=thumbnail if thumbnail else like_button
         )
         
-        # Build container
+        # Build container with main section
         container = discord.ui.Container(
             main_section,
             accent_colour=discord.Colour(COLOR_PLAYING)
         )
         
-        # Add requester section if present
+        # Add: space + requester
         if requester_text:
-            requester_section = discord.ui.Section(
-                discord.ui.TextDisplay(content=requester_text),
-                accessory=like_button if thumbnail else discord.ui.Button(
-                    label="",
-                    emoji="📋",
-                    style=discord.ButtonStyle.secondary,
-                    custom_id=f"btn_queue_inline_{guild_id}",
-                    disabled=True  # Placeholder
-                )
-            )
-            container.add_item(requester_section)
+            container.add_item(discord.ui.TextDisplay(content=""))  # Single space
+            container.add_item(discord.ui.TextDisplay(content=f"│ {requester_text}"))
         
-        # Add separator
+        # Add: double space + lyrics
+        if lyrics_text:
+            container.add_item(discord.ui.TextDisplay(content=""))  # Space 1
+            container.add_item(discord.ui.TextDisplay(content=""))  # Space 2
+            container.add_item(discord.ui.TextDisplay(content=lyrics_text))
+        
+        # Add: double space + progress bar
+        if progress_bar:
+            container.add_item(discord.ui.TextDisplay(content=""))  # Space 1
+            container.add_item(discord.ui.TextDisplay(content=""))  # Space 2
+            container.add_item(discord.ui.TextDisplay(content=progress_bar))
+        
+        # Add: space before controls (separator)
         container.add_item(discord.ui.Separator())
         
-        # Add lyrics section if present
-        if lyrics_text:
-            # Lyrics section needs accessory - use a placeholder or actual accessory
-            lyrics_section = discord.ui.Section(
-                discord.ui.TextDisplay(content=lyrics_text),
-                accessory=discord.ui.Button(
-                    label="",
-                    emoji="🎵",
-                    style=discord.ButtonStyle.secondary,
-                    custom_id=f"btn_lyrics_expand_{guild_id}",
-                    disabled=True
-                )
-            )
-            container.add_item(lyrics_section)
-        
-        # Add progress bar section if present
-        if progress_bar:
-            progress_section = discord.ui.Section(
-                discord.ui.TextDisplay(content=progress_bar),
-                accessory=discord.ui.Button(
-                    label="",
-                    emoji="⏱️",
-                    style=discord.ButtonStyle.secondary,
-                    custom_id=f"btn_time_{guild_id}",
-                    disabled=True
-                )
-            )
-            container.add_item(progress_section)
-        
-        # Add favorites section with Like button (if not already used)
+        # Add favorites section with Like button (if not already used in main section)
         if thumbnail:  # Like button not yet used
             favorites_section = discord.ui.Section(
                 discord.ui.TextDisplay(content="-# Add to your favorites"),
