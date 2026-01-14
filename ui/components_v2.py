@@ -170,15 +170,10 @@ class MediaPlayerComponentsV2:
         # Add container to view
         view.add_item(container)
         
-        # No more external ActionRow for controls
-        # view.add_control_buttons(is_paused)
+        # Add selection menu (Dropdown) - RESTORED
+        view.add_selection_menu()
         
         return view
-        
-    @staticmethod
-    def create_search_results_view(results: list, user_id: int):
-        """Create view for search results"""
-        pass
 
 
 class MediaPlayerLayoutView(discord.ui.LayoutView):
@@ -190,6 +185,30 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         self.guild_id = guild_id
         
         # Callbacks will be handled by the buttons themselves or main view based on custom_id
+        
+    def add_selection_menu(self):
+        """Add settings selection menu (Filters, etc)"""
+        # Create ActionRow for select menu
+        # Note: In LayoutView, items added directly are placed automatically. 
+        # Select menu usually takes full width row.
+        
+        select = discord.ui.Select(
+            placeholder="✨ Audio Effects & Settings...",
+            min_values=1,
+            max_values=1,
+            custom_id=f"sel_settings_{self.guild_id}",
+            options=[
+                discord.SelectOption(label="Reset Effects", value="filter_clear", emoji="🔄", description="Remove all audio filters"),
+                discord.SelectOption(label="Bass Boost", value="filter_bass", emoji="🔊", description="Heavy bass boost"),
+                discord.SelectOption(label="Nightcore", value="filter_nightcore", emoji="🌙", description="Higher pitch & speed"),
+                discord.SelectOption(label="Vaporwave", value="filter_vaporwave", emoji="🌊", description="Slowed & reverb"),
+                discord.SelectOption(label="8D Audio", value="filter_8d", emoji="🎧", description="Immersive 3D audio"),
+                discord.SelectOption(label="Loop Track", value="loop_track", emoji="🔂", description="Repeat current song"),
+                discord.SelectOption(label="Loop Queue", value="loop_queue", emoji="🔁", description="Repeat entire queue"),
+                discord.SelectOption(label="Lyrics Toggle", value="toggle_lyrics", emoji="📝", description="Show/Hide lyrics"),
+            ]
+        )
+        self.add_item(select)
         
     # add_control_buttons removed - logic moved to create_now_playing_view
     
