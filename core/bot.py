@@ -36,7 +36,7 @@ class MusicBot(commands.Bot):
         """Initialize music bot"""
         # Setup intents
         intents = discord.Intents.default()
-        intents.message_content = True
+        intents.message_content = False  # Disabled: using modal-based support
         intents.voice_states = True
         intents.guilds = True
         
