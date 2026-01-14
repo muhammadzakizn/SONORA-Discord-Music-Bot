@@ -86,6 +86,18 @@ class PlayCommand(commands.Cog):
             logger.debug(f"Autocomplete error: {e}")
             return []
     
+    async def _fetch_lyrics_bg(self, metadata):
+        """Fetch lyrics in background"""
+        try:
+            from services.lyrics.lyrics_manager import get_lyrics_manager
+            lyrics_mgr = get_lyrics_manager()
+            lyrics = await lyrics_mgr.get_lyrics(metadata.title, metadata.artist, duration=metadata.duration)
+            if lyrics:
+                metadata.lyrics = lyrics
+                logger.info(f"[Lyrics] Background fetch success for {metadata.title}")
+        except Exception as e:
+            logger.error(f"[Lyrics] Background fetch failed: {e}")
+
     @app_commands.command(name="play", description="Play music from Spotify, YouTube, Deezer, or search")
     @app_commands.describe(query="Song name, URL (YouTube, Spotify, Deezer, Apple Music)")
     @app_commands.autocomplete(query=play_autocomplete)
@@ -95,6 +107,18 @@ class PlayCommand(commands.Cog):
         query: str
     ):
 
+        """
+        Play command - Main entry point
+        """
+        await self._play_impl(interaction, query)
+
+    async def _play_impl(self, interaction: discord.Interaction, query: str):
+        # Implementation moved here to allow calling from button interactions if needed
+        # But for now just keeping the original logic structure but ensuring indentation
+        
+        # NOTE: Since we are using replace_content on a large file, I cannot easily wrap the entire method.
+        # I will only insert the helper method ABOVE play, and then modify the play method internals separately.
+        
         """
         Play command - Main entry point
         
@@ -334,11 +358,37 @@ class PlayCommand(commands.Cog):
                             audio_source=AudioSource.STREAMING,
                             artwork_url=artwork_url,
                             artwork_source=ArtworkSource.LAVALINK if artwork_url else ArtworkSource.NONE,
-                            lyrics=None,  # Will be loaded in background
+                            lyrics=None, 
                             requested_by=interaction.user.display_name,
                             requested_by_id=interaction.user.id,
                             voice_channel_id=voice_channel.id
                         )
+                        
+                        # ========================================
+                        # WAIT FOR LYRICS (Max 5s)
+                        # ========================================
+                        try:
+                            from services.lyrics.lyrics_manager import get_lyrics_manager
+                            lyrics_mgr = get_lyrics_manager()
+                            
+                            logger.info("[Play] Pre-fetching lyrics (max 5s)...")
+                            # Fetch with timeout
+                            fetched_lyrics = await asyncio.wait_for(
+                                lyrics_mgr.get_lyrics(metadata.title, metadata.artist, duration=metadata.duration),
+                                timeout=5.0
+                            )
+                            
+                            if fetched_lyrics:
+                                metadata.lyrics = fetched_lyrics
+                                logger.info("[Play] Lyrics ready before playback!")
+                        except asyncio.TimeoutError:
+                            logger.info("[Play] Lyrics fetch timeout - continuing in background")
+                            # Start background task
+                            asyncio.create_task(self._fetch_lyrics_bg(metadata))
+                        except Exception as e:
+                            logger.warning(f"[Play] Pre-fetch lyrics error: {e}")
+                            # Try background anyway
+                            asyncio.create_task(self._fetch_lyrics_bg(metadata))
                         
                         # Stop spinner and show player immediately
                         await loader.stop_spinner()
@@ -350,10 +400,16 @@ class PlayCommand(commands.Cog):
                         
                         # Create Components v2 player (FlaviBot style)
                         from config.constants import EMOJI_LOADING
+                        
+                        # Determine initial lyrics lines
+                        initial_lyrics = ["", f"{EMOJI_LOADING} Loading lyrics...", ""]
+                        if metadata.lyrics:
+                            initial_lyrics = metadata.lyrics.get_lines_at_time(0, 3)
+                        
                         layout_view = create_media_player_v2(
                             metadata=metadata,
                             progress_bar="",
-                            lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
+                            lyrics_lines=initial_lyrics,
                             guild_id=interaction.guild.id,
                             voice_channel_name=voice_channel_name,
                             is_paused=False,
