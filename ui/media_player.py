@@ -14,6 +14,7 @@ from services.audio.file_registry import get_audio_registry
 from utils.formatters import ProgressBarFormatter
 from .embeds import EmbedBuilder
 from .loading import SafeLoadingManager
+from .components_v2 import create_media_player_v2
 from config.logging_config import get_logger
 
 logger = get_logger('ui.media_player')
@@ -1474,23 +1475,28 @@ class SynchronizedMediaPlayer:
                                     next_metadata.apple_lyrics = cached_data.apple_lyrics
                                     logger.info(f"[PreProcessor] Using cached Apple lyrics")
                             
-                            # Create player UI
-                            from .menu_view import MediaPlayerView
-                            view = MediaPlayerView(self.bot, self.guild_id, timeout=None)
-                            
+                            # Delete old message and send Components v2 player
                             try:
                                 await self.message.delete()
                             except:
                                 pass
                             
-                            player_msg = await self.message.channel.send(
-                                embed=EmbedBuilder.create_now_playing(
-                                    metadata=next_metadata,
-                                    current_time=0,
-                                    guild_id=self.guild_id
-                                ),
-                                view=view
+                            # Get voice channel name
+                            voice_channel_name = None
+                            if hasattr(self.voice, 'channel') and self.voice.channel:
+                                voice_channel_name = self.voice.channel.name
+                            
+                            # Create Components v2 player for next track
+                            layout_view = create_media_player_v2(
+                                metadata=next_metadata,
+                                progress_bar="",
+                                lyrics_lines=["", "", ""],
+                                guild_id=self.guild_id,
+                                voice_channel_name=voice_channel_name,
+                                is_paused=False,
+                                bot=self.bot
                             )
+                            player_msg = await self.message.channel.send(view=layout_view)
 
                             
                             # Create new player for UI updates
@@ -1748,9 +1754,6 @@ class SynchronizedMediaPlayer:
             
             # Delete old player message and create new one
             # This keeps the player fresh and accessible at bottom of chat
-            from .menu_view import MediaPlayerView
-            view = MediaPlayerView(self.bot, self.guild_id, timeout=None)
-            
             try:
                 # Delete old message first
                 await self.message.delete()
@@ -1758,17 +1761,23 @@ class SynchronizedMediaPlayer:
             except Exception as e:
                 logger.warning(f"Could not delete old message: {e}")
             
-            # Send new player message
+            # Get voice channel name
+            voice_channel_name = None
+            if hasattr(self.voice, 'channel') and self.voice.channel:
+                voice_channel_name = self.voice.channel.name
+            
+            # Send new Components v2 player message
             try:
-                player_msg = await self.message.channel.send(
-                    embed=EmbedBuilder.create_now_playing(
-                        metadata=next_metadata,
-                        progress_bar="",
-                        lyrics_lines=["", "", ""],
-                        guild_id=self.guild_id
-                    ),
-                    view=view
+                layout_view = create_media_player_v2(
+                    metadata=next_metadata,
+                    progress_bar="",
+                    lyrics_lines=["", "", ""],
+                    guild_id=self.guild_id,
+                    voice_channel_name=voice_channel_name,
+                    is_paused=False,
+                    bot=self.bot
                 )
+                player_msg = await self.message.channel.send(view=layout_view)
                 self.message = player_msg
                 
                 # Store player message for future deletion
