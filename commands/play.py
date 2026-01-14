@@ -23,6 +23,7 @@ from utils.permission_fallback import send_with_fallback
 from config.settings import Settings
 from config.logging_config import get_logger
 from core.error_handler import DownloadError
+from ui.components_v2 import create_media_player_v2
 
 logger = get_logger('commands.play')
 
@@ -340,20 +341,25 @@ class PlayCommand(commands.Cog):
                         # Stop spinner and show player immediately
                         await loader.stop_spinner()
                         
-                        # Create menu view for controls
-                        view = MediaPlayerView(self.bot, interaction.guild.id, timeout=None)
+                        # Get voice channel name for display
+                        voice_channel_name = None
+                        if hasattr(interaction.user, 'voice') and interaction.user.voice and interaction.user.voice.channel:
+                            voice_channel_name = interaction.user.voice.channel.name
                         
-                        # Send player message with "Loading lyrics" text
+                        # Create Components v2 player (FlaviBot style)
                         from config.constants import EMOJI_LOADING
-                        player_msg = await interaction.channel.send(
-                            embed=EmbedBuilder.create_now_playing(
-                                metadata=metadata,
-                                progress_bar="",
-                                lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
-                                guild_id=interaction.guild.id
-                            ),
-                            view=view
+                        layout_view = create_media_player_v2(
+                            metadata=metadata,
+                            progress_bar="",
+                            lyrics_lines=["", f"{EMOJI_LOADING} Loading lyrics...", ""],
+                            guild_id=interaction.guild.id,
+                            voice_channel_name=voice_channel_name,
+                            is_paused=False,
+                            bot=self.bot
                         )
+                        
+                        # Send player message with Components v2
+                        player_msg = await interaction.channel.send(view=layout_view)
                         
                         # Delete loader message
                         await loader.delete()

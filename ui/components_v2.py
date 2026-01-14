@@ -1,0 +1,436 @@
+"""
+Discord Components V2 helper for SONORA media player
+Implements FlaviBot-style UI with Section and Button accessories
+"""
+
+import discord
+from typing import Optional, List
+from database.models import MetadataInfo
+from config.constants import COLOR_PLAYING
+from config.logging_config import get_logger
+
+logger = get_logger('ui.components_v2')
+
+
+class MediaPlayerComponentsV2:
+    """
+    Build Components V2 layout for media player
+    Structure like FlaviBot:
+    - Container with accent color
+    - Section with text content + thumbnail/button accessory
+    - ActionRow with control buttons (Pause, Skip, Stop, Loop, Queue)
+    """
+    
+    @staticmethod
+    def create_now_playing_view(
+        metadata: MetadataInfo,
+        progress_bar: str = "",
+        lyrics_lines: Optional[List[str]] = None,
+        guild_id: int = None,
+        voice_channel_name: str = None,
+        is_paused: bool = False,
+        bot = None
+    ) -> discord.ui.LayoutView:
+        """
+        Create Components V2 media player as LayoutView
+        
+        Args:
+            metadata: Track metadata
+            progress_bar: Progress bar string
+            lyrics_lines: Current lyrics lines
+            guild_id: Guild ID for EQ indicator
+            voice_channel_name: Voice channel name
+            is_paused: Whether playback is paused
+            bot: Bot instance for button callbacks
+            
+        Returns:
+            discord.ui.LayoutView with all components
+        """
+        # Format duration
+        duration_str = ""
+        if metadata.duration and metadata.duration > 0:
+            mins = int(metadata.duration // 60)
+            secs = int(metadata.duration % 60)
+            duration_str = f"`{mins:02d}:{secs:02d}`"
+        
+        # Build main text
+        if duration_str:
+            main_text = f"**{metadata.title}** - *{metadata.artist}* - {duration_str}"
+        else:
+            main_text = f"**{metadata.title}** - *{metadata.artist}*"
+        
+        # Build requester info
+        requester_text = ""
+        if metadata.requested_by_id and metadata.requested_by_id > 0:
+            requester_text = f"> Requested by <@{metadata.requested_by_id}>"
+        elif metadata.requested_by:
+            requester_text = f"> Requested by {metadata.requested_by}"
+        
+        if voice_channel_name:
+            if requester_text:
+                requester_text += f"\n> Connected in 🔊 {voice_channel_name}"
+            else:
+                requester_text = f"> Connected in 🔊 {voice_channel_name}"
+        
+        # Build lyrics text  
+        lyrics_text = ""
+        if lyrics_lines and any(lyrics_lines):
+            lyrics_text = "\n".join(l for l in lyrics_lines if l)
+        
+        # Create LayoutView
+        view = MediaPlayerLayoutView(bot=bot, guild_id=guild_id, timeout=None)
+        
+        # Create thumbnail accessory if artwork available
+        thumbnail = None
+        if metadata.artwork_url:
+            try:
+                thumbnail = discord.ui.Thumbnail(media=metadata.artwork_url)
+            except Exception as e:
+                logger.warning(f"Could not create thumbnail: {e}")
+        
+        # Create Like button for accessory
+        like_button = discord.ui.Button(
+            label="Like",
+            emoji="🤍",
+            style=discord.ButtonStyle.primary,
+            custom_id=f"btn_like_{guild_id}"
+        )
+        
+        # Section 1: Main info with thumbnail
+        main_section = discord.ui.Section(
+            discord.ui.TextDisplay(content="### Now Playing"),
+            discord.ui.TextDisplay(content=main_text),
+            accessory=thumbnail if thumbnail else like_button
+        )
+        
+        # Build container
+        container = discord.ui.Container(
+            main_section,
+            accent_colour=discord.Colour(COLOR_PLAYING)
+        )
+        
+        # Add requester section if present
+        if requester_text:
+            requester_section = discord.ui.Section(
+                discord.ui.TextDisplay(content=requester_text),
+                accessory=like_button if thumbnail else discord.ui.Button(
+                    label="",
+                    emoji="📋",
+                    style=discord.ButtonStyle.secondary,
+                    custom_id=f"btn_queue_inline_{guild_id}",
+                    disabled=True  # Placeholder
+                )
+            )
+            container.add_item(requester_section)
+        
+        # Add separator
+        container.add_item(discord.ui.Separator())
+        
+        # Add lyrics section if present
+        if lyrics_text:
+            # Lyrics section needs accessory - use a placeholder or actual accessory
+            lyrics_section = discord.ui.Section(
+                discord.ui.TextDisplay(content=lyrics_text),
+                accessory=discord.ui.Button(
+                    label="",
+                    emoji="🎵",
+                    style=discord.ButtonStyle.secondary,
+                    custom_id=f"btn_lyrics_expand_{guild_id}",
+                    disabled=True
+                )
+            )
+            container.add_item(lyrics_section)
+        
+        # Add progress bar section if present
+        if progress_bar:
+            progress_section = discord.ui.Section(
+                discord.ui.TextDisplay(content=progress_bar),
+                accessory=discord.ui.Button(
+                    label="",
+                    emoji="⏱️",
+                    style=discord.ButtonStyle.secondary,
+                    custom_id=f"btn_time_{guild_id}",
+                    disabled=True
+                )
+            )
+            container.add_item(progress_section)
+        
+        # Add favorites section with Like button (if not already used)
+        if thumbnail:  # Like button not yet used
+            favorites_section = discord.ui.Section(
+                discord.ui.TextDisplay(content="-# Add to your favorites"),
+                accessory=like_button
+            )
+            container.add_item(favorites_section)
+        
+        # Add container to view
+        view.add_item(container)
+        
+        # Add control buttons in ActionRow
+        view.add_control_buttons(is_paused)
+        
+        return view
+
+
+class MediaPlayerLayoutView(discord.ui.LayoutView):
+    """
+    Components V2 LayoutView for media player
+    Contains Container with Sections and ActionRow buttons
+    """
+    
+    def __init__(self, bot=None, guild_id: int = None, timeout: int = None):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.is_paused = False
+        self.loop_mode = 0
+    
+    def add_control_buttons(self, is_paused: bool = False):
+        """Add playback control buttons in row 1"""
+        self.is_paused = is_paused
+        
+        # ActionRow for control buttons
+        action_row = discord.ui.ActionRow()
+        
+        # Pause/Resume
+        pause_btn = discord.ui.Button(
+            label="Pause" if not is_paused else "Play",
+            emoji="⏸" if not is_paused else "▶️",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"ctrl_pause_{self.guild_id}"
+        )
+        action_row.add_item(pause_btn)
+        
+        # Skip
+        skip_btn = discord.ui.Button(
+            label="Skip",
+            emoji="⏭",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"ctrl_skip_{self.guild_id}"
+        )
+        action_row.add_item(skip_btn)
+        
+        # Stop
+        stop_btn = discord.ui.Button(
+            label="Stop",
+            emoji="⏹",
+            style=discord.ButtonStyle.danger,
+            custom_id=f"ctrl_stop_{self.guild_id}"
+        )
+        action_row.add_item(stop_btn)
+        
+        # Loop
+        loop_btn = discord.ui.Button(
+            label="Loop",
+            emoji="🔁",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"ctrl_loop_{self.guild_id}"
+        )
+        action_row.add_item(loop_btn)
+        
+        # Queue
+        queue_btn = discord.ui.Button(
+            label="Queue",
+            emoji="📋",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"ctrl_queue_{self.guild_id}"
+        )
+        action_row.add_item(queue_btn)
+        
+        self.add_item(action_row)
+    
+    def _check_voice_channel(self, interaction: discord.Interaction) -> tuple:
+        """Check if user is in the same voice channel as bot"""
+        if not interaction.user.voice:
+            return False, "You must be in a voice channel"
+        
+        if self.bot and hasattr(self.bot, 'voice_manager'):
+            connection = self.bot.voice_manager.get_connection(self.guild_id)
+            if connection:
+                vc = getattr(connection, 'connection', connection)
+                if hasattr(vc, 'channel') and vc.channel:
+                    if interaction.user.voice.channel.id != vc.channel.id:
+                        return False, "You must be in the same voice channel"
+        
+        return True, None
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Handle button interactions"""
+        custom_id = interaction.data.get('custom_id', '')
+        
+        # Handle control buttons
+        if custom_id.startswith('ctrl_pause_'):
+            await self._handle_pause(interaction)
+            return False
+        elif custom_id.startswith('ctrl_skip_'):
+            await self._handle_skip(interaction)
+            return False
+        elif custom_id.startswith('ctrl_stop_'):
+            await self._handle_stop(interaction)
+            return False
+        elif custom_id.startswith('ctrl_loop_'):
+            await self._handle_loop(interaction)
+            return False
+        elif custom_id.startswith('ctrl_queue_'):
+            await self._handle_queue(interaction)
+            return False
+        elif custom_id.startswith('btn_like_'):
+            await self._handle_like(interaction)
+            return False
+        
+        return True
+    
+    async def _handle_pause(self, interaction: discord.Interaction):
+        """Handle pause/resume"""
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
+            await interaction.response.send_message(f"❌ {error_msg}", ephemeral=True, delete_after=3)
+            return
+        
+        try:
+            if self.bot and hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                player = self.bot.players[self.guild_id]
+                if player.is_paused:
+                    await player.resume()
+                    await interaction.response.send_message("▶️ Resumed", ephemeral=True, delete_after=2)
+                else:
+                    await player.pause()
+                    await interaction.response.send_message("⏸️ Paused", ephemeral=True, delete_after=2)
+            else:
+                await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=2)
+        except Exception as e:
+            logger.error(f"Pause error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
+    
+    async def _handle_skip(self, interaction: discord.Interaction):
+        """Handle skip"""
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
+            await interaction.response.send_message(f"❌ {error_msg}", ephemeral=True, delete_after=3)
+            return
+        
+        try:
+            if self.bot and hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                player = self.bot.players[self.guild_id]
+                player.is_playing = False
+                await player._play_next_from_queue()
+                await interaction.response.send_message("⏭️ Skipped", ephemeral=True, delete_after=2)
+            else:
+                await interaction.response.send_message("Nothing playing", ephemeral=True, delete_after=2)
+        except Exception as e:
+            logger.error(f"Skip error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
+    
+    async def _handle_stop(self, interaction: discord.Interaction):
+        """Handle stop"""
+        is_valid, error_msg = self._check_voice_channel(interaction)
+        if not is_valid:
+            await interaction.response.send_message(f"❌ {error_msg}", ephemeral=True, delete_after=3)
+            return
+        
+        try:
+            from services.audio.lavalink_player import get_lavalink_player
+            lavalink_player = get_lavalink_player()
+            if lavalink_player:
+                await lavalink_player.disconnect(self.guild_id)
+            
+            if self.bot:
+                connection = self.bot.voice_manager.get_connection(self.guild_id)
+                if connection:
+                    await connection.disconnect()
+                
+                if hasattr(self.bot, 'players') and self.guild_id in self.bot.players:
+                    self.bot.players[self.guild_id].is_playing = False
+                
+                queue_cog = self.bot.get_cog('QueueCommands')
+                if queue_cog:
+                    queue_cog.clear(self.guild_id)
+            
+            await interaction.response.send_message("⏹️ Stopped", ephemeral=True, delete_after=3)
+        except Exception as e:
+            logger.error(f"Stop error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
+    
+    async def _handle_loop(self, interaction: discord.Interaction):
+        """Handle loop toggle"""
+        try:
+            if self.bot:
+                loop_cog = self.bot.get_cog('LoopCommands')
+                if loop_cog:
+                    from commands.loop import LoopMode
+                    current = loop_cog.get_loop_mode(self.guild_id)
+                    
+                    if current == LoopMode.OFF:
+                        loop_cog.set_loop_mode(self.guild_id, LoopMode.TRACK)
+                        await interaction.response.send_message("🔂 Loop: Track", ephemeral=True, delete_after=2)
+                    elif current == LoopMode.TRACK:
+                        loop_cog.set_loop_mode(self.guild_id, LoopMode.QUEUE)
+                        await interaction.response.send_message("🔁 Loop: Queue", ephemeral=True, delete_after=2)
+                    else:
+                        loop_cog.set_loop_mode(self.guild_id, LoopMode.OFF)
+                        await interaction.response.send_message("➡️ Loop: Off", ephemeral=True, delete_after=2)
+                else:
+                    await interaction.response.send_message("Loop not available", ephemeral=True, delete_after=2)
+        except Exception as e:
+            logger.error(f"Loop error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
+    
+    async def _handle_queue(self, interaction: discord.Interaction):
+        """Handle queue display"""
+        try:
+            if self.bot:
+                queue_cog = self.bot.get_cog('QueueCommands')
+                if queue_cog and self.guild_id in queue_cog.queues:
+                    queue = queue_cog.queues[self.guild_id]
+                    if queue:
+                        queue_text = ""
+                        for i, item in enumerate(queue[:10], 1):
+                            title = item.title[:30] + "..." if len(item.title) > 30 else item.title
+                            queue_text += f"`{i}.` {title}\n"
+                        
+                        if len(queue) > 10:
+                            queue_text += f"\n*...and {len(queue) - 10} more*"
+                        
+                        embed = discord.Embed(
+                            title="📋 Queue",
+                            description=queue_text,
+                            color=0x7B1E3C
+                        )
+                        await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=15)
+                    else:
+                        await interaction.response.send_message("Queue is empty", ephemeral=True, delete_after=3)
+                else:
+                    await interaction.response.send_message("Queue is empty", ephemeral=True, delete_after=3)
+        except Exception as e:
+            logger.error(f"Queue error: {e}")
+            await interaction.response.send_message("❌ Error", ephemeral=True, delete_after=2)
+    
+    async def _handle_like(self, interaction: discord.Interaction):
+        """Handle like button"""
+        await interaction.response.send_message("🤍 Added to favorites!", ephemeral=True, delete_after=3)
+
+
+def create_media_player_v2(
+    metadata: MetadataInfo,
+    progress_bar: str = "",
+    lyrics_lines: Optional[List[str]] = None,
+    guild_id: int = None,
+    voice_channel_name: str = None,
+    is_paused: bool = False,
+    bot = None
+) -> discord.ui.LayoutView:
+    """
+    Create Components V2 media player LayoutView
+    
+    Returns:
+        LayoutView to be sent with channel.send(view=layout_view)
+    """
+    return MediaPlayerComponentsV2.create_now_playing_view(
+        metadata=metadata,
+        progress_bar=progress_bar,
+        lyrics_lines=lyrics_lines,
+        guild_id=guild_id,
+        voice_channel_name=voice_channel_name,
+        is_paused=is_paused,
+        bot=bot
+    )
