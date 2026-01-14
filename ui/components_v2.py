@@ -153,7 +153,7 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         self.loop_mode = 0
     
     def add_control_buttons(self, is_paused: bool = False):
-        """Add playback control buttons in row 1"""
+        """Add playback control buttons in row 1 (emoji only, no labels)"""
         self.is_paused = is_paused
         
         # ActionRow for control buttons
@@ -165,50 +165,37 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
         loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
         
-        # Pause/Resume
+        # Pause/Resume (emoji only)
         pause_btn = discord.ui.Button(
-            label="Pause" if not is_paused else "Play",
             emoji=pause_emoji if not is_paused else play_emoji,
             style=discord.ButtonStyle.secondary,
             custom_id=f"ctrl_pause_{self.guild_id}"
         )
         action_row.add_item(pause_btn)
         
-        # Skip
+        # Skip (emoji only)
         skip_btn = discord.ui.Button(
-            label="Skip",
-            emoji="⏭",  # Unicode skip
+            emoji="⏭",
             style=discord.ButtonStyle.secondary,
             custom_id=f"ctrl_skip_{self.guild_id}"
         )
         action_row.add_item(skip_btn)
         
-        # Stop
+        # Stop (emoji only)
         stop_btn = discord.ui.Button(
-            label="Stop",
             emoji=stop_emoji,
             style=discord.ButtonStyle.danger,
             custom_id=f"ctrl_stop_{self.guild_id}"
         )
         action_row.add_item(stop_btn)
         
-        # Loop
+        # Loop (emoji only)
         loop_btn = discord.ui.Button(
-            label="Loop",
             emoji=loop_emoji,
             style=discord.ButtonStyle.secondary,
             custom_id=f"ctrl_loop_{self.guild_id}"
         )
         action_row.add_item(loop_btn)
-        
-        # Queue
-        queue_btn = discord.ui.Button(
-            label="Queue",
-            emoji="📋",  # Unicode queue
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"ctrl_queue_{self.guild_id}"
-        )
-        action_row.add_item(queue_btn)
         
         self.add_item(action_row)
     
