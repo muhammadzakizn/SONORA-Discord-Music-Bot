@@ -509,6 +509,37 @@ class AdminCommands(commands.Cog):
                 ),
                 ephemeral=True
             )
+    
+    @app_commands.command(name="sync", description="Sync slash commands to Discord")
+    @is_bot_admin()
+    async def sync(self, interaction: discord.Interaction):
+        """Force sync slash commands"""
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            # Sync to current guild (instant)
+            synced = await self.bot.tree.sync(guild=interaction.guild)
+            
+            embed = discord.Embed(
+                title="✅ Commands Synced",
+                description=f"Synced **{len(synced)}** commands to this server.\n\n"
+                           f"Commands should now be visible.",
+                color=0x1DB954
+            )
+            embed.set_footer(text="Guild-specific sync (instant)")
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            logger.info(f"Synced {len(synced)} commands to guild {interaction.guild.id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to sync commands: {e}", exc_info=True)
+            await interaction.followup.send(
+                embed=EmbedBuilder.create_error(
+                    "Sync Failed",
+                    f"Error: {str(e)}"
+                ),
+                ephemeral=True
+            )
 
 
 async def setup(bot: commands.Bot):
