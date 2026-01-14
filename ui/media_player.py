@@ -1186,6 +1186,10 @@ class SynchronizedMediaPlayer:
         Uses pre-fetched track if available for instant playback
         """
         try:
+            # IMPORTANT: Reset is_playing immediately since current track has ended
+            # This ensures correct disconnect logic in the queue empty check below
+            self.is_playing = False
+            
             # ========================================
             # CACHE: Mark finished track as recently used
             # No longer deleting - SmartCacheManager handles cleanup
