@@ -115,26 +115,63 @@ class MediaPlayerComponentsV2:
         if progress_bar:
             container.add_item(discord.ui.TextDisplay(content=progress_bar))
             
-        # Add Like Button Section (Inside Container, FlaviBot Style)
-        # container.add_item(discord.ui.Separator())
-        container.add_item(discord.ui.TextDisplay(content="Add to your favorites"))
-        
-        like_btn = discord.ui.Button(
-            label="Like",
-            emoji="🤍",
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"act_like_{guild_id}"
-        )
-        container.add_item(like_btn)
-
-        # Add separator before controls
+        # Add separator
         container.add_item(discord.ui.Separator())
+
+        # ========================================
+        # CONTROL BUTTONS INSIDE CONTAINER
+        # ========================================
         
+        # Custom SONORA emoji IDs
+        pause_emoji = discord.PartialEmoji(name="pause", id=1460800072823476264)
+        play_emoji = discord.PartialEmoji(name="play", id=1460800090586353928)
+        stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
+        loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
+        skip_emoji = discord.PartialEmoji(name="skip", id=1460800090586353928) # Placeholder
+        
+        # Pause/Resume
+        pause_btn = discord.ui.Button(
+            emoji=pause_emoji if not is_paused else play_emoji,
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"ctrl_pause_{guild_id}",
+            row=0
+        )
+        
+        # Skip
+        skip_btn = discord.ui.Button(
+            emoji=skip_emoji,
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"ctrl_skip_{guild_id}",
+            row=0
+        )
+        
+        # Stop
+        stop_btn = discord.ui.Button(
+            emoji=stop_emoji,
+            style=discord.ButtonStyle.danger,
+            custom_id=f"ctrl_stop_{guild_id}",
+            row=0
+        )
+        
+        # Loop
+        loop_btn = discord.ui.Button(
+            emoji=loop_emoji,
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"ctrl_loop_{guild_id}",
+            row=0
+        )
+        
+        # Add buttons to container (Hope they render inline or wrap)
+        container.add_item(pause_btn)
+        container.add_item(skip_btn)
+        container.add_item(stop_btn)
+        container.add_item(loop_btn)
+
         # Add container to view
         view.add_item(container)
         
-        # Add control buttons in ActionRow
-        view.add_control_buttons(is_paused)
+        # No more external ActionRow for controls
+        # view.add_control_buttons(is_paused)
         
         return view
         
@@ -151,59 +188,10 @@ class MediaPlayerLayoutView(discord.ui.LayoutView):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild_id = guild_id
-        self.is_paused = False
-        self.loop_mode = 0
-    
-    def add_control_buttons(self, is_paused: bool = False):
-        """Add playback control buttons in row 1 (emoji only, no labels)"""
-        self.is_paused = is_paused
         
-        # ActionRow for control buttons
-        action_row = discord.ui.ActionRow()
+        # Callbacks will be handled by the buttons themselves or main view based on custom_id
         
-        # Custom SONORA emoji IDs
-        pause_emoji = discord.PartialEmoji(name="pause", id=1460800072823476264)
-        play_emoji = discord.PartialEmoji(name="play", id=1460800090586353928)
-        stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
-        loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
-        
-        # Skip emoji - using Play ID temporarily if specific Skip ID unknown
-        # User please update ID: 1460800090586353928 (Play) -> Skip ID
-        skip_emoji = discord.PartialEmoji(name="skip", id=1460800090586353928) 
-        
-        # Pause/Resume (emoji only)
-        pause_btn = discord.ui.Button(
-            emoji=pause_emoji if not is_paused else play_emoji,
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"ctrl_pause_{self.guild_id}"
-        )
-        action_row.add_item(pause_btn)
-        
-        # Skip (emoji only, custom)
-        skip_btn = discord.ui.Button(
-            emoji=skip_emoji,
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"ctrl_skip_{self.guild_id}"
-        )
-        action_row.add_item(skip_btn)
-        
-        # Stop (emoji only)
-        stop_btn = discord.ui.Button(
-            emoji=stop_emoji,
-            style=discord.ButtonStyle.danger,
-            custom_id=f"ctrl_stop_{self.guild_id}"
-        )
-        action_row.add_item(stop_btn)
-        
-        # Loop (emoji only)
-        loop_btn = discord.ui.Button(
-            emoji=loop_emoji,
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"ctrl_loop_{self.guild_id}"
-        )
-        action_row.add_item(loop_btn)
-        
-        self.add_item(action_row)
+    # add_control_buttons removed - logic moved to create_now_playing_view
     
     def _check_voice_channel(self, interaction: discord.Interaction) -> tuple:
         """Check if user is in the same voice channel as bot"""
