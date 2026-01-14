@@ -434,7 +434,7 @@ class PlayCommand(commands.Cog):
                             # Returns (Embed, View)
                             embed, view = MediaPlayerComponentsV2.create_now_playing_view(
                                 metadata=metadata,
-                                lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                                lyrics_lines=initial_lyrics if initial_lyrics else None,
                                 guild_id=interaction.guild.id,
                                 voice_channel_name=voice_channel_name,
                                 is_paused=False, # We are about to resume
@@ -910,7 +910,7 @@ class PlayCommand(commands.Cog):
             if MediaPlayerComponentsV2:
                 embed, view = MediaPlayerComponentsV2.create_now_playing_view(
                     metadata=metadata,
-                    lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                    lyrics_lines=initial_lyrics if initial_lyrics else None,
                     guild_id=interaction.guild.id,
                     voice_channel_name=voice_channel_name,
                     is_paused=False,
@@ -1805,7 +1805,7 @@ class PlayCommand(commands.Cog):
             if MediaPlayerComponentsV2:
                 embed, view = MediaPlayerComponentsV2.create_now_playing_view(
                     metadata=metadata,
-                    lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                    lyrics_lines=initial_lyrics if initial_lyrics else None,
                     guild_id=guild_id,
                     voice_channel_name=voice_channel_name,
                     is_paused=False,
@@ -2078,7 +2078,7 @@ class PlayCommand(commands.Cog):
             if MediaPlayerComponentsV2:
                 embed, view = MediaPlayerComponentsV2.create_now_playing_view(
                     metadata=metadata,
-                    lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                    lyrics_lines=initial_lyrics if initial_lyrics else None,
                     guild_id=guild_id,
                     voice_channel_name=voice_channel_name,
                     is_paused=False,
@@ -2323,7 +2323,7 @@ class PlayCommand(commands.Cog):
         if MediaPlayerComponentsV2:
             embed, view = MediaPlayerComponentsV2.create_now_playing_view(
                 metadata=metadata,
-                lyrics_lines=initial_lyrics.lines if initial_lyrics else None,
+                lyrics_lines=initial_lyrics if initial_lyrics else None,
                 guild_id=guild_id,
                 voice_channel_name=voice_channel_name,
                 is_paused=False,
