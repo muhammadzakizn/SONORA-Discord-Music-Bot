@@ -73,14 +73,6 @@ class MediaPlayerComponentsV2:
             except Exception as e:
                 logger.warning(f"Could not create thumbnail: {e}")
         
-        # Create Like button for accessory
-        like_button = discord.ui.Button(
-            label="Like",
-            emoji="🤍",
-            style=discord.ButtonStyle.primary,
-            custom_id=f"btn_like_{guild_id}"
-        )
-        
         # ========================================
         # LAYOUT STRUCTURE (cleaner FlaviBot style)
         # ========================================
@@ -90,7 +82,11 @@ class MediaPlayerComponentsV2:
             discord.ui.TextDisplay(content="### Now Playing"),
             discord.ui.TextDisplay(content=title_text),
             discord.ui.TextDisplay(content=artist_text),
-            accessory=thumbnail if thumbnail else like_button
+            accessory=thumbnail
+        ) if thumbnail else discord.ui.Section(
+            discord.ui.TextDisplay(content="### Now Playing"),
+            discord.ui.TextDisplay(content=title_text),
+            discord.ui.TextDisplay(content=artist_text)
         )
         
         # Build container with main section
@@ -121,14 +117,6 @@ class MediaPlayerComponentsV2:
         
         # Add separator before controls
         container.add_item(discord.ui.Separator())
-        
-        # Add favorites section with Like button (if not already used in main section)
-        if thumbnail:  # Like button not yet used
-            favorites_section = discord.ui.Section(
-                discord.ui.TextDisplay(content="-# Add to your favorites"),
-                accessory=like_button
-            )
-            container.add_item(favorites_section)
         
         # Add container to view
         view.add_item(container)
