@@ -310,9 +310,29 @@ class LavalinkPlayer:
         return player.connected if player else False
     
     def get_position(self, guild_id: int) -> int:
-        """Get current playback position in ms"""
+        """
+        Get current playback position in ms (with estimation for real-time accuracy).
+        
+        Wavelink's player.position is cached and not real-time.
+        We estimate the real position by adding elapsed time since last Lavalink update.
+        """
         player = self._players.get(guild_id)
-        return player.position if player else 0
+        if not player:
+            return 0
+            
+        # Base position from Lavalink
+        base_position = player.position
+        
+        # For more accurate timing, estimate based on elapsed time
+        # player.last_update is timestamp of last position update from Lavalink
+        if hasattr(player, 'last_update') and player.last_update and not player.paused:
+            import time
+            elapsed_since_update = (time.time() * 1000) - (player.last_update.timestamp() * 1000)
+            # Cap estimation to avoid drift issues (max 5 seconds ahead)
+            elapsed_since_update = min(elapsed_since_update, 5000)
+            return int(base_position + elapsed_since_update)
+        
+        return base_position
     
     def get_current_track(self, guild_id: int) -> Optional[TrackInfo]:
         """Get current track info"""
