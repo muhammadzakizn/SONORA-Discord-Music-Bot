@@ -135,14 +135,13 @@ class AIQuestionModal(discord.ui.Modal, title="Ask AI"):
         
         if error:
             await interaction.followup.send(
-                embed=discord.Embed(title="❌ AI Unavailable", description=error, color=0xE74C3C),
+                f"Sorry, I couldn't process your question right now. Please try again later.",
                 ephemeral=True
             )
             return
             
-        # Send Embed
-        embed = AIHelpers.create_response_embed(question_text, response)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        # Send plain text response (no embed)
+        await interaction.followup.send(response, ephemeral=True)
 
 
 class AICog(commands.Cog):
@@ -225,14 +224,13 @@ class AICog(commands.Cog):
             
             if error:
                 await message.reply(
-                    embed=discord.Embed(title="❌ Error", description=error, color=0xE74C3C),
+                    "Sorry, I couldn't process your question right now.",
                     mention_author=False
                 )
                 return
             
-            # Send standard embed
-            embed = AIHelpers.create_response_embed(query, response)
-            await message.reply(embed=embed, mention_author=False)
+            # Send plain text response (no embed)
+            await message.reply(response, mention_author=False)
 
 
 async def setup(bot: commands.Bot):
