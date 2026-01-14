@@ -161,11 +161,13 @@ class MediaPlayerComponentsV2:
             row=0
         )
         
-        # Add buttons to container (Hope they render inline or wrap)
-        container.add_item(pause_btn)
-        container.add_item(skip_btn)
-        container.add_item(stop_btn)
-        container.add_item(loop_btn)
+        # Add buttons to VIEW (ActionRow) NOT Container
+        # To fix "Invalid Form Body" error
+        # Because Container does not support Button items directly in this library version
+        view.add_item(pause_btn)
+        view.add_item(skip_btn)
+        view.add_item(stop_btn)
+        view.add_item(loop_btn)
 
         # Add container to view
         view.add_item(container)

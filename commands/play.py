@@ -89,9 +89,25 @@ class PlayCommand(commands.Cog):
     async def _fetch_lyrics_bg(self, metadata):
         """Fetch lyrics in background"""
         try:
-            from services.lyrics.lyrics_manager import get_lyrics_manager
-            lyrics_mgr = get_lyrics_manager()
-            lyrics = await lyrics_mgr.get_lyrics(metadata.title, metadata.artist, duration=metadata.duration)
+            from services.lyrics.applemusic import AppleMusicFetcher
+            from database.models import TrackInfo
+            import os
+            
+            # Setup path to apple music cookies
+            # commands/play.py -> commands -> root
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            apple_cookies_path = os.path.join(project_root, 'cookies', 'apple_music_cookies.txt')
+            
+            fetcher = AppleMusicFetcher(cookies_path=apple_cookies_path)
+            
+            # Create TrackInfo for fetcher
+            track_info = TrackInfo(
+                title=metadata.title,
+                artist=metadata.artist,
+                duration=metadata.duration
+            )
+            
+            lyrics = await fetcher.fetch(track_info)
             if lyrics:
                 metadata.lyrics = lyrics
                 logger.info(f"[Lyrics] Background fetch success for {metadata.title}")
@@ -368,13 +384,20 @@ class PlayCommand(commands.Cog):
                         # WAIT FOR LYRICS (Max 5s)
                         # ========================================
                         try:
-                            from services.lyrics.lyrics_manager import get_lyrics_manager
-                            lyrics_mgr = get_lyrics_manager()
+                            # Use Apple Music fetcher directly (FASTEST)
+                            from services.lyrics.applemusic import AppleMusicFetcher
+                            import os
                             
-                            logger.info("[Play] Pre-fetching lyrics (max 5s)...")
+                            # Setup path to apple music cookies (commands/play.py -> commands -> root)
+                            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                            apple_cookies_path = os.path.join(project_root, 'cookies', 'apple_music_cookies.txt')
+                            
+                            lyrics_fetcher = AppleMusicFetcher(cookies_path=apple_cookies_path)
+                            
+                            logger.info("[Play] Pre-fetching lyrics from Apple Music (max 5s)...")
                             # Fetch with timeout
                             fetched_lyrics = await asyncio.wait_for(
-                                lyrics_mgr.get_lyrics(metadata.title, metadata.artist, duration=metadata.duration),
+                                lyrics_fetcher.fetch(track_info),
                                 timeout=5.0
                             )
                             
