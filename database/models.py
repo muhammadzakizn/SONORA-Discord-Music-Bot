@@ -174,10 +174,37 @@ class LyricsData:
                 else:
                     # No romanization, just format normally
                     if i == 1 and self.is_synced:  # Middle line
-                        if line_text:
-                            formatted_line = f"**{line_text}**"  # Discord bold formatting
+                        # WORD LEVEL HIGHLIGHTING
+                        if line_obj.words:
+                            highlighted_words = []
+                            word_found = False
+                            
+                            for w in line_obj.words:
+                                w_text = w.get('text', '')
+                                w_start = w.get('start_time', 0.0)
+                                w_end = w.get('end_time', 0.0)
+                                
+                                # Check if word is active
+                                if w_start <= adjusted_time <= w_end:
+                                    highlighted_words.append(f"**{w_text}**")
+                                    word_found = True
+                                else:
+                                    highlighted_words.append(w_text)
+                            
+                            # Join with space (standard assumption)
+                            # For estimated words (split by space), this restores original look.
+                            # For syllables, this might add spaces, but improves readability for karaoke style.
+                            formatted_line = " ".join(highlighted_words)
+                            
+                            # Fallback if result is empty or weird
+                            if not formatted_line.strip():
+                                formatted_line = f"**{line_text}**"
                         else:
-                            formatted_line = ""
+                            # Fallback to bold line if no word timing
+                            if line_text:
+                                formatted_line = f"**{line_text}**"
+                            else:
+                                formatted_line = ""
                     else:
                         formatted_line = line_text
                 
