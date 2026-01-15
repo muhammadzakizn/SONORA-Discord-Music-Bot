@@ -114,6 +114,7 @@ class MediaPlayerView(discord.ui.View):
         self.play_emoji = discord.PartialEmoji(name="play", id=1460800090586353928)
         self.stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
         self.loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
+        self.skip_emoji = discord.PartialEmoji(name="skipnext", id=1461176857654202388)
         
     def _get_player(self):
         """Get current player for this guild"""
@@ -140,7 +141,7 @@ class MediaPlayerView(discord.ui.View):
             logger.error(f"Pause button error: {e}")
             await interaction.response.send_message("Error toggling pause", ephemeral=True)
     
-    @discord.ui.button(emoji="⏭", style=discord.ButtonStyle.secondary, custom_id="ctrl_skip", row=0)
+    @discord.ui.button(emoji=discord.PartialEmoji(name="skipnext", id=1461176857654202388), style=discord.ButtonStyle.secondary, custom_id="ctrl_skip", row=0)
     async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Skip current track"""
         try:
