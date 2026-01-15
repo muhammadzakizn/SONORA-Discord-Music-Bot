@@ -127,8 +127,8 @@ class AIQuestionModal(discord.ui.Modal, title="Ask AI"):
             )
             return
             
-        # Defer
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        # Defer (Must be False for public response)
+        await interaction.response.defer(ephemeral=False, thinking=True)
         
         # Get Response
         response, error = await AIHelpers.get_ai_response_content(interaction.user.id, question_text)
