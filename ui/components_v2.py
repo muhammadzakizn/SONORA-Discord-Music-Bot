@@ -95,117 +95,101 @@ class MediaPlayerComponentsV2:
         
         # 2. Create View (Controls)
         # =========================
+        # MediaPlayerView already has buttons with callbacks defined via decorators
         view = MediaPlayerView(bot, guild_id)
-        
-        # Custom SONORA emoji IDs
-        pause_emoji = discord.PartialEmoji(name="pause", id=1460800072823476264)
-        play_emoji = discord.PartialEmoji(name="play", id=1460800090586353928)
-        stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
-        loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
-        skip_emoji = "⏭"  # Unicode fallback
-        
-        # Buttons (Row 0)
-        pause_btn = discord.ui.Button(
-            emoji=pause_emoji if not is_paused else play_emoji,
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"ctrl_pause_{guild_id}",
-            row=0
-        )
-        skip_btn = discord.ui.Button(
-            emoji=skip_emoji,
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"ctrl_skip_{guild_id}",
-            row=0
-        )
-        stop_btn = discord.ui.Button(
-            emoji=stop_emoji,
-            style=discord.ButtonStyle.danger,
-            custom_id=f"ctrl_stop_{guild_id}",
-            row=0
-        )
-        loop_btn = discord.ui.Button(
-            emoji=loop_emoji,
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"ctrl_loop_{guild_id}",
-            row=0
-        )
-        
-        view.add_item(pause_btn)
-        view.add_item(skip_btn)
-        view.add_item(stop_btn)
-        view.add_item(loop_btn)
-        
-        # NOTE: Dropdown menu removed - it had no callback handler and caused "interaction failed"
-        # Users can use /help to see all commands
         
         return embed, view
 
 
 class MediaPlayerView(discord.ui.View):
-    """Standard View for media player"""
+    """Standard View for media player with working button callbacks"""
     
     def __init__(self, bot, guild_id: int, timeout: float = None):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild_id = guild_id
         
-    def add_command_menu(self):
-        """Add bot commands dropdown menu"""
-        select = discord.ui.Select(
-            placeholder="📋 Commands & Help...",
-            min_values=1,
-            max_values=1,
-            custom_id=f"sel_commands_{self.guild_id}",
-            row=1,
-            options=[
-                discord.SelectOption(
-                    label="/play",
-                    value="cmd_play",
-                    emoji="▶️",
-                    description="Play a song or playlist"
-                ),
-                discord.SelectOption(
-                    label="/queue",
-                    value="cmd_queue",
-                    emoji="📜",
-                    description="View current queue"
-                ),
-                discord.SelectOption(
-                    label="/skip",
-                    value="cmd_skip",
-                    emoji="⏭️",
-                    description="Skip to next song"
-                ),
-                discord.SelectOption(
-                    label="/stop",
-                    value="cmd_stop",
-                    emoji="⏹️",
-                    description="Stop playback and disconnect"
-                ),
-                discord.SelectOption(
-                    label="/loop",
-                    value="cmd_loop",
-                    emoji="🔁",
-                    description="Toggle loop mode"
-                ),
-                discord.SelectOption(
-                    label="/volume",
-                    value="cmd_volume",
-                    emoji="🔊",
-                    description="Adjust volume"
-                ),
-                discord.SelectOption(
-                    label="/lyrics",
-                    value="cmd_lyrics",
-                    emoji="📝",
-                    description="View full lyrics"
-                ),
-                discord.SelectOption(
-                    label="/help",
-                    value="cmd_help",
-                    emoji="❓",
-                    description="Show all commands"
-                ),
-            ]
-        )
-        self.add_item(select)
+        # Custom SONORA emoji IDs
+        self.pause_emoji = discord.PartialEmoji(name="pause", id=1460800072823476264)
+        self.play_emoji = discord.PartialEmoji(name="play", id=1460800090586353928)
+        self.stop_emoji = discord.PartialEmoji(name="stop", id=1460800121217224884)
+        self.loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
+        
+    def _get_player(self):
+        """Get current player for this guild"""
+        if self.bot and hasattr(self.bot, 'players'):
+            return self.bot.players.get(self.guild_id)
+        return None
+    
+    @discord.ui.button(emoji="⏸", style=discord.ButtonStyle.secondary, custom_id="ctrl_pause", row=0)
+    async def pause_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Toggle pause/resume"""
+        try:
+            player = self._get_player()
+            if not player:
+                await interaction.response.send_message("No active player!", ephemeral=True)
+                return
+                
+            if player.is_paused:
+                await player.resume()
+                await interaction.response.send_message("▶️ Resumed", ephemeral=True)
+            else:
+                await player.pause()
+                await interaction.response.send_message("⏸ Paused", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Pause button error: {e}")
+            await interaction.response.send_message("Error toggling pause", ephemeral=True)
+    
+    @discord.ui.button(emoji="⏭", style=discord.ButtonStyle.secondary, custom_id="ctrl_skip", row=0)
+    async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Skip current track"""
+        try:
+            player = self._get_player()
+            if not player:
+                await interaction.response.send_message("No active player!", ephemeral=True)
+                return
+            
+            await interaction.response.defer(ephemeral=True)
+            
+            # Stop current playback to trigger next track
+            await player.skip()
+            await interaction.followup.send("⏭ Skipped!", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Skip button error: {e}")
+            await interaction.response.send_message("Error skipping track", ephemeral=True)
+    
+    @discord.ui.button(emoji="⏹", style=discord.ButtonStyle.danger, custom_id="ctrl_stop", row=0)
+    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Stop playback and disconnect"""
+        try:
+            player = self._get_player()
+            if not player:
+                await interaction.response.send_message("No active player!", ephemeral=True)
+                return
+            
+            await interaction.response.defer(ephemeral=True)
+            
+            # Stop and cleanup
+            await player.stop()
+            await interaction.followup.send("⏹ Stopped!", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Stop button error: {e}")
+            await interaction.response.send_message("Error stopping playback", ephemeral=True)
+    
+    @discord.ui.button(emoji="🔁", style=discord.ButtonStyle.secondary, custom_id="ctrl_loop", row=0)
+    async def loop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Toggle loop mode"""
+        try:
+            player = self._get_player()
+            if not player:
+                await interaction.response.send_message("No active player!", ephemeral=True)
+                return
+            
+            # Toggle loop
+            player.loop = not getattr(player, 'loop', False)
+            loop_status = "enabled 🔁" if player.loop else "disabled"
+            await interaction.response.send_message(f"Loop {loop_status}", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Loop button error: {e}")
+            await interaction.response.send_message("Error toggling loop", ephemeral=True)
+
