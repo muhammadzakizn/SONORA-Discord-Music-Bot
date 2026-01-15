@@ -116,17 +116,21 @@ class MediaPlayerView(discord.ui.View):
         self.loop_emoji = discord.PartialEmoji(name="loop", id=1460800053483667610)
         self.skip_emoji = discord.PartialEmoji(name="skipnext", id=1461176857654202388)
         
-    def _get_player(self):
+    def _get_player(self, guild_id: int = None):
         """Get current player for this guild"""
+        # Use provided guild_id or fall back to self.guild_id
+        gid = guild_id or self.guild_id
+        if not gid:
+            return None
         if self.bot and hasattr(self.bot, 'players'):
-            return self.bot.players.get(self.guild_id)
+            return self.bot.players.get(gid)
         return None
     
     @discord.ui.button(emoji="⏸", style=discord.ButtonStyle.secondary, custom_id="ctrl_pause", row=0)
     async def pause_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Toggle pause/resume"""
         try:
-            player = self._get_player()
+            player = self._get_player(interaction.guild_id)
             if not player:
                 await interaction.response.send_message("No active player!", ephemeral=True)
                 return
@@ -145,7 +149,7 @@ class MediaPlayerView(discord.ui.View):
     async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Skip current track"""
         try:
-            player = self._get_player()
+            player = self._get_player(interaction.guild_id)
             if not player:
                 await interaction.response.send_message("No active player!", ephemeral=True)
                 return
@@ -163,7 +167,7 @@ class MediaPlayerView(discord.ui.View):
     async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Stop playback and disconnect"""
         try:
-            player = self._get_player()
+            player = self._get_player(interaction.guild_id)
             if not player:
                 await interaction.response.send_message("No active player!", ephemeral=True)
                 return
@@ -181,7 +185,7 @@ class MediaPlayerView(discord.ui.View):
     async def loop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Toggle loop mode"""
         try:
-            player = self._get_player()
+            player = self._get_player(interaction.guild_id)
             if not player:
                 await interaction.response.send_message("No active player!", ephemeral=True)
                 return
