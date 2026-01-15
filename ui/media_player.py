@@ -608,7 +608,7 @@ class SynchronizedMediaPlayer:
         """
         last_update = 0
         pause_time = None  # Track when pause started
-        update_interval = 1.0  # Update every 1 second for smooth sync
+        update_interval = 0.5  # Update every 0.5 second for smoother sync (Rate Limited Safe)
         
         try:
             while self.is_playing:
