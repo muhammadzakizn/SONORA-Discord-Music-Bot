@@ -36,7 +36,7 @@ class MusicBot(commands.Bot):
         """Initialize music bot"""
         # Setup intents
         intents = discord.Intents.default()
-        intents.message_content = True  # Required for AI reply/chat features
+        intents.message_content = False  # Disabled per user request (Reply AI wont work fully)
         intents.voice_states = True
         intents.guilds = True
         
