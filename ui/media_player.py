@@ -598,6 +598,16 @@ class SynchronizedMediaPlayer:
         
         logger.info("Playback stopped")
 
+    async def skip(self) -> None:
+        """Skip current track"""
+        logger.info("Skip requested via Player")
+        # Stop current playback to trigger next track
+        if self.is_lavalink and self.lavalink_player:
+            await self.lavalink_player.stop(self.guild_id)
+        else:
+            if self.voice:
+                self.voice.stop()
+
     
     async def _update_loop(self) -> None:
         """
@@ -608,7 +618,7 @@ class SynchronizedMediaPlayer:
         """
         last_update = 0
         pause_time = None  # Track when pause started
-        update_interval = 0.5  # Update every 0.5 second for smoother sync (Rate Limited Safe)
+        update_interval = 0.1  # Aggressive 0.1s updates for syllable sync
         
         try:
             while self.is_playing:
@@ -720,7 +730,7 @@ class SynchronizedMediaPlayer:
                     logger.debug(f"Failed to update dashboard time: {e}")
 
                 # Sleep with shorter interval for more responsive updates
-                await asyncio.sleep(0.2)  # Check status every 200ms for precision
+                await asyncio.sleep(0.05)  # Fast poll for 0.1s syllable updates
         
         except asyncio.CancelledError:
             logger.debug("Update loop cancelled")
@@ -1250,6 +1260,24 @@ class SynchronizedMediaPlayer:
             
             # Get next track from queue
             next_item = queue_cog.get_next(self.guild_id)
+            
+            # Use pre-processed metadata if available (Lyrics & Artwork instant load)
+            if next_item:
+                try:
+                    from services.audio.queue_preprocessor import get_preprocessor
+                    preprocessor = get_preprocessor()
+                    if preprocessor:
+                        cached = preprocessor.get_cached(next_item)
+                        if cached and cached.is_ready:
+                            logger.info(f"⚡ Using pre-processed metadata for {next_item.title}")
+                            if cached.lyrics:
+                                next_item.lyrics = cached.lyrics
+                            if cached.apple_lyrics:
+                                next_item.apple_lyrics = cached.apple_lyrics
+                            if cached.artwork_url:
+                                next_item.artwork_url = cached.artwork_url
+                except Exception as e:
+                    logger.debug(f"Pre-processor cache injection failed: {e}")
 
             
             if not next_item:
