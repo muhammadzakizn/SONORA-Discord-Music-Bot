@@ -618,7 +618,7 @@ class SynchronizedMediaPlayer:
         """
         last_update = 0
         pause_time = None  # Track when pause started
-        update_interval = 0.1  # Aggressive 0.1s updates for syllable sync
+        update_interval = 0.025  # 25ms updates for ultra-smooth syllable sync
         
         try:
             while self.is_playing:
@@ -730,7 +730,7 @@ class SynchronizedMediaPlayer:
                     logger.debug(f"Failed to update dashboard time: {e}")
 
                 # Sleep with shorter interval for more responsive updates
-                await asyncio.sleep(0.05)  # Fast poll for 0.1s syllable updates
+                await asyncio.sleep(0.025)  # 25ms loop poll for ultra-smooth sync
         
         except asyncio.CancelledError:
             logger.debug("Update loop cancelled")
