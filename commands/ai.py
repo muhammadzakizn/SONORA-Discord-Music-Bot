@@ -101,48 +101,6 @@ class AIHelpers:
         return embed
 
 
-class AIQuestionModal(discord.ui.Modal, title="Ask AI"):
-    """Modal for asking AI questions via Slash Command"""
-    
-    question = discord.ui.TextInput(
-        label="Your Question",
-        placeholder="e.g., How does Bluetooth send audio between devices?",
-        style=discord.TextStyle.paragraph,
-        max_length=500,
-        required=True
-    )
-    
-    async def on_submit(self, interaction: discord.Interaction):
-        question_text = self.question.value
-        
-        # Check blocked
-        if AIHelpers.check_blocked_topic(question_text):
-            await interaction.response.send_message(
-                embed=discord.Embed(
-                    title="❌ Restricted Topic",
-                    description="This topic is not allowed.",
-                    color=0xE74C3C
-                ),
-                ephemeral=True
-            )
-            return
-            
-        # Defer (Must be False for public response)
-        await interaction.response.defer(ephemeral=False, thinking=True)
-        
-        # Get Response
-        response, error = await AIHelpers.get_ai_response_content(interaction.user.id, question_text)
-        
-        if error:
-            await interaction.followup.send(
-                f"Sorry, I couldn't process your question right now. Please try again later.",
-                ephemeral=True
-            )
-            return
-            
-        # Send plain text response (public)
-        await interaction.followup.send(response, ephemeral=False)
-
 
 class AICog(commands.Cog):
     """AI Assistant - /ai command and . prefix"""
@@ -151,8 +109,9 @@ class AICog(commands.Cog):
         self.bot = bot
     
     @app_commands.command(name="ai", description="Ask AI a question about SONORA or general topics")
-    async def ai(self, interaction: discord.Interaction):
-        """Open modal to ask AI a question"""
+    @app_commands.describe(question="Your question for the AI")
+    async def ai(self, interaction: discord.Interaction, question: str):
+        """Ask AI a question directly"""
         
         # Check rate limit
         retry_after = AIHelpers.check_rate_limit(interaction.user.id)
@@ -163,8 +122,33 @@ class AICog(commands.Cog):
             )
             return
             
-        # Show modal
-        await interaction.response.send_modal(AIQuestionModal())
+        # Check blocked
+        if AIHelpers.check_blocked_topic(question):
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="❌ Restricted Topic",
+                    description="This topic is not allowed.",
+                    color=0xE74C3C
+                ),
+                ephemeral=True
+            )
+            return
+            
+        # Defer (Public)
+        await interaction.response.defer(ephemeral=False, thinking=True)
+        
+        # Get Response
+        response, error = await AIHelpers.get_ai_response_content(interaction.user.id, question)
+        
+        if error:
+            await interaction.followup.send(
+                f"Sorry, I couldn't process your question right now. Please try again later.",
+                ephemeral=True
+            )
+            return
+            
+        # Send plain text response (public)
+        await interaction.followup.send(response, ephemeral=False)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
