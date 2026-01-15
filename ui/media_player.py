@@ -618,7 +618,7 @@ class SynchronizedMediaPlayer:
         """
         last_update = 0
         pause_time = None  # Track when pause started
-        update_interval = 0.025  # 25ms updates for ultra-smooth syllable sync
+        update_interval = 0.8  # 800ms - stable rate without Discord rate limiting
         
         try:
             while self.is_playing:
@@ -730,7 +730,7 @@ class SynchronizedMediaPlayer:
                     logger.debug(f"Failed to update dashboard time: {e}")
 
                 # Sleep with shorter interval for more responsive updates
-                await asyncio.sleep(0.025)  # 25ms loop poll for ultra-smooth sync
+                await asyncio.sleep(0.2)  # 200ms poll for responsive updates
         
         except asyncio.CancelledError:
             logger.debug("Update loop cancelled")
