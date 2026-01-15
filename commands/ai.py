@@ -194,26 +194,16 @@ class AICog(commands.Cog):
                 # Try getting cached message first
                 ref_msg = message.reference.cached_message
                 if not ref_msg and message.reference.message_id:
-                    # Fetch if not cached
                     try:
                         ref_msg = await message.channel.fetch_message(message.reference.message_id)
-                    except discord.NotFound:
-                        logger.warning(f"Reply reference not found: {message.reference.message_id}")
-                    except discord.Forbidden:
-                        logger.warning("Missing permissions to fetch reply reference")
+                    except (discord.NotFound, discord.Forbidden):
+                        pass
 
-                # Debug log
-                if ref_msg:
-                    # logger.info(f"Checking reply to: {ref_msg.author.id} vs Bot: {self.bot.user.id}")
-                    if ref_msg.author.id == self.bot.user.id:
-                        query = message.content.strip()
-                        is_trigger = True
-                        logger.info(f"AI Triggered via REPLY: {query}")
-                else:
-                    logger.debug("Could not resolve reply reference message")
-                    
-            except Exception as e:
-                logger.error(f"Error checking reply reference: {e}")
+                if ref_msg and ref_msg.author.id == self.bot.user.id:
+                    query = message.content.strip()
+                    is_trigger = True
+            except Exception:
+                pass
 
         # If not triggered or empty query, ignore
         if not is_trigger or not query:
