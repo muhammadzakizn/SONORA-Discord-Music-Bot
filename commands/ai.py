@@ -140,8 +140,8 @@ class AIQuestionModal(discord.ui.Modal, title="Ask AI"):
             )
             return
             
-        # Send plain text response (no embed)
-        await interaction.followup.send(response, ephemeral=True)
+        # Send plain text response (public)
+        await interaction.followup.send(response, ephemeral=False)
 
 
 class AICog(commands.Cog):
