@@ -126,7 +126,7 @@ class MediaPlayerView(discord.ui.View):
             return self.bot.players.get(gid)
         return None
     
-    @discord.ui.button(emoji="⏸", style=discord.ButtonStyle.secondary, custom_id="ctrl_pause", row=0)
+    @discord.ui.button(emoji=discord.PartialEmoji(name="pause", id=1460800072823476264), style=discord.ButtonStyle.secondary, custom_id="ctrl_pause", row=0)
     async def pause_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Toggle pause/resume"""
         try:
@@ -163,7 +163,7 @@ class MediaPlayerView(discord.ui.View):
             logger.error(f"Skip button error: {e}")
             await interaction.response.send_message("Error skipping track", ephemeral=True)
     
-    @discord.ui.button(emoji="⏹", style=discord.ButtonStyle.danger, custom_id="ctrl_stop", row=0)
+    @discord.ui.button(emoji=discord.PartialEmoji(name="stop", id=1460800121217224884), style=discord.ButtonStyle.danger, custom_id="ctrl_stop", row=0)
     async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Stop playback and disconnect"""
         try:
@@ -181,7 +181,7 @@ class MediaPlayerView(discord.ui.View):
             logger.error(f"Stop button error: {e}")
             await interaction.response.send_message("Error stopping playback", ephemeral=True)
     
-    @discord.ui.button(emoji="🔁", style=discord.ButtonStyle.secondary, custom_id="ctrl_loop", row=0)
+    @discord.ui.button(emoji=discord.PartialEmoji(name="loop", id=1460800053483667610), style=discord.ButtonStyle.secondary, custom_id="ctrl_loop", row=0)
     async def loop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Toggle loop mode"""
         try:
