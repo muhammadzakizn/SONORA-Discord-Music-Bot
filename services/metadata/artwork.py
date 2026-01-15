@@ -146,13 +146,17 @@ class ArtworkFetcher:
             
             try:
                 # Use spotdl save to get metadata including cover_url
-                result = subprocess.run(
-                    ['spotdl', 'save', search_query, '--save-file', temp_file],
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    env=clean_env
-                )
+                # Wrap in to_thread to avoid blocking event loop
+                def run_spotdl():
+                    return subprocess.run(
+                        ['spotdl', 'save', search_query, '--save-file', temp_file],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        env=clean_env
+                    )
+                
+                result = await asyncio.to_thread(run_spotdl)
                 
                 if result.returncode == 0 and os.path.exists(temp_file):
                     with open(temp_file, 'r', encoding='utf-8') as f:
@@ -193,19 +197,23 @@ class ArtworkFetcher:
             search_url = f"https://music.youtube.com/search?q={search_query.replace(' ', '+')}"
             
             # Use yt-dlp to get thumbnail from YouTube Music search
-            result = subprocess.run(
-                [
-                    'yt-dlp',
-                    '--dump-json',
-                    '--no-playlist',
-                    '--playlist-items', '1',
-                    '--extractor-args', 'youtube:player_client=android_music',
-                    search_url
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            # Wrap in to_thread to avoid blocking event loop
+            def run_ytdlp():
+                return subprocess.run(
+                    [
+                        'yt-dlp',
+                        '--dump-json',
+                        '--no-playlist',
+                        '--playlist-items', '1',
+                        '--extractor-args', 'youtube:player_client=android_music',
+                        search_url
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+            
+            result = await asyncio.to_thread(run_ytdlp)
             
             if result.returncode == 0 and result.stdout:
                 data = json.loads(result.stdout)
