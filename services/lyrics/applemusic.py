@@ -284,7 +284,7 @@ class AppleMusicFetcher(BaseLyricsFetcher):
                     lines=lines,
                     source=LyricsSource.SYNCED,
                     is_synced=True,
-                    offset=0.0,
+                    offset=2.5,  # +2.5s to sync Apple Music lyrics with Lavalink audio
                     has_syllable_timing=has_syllable  # True only when real syllable timing exists
                 )
             
