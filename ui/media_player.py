@@ -618,7 +618,7 @@ class SynchronizedMediaPlayer:
         """
         last_update = 0
         pause_time = None  # Track when pause started
-        update_interval = 0.8  # 800ms - stable rate without Discord rate limiting
+        update_interval = 1.0  # 1 second - Discord rate limit safe
         
         try:
             while self.is_playing:
@@ -1631,6 +1631,9 @@ class SynchronizedMediaPlayer:
                                 is_paused=False,
                                 bot=self.bot
                             )
+                            
+                            # Rate limit protection: wait before sending new message
+                            await asyncio.sleep(1.5)
                             player_msg = await self.message.channel.send(embed=embed, view=view)
 
                             
@@ -1912,6 +1915,9 @@ class SynchronizedMediaPlayer:
                     is_paused=False,
                     bot=self.bot
                 )
+                
+                # Rate limit protection: wait before sending new message
+                await asyncio.sleep(1.5)
                 player_msg = await self.message.channel.send(embed=embed, view=view)
                 self.message = player_msg
                 
