@@ -6,7 +6,7 @@
 
 ![Preview](docs/preview.jpg)
 
-[![Version](https://img.shields.io/badge/version-3.32.0-7B1E3C.svg)](https://github.com/muhammadzakizn/SONORA-Discord-Music-Bot/releases)
+[![Version](https://img.shields.io/badge/version-3.38.0-7B1E3C.svg)](https://github.com/muhammadzakizn/SONORA-Discord-Music-Bot/releases)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/website-sonora.muhammadzakizn.com-7B1E3C)](https://sonora.muhammadzakizn.com)
@@ -50,7 +50,7 @@
 
 ### 🧠 AI-Powered Support
 - `/support` command with AI assistant
-- Powered by Groq, DeepSeek, or Gemini
+- Powered by Perplexity, DeepSeek, or Gemini
 - 24/7 automated help & feedback handling
 
 ### ⚡ Performance Features
@@ -159,7 +159,7 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 
 # Optional
 GENIUS_API_TOKEN=your_genius_token
-GROQ_API_KEY=your_groq_key_for_ai_support
+PERPLEXITY_API_KEY=your_perplexity_key_for_ai_support
 ```
 
 See [.env.example](.env.example) for all options.
@@ -170,7 +170,7 @@ See [.env.example](.env.example) for all options.
 
 - **75+ Tests** passing
 - **200+ Files** organized
-- **3.32.0** current version
+- **3.38.0** current version
 - Active development since 2024
 
 ---

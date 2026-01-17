@@ -72,40 +72,40 @@ Intent detection (for special handling):
 
     def __init__(self):
         # Support multiple AI providers (priority order)
-        self.groq_key = os.getenv('GROQ_API_KEY', '')  # FREE! 14,400 requests/day
+        self.perplexity_key = os.getenv('PERPLEXITY_API_KEY', '')  # Primary provider
         self.deepseek_key = os.getenv('DEEPSEEK_API_KEY', '')
         self.gemini_key = os.getenv('GEMINI_API_KEY', '')
         
         self._client = None
         self._model = None
-        self._provider = None  # 'groq', 'deepseek', 'gemini', or None
+        self._provider = None  # 'perplexity', 'deepseek', 'gemini', or None
         self._initialized = False
         
     async def _ensure_initialized(self) -> bool:
-        """Initialize AI client - tries Groq first (FREE), then DeepSeek, then Gemini"""
+        """Initialize AI client - tries Perplexity first, then DeepSeek, then Gemini"""
         if self._initialized:
             return True
         
-        # Provider 1: Groq (FREE - 14,400 requests/day!)
-        if self.groq_key:
+        # Provider 1: Perplexity (sonar-pro model)
+        if self.perplexity_key:
             try:
                 from openai import OpenAI
                 
                 self._client = OpenAI(
-                    api_key=self.groq_key,
-                    base_url="https://api.groq.com/openai/v1"
+                    api_key=self.perplexity_key,
+                    base_url="https://api.perplexity.ai"
                 )
-                # Use llama model - fast and free!
-                self._model = 'llama-3.3-70b-versatile'
-                self._provider = 'groq'
+                # Use sonar-pro model - powerful and accurate
+                self._model = 'sonar-pro'
+                self._provider = 'perplexity'
                 self._initialized = True
-                logger.info(f"AI Support initialized with Groq FREE (model: {self._model})")
+                logger.info(f"AI Support initialized with Perplexity (model: {self._model})")
                 return True
                 
             except ImportError:
                 logger.warning("openai package not installed. Run: pip install openai")
             except Exception as e:
-                logger.warning(f"Groq init failed: {e}")
+                logger.warning(f"Perplexity init failed: {e}")
         
         # Provider 2: DeepSeek (uses OpenAI SDK)
         if self.deepseek_key:
@@ -145,8 +145,8 @@ Intent detection (for special handling):
                 logger.warning(f"Gemini init failed: {e}")
         
         # No API keys configured
-        if not self.groq_key and not self.deepseek_key and not self.gemini_key:
-            logger.warning("No AI API key configured. Set GROQ_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")
+        if not self.perplexity_key and not self.deepseek_key and not self.gemini_key:
+            logger.warning("No AI API key configured. Set PERPLEXITY_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")
         else:
             logger.error("All AI providers failed to initialize")
         
@@ -272,8 +272,8 @@ Intent detection (for special handling):
             # Send system prompt + user message
             prompt = f"{self.SYSTEM_PROMPT}\n\nUser ({user_name}): {message}\n\nRespond briefly and helpfully:"
             
-            if self._provider in ('groq', 'deepseek'):
-                # Groq and DeepSeek use OpenAI SDK
+            if self._provider in ('perplexity', 'deepseek'):
+                # Perplexity and DeepSeek use OpenAI SDK
                 response = await asyncio.to_thread(
                     lambda: self._client.chat.completions.create(
                         model=self._model,
