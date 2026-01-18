@@ -6,7 +6,7 @@
 
 ![Preview](docs/preview.jpg)
 
-[![Version](https://img.shields.io/badge/version-3.38.0-7B1E3C.svg)](https://github.com/muhammadzakizn/SONORA-Discord-Music-Bot/releases)
+[![Version](https://img.shields.io/badge/version-3.39.0-7B1E3C.svg)](https://github.com/muhammadzakizn/SONORA-Discord-Music-Bot/releases)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/website-sonora.muhammadzakizn.com-7B1E3C)](https://sonora.muhammadzakizn.com)
@@ -170,7 +170,7 @@ See [.env.example](.env.example) for all options.
 
 - **75+ Tests** passing
 - **200+ Files** organized
-- **3.38.0** current version
+- **3.39.0** current version
 - Active development since 2024
 
 ---

@@ -173,34 +173,12 @@ class LyricsData:
                         formatted_line = f"{line_text}\n*{line_obj.romanized}*"
                 else:
                     # No romanization, just format normally
-                    if i == 1 and self.is_synced:  # Middle line
-                        # KARAOKE-STYLE HIGHLIGHTING
-                        # All words up to current time stay bold (no gaps/flicker)
-                        if line_obj.words:
-                            highlighted_words = []
-                            
-                            for w in line_obj.words:
-                                w_text = w.get('text', '')
-                                w_start = w.get('start_time', 0.0)
-                                
-                                # Bold all words that have started (karaoke fill effect)
-                                if w_start <= adjusted_time:
-                                    highlighted_words.append(f"**{w_text}**")
-                                else:
-                                    highlighted_words.append(w_text)
-                            
-                            # Join with space
-                            formatted_line = " ".join(highlighted_words)
-                            
-                            # Fallback if result is empty
-                            if not formatted_line.strip():
-                                formatted_line = f"**{line_text}**"
+                    if i == 1 and self.is_synced:  # Middle line (current line - bold entire line)
+                        # Per-line highlighting (not per-word)
+                        if line_text:
+                            formatted_line = f"**{line_text}**"
                         else:
-                            # Fallback to bold line if no word timing
-                            if line_text:
-                                formatted_line = f"**{line_text}**"
-                            else:
-                                formatted_line = ""
+                            formatted_line = ""
                     else:
                         formatted_line = line_text
                 
