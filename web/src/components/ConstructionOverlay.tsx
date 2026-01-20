@@ -13,21 +13,8 @@ export default function ConstructionOverlay() {
     const [isVisible, setIsVisible] = useState(true);
 
     useEffect(() => {
-        // Check if user has already seen this overlay in this session
-        const hasSeenOverlay = sessionStorage.getItem("sonora-construction-seen");
-
-        if (hasSeenOverlay) {
-            setIsVisible(false);
-            return;
-        }
-
-        // Hide overlay after 1.8 seconds
-        const timer = setTimeout(() => {
-            setIsVisible(false);
-            sessionStorage.setItem("sonora-construction-seen", "true");
-        }, 1800);
-
-        return () => clearTimeout(timer);
+        // Overlay now shows permanently - no auto-hide
+        setIsVisible(true);
     }, []);
 
     return (
