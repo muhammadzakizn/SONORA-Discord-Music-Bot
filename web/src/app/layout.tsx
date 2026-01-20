@@ -10,6 +10,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import NavLiquidGlass from "@/components/NavLiquidGlass";
 import PageTransition from "@/components/PageTransition";
 import BotStatusBanner from "@/components/BotStatusBanner";
+import ConstructionOverlay from "@/components/ConstructionOverlay";
 
 
 const geistSans = Geist({
@@ -124,6 +125,9 @@ export default function RootLayout({
               <BotStatusProvider>
                 <FullscreenLyricsProvider>
                   <NotificationProvider>
+                    {/* Construction overlay - shows briefly on first load */}
+                    <ConstructionOverlay />
+
                     {/* Bot offline banner */}
                     <BotStatusBanner />
 
